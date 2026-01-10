@@ -118,12 +118,12 @@ KERNEL progressively builds Claude Code config based on observed patterns.
    - Claude needs to learn a capability/process?
    - Claude should auto-discover based on context?
    - → `.claude/skills/name/SKILL.md`
-   - Example: pr-review-standards, commit-message-format
+   - Example: pr-review-standards, commit-message-format, worktree-parallelization
 
 3. **Is this a MANUAL WORKFLOW you invoke?**
    - Repeated 2+ times, you control when it runs?
    - → `.claude/commands/workflow-name.md`
-   - Example: /optimize, /explain, /fix-lint
+   - Example: /optimize, /explain, /fix-lint, /parallelize
 
 4. **Is this AUTOMATIC on events?**
    - Pre/post tool usage processing?
