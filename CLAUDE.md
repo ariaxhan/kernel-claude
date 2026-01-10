@@ -30,16 +30,22 @@ Git history IS the changelog. Ship via PR.
 
 This project uses KERNEL for development intelligence.
 
-**On-demand methodology:**
-- `/discover` — Map codebase, populate state
-- `/plan` — Get-it-right-first-time planning
-- `/debug` — Systematic diagnosis
-- `/review` — Correctness validation
+**Commands** (10 total):
+- `/init` — When: First setup or updating. What: Initialize/update KERNEL
+- `/clean` — When: Regular maintenance. What: Show config health and prune stale
+- `/explore` — When: Before work in unfamiliar code. What: Map codebase structure
+- `/plan` — When: Before implementing. What: Plan to get it right first time
+- `/debug` — When: Fixing bugs. What: Systematic diagnosis
+- `/audit` — When: Before committing. What: Review code quality and docs
+- `/branch` — When: Before starting work. What: Create intention-focused branch
+- `/ship` — When: Work complete. What: Commit, push, and create PR
+- `/parallelize` — When: Parallel work needed. What: Set up git worktrees
+- `/handoff` — When: Ending session. What: Generate context handoff
 
 **Living knowledge:**
 - `kernel/state.md` — Current project reality (read first when uncertain)
-- `kernel/banks/` — Methodology references (load via modes)
-- `.claude/rules/` — Project patterns (evolves over time)
+- `kernel/banks/` — Methodology references (loaded by commands)
+- `kernel/rules/` — Project patterns (evolves over time)
 
 ---
 

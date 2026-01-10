@@ -1,11 +1,12 @@
 ---
-description: Ship branch - commit, push, and create PR
+description: When work is complete - Commit, push, and create PR
 allowed-tools: Bash, Read
 ---
 
-# Ship Command
+# Ship Changes
 
-Commit remaining work, push branch, create PR.
+**When to use**: After work is complete and tested (run /audit first).
+**What it does**: Commits changes with conventional message, pushes branch, creates PR.
 
 ## Steps
 

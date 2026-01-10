@@ -1,6 +1,6 @@
 ---
 doc_kind: reference
-depends_on: [commands/*.md, kernel/commands/*.md]
+depends_on: [kernel/commands/*.md]
 review_cadence: 30
 last_reviewed: 2026-01-10
 owners: ["@ariaxhan"]
@@ -8,387 +8,480 @@ owners: ["@ariaxhan"]
 
 # KERNEL Commands Reference
 
-Complete reference for all KERNEL plugin commands. Commands are invoked with `/command-name` in Claude Code.
+Complete reference for all 10 KERNEL commands with clear "when/what" descriptions.
 
-## Core Commands
+## Command Overview
 
-### `/kernel-init`
+All commands follow pattern: **When to use** + **What it does**
 
-Initialize KERNEL for any project.
-
-**Purpose**: Analyzes your project and creates customized `.claude/CLAUDE.md` with detected tier, stack-specific coding rules, and KERNEL artifact templates.
-
-**What it does**:
-1. Detects project tier (T1 hackathon, T2 production, T3 critical)
-2. Identifies stack (TypeScript, Python, Go, etc.)
-3. Determines domain (API, CLI, library, app)
-4. Creates directory structure (`.claude/commands/`, `.claude/agents/`, `.claude/skills/`, `.claude/rules/`)
-5. Generates customized `.claude/CLAUDE.md`
-6. Copies baseline artifacts (banks, commands, skills)
-
-**When to use**: First time setting up KERNEL in a project.
-
-**Example**:
-```
-/kernel-init
-```
-
-**Output**: Project analysis summary and list of created files.
+| Command | When | What |
+|---------|------|------|
+| `/init` | First setup or updating | Initialize/update KERNEL templates |
+| `/clean` | Regular maintenance | Show config health and prune stale entries |
+| `/explore` | Before work in unfamiliar code | Map codebase structure and conventions |
+| `/plan` | Before implementing features | Plan to get it right first time |
+| `/debug` | Fixing bugs | Systematic diagnosis and root cause fixing |
+| `/audit` | Before committing | Review code quality and documentation |
+| `/branch` | Before starting work | Create intention-focused git branch |
+| `/ship` | Work is complete | Commit, push, and create PR |
+| `/parallelize` | Parallel work needed | Set up git worktrees for multiple branches |
+| `/handoff` | Ending session | Generate context handoff for continuation |
 
 ---
 
-### `/kernel-status`
+## Setup & Maintenance
 
-Show KERNEL config health and staleness report.
+### `/init`
 
-**Purpose**: Display health status of all KERNEL configuration artifacts, showing which are active, stale, or new.
+**When**: First time setting up KERNEL or updating templates to latest version.
+**What**: Analyzes project and creates/updates customized configuration.
 
-**What it shows**:
-- Total config entries
-- Active entries (referenced in last 7 days)
-- Stale entries (no reference for 30+ days)
-- New entries (< 7 days old)
-- Reference counts per entry
+**Modes**:
+1. **First time setup** - Full initialization with tier/stack detection
+2. **Template refresh** - Update templates only, preserve customizations
 
-**When to use**: Regular health checks to identify unused configuration.
+**First Time Setup**:
+- Analyzes project (tier, stack, domain)
+- Creates `CLAUDE.md` with customized philosophy
+- Copies `kernel/banks/` (5 methodology banks)
+- Copies `kernel/commands/` (all 10 commands)
+- Creates `kernel/state.md` (world model)
+- Copies `kernel/hooks/` and `kernel/rules/` templates
+
+**Template Refresh**:
+- Updates banks and commands to latest plugin version
+- Preserves your `CLAUDE.md`, `kernel/rules/`, `kernel/state.md`
+- Shows what was updated and what was preserved
 
 **Example**:
 ```
-/kernel-status
-```
+> /init
 
-**Output**: Config health summary with statistics.
+Mode: First time setup or update? [setup/update]
+
+Analyzing project...
+- TIER: 2 (Production-grade)
+- STACK: TypeScript, React, Node.js
+- DOMAIN: Web Application
+
+Created:
+✓ CLAUDE.md (customized)
+✓ kernel/banks/ (5 banks)
+✓ kernel/commands/ (10 commands)
+✓ kernel/state.md
+
+Next: Run /explore to map codebase
+```
 
 ---
 
-### `/kernel-prune`
+### `/clean`
 
-Review and remove stale KERNEL config entries.
+**When**: Regular maintenance to check config health.
+**What**: Shows status of all KERNEL artifacts and prompts to remove stale entries.
 
-**Purpose**: Identify stale configuration artifacts (commands, agents, skills, rules) and prompt for removal.
+**Process**:
+1. **Show Status** - Lists all artifacts by category (active/stale/new/untracked)
+2. **Handle Untracked** - Offers to bootstrap new entries into registry
+3. **Prune Stale** - For entries unused 30+ days, prompts for removal
 
-**What it does**:
-1. Scans all KERNEL artifacts
-2. Identifies entries not referenced in 30+ days
-3. Presents each stale entry with metadata
-4. Prompts for confirmation before removal
-5. Logs all removals for audit trail
-
-**When to use**: Periodic cleanup to remove unused configuration.
+**Stale Criteria**: No reference in 30+ days
 
 **Example**:
 ```
-/kernel-prune
+> /clean
+
+KERNEL Config Status
+====================
+Config entries: 15
+  Active (last 7 days): 10
+  Stale (30+ days): 3
+  New (< 7 days): 2
+
+Commands: 10 total
+  [active] explore (2d ago, 15 uses)
+  [stale] old-deploy (35d ago, 2 uses)
+
+Review and remove stale? [Y/n] Y
+
+STALE: [command] old-deploy
+  Last used: 35 days ago
+  Remove? [Y/n] Y
+✓ Removed
+
+Clean complete
+  Reviewed: 3
+  Removed: 1
+  Kept: 2
 ```
 
-**Output**: Interactive prompts for each stale entry.
+**Safety**: Never auto-deletes, always prompts, logs all removals.
 
 ---
 
-## Methodology Commands
+## Development Workflow
 
-### `/discover`
+### `/explore`
 
-Map codebase, find tooling, extract conventions.
+**When**: Before starting work in unfamiliar codebase or after significant changes.
+**What**: Maps repository structure, detects tooling, extracts conventions.
 
-**Purpose**: Activate discovery mode to systematically explore and document the project structure, tooling, and conventions.
+**Discovers**:
+- **Repo Map**: Entrypoints, modules, directories, tests, docs
+- **Tooling**: Formatter, linter, type checker, test runner, package manager
+- **Conventions**: Naming patterns, error handling, logging, config
+- **Critical Paths**: Migration files, auth code, schemas (Do Not Touch)
 
-**What it does**:
-1. Reads `kernel/banks/DISCOVERY-BANK.md` for methodology
-2. Reads `kernel/state.md` for current context
-3. Inventories files and directories
-4. Detects available tooling (linters, test runners, build tools)
-5. Extracts naming conventions and patterns
-6. Updates `kernel/state.md` with discoveries
-
-**When to use**:
-- First time exploring an unfamiliar codebase
-- Before starting work on a new project
-- When project structure has changed significantly
+**Updates**: `kernel/state.md` with all discoveries
 
 **Example**:
 ```
-/discover
-```
+> /explore
 
-**Output**: Updated `kernel/state.md` with repo map, tooling inventory, and conventions.
+TOOLING
+-------
+✓ Formatter: prettier
+✓ Linter: eslint
+✓ Tests: jest
+
+CONVENTIONS
+-----------
+Naming:
+  - Files: kebab-case
+  - Functions: camelCase
+  - Classes: PascalCase
+
+CRITICAL PATHS
+--------------
+⚠️ src/auth/ - Security-critical
+⚠️ src/models/schema.ts - Migration-critical
+
+State updated. Ready to work.
+```
 
 ---
 
 ### `/plan`
 
-Get-it-right-first-time planning mode.
+**When**: Before implementing new features, complex changes, or refactoring.
+**What**: Systematic planning to understand requirements and design implementation.
 
-**Purpose**: Activate planning mode for systematic task analysis before implementation.
+**Process**:
+1. Understand goal
+2. Extract assumptions
+3. Investigate patterns
+4. Define interfaces
+5. Mental simulation
 
-**What it does**:
-1. Reads `kernel/banks/PLANNING-BANK.md` for methodology
-2. Reads `kernel/state.md` for current context
-3. Guides through: goal understanding, assumption extraction, pattern investigation, interface definition, mental simulation
-4. Updates `kernel/state.md` with discoveries
-
-**When to use**:
-- Before implementing new features
-- When approaching complex changes
-- When multiple approaches are possible
-- To avoid costly debugging cycles
+**Prevents**:
+- Wasted implementation cycles
+- Missing edge cases
+- Incorrect assumptions
+- Integration issues
 
 **Example**:
 ```
-/plan
-```
+> /plan
 
-**Output**: Structured implementation plan with verified assumptions.
+Goal: Add user authentication
+
+Assumptions extracted:
+1. Using JWT tokens
+2. PostgreSQL for user storage
+3. bcrypt for password hashing
+
+Investigating existing patterns...
+Found: src/api/ follows REST conventions
+
+Plan:
+1. Create src/auth/jwt.ts (token generation)
+2. Create src/models/user.ts (user schema)
+3. Add POST /auth/login endpoint
+4. Add middleware for route protection
+
+Estimated complexity: Medium
+Estimated files: 4 new, 2 modified
+
+Proceed with implementation? [Y/n]
+```
 
 ---
 
 ### `/debug`
 
-Systematic diagnosis and root cause fixing.
+**When**: Fixing bugs, investigating errors, or troubleshooting unexpected behavior.
+**What**: Applies scientific method to diagnose root cause.
 
-**Purpose**: Activate debugging mode for methodical problem diagnosis.
-
-**What it does**:
-1. Reads `kernel/banks/DEBUGGING-BANK.md` for methodology
-2. Reads `kernel/state.md` for current context
-3. Applies systematic debugging: reproduce, isolate, hypothesize, verify, fix
-4. Updates `kernel/state.md` with findings
-
-**When to use**:
-- When encountering bugs or unexpected behavior
-- When errors are intermittent or unclear
-- For systematic root cause analysis
+**Steps**:
+1. **Reproduce** - Consistently trigger the issue
+2. **Isolate** - Narrow down to specific component
+3. **Hypothesize** - Form theory about cause
+4. **Verify** - Test hypothesis with minimal change
+5. **Fix** - Apply proper solution
+6. **Confirm** - Ensure resolved, no regressions
 
 **Example**:
 ```
-/debug
-```
+> /debug
 
-**Output**: Diagnosis with root cause and verified fix.
+Issue: Users can't log in
+
+Reproducing...
+✓ Consistently fails with "Invalid credentials"
+
+Isolating...
+- Frontend: Sends correct payload
+- API: Receives correct payload
+- Auth: Password comparison fails
+
+Hypothesis: bcrypt comparison reversed
+
+Verifying...
+✓ Found: bcrypt.compare(hash, password) should be bcrypt.compare(password, hash)
+
+Fix applied: src/auth/login.ts:45
+
+Confirming...
+✓ Login now works
+✓ No regressions in test suite
+```
 
 ---
 
-### `/review`
+### `/audit`
 
-Correctness, consistency, completeness validation.
+**When**: Before committing code to ensure quality.
+**What**: Reviews code for correctness and audits documentation.
 
-**Purpose**: Activate review mode for code quality validation.
+**Checks**:
+- **Code Review**: Correctness, consistency, completeness, conventions, invariants
+- **Documentation Audit**: Frontmatter, staleness, budgets, links, orphans
 
-**What it does**:
-1. Reads `kernel/banks/REVIEW-BANK.md` for methodology
-2. Reads `kernel/state.md` for current context
-3. Applies review criteria: correctness, consistency, completeness, conventions, security
-4. Reports findings with severity levels
-
-**When to use**:
-- Before committing code
-- During PR review
-- After implementing features
-- For quality assurance
+**Integrated workflow**:
+1. Make changes
+2. Run `/audit`
+3. Fix issues found
+4. Run `/audit` again
+5. Run `/ship`
 
 **Example**:
 ```
-/review
-```
+> /audit
 
-**Output**: Review report with identified issues and recommendations.
+CODE REVIEW
+-----------
+✓ src/api/auth.ts - all checks passed
+⚠ src/utils/parser.ts:45 - missing JSDoc
+
+DOCUMENTATION
+-------------
+✗ docs/api-reference.md - stale (depends_on modified)
+
+Issues: 1 warning, 1 staleness
+
+Fix? [Y/n] Y
+
+✓ Added JSDoc to parser.ts
+✓ Updated api-reference.md
+
+All checks passed. Ready to commit.
+```
 
 ---
 
-### `/docs`
-
-Documentation audit, generation, and maintenance.
-
-**Purpose**: Activate documentation mode for systematic doc management.
-
-**What it does**:
-1. Reads `kernel/banks/DOCUMENTATION-BANK.md` for methodology
-2. Reads `kernel/state.md` for current context (including `docs_style`)
-3. If `docs_style` missing, detects from repo signals (REFERENCE, PROCEDURAL, or NARRATIVE)
-4. Audits existing docs for: completeness, staleness, budget violations, orphans
-5. Generates or refactors docs following style templates
-6. Updates frontmatter and maintenance logs
-
-**When to use**:
-- Setting up documentation structure
-- Auditing existing docs for issues
-- Generating new documentation
-- Ensuring docs stay current
-
-**Example**:
-```
-/docs
-```
-
-**Output**: Documentation audit report with issues and fixes applied.
-
----
-
-## Git Workflow Commands
+## Git Workflow
 
 ### `/branch`
 
-Create intention-focused branch for work.
+**When**: Before starting any new work (NEVER WORK ON MAIN).
+**What**: Creates properly named git branch based on work type.
 
-**Purpose**: Create a properly named git branch based on the type of work.
-
-**What it does**:
-1. Checks current git status
-2. Prompts for branch type (feat, fix, docs, refactor, test, chore)
-3. Prompts for description
-4. Creates and checks out branch with format: `<type>/<description>`
-5. Updates `kernel/state.md` with branch metadata
-
-**When to use**: Before starting any new work (NEVER WORK ON MAIN).
+**Branch Types**:
+- `feat/` - New feature
+- `fix/` - Bug fix
+- `docs/` - Documentation
+- `refactor/` - Code restructure
+- `test/` - Test changes
+- `chore/` - Maintenance
 
 **Example**:
 ```
-/branch
-```
+> /branch
 
-**Output**: New branch created and checked out.
+Current: main
+
+Type? [feat/fix/docs/refactor/test/chore] feat
+Description? (2-4 words, kebab-case) user-authentication
+
+Creating branch...
+✓ git checkout -b feat/user-authentication
+✓ Ready to work
+
+Uncommitted changes moved to new branch.
+```
 
 ---
 
 ### `/ship`
 
-Ship branch - commit, push, and create PR.
+**When**: After work is complete and tested (run `/audit` first).
+**What**: Commits changes with conventional message, pushes branch, creates PR.
 
-**Purpose**: Complete the git workflow by committing changes, pushing, and opening a PR.
-
-**What it does**:
-1. Runs `git status` and `git diff` to analyze changes
-2. Reviews commit history for message style
-3. Generates commit message following conventions
-4. Stages and commits changes
-5. Pushes branch to remote
-6. Creates PR with summary and test plan
-
-**When to use**: When work is complete and ready for review.
+**Process**:
+1. Check git status
+2. Generate commit message from changes
+3. Commit with conventional format
+4. Push branch to remote
+5. Create PR with summary
 
 **Example**:
 ```
-/ship
-```
+> /ship
 
-**Output**: Commit created, branch pushed, PR URL returned.
+Checking state...
+✓ On feat/user-authentication
+✓ 4 files changed
+
+Generating commit message...
+
+feat(auth): add user authentication
+
+- Add JWT token generation
+- Add user model and schema
+- Add login endpoint
+- Add auth middleware
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+
+Commit? [Y/n] Y
+✓ Committed
+
+Pushing...
+✓ git push -u origin feat/user-authentication
+
+Creating PR...
+✓ https://github.com/user/repo/pull/123
+
+PR created successfully.
+```
 
 ---
 
 ### `/parallelize`
 
-Set up git worktrees for parallel development.
+**When**: Working on multiple related features or testing changes in isolation.
+**What**: Creates git worktree structure for parallel development.
 
-**Purpose**: Configure git worktrees to work on multiple branches simultaneously.
-
-**What it does**:
-1. Detects if task benefits from parallel development
-2. Creates worktree structure
-3. Sets up separate directories for each branch
-4. Provides guidance on coordination
-
-**When to use**:
-- Working on multiple related features
-- Need to test changes in isolation
-- Want to switch contexts without stashing
+**Modes**:
+1. **Independent** - Manual coordination, you open terminals for each worktree
+2. **Coordinated** - Automated agents spawned in each worktree
 
 **Example**:
 ```
-/parallelize
-```
+> /parallelize
 
-**Output**: Worktree structure created with setup instructions.
+Task: Add OAuth, billing, notifications
+
+Streams identified:
+1. OAuth (src/auth/)
+2. Billing (src/billing/)
+3. Notifications (src/notifications/)
+
+Creating worktrees...
+✓ ../myproject-oauth (branch: feat/oauth)
+✓ ../myproject-billing (branch: feat/billing)
+✓ ../myproject-notifications (branch: feat/notifications)
+
+Open new terminals:
+osascript -e 'tell app "Terminal" to do script "cd ../myproject-oauth && claude"'
+osascript -e 'tell app "Terminal" to do script "cd ../myproject-billing && claude"'
+
+Work in parallel, merge when done.
+```
 
 ---
 
 ### `/handoff`
 
-Generate context handoff for session continuation.
+**When**: Ending work session, switching tasks, or preparing team handoff.
+**What**: Creates structured handoff document with context, decisions, and next steps.
 
-**Purpose**: Create a structured handoff brief for seamless conversation continuation across sessions or AI systems.
-
-**What it does**:
-1. Summarizes current work and context
-2. Documents decisions made
-3. Lists pending tasks
-4. Captures important state
-5. Provides continuation guidance
-
-**When to use**:
-- Ending a work session
-- Switching to different task
-- Preparing for team handoff
-- Before significant context switch
+**Includes**:
+- Summary (one sentence)
+- Goal and current state
+- Decisions made (with rationale)
+- Artifacts created
+- Open threads
+- Next steps
+- Context essentials
+- Warnings (pitfalls to avoid)
+- Continuation prompt (2-3 sentences for next session)
 
 **Example**:
 ```
-/handoff
-```
+> /handoff
 
-**Output**: Structured handoff document with context and next steps.
+CONTEXT HANDOFF
+===============
+
+Summary: Building user authentication system with JWT tokens
+
+Goal: Add secure login/logout for web app
+
+Current state: Completed backend (JWT, user model, endpoints), frontend pending
+
+Decisions:
+- JWT over sessions (stateless, scales better)
+- bcrypt for hashing (industry standard)
+- 24h token expiry (balance security/UX)
+
+Artifacts:
+- src/auth/jwt.ts
+- src/models/user.ts
+- src/api/auth.ts
+
+Next steps:
+1. Implement frontend login form
+2. Add token refresh logic
+3. Test full flow
+
+Continuation prompt:
+> We're adding user authentication to the web app. Backend is complete (JWT tokens, user model, auth endpoints). Next: implement frontend login form and token refresh logic.
+
+Save to file? [Y/n]
+```
 
 ---
 
 ## Command Organization
 
-Commands exist in two locations:
+All commands are in `kernel/commands/` directory.
 
-1. **Plugin commands** (`commands/*.md`): Core KERNEL commands that work across all projects
-   - `/kernel-init`
-   - `/kernel-status`
-   - `/kernel-prune`
-
-2. **Template commands** (`kernel/commands/*.md`): Methodology commands copied to projects during initialization
-   - `/discover`
-   - `/plan`
-   - `/debug`
-   - `/review`
-   - `/docs`
-   - `/branch`
-   - `/ship`
-   - `/parallelize`
-   - `/handoff`
-
-After running `/kernel-init`, template commands are copied to your project's `.claude/commands/` directory and become available for use.
+After running `/init`, commands are copied to your project and become available for use.
 
 ---
 
-## Command Naming Convention
+## Workflow Example
 
-All KERNEL commands follow these patterns:
+Typical development workflow using KERNEL commands:
 
-- **Core plugin commands**: Prefixed with `kernel-` (e.g., `/kernel-init`, `/kernel-status`)
-- **Methodology commands**: Short, verb-based names (e.g., `/plan`, `/debug`, `/review`)
-- **Workflow commands**: Action-oriented (e.g., `/branch`, `/ship`)
-
----
-
-## Adding Custom Commands
-
-You can add project-specific commands by creating `.claude/commands/your-command.md`:
-
-```markdown
----
-description: One-line description of what this command does
-allowed-tools: Read, Write, Bash, Grep, Glob
----
-
-# Your Command
-
-Instructions for what Claude should do when `/your-command` is invoked.
-
-1. Step by step instructions
-2. Use clear, actionable language
-3. Reference project-specific paths and conventions
 ```
-
-Then invoke with `/your-command`.
+1. /init              # Set up KERNEL (first time)
+2. /explore           # Map codebase before starting
+3. /branch            # Create feature branch
+4. /plan              # Plan implementation
+   [make changes]
+5. /debug             # Fix any issues
+6. /audit             # Check quality before commit
+7. /ship              # Commit, push, create PR
+8. /handoff           # End session with context handoff
+```
 
 ---
 
 ## See Also
 
-- [CONFIG-TYPES.md](../CONFIG-TYPES.md) - When to use commands vs agents vs skills vs rules
-- [README.md](../README.md) - KERNEL overview and philosophy
-- [SETUP.md](../SETUP.md) - Installation and configuration guide
+- [README.md](../README.md) - KERNEL overview
+- [SETUP.md](../SETUP.md) - Installation guide
+- [CONFIG-TYPES.md](../CONFIG-TYPES.md) - When to use commands vs agents vs skills
 - `kernel/banks/` - Methodology banks loaded by commands

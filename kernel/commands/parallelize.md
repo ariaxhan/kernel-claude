@@ -1,11 +1,12 @@
 ---
-description: Set up git worktrees for parallel development
+description: For parallel work - Set up git worktrees for multiple branches
 allowed-tools: Bash, Read, Write, AskUserQuestion, Task, TodoWrite
 ---
 
-# Parallelize Command
+# Set Up Parallel Worktrees
 
-When user invokes `/parallelize`, set up git worktrees for parallel development across independent work streams.
+**When to use**: Working on multiple related features or testing changes in isolation.
+**What it does**: Creates git worktree structure for parallel development without stashing.
 
 ## Execution Steps
 

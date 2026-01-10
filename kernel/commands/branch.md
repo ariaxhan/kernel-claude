@@ -1,11 +1,12 @@
 ---
-description: Create intention-focused branch for work
+description: Before starting work - Create intention-focused git branch
 allowed-tools: Bash, AskUserQuestion
 ---
 
-# Branch Command
+# Create Branch
 
-Create a focused branch before starting work.
+**When to use**: Before starting any new work (NEVER WORK ON MAIN).
+**What it does**: Creates properly named git branch based on work type.
 
 ## Steps
 

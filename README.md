@@ -149,27 +149,25 @@ Imperative rules grouped by topic that Claude follows.
 
 ### Available Commands
 
-KERNEL provides commands in two categories:
+KERNEL provides **10 workflow commands** with clear "when/what" descriptions:
 
-**Core Commands** (always available):
-- `/kernel-init` - Initialize KERNEL for any project
-- `/kernel-status` - Show config health and staleness report
-- `/kernel-prune` - Review and remove stale config entries
+**Setup & Maintenance**:
+- `/init` - When: First setup or updating templates. What: Initialize/update KERNEL
+- `/clean` - When: Regular maintenance. What: Show config health and prune stale entries
 
-**Methodology Commands** (available after `/kernel-init`):
-- `/discover` - Map codebase, find tooling, extract conventions
-- `/plan` - Get-it-right-first-time planning mode
-- `/debug` - Systematic diagnosis and root cause fixing
-- `/review` - Correctness, consistency, completeness validation
-- `/docs` - Documentation audit, generation, maintenance
+**Development Workflow**:
+- `/explore` - When: Before work in unfamiliar code. What: Map codebase structure and conventions
+- `/plan` - When: Before implementing features. What: Plan to get it right first time
+- `/debug` - When: Fixing bugs. What: Systematic diagnosis and root cause fixing
+- `/audit` - When: Before committing. What: Review code quality and documentation
 
-**Git Workflow Commands** (available after `/kernel-init`):
-- `/branch` - Create intention-focused branch for work
-- `/ship` - Commit, push, and create PR
-- `/parallelize` - Set up git worktrees for parallel development
-- `/handoff` - Generate context handoff for session continuation
+**Git Workflow**:
+- `/branch` - When: Before starting work. What: Create intention-focused git branch
+- `/ship` - When: Work is complete. What: Commit, push, and create PR
+- `/parallelize` - When: Parallel work needed. What: Set up git worktrees for multiple branches
+- `/handoff` - When: Ending session. What: Generate context handoff for continuation
 
-**For detailed command documentation**, see [docs/COMMANDS.md](docs/COMMANDS.md).
+**For detailed documentation**, see [docs/COMMANDS.md](docs/COMMANDS.md).
 
 ## Project Structure
 

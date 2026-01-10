@@ -9,7 +9,7 @@
   - kernel/commands/ (9 mode commands: discover, plan, debug, review, docs, branch, ship, parallelize, handoff)
   - kernel/hooks/ (3 hook templates)
   - kernel/rules/ (rule templates)
-- Plugin commands: commands/ (12 total: 3 core kernel-*, 9 methodology/workflow)
+- All commands: kernel/commands/ (10 total: 2 setup, 4 dev workflow, 4 git workflow)
 - Documentation: docs/COMMANDS.md (reference), README.md (overview), SETUP.md (how-to), CONFIG-TYPES.md (guide)
 - MCP server: claude-docs-server.py (Python 3.8+, optional)
 - Memory: memory/config_registry.jsonl (tracks artifact usage for pruning)

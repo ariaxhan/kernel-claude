@@ -1,11 +1,12 @@
 ---
-description: Generate a structured context handoff brief for seamless conversation continuation across sessions or AI systems
+description: When ending session - Generate context handoff for continuation
 allowed-tools: Read, Glob, Bash
 ---
 
-# Context Handoff
+# Generate Handoff
 
-Generate a token-optimized brief that enables seamless conversation continuation.
+**When to use**: Ending work session, switching tasks, or preparing team handoff.
+**What it does**: Creates structured handoff document with context, decisions, and next steps.
 
 ## When to Use
 
