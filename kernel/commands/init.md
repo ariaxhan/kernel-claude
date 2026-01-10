@@ -159,13 +159,32 @@ Quick checklist:
 - **Read CONFIG-TYPES.md before creating artifacts**
 ```
 
-## Step 5: Create Starter Files
+## Step 5: Copy Baseline Artifacts
+
+Copy template files from the kernel plugin to the project:
+
+**From kernel/commands/:**
+- `parallelize.md` → `.claude/commands/parallelize.md`
+
+**From kernel/skills/:**
+- `worktree-parallelization/` → `.claude/skills/worktree-parallelization/`
+
+**From kernel/agents/:**
+- `test-maintainer.md` → `.claude/agents/test-maintainer.md` (optional, if applicable)
+
+**Important**:
+- Look for the kernel plugin in these locations:
+  1. `~/.claude/plugins/kernel/`
+  2. Project's parent directories (if kernel-plugin is cloned nearby)
+  3. Ask user for plugin location if not found
+
+## Step 6: Create Starter Files
 
 - `.claude/rules/preferences.md` with header
 - `.mcp.json` if not exists
 - `.claude/settings.json` if not exists
 
-## Step 6: Report
+## Step 7: Report
 
 Summary of:
 - Detected tier, stack, domain
