@@ -1,0 +1,16 @@
+{
+  "description": "KERNEL hooks - session start reminder for reflection",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'KERNEL active: Remember to write learnings to .claude/rules/kernel-learnings.md before completing major tasks if explicit preferences or patterns emerge.'"
+          }
+        ]
+      }
+    ]
+  }
+}
