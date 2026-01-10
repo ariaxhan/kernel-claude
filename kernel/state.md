@@ -41,6 +41,13 @@
 ## Active Preferences
 → See .claude/rules/preferences.md
 
+## Git Workflow State
+- current_branch: main
+- branch_type: null      # feat | fix | docs | refactor | test | chore
+- branch_created: null   # ISO date
+- last_commit: null      # ISO date
+- uncommitted: false
+
 ## Documentation State
 - docs_style: null  # REFERENCE | PROCEDURAL | NARRATIVE (set once, lock)
 - doc_kinds: []     # tutorial, how-to, reference, explanation

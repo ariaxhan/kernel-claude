@@ -19,6 +19,29 @@ Backup before mutation.
 Confirm before deletion.
 Make time explicit (UTC + timezone).
 
+**NEVER WORK ON MAIN**
+All work happens on intention-focused branches.
+Branch first, then code. Commit often.
+Git history IS the changelog. Ship via PR.
+
+---
+
+## Git Workflow
+
+**Before starting work:**
+1. Check current branch: `git branch --show-current`
+2. If on main → create branch: `git checkout -b <type>/<description>`
+3. Branch types: `feat/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`
+
+**During work:**
+- Commit after completing logical units
+- Use conventional commits: `type(scope): description`
+
+**When done:**
+- Push branch: `git push -u origin <branch>`
+- Create PR: `gh pr create`
+- Never merge to main locally
+
 ---
 
 ## KERNEL

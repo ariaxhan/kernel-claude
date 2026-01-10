@@ -19,6 +19,11 @@ Backup before mutation.
 Confirm before deletion.
 Make time explicit (UTC + timezone).
 
+**NEVER WORK ON MAIN**
+All work happens on intention-focused branches.
+Branch first, then code. Commit often.
+Git history IS the changelog. Ship via PR.
+
 ---
 
 ## KERNEL
