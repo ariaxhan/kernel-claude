@@ -159,13 +159,76 @@ Quick checklist:
 - **Read CONFIG-TYPES.md before creating artifacts**
 ```
 
-## Step 5: Create Starter Files
+## Step 5: Copy Baseline Artifacts
+
+Copy template files from the kernel plugin to the project.
+
+### Locate Kernel Plugin
+
+Search for kernel in:
+1. `~/.claude/plugins/kernel/`
+2. Project's parent directories
+3. Ask user for location if not found
+
+### Copy Knowledge Banks
+
+**From kernel/banks/ → project root (or .claude/banks/):**
+- `PLANNING-BANK.md` - Get-it-right-first-time methodology
+- `DEBUGGING-BANK.md` - Systematic debugging process
+- `CODE-REVIEW-BANK.md` - Review standards checklist
+- `TESTING-BANK.md` - Testing strategy & pyramid
+- `SECURITY-BANK.md` - Security review & OWASP
+- `FRONTEND-BANK.md` - Frontend baseline patterns
+
+**Note**: Banks are NOT loaded by default (zero token cost until referenced).
+
+### Copy Skills (Lightweight Pointers)
+
+**From kernel/skills/ → .claude/skills/:**
+- `planning/SKILL.md` - Points to PLANNING-BANK
+- `debugging/SKILL.md` - Points to DEBUGGING-BANK
+- `code-review/SKILL.md` - Points to CODE-REVIEW-BANK
+- `testing-strategy/SKILL.md` - Points to TESTING-BANK
+- `security-review/SKILL.md` - Points to SECURITY-BANK
+- `frontend-patterns/SKILL.md` - Points to FRONTEND-BANK
+- `worktree-parallelization/SKILL.md` - Worktree detection
+
+**Note**: Skills are ~50-100 tokens each, auto-discovered when context matches.
+
+### Copy Commands (On-Demand)
+
+**From kernel/commands/ → .claude/commands/:**
+- `plan.md` - /plan - Planning workflow using PLANNING-BANK
+- `review.md` - /review - Code review using CODE-REVIEW-BANK
+- `debug.md` - /debug - Debugging workflow using DEBUGGING-BANK
+- `parallelize.md` - /parallelize - Git worktree setup
+
+**Note**: Commands only loaded when invoked (zero cost until used).
+
+### Copy Agents (Optional)
+
+**From kernel/agents/ → .claude/agents/:**
+- `test-maintainer.md` - Test generation specialist (if applicable to project)
+
+**Note**: Only copy if relevant to project stack.
+
+### Token Cost Summary
+
+After copying baseline artifacts:
+- **Banks**: 0 tokens (not loaded)
+- **Skills**: ~400-600 tokens (7 skills × ~80 tokens each)
+- **Commands**: 0 tokens (loaded on use)
+- **Agents**: 0 tokens (isolated context)
+
+**Total baseline cost: ~500 tokens** vs ~6000+ without bank architecture.
+
+## Step 6: Create Starter Files
 
 - `.claude/rules/preferences.md` with header
 - `.mcp.json` if not exists
 - `.claude/settings.json` if not exists
 
-## Step 6: Report
+## Step 7: Report
 
 Summary of:
 - Detected tier, stack, domain

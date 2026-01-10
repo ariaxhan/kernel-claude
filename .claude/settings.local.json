@@ -13,6 +13,8 @@
       "Bash(ls:*)",
       "Bash(xargs:*)",
       "Bash(find:*)"
+      "Bash(git worktree:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   },
