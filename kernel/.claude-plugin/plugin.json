@@ -1,6 +1,0 @@
-{
-  "name": "kernel",
-  "version": "1.0.0",
-  "description": "Self-evolving configuration - Claude reflects and updates project rules automatically",
-  "homepage": "https://github.com/ariaxhan/kernel-plugin"
-}
