@@ -1,203 +1,133 @@
 # Debugging Bank
 
-**Systematic debugging: Reproduce → Isolate → Fix → Verify**
+## Philosophy
+Reproduce first. Isolate via binary search. Instrument, don't guess. Fix root cause, not symptom. Confirm fix with regression validation. Systematic debugging beats random changes.
+
+## Process Skeleton
+1. **Reproduce** → Can you trigger it consistently? If no, gather more data first.
+2. **Isolate** → Binary search the call chain, find exact location
+3. **Instrument** → Add logging/breakpoints, observe state
+4. **Understand Root Cause** → Why does this happen? (Not just what fails)
+5. **Fix Root Cause** → Not the symptom
+6. **Verify** → Original bug + edge cases + regression check
 
 ---
 
-## The Process
+## Slots (Designed to Fill)
 
-### 1. Reproduce
+### Reproduction Patterns (max 8)
+[TO EVOLVE: Add techniques discovered while debugging THIS codebase]
+
+- **Exact steps**: Write down precise sequence to trigger bug
+- **Minimal repro**: Remove unrelated code until minimal case that fails
+- **Input data**: What specific input causes failure?
+- **Environment**: Local vs prod, versions, config differences?
+- **Frequency**: Always, sometimes, specific conditions?
+- **Logs**: What does output show? Error messages? Stack traces?
+
+### Isolation Techniques (max 8)
+[TO EVOLVE: Add debugging strategies that work in THIS codebase]
+
+**Binary Search:**
 ```
-Can you trigger the bug consistently?
-
-YES → Proceed to step 2
-NO → Gather more data:
-  - Under what conditions does it happen?
-  - What's different when it doesn't happen?
-  - Can you make it happen more often?
-```
-
-### 2. Isolate
-```
-Narrow down WHERE the bug occurs:
-
-BINARY SEARCH:
-1. Identify the call chain
-2. Check midpoint: Is bug before or after this?
-3. Repeat until you find the exact line
-
-LOGGING:
-1. Add strategic console.log/print statements
-2. Trace data flow through the system
-3. Find where expected != actual
+Call chain: A → B → C → D → E (fails)
+Check C: Works? Bug is in D or E. Fails? Bug is in A, B, or C.
+Repeat until exact location found.
 ```
 
-### 3. Understand Root Cause
+**Logging Strategy:**
+```javascript
+// Add strategic checkpoints
+console.log('1. Input:', JSON.stringify(input))
+console.log('2. After transform:', result1)
+console.log('3. Before external call:', params)
+console.log('4. After external call:', response)
+console.log('5. Final:', output)
 ```
-Why does this happen?
 
-COMMON CAUSES:
-- Wrong assumption about input shape
-- Off-by-one error
-- Race condition / timing issue
-- Missing null/undefined check
-- Incorrect operator (= vs ==, && vs ||)
+**Dependency Removal:**
+- Comment out external API calls, use mock data
+- Comment out database queries, use in-memory data
+- Remove complex logic, use simple placeholder
+- Isolate which dependency causes failure
+
+### Instrumentation Patterns (max 6)
+[TO EVOLVE: Add debugging tools discovered in THIS codebase]
+
+**Stack-specific:**
+- JavaScript: `console.log`, `debugger`, Chrome DevTools
+- Python: `print()`, `import pdb; pdb.set_trace()`, logging module
+- Go: `fmt.Printf`, `log.Printf`, delve debugger
+- Rust: `println!`, `dbg!`, rust-gdb
+
+**State Inspection:**
+```
+At failure point, check:
+- Variable values: Are they what you expect?
+- Types: console.log(typeof x), print(type(x))
+- Null/undefined: Explicit checks
+- Array/object contents: JSON.stringify, pprint
+```
+
+### Common Root Causes (max 10)
+[TO EVOLVE: Add patterns discovered while fixing bugs in THIS codebase]
+
+- Wrong assumption about input shape/type
+- Off-by-one error (loop bounds, array indices)
+- Missing null/undefined/None check
+- Race condition (async timing issue)
 - Mutating shared state
-- Wrong variable scope
-```
+- Wrong operator (=, ==, ===, >, >=)
+- Variable scope issue
+- Incorrect error handling (swallowing errors)
+- API mismatch (expected response vs actual)
+- Timezone/datetime handling
 
-### 4. Fix
-```
-Fix the ROOT CAUSE, not the symptom.
+### Regression Validation (max 5)
+[TO EVOLVE: Add validation patterns for THIS codebase]
 
-BAD: Add a try-catch to hide the error
-GOOD: Fix why the error occurs
-
-BAD: Add special case for this one input
-GOOD: Handle the whole class of inputs correctly
-```
-
-### 5. Verify
-```
-Test the fix:
-1. Original bug case → Should now work
-2. Edge cases → Should still work
-3. Regression → Old functionality still works
-```
+After fix:
+1. **Original bug case** → Should now work
+2. **Edge cases** → Null, empty, boundary values still work
+3. **Happy path** → Normal case still works
+4. **Integration** → Adjacent code still works
+5. **Add test** → Prevent regression (if tests exist per state.md)
 
 ---
 
 ## Debugging Checklist
 
-### Data Flow Issues
-- [ ] Check input shape/type (console.log it)
+### Data Flow
+- [ ] Check input shape/type (log it)
 - [ ] Check each transformation step
 - [ ] Check output shape/type
 - [ ] Verify no mutation of shared data
 
-### Logic Issues
+### Logic
 - [ ] Are conditions correct? (>, >=, ==, ===)
 - [ ] Are all branches covered?
 - [ ] Is loop termination correct?
 - [ ] Are variables in correct scope?
 
-### Async Issues
+### Async (if applicable)
 - [ ] Are promises awaited?
 - [ ] Is race condition possible?
 - [ ] Are callbacks called?
 - [ ] Is event handler registered?
 
-### Integration Issues
-- [ ] Does API return what you expect?
-- [ ] Are headers/auth correct?
-- [ ] Is data format compatible?
-- [ ] Are versions compatible?
-
----
-
-## Stack-Specific Debugging
-
-### JavaScript/TypeScript
-```javascript
-// Strategic logging
-console.log('Input:', JSON.stringify(input, null, 2))
-console.log('After step 1:', result1)
-console.log('Final:', output)
-
-// Debugger breakpoint
-debugger;  // Execution pauses here
-
-// Type checking
-console.log(typeof value, Array.isArray(value))
-```
-
-### Python
-```python
-# Strategic logging
-import json
-print(f"Input: {json.dumps(input, indent=2)}")
-print(f"After step 1: {result1}")
-print(f"Final: {output}")
-
-# Debugger breakpoint
-import pdb; pdb.set_trace()
-
-# Type checking
-print(type(value), isinstance(value, list))
-```
-
-### Go
-```go
-// Strategic logging
-import "encoding/json"
-data, _ := json.MarshalIndent(input, "", "  ")
-fmt.Printf("Input: %s\n", data)
-fmt.Printf("After step 1: %+v\n", result1)
-fmt.Printf("Final: %+v\n", output)
-
-// Type checking
-fmt.Printf("%T\n", value)
-```
-
----
-
-## Common Patterns
-
-### "It works locally but not in production"
-```
-CHECK:
-- Environment variables different?
-- Dependencies/versions different?
-- Data different (dev DB vs prod DB)?
-- Permissions different?
-- External services configured differently?
-```
-
-### "Intermittent failure"
-```
-LIKELY:
-- Race condition
-- Timing-dependent
-- Depends on external state (cache, DB)
-- Resource exhaustion
-- Retry logic hiding root cause
-```
-
-### "It worked yesterday"
-```
-FIND:
-- What changed? (git diff, deploy logs)
-- New dependency version?
-- Config change?
-- Data migration?
-```
-
----
-
-## Red Flags (Stop Doing This)
-
-❌ Random code changes hoping it fixes
-✅ Understand WHY it's broken, then fix
-
-❌ "It's probably X" without verifying
-✅ Verify with evidence (logs, debugger)
-
-❌ Fixing symptom instead of cause
-✅ Find root cause, fix that
-
-❌ Skipping verification step
-✅ Always test the fix thoroughly
-
 ---
 
 ## When Stuck
 
-1. **Explain it to a rubber duck** (or write it out)
-2. **Read the error message carefully** (contains the answer 80% of the time)
-3. **Check the docs** (you might be using the API wrong)
-4. **Simplify** (make a minimal reproduction case)
+1. **Explain to rubber duck** (or write it out)
+2. **Read error message carefully** (contains answer 80% of time)
+3. **Check docs** (might be using API wrong)
+4. **Simplify** (make minimal reproduction case)
 5. **Take a break** (fresh eyes find bugs faster)
 
 ---
 
-**Remember: Systematic debugging is faster than random debugging.**
+⚠️ **TEMPLATE NOTICE**
+This bank is scaffolding. Fill slots as you debug issues in this codebase.
+Move stable debugging patterns to `.claude/rules/patterns.md` when they repeat.
+Respect caps; if full, replace least valuable or promote to rules.
