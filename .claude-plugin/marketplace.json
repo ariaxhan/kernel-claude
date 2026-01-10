@@ -6,7 +6,6 @@
   "plugins": [
     {
       "name": "kernel",
-      "source": "kernel",
       "description": "Self-evolving project intelligence"
     }
   ]
