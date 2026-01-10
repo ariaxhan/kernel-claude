@@ -1,0 +1,12 @@
+{
+  "name": "kernel-marketplace",
+  "owner": {
+    "name": "Aria Han"
+  },
+  "plugins": [
+    {
+      "name": "kernel",
+      "description": "Self-evolving project intelligence"
+    }
+  ]
+}
