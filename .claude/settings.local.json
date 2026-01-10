@@ -9,7 +9,8 @@
       "Bash(grep:*)",
       "Bash(git -C /Users/ariaxhan/Documents/claude-code-playground/kernel-plugin log --oneline)",
       "Bash(wc:*)",
-      "Bash(git worktree:*)"
+      "Bash(git worktree:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   },
