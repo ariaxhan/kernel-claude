@@ -1,28 +1,80 @@
 ---
-description: Initialize KERNEL - enables automatic creation of commands, agents, skills, hooks, and rules
-allowed-tools: Read, Write, Glob, Bash
+description: Initialize KERNEL - builds customized CLAUDE.md from prompt bank + enables artifact creation
+allowed-tools: Read, Write, Glob, Bash, Grep
 ---
 
 # Initialize KERNEL
 
-Set up this project for self-evolving Claude Code configuration.
+Build a project-specific CLAUDE.md using CODING-PROMPT-BANK.MD as substrate.
 
-## Step 1: Create Directory Structure
-Ensure these exist:
-- `.claude/commands/`
-- `.claude/agents/`
-- `.claude/skills/`
-- `.claude/rules/`
+## Step 1: Locate Prompt Bank
 
-## Step 2: Scan Project
-Briefly read:
-- README.md for project purpose
-- package.json / pyproject.toml / Cargo.toml for tech stack
+Search for CODING-PROMPT-BANK.MD in order:
+1. Project root
+2. `~/.claude/CODING-PROMPT-BANK.MD`
+3. Plugin location
 
-## Step 3: Update CLAUDE.md
-Append to `.claude/CLAUDE.md` (create if needed):
+Read the entire bank. This is your substrate for building the project config.
+
+## Step 2: Analyze Project
+
+Gather intel:
+- README.md → purpose, domain
+- package.json / pyproject.toml / Cargo.toml / go.mod → stack, dependencies
+- Existing tests → testing patterns
+- .github/workflows → CI patterns
+- Existing .claude/ → prior config
+
+Determine:
+- **TIER**: 1 (hackathon), 2 (default), or 3 (critical)
+- **STACK**: Primary language, framework, tools
+- **DOMAIN**: What kind of project (API, CLI, library, app)
+
+## Step 3: Create Directory Structure
+
+```
+.claude/
+├── commands/
+├── agents/
+├── skills/
+├── rules/
+```
+
+## Step 4: Build Customized CLAUDE.md
+
+Create `.claude/CLAUDE.md` by:
+
+1. **Header**: Project name, tier, stack summary
+2. **Selected Bank Rules**: Pull ONLY relevant sections from the bank based on:
+   - Stack (JS? Python? Go? → different idioms)
+   - Tier (T1 lighter, T3 heavier validation)
+   - Domain (API → endpoint workflow, CLI → different patterns)
+3. **Project Constraints**: Any discovered from existing config
+4. **KERNEL Artifact Instructions**: The pattern→artifact mapping
+
+### Template Structure
 
 ```markdown
+# [PROJECT NAME]
+
+TIER: [1-3]
+STACK: [detected stack]
+DOMAIN: [api/cli/library/app/other]
+
+---
+
+## CODING RULES
+
+[Selected sections from CODING-PROMPT-BANK.MD relevant to this stack/tier]
+
+---
+
+## PROJECT CONSTRAINTS
+
+[Any discovered constraints, or placeholder for user to fill]
+
+---
+
 ## KERNEL: Self-Evolving Configuration
 
 KERNEL progressively builds Claude Code config based on observed patterns.
@@ -38,79 +90,62 @@ KERNEL progressively builds Claude Code config based on observed patterns.
 | Domain capability used repeatedly | `.claude/skills/capability.md` |
 | User states explicit preference | `.claude/rules/topic.md` |
 
-### How to Create Each Artifact
+### Artifact Templates
 
-**SLASH COMMAND** (`.claude/commands/name.md`):
+**COMMAND** (`.claude/commands/name.md`):
 ```md
 ---
 description: One-line description
 allowed-tools: Read, Write, Bash
 ---
-Instructions for Claude to follow when /name is invoked.
+Instructions for Claude when /name is invoked.
 ```
 
-**SUBAGENT** (`.claude/agents/name.md`):
+**AGENT** (`.claude/agents/name.md`):
 ```md
 ---
 name: agent-name
-description: What it specializes in
+description: Specialization
 tools: Read, Write, Grep, Glob, Bash
 model: sonnet
 ---
-You are a specialist in X. Your job is to...
+You are a specialist in X...
 ```
 
-**MCP SERVER** (`.mcp.json`):
-```json
-{"mcpServers": {"name": {"command": "npx", "args": ["package-name"]}}}
-```
+**MCP** (`.mcp.json`): `{"mcpServers": {"name": {"command": "npx", "args": ["pkg"]}}}`
 
-**HOOK** (`.claude/settings.json`):
-```json
-{"hooks": {"PostToolUse": [{"matcher": "Write", "hooks": [{"type": "command", "command": "prettier --write $CLAUDE_FILE_PATHS"}]}]}}
-```
+**HOOK** (`.claude/settings.json`): `{"hooks": {"PostToolUse": [...]}}`
 
-**SKILL** (`.claude/skills/name.md`):
-Markdown describing capability, patterns, examples.
+**SKILL** (`.claude/skills/name.md`): Capability description + examples
 
-**RULE** (`.claude/rules/topic.md`):
-```md
-# Topic
-- Imperative rule 1
-- Imperative rule 2
-```
+**RULE** (`.claude/rules/topic.md`): Imperative rules grouped by topic
 
-### Before Completing Any Task
+### Before Completing Tasks
 
-Check:
-1. Did user repeat a workflow? → Create command
-2. Did task need specialized focus? → Create agent
-3. Did we use external service? → Add to .mcp.json
-4. Is there a pre/post pattern? → Create hook
-5. Did user state preference? → Add rule
+1. Workflow repeated? → Command
+2. Specialized expertise? → Agent
+3. External service? → MCP config
+4. Pre/post processing? → Hook
+5. Explicit preference? → Rule
 
 ### Guidelines
 
-- **Conservative**: Only create for clear, repeated patterns
-- **Minimal**: Start simple, iterate later
-- **Ask first**: Confirm with user before creating if unsure
-- **Check existing**: Read configs first to avoid duplicates
+- Conservative: Clear, repeated patterns only
+- Minimal: Start simple
+- Ask first: Confirm if unsure
+- Check existing: Avoid duplicates
 ```
 
-## Step 4: Create Starter Files
+## Step 5: Create Starter Files
 
-`.claude/rules/preferences.md`:
-```md
-# Project Preferences
-<!-- KERNEL adds preferences here -->
-```
+- `.claude/rules/preferences.md` with header
+- `.mcp.json` if not exists
+- `.claude/settings.json` if not exists
 
-`.mcp.json` (if not exists):
-```json
-{"mcpServers": {}}
-```
+## Step 6: Report
 
-## Step 5: Report
-- KERNEL active
-- Will create commands, agents, skills, hooks, rules as patterns emerge
-- User can review anytime via `/config` or direct file access
+Summary of:
+- Detected tier, stack, domain
+- Which bank sections were included
+- What was created
+- How KERNEL will evolve the config going forward
