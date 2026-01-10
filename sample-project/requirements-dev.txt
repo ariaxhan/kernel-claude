@@ -1,5 +1,5 @@
 black==24.10.0
-cryptography==41.0.7
+cryptography==44.0.1
 flask==3.0.0
 requests==2.32.4
 pylint==3.0.3
