@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "claude-docs": {
+      "command": "python3",
+      "args": ["/Users/ariaxhan/Documents/claude-code-playground/kernel-plugin/claude-docs-server.py"],
+      "env": {}
+    }
+  }
+}
