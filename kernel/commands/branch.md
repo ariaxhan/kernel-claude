@@ -1,39 +1,87 @@
 ---
-description: Create intention-focused branch for work
+description: Create worktree for isolated development work
 allowed-tools: Bash, AskUserQuestion
 ---
 
-# Branch Command
+# Branch Command (Worktree-Based)
 
-Create a focused branch before starting work.
+Create an isolated worktree before starting work. Never work directly on main.
+
+## Philosophy
+
+```
+NEVER WORK ON MAIN
+All work happens on isolated worktrees.
+Create worktree first, then code.
+Each worktree = isolated context = own Claude session.
+```
 
 ## Steps
 
-1. **Check current state**
-   ```bash
-   git status --short
-   git branch --show-current
-   ```
+### 1. Check Current State
 
-2. **If uncommitted changes exist**
-   - Ask: commit them first, stash them, or abort?
+```bash
+git status --short
+git branch --show-current
+git worktree list
+```
 
-3. **If already on a feature branch**
-   - Ask: continue on this branch or create new?
+### 2. If Uncommitted Changes Exist
+- Ask: commit them first, stash them, or abort?
 
-4. **Get branch intention**
-   Ask user for:
-   - Type: feat | fix | docs | refactor | test | chore
-   - Description: 2-4 words, kebab-case
+### 3. If Already in a Worktree (not main)
+- Ask: continue here, or create new worktree?
 
-5. **Create and push branch**
-   ```bash
-   git checkout -b <type>/<description>
-   git push -u origin <type>/<description>
-   ```
+### 4. If on Main, Get Branch Intention
 
-6. **Confirm**
-   Report: "Ready to work on `<branch>`. Commits will be isolated from main."
+Ask user for:
+- **Type**: feat | fix | docs | refactor | test | chore
+- **Description**: 2-4 words, kebab-case
+
+### 5. Create Worktree and Open Terminal
+
+```bash
+# Get project name for naming
+PROJECT=$(basename $(pwd))
+
+# Create worktree with new branch
+git worktree add -b <type>/<description> ../${PROJECT}-<type>-<description>
+
+# Open in new terminal (macOS)
+open -a Terminal ../${PROJECT}-<type>-<description>
+```
+
+**For Linux:**
+```bash
+gnome-terminal --working-directory="../${PROJECT}-<type>-<description>"
+```
+
+**For Windows (PowerShell):**
+```powershell
+Start-Process wt -ArgumentList "-d", "..\${PROJECT}-<type>-<description>"
+```
+
+### 6. Confirm
+
+Report:
+```
+Worktree created and terminal opened!
+
+Setup:
+  Main directory: [current path] (stays on main)
+  Worktree: ../${PROJECT}-<type>-<description> (on <type>/<description>)
+
+New Terminal window opened at the worktree location.
+
+You can now:
+  1. Start Claude Code in the new terminal
+  2. Work on your feature in isolation
+  3. When done, use /ship to push and create PR
+
+Cleanup (after merge):
+  git worktree remove ../${PROJECT}-<type>-<description>
+  git branch -d <type>/<description>
+```
 
 ## Branch Types
 
@@ -45,3 +93,18 @@ Create a focused branch before starting work.
 | refactor/ | Code restructure |
 | test/ | Test changes |
 | chore/ | Maintenance |
+
+## Why Worktrees Instead of Branches?
+
+| Traditional Branching | Worktree Approach |
+|----------------------|-------------------|
+| `git checkout -b feat/x` | `git worktree add -b feat/x ../proj-feat-x` |
+| Same directory, different branch | Separate directory, own context |
+| Stash required for context switch | Just open another terminal |
+| One Claude session | Multiple parallel Claude sessions |
+| Risk of cross-contamination | Complete isolation |
+
+## Related
+
+- `/ship` - Push branch and create PR from worktree
+- `/parallelize` - Set up multiple worktrees for parallel streams
