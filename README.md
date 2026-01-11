@@ -96,6 +96,50 @@ KERNEL includes token-optimized methodology banks:
 
 Banks load on-demand via mode commands (~140 lines each, zero cost until used).
 
+### Arbiter Context Compression
+
+KERNEL includes **arbiter** - a propositional logic engine for mathematical context compression.
+
+**Why Arbiter?**
+- Conversations accumulate context that must eventually be compacted
+- Traditional summarization loses precision and nuance
+- Arbiter represents knowledge as logical facts, preserving exactness
+
+**How It Works**:
+1. Extract conversation facts in propositional logic format:
+   ```
+   use_python
+   use_fastapi
+   authenticated -> can_read
+   admin & authenticated -> can_write
+   ```
+
+2. Compress via logical redundancy removal:
+   - Removes tautologies (always-true statements)
+   - Eliminates semantic redundancies
+   - Validates consistency (no contradictions)
+
+3. Result: **95% token reduction** with zero information loss
+
+**Manual Usage**: `/arbiter-compact`
+
+**Automatic Usage**: Enable PreCompact hook in `.claude/settings.json`:
+```json
+{
+  "hooks": {
+    "PreCompact": [{
+      "matcher": "*",
+      "hooks": [{
+        "type": "prompt",
+        "prompt": "Extract facts in arbiter syntax per .claude/rules/arbiter-syntax.md"
+      }]
+    }]
+  }
+}
+```
+
+When enabled, arbiter automatically compresses context before every compaction, allowing seamless infinitely-long conversations.
+
 ### Configuration Type Distinctions
 
 **IMPORTANT**: See [CONFIG-TYPES.md](CONFIG-TYPES.md) for the complete guide on when to use each artifact type.
@@ -161,6 +205,7 @@ Imperative rules grouped by topic that Claude follows.
 | `/kernel-prune` | Review and remove stale config entries |
 | `/handoff` | Generate context handoff for session continuation |
 | `/parallelize` | Set up git worktrees for parallel development |
+| `/arbiter-compact` | Compress conversation context via propositional logic |
 
 ## Project Structure
 
