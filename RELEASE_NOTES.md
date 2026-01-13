@@ -1,3 +1,56 @@
+# KERNEL v1.5.0
+
+**Documentation Overhaul: Tailored, Not Templated**
+
+This release establishes the core philosophy that KERNEL creates tailored configuration for each project, not copy-pasted templates.
+
+---
+
+## Philosophy Shift
+
+KERNEL now explicitly:
+- Uses banks as **methodology guides**, not copy-paste templates
+- Only creates artifacts the specific project **actually needs**
+- **Tailors everything** to the actual codebase patterns
+
+## README Rewrite
+
+Complete rewrite focused on developers wanting to try KERNEL:
+- Clear pitch explaining what KERNEL does and why
+- Philosophy section (Tailored not Templated, Minimal Surface Area, Banks as Guides)
+- All 10 methodology banks documented
+- Quick start with 3 clear steps
+
+## kernel-init Overhaul
+
+The `/kernel-init` command now:
+- Analyzes the project before creating anything
+- Only creates directories/files that are needed
+- Writes project-specific rules, not generic ones
+- Explicitly avoids copy-pasting bank content
+
+## Sample Project Update
+
+`sample-project/.claude/CLAUDE.md` now demonstrates:
+- Proper tailored configuration
+- Why each command exists for THIS project
+- What was intentionally NOT included
+- Clear narrative structure
+
+## Cleanup (-2329 lines)
+
+- Removed duplicate directories (`hooks/`, `rules/`, `state.md` at root)
+- Removed outdated `BASELINE-*.md` design docs
+- Removed `ARBITER_HANDOFF.md` dev file
+- Consolidated `DOCUMENTATION-BANK.md` (now 643 lines)
+
+## Fixes
+
+- Fixed `/kernel:init` → `/kernel-init` syntax across all docs
+- Updated `/ship` command with release workflow
+
+---
+
 # KERNEL v1.4.0
 
 **Bank Architecture Expansion + New Development Commands**
