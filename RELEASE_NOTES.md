@@ -1,3 +1,77 @@
+# KERNEL v1.5.0
+
+**Automatic Methodology + Tailored Configuration**
+
+This release makes KERNEL methodology automatic. No more typing `/plan` or `/debug` - KERNEL detects context and applies the right approach. Commands reduced from 19 to 11.
+
+---
+
+## Automatic Methodology
+
+**The big change:** Methodology now applies based on context, not commands.
+
+| You're doing... | KERNEL automatically... |
+|-----------------|-------------------------|
+| Implementing new feature | Researches, plans, defines interfaces first |
+| Fixing a bug | Reproduces, isolates, finds root cause |
+| Refactoring | Understands deeply before changing |
+| Completing work | Reviews against requirements |
+
+**Removed commands (now automatic):**
+- `/plan` → Applied when implementing
+- `/debug` → Applied when fixing bugs
+- `/review` → Applied before completing
+- `/research` → Applied before new functionality
+- `/discover` → Applied in unfamiliar codebases
+- `/iterate` → Applied when refactoring
+- `/tearitapart` → Applied before complex implementations
+- `/arbiter-compact` → Available as hook configuration
+
+**Remaining commands (11):**
+- Setup: `/kernel-init`, `/kernel-user-init`
+- Pipelines: `/build`, `/docs`
+- Git: `/branch`, `/ship`, `/parallelize`, `/release`
+- Maintenance: `/kernel-status`, `/kernel-prune`, `/handoff`
+
+## Redundancy Layers
+
+Methodology applied through three layers (if one misses, others catch):
+
+1. **`kernel/rules/methodology.md`** - Context detection rules
+2. **Project CLAUDE.md** - Default behaviors section
+3. **`kernel/banks/`** - Deep methodology when needed
+
+## Default Behaviors in CLAUDE.md
+
+`/kernel-init` now creates a "Default Behaviors" section:
+- When Implementing New Features
+- When Debugging
+- When Refactoring
+- Before Completing Any Task
+
+## Philosophy Shift
+
+KERNEL now explicitly:
+- Uses banks as **methodology guides**, not copy-paste templates
+- Only creates artifacts the specific project **actually needs**
+- **Tailors everything** to the actual codebase patterns
+- **Applies methodology automatically** based on task context
+
+## Cleanup
+
+- Removed 8 methodology commands (now automatic)
+- Removed duplicate directories (`hooks/`, `rules/`, `state.md` at root)
+- Removed outdated `BASELINE-*.md` design docs
+- Consolidated `DOCUMENTATION-BANK.md` (now 643 lines)
+- Net reduction: ~3000 lines removed
+
+## Fixes
+
+- Fixed `/kernel:init` → `/kernel-init` syntax across all docs
+- Updated `/ship` command with release workflow
+
+---
+
 # KERNEL v1.4.0
 
 **Bank Architecture Expansion + New Development Commands**
