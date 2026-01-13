@@ -59,4 +59,4 @@ Hooks: X total
 
 5. **If untracked entries exist**, offer to bootstrap them into the registry.
 
-6. **If stale entries exist**, suggest running `/kernel:prune` for cleanup review.
+6. **If stale entries exist**, suggest running `/kernel-prune` for cleanup review.

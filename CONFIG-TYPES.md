@@ -269,7 +269,7 @@ DOMAIN: [api/cli/library/app]
 ```
 
 **When to Create/Update**:
-- ✅ During `/kernel:init`
+- ✅ During `/kernel-init`
 - ✅ Fundamental project-wide rule changes
 - ✅ Stack/tier/domain changes
 
@@ -497,7 +497,7 @@ Before creating ANY KERNEL artifact, check:
 
 - Claude Code documentation: [claude.ai/claude-code](https://claude.ai/claude-code)
 - MCP specification: [modelcontextprotocol.io](https://modelcontextprotocol.io)
-- This plugin: `/kernel:init` for setup, `/kernel:status` for health check
+- This plugin: `/kernel-init` for setup, `/kernel-status` for health check
 
 ---
 

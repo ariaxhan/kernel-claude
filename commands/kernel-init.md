@@ -1,269 +1,224 @@
 ---
-description: Initialize KERNEL for project - builds project-specific CLAUDE.md from bank + enables artifact creation
+description: Initialize KERNEL for project - analyzes codebase and creates tailored configuration
 allowed-tools: Read, Write, Glob, Bash, Grep, AskUserQuestion
 ---
 
-# Initialize KERNEL (Project-Level)
+# Initialize KERNEL
 
-Build a project-specific CLAUDE.md using CODING-PROMPT-BANK.md as substrate.
+Create project-specific Claude Code configuration by analyzing the codebase and tailoring every artifact to this project's actual needs.
 
-**Architecture:**
+**Philosophy**: KERNEL uses banks as methodology guides, not as copy-paste templates. Every command, rule, and hook should exist because THIS project needs it.
+
+---
+
+## Step 1: Analyze the Project
+
+Gather context before creating anything:
+
 ```
-PRECEDENCE: Project > User > Plugin
-
-~/.claude/CLAUDE.md       <-- Universal (user-init)
-./CLAUDE.md + kernel/     <-- Project-specific (THIS command)
-```
-
-## Step 0: Check User-Level Installation
-
-```bash
-ls ~/.claude/CLAUDE.md 2>/dev/null || echo "NOT_FOUND"
-```
-
-**If NOT_FOUND:**
-```
-User-level KERNEL not installed.
-
-The user-level config (~/.claude/CLAUDE.md) contains universal principles
-that apply to ALL projects. Project-level config adds specifics.
-
-Options:
-  1. Run /kernel:user-init first (recommended)
-  2. Continue anyway (project-level only)
-```
-
-Ask user which option. If they choose 1, stop and let them run user-init first.
-
-## Step 1: Read Configuration Types Guide
-
-**CRITICAL**: Before creating ANY artifacts, read CONFIG-TYPES.md in the plugin root.
-
-This guide defines WHEN to use:
-- AGENTS vs SKILLS vs COMMANDS vs RULES vs HOOKS vs MCP
-
-If CONFIG-TYPES.md doesn't exist in the target project, copy it from the plugin location.
-
-## Step 2: Locate CODING-PROMPT-BANK
-
-Search for CODING-PROMPT-BANK.md in order:
-1. Project root (if customized)
-2. Plugin location: `kernel/banks/CODING-PROMPT-BANK.md`
-
-Read the entire bank. Extract sections tagged `[PROJECT-LEVEL]`:
-- COMPLEXITY TIERS
-- TESTING REQUIREMENTS
-- PROJECT TEMPLATE
-- VALIDATION PROTOCOL (adapt per stack)
-
-**Do NOT extract `[USER-LEVEL]` sections** - those belong in `~/.claude/CLAUDE.md`.
-
-## Step 3: Analyze Project
-
-Gather intel:
-- README.md → purpose, domain
+READ:
+- README.md → purpose, features, audience
 - package.json / pyproject.toml / Cargo.toml / go.mod → stack, dependencies
-- Existing tests → testing patterns
-- .github/workflows → CI patterns
-- Existing .claude/ → prior config
+- Existing tests → testing patterns, coverage expectations
+- .github/workflows → CI patterns (if any)
+- Existing .claude/ → prior configuration
+- Source structure → module organization, key files
+```
 
-Determine:
-- **TIER**: 1 (hackathon), 2 (default), or 3 (critical)
-- **STACK**: Primary language, framework, tools
-- **DOMAIN**: What kind of project (API, CLI, library, app)
+**Determine:**
+- **Tier**: 1 (hackathon), 2 (production), 3 (critical systems)
+- **Stack**: Primary language, frameworks, tools
+- **Domain**: API, CLI, library, web app, mobile, etc.
+- **Patterns**: How errors are handled, how tests are structured, naming conventions
 
-## Step 4: Create Directory Structure
+---
+
+## Step 2: Ask Clarifying Questions (If Needed)
+
+If intent is unclear, ask:
+- "What's the primary use case for this project?"
+- "Are there any specific workflows you repeat often?"
+- "What quality standards matter most? (tests, types, docs)"
+
+Don't assume - ask when uncertain.
+
+---
+
+## Step 3: Create Directory Structure
+
+Only create what's needed:
 
 ```
 .claude/
-├── commands/
-├── agents/
-├── skills/
-├── rules/
-kernel/
-├── banks/      (methodology banks)
-├── commands/   (kernel commands)
-├── state.md    (project state)
+├── CLAUDE.md       # Project intelligence (always)
+├── commands/       # Only if project has repeatable workflows
+├── rules/          # Only if project has specific conventions
+└── settings.json   # Only if hooks make sense for this stack
 ```
 
-## Step 5: Build Project CLAUDE.md
+**Do NOT create empty directories.** If no commands are needed, don't create `commands/`.
 
-Create `.claude/CLAUDE.md` with PROJECT-SPECIFIC content only:
+---
+
+## Step 4: Write Project CLAUDE.md
+
+Create `.claude/CLAUDE.md` with content tailored to THIS project:
 
 ```markdown
-# [PROJECT NAME]
+# [Project Name]
 
-**TIER:** [1-3]
-**STACK:** [detected stack]
-**DOMAIN:** [api/cli/library/app/other]
+**[One-line description of what this project does]**
 
 ---
 
-## Project Constraints
+## Project Context
 
-[Discovered or user-specified constraints]
+**Tier**: [1/2/3] - [explanation]
+**Stack**: [detected stack]
+**Domain**: [what kind of project]
 
----
-
-## Coding Rules (Project-Specific)
-
-[Selected sections from CODING-PROMPT-BANK.md relevant to this tier/stack]
-
-### Tier [X] Requirements
-[From COMPLEXITY TIERS section, only the relevant tier]
-
-### Testing Requirements
-[From TESTING REQUIREMENTS section, adapted for stack]
-
-### Validation Protocol
-[From VALIDATION PROTOCOL section, adapted for project]
+**Key constraints**:
+- [Constraint 1 specific to this project]
+- [Constraint 2 specific to this project]
 
 ---
 
-## KERNEL: Self-Evolving Configuration
+## Coding Rules
 
-KERNEL progressively builds Claude Code config based on observed patterns.
+[Rules that emerged from analyzing THIS codebase, not generic best practices]
 
-### Pattern → Artifact Mapping
+### [Category 1]
+- [Specific rule observed in codebase]
+- [Another specific rule]
 
-| When You Notice... | Create This |
-|-------------------|-------------|
-| Same multi-step workflow repeated 2+ times | `.claude/commands/workflow-name.md` |
-| Task needing specialized expertise | `.claude/agents/specialist-name.md` |
-| External service integration needed | Entry in `.mcp.json` |
-| Pre/post processing on tool usage | Hook in `.claude/settings.json` |
-| Domain capability used repeatedly | `.claude/skills/capability/SKILL.md` |
-| User states explicit preference | `.claude/rules/topic.md` |
-
-### Guidelines
-
-- Conservative: Clear, repeated patterns only
-- Minimal: Start simple
-- Ask first: Confirm if unsure
-- Check existing: Avoid duplicates
-- **Read CONFIG-TYPES.md before creating artifacts**
-
-### On-Demand Methodology
-
-Methodology banks available via commands (zero token cost until used):
-
-- `/discover` — Map codebase, populate state
-- `/plan` — Get-it-right-first-time planning (loads PLANNING-BANK)
-- `/debug` — Systematic diagnosis (loads DEBUGGING-BANK)
-- `/review` — Correctness validation (loads REVIEW-BANK)
-- `/branch` — Create worktree for isolated development
-- `/ship` — Commit, push, create PR
-- `/parallelize` — Set up multiple worktrees for parallel streams
-
-### Living Knowledge
-
-- `kernel/state.md` — Current project reality (read first when uncertain)
-- `kernel/banks/` — Methodology references (load via commands)
-- `.claude/rules/` — Project patterns (evolves over time)
+### [Category 2]
+- [More specific rules]
 
 ---
 
-## Relationship to User-Level Config
+## Commands
 
-Universal principles (philosophy, git workflow, defaults) live in `~/.claude/CLAUDE.md`.
-This file contains PROJECT-SPECIFIC additions that take precedence.
+[Only list commands that were created for this project]
 
-**Full precedence chain:**
-1. This file (project-specific, highest priority)
-2. ~/.claude/CLAUDE.md (universal principles)
-3. Plugin defaults (lowest priority)
+| Command | Purpose |
+|---------|---------|
+| `/command-name` | Why this command exists for this project |
 
 ---
 
-Generated by KERNEL `/kernel:init`
-Source: CODING-PROMPT-BANK v1.1
-Last updated: {TIMESTAMP}
+## Methodology
+
+KERNEL provides methodology banks for common workflows:
+- `/plan` — Think before coding, using PLANNING-BANK methodology
+- `/debug` — Systematic diagnosis, using DEBUGGING-BANK methodology
+- `/review` — Correctness validation, using REVIEW-BANK methodology
+- `/discover` — Map codebase, populate understanding
+
+Banks are guides, not scripts. Adapt methodology to context.
 ```
 
-## Step 6: Copy Methodology Banks
+---
 
-**From plugin kernel/banks/ → project kernel/banks/:**
-- `PLANNING-BANK.md`
-- `DEBUGGING-BANK.md`
-- `REVIEW-BANK.md`
-- `DISCOVERY-BANK.md`
-- `CODING-PROMPT-BANK.md`
+## Step 5: Create Commands (Only If Needed)
 
-**Note**: Banks are NOT loaded by default (zero token cost until referenced via commands).
+**Before creating any command, ask**: "Would this project actually use this?"
 
-## Step 7: Copy Commands
+**Good reasons to create a command:**
+- Workflow is repeated 2+ times in this project
+- Project has a specific multi-step process (deploy, release, test cycle)
+- Team has requested automation for something
 
-**From plugin kernel/commands/ → project kernel/commands/:**
-- `discover.md`
-- `plan.md`
-- `debug.md`
-- `review.md`
-- `branch.md`
-- `ship.md`
-- `parallelize.md`
-- `handoff.md`
+**Bad reasons to create a command:**
+- "It might be useful someday"
+- "Other projects have this"
+- "The template includes it"
 
-Also copy to `.claude/commands/` for Claude Code discovery.
+**When creating a command:**
+- Write it specifically for this project's tools and structure
+- Reference actual file paths and commands
+- Include project-specific context
 
-## Step 8: Create Starter Files
+---
 
-- `.claude/rules/preferences.md` with header
-- `kernel/state.md` with initial template
-- `.mcp.json` if not exists
-- `.claude/settings.json` if not exists
+## Step 6: Create Rules (Only If Needed)
 
-## Step 9: Report
+Rules capture preferences and patterns specific to this project.
+
+**Only create rules for:**
+- Explicitly stated preferences ("we use tabs", "no semicolons")
+- Observed patterns that differ from defaults
+- Non-negotiable constraints (security, compliance)
+
+**Do NOT create rules for:**
+- General best practices (those are assumed)
+- Things that haven't been decided yet
+- Preferences that can be inferred from tooling config
+
+---
+
+## Step 7: Configure Hooks (Only If Stack Benefits)
+
+Hooks run automatically on tool use. Only configure if:
+- Project has formatters/linters that should auto-run
+- Project has validation that should happen on writes
+- Stack has common automation patterns
+
+**Example decision tree:**
+- Python project with Black/Ruff → configure PostToolUse formatter hook
+- Rust project with cargo fmt → configure PostToolUse formatter hook
+- Markdown-only project → probably no hooks needed
+- Project without tests → don't add test-running hooks
+
+---
+
+## Step 8: Report What Was Created
 
 ```
-KERNEL Initialized for [PROJECT NAME]
+KERNEL initialized for [Project Name]
 
 Detected:
-  TIER: [tier] — [explanation]
-  STACK: [stack]
-  DOMAIN: [domain]
+  Tier: [tier] — [why]
+  Stack: [stack]
+  Domain: [domain]
 
 Created:
-  .claude/CLAUDE.md         — Project-specific config
-  .claude/commands/         — [count] commands
-  .claude/rules/            — Starter rules
-  kernel/banks/             — [count] methodology banks
-  kernel/commands/          — [count] kernel commands
-  kernel/state.md           — Project state tracker
+  .claude/CLAUDE.md     — Project-specific configuration
+  [.claude/commands/]   — [N commands, if any]
+  [.claude/rules/]      — [N rules, if any]
+  [.claude/settings.json] — [Hooks, if any]
 
-User-Level Config:
-  [Found at ~/.claude/CLAUDE.md | NOT FOUND - run /kernel:user-init]
+Not created (not needed for this project):
+  [List anything intentionally skipped and why]
 
-Content Source:
-  CODING-PROMPT-BANK v1.1
-
-Available Commands:
-  /discover  — Map codebase and populate state
-  /plan      — Planning mode
-  /debug     — Debugging mode
-  /review    — Review mode
-  /branch    — Create worktree for work
-  /ship      — Push and create PR
-  /parallelize — Parallel worktrees
+Methodology available:
+  /discover  — Map codebase
+  /plan      — Planning methodology
+  /debug     — Debugging methodology
+  /review    — Review methodology
 
 Next steps:
-  1. Run /discover to populate kernel/state.md
-  2. Use /branch before starting any work
-  3. Patterns emerge → artifacts evolve
+  1. Review .claude/CLAUDE.md and adjust if needed
+  2. Use /discover if codebase is unfamiliar
+  3. Work normally - patterns will emerge
 ```
 
-## Key Differences from User-Init
-
-| User-Init (`~/.claude/`) | Project-Init (`./`) |
-|--------------------------|---------------------|
-| Universal philosophy | Project tier/stack/domain |
-| Git workflow | Testing requirements |
-| Defaults | Validation protocol |
-| Response preferences | Project constraints |
-| Applies to ALL projects | Applies to THIS project |
-| Run once per machine | Run once per project |
+---
 
 ## Anti-Patterns
 
-- **DON'T duplicate** universal content already in `~/.claude/CLAUDE.md`
-- **DON'T skip** user-level check (at least warn if missing)
-- **DON'T create** project-level versions of git workflow, philosophy, defaults
+- **DON'T copy-paste bank content** into CLAUDE.md - reference banks, don't duplicate
+- **DON'T create generic commands** - every command should mention this project's specifics
+- **DON'T assume conventions** - discover them from the codebase
+- **DON'T create empty structures** - if nothing goes in a directory, don't create it
+- **DON'T include irrelevant methodology** - no frontend rules for a CLI tool
+
+---
+
+## What Makes Good Project Config
+
+**Specific**: References actual files, paths, and tools in this project
+**Minimal**: Only includes what's actually used
+**Grounded**: Rules based on observed patterns, not aspirations
+**Honest**: Describes reality, admits what's not yet decided
+
+See `sample-project/.claude/CLAUDE.md` for an example of well-tailored configuration.

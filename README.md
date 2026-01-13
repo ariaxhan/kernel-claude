@@ -1,309 +1,327 @@
 # KERNEL
 
-**Self-Evolving Configuration for Claude Code**
+**Project Intelligence for Claude Code**
 
-KERNEL is a Claude Code plugin that progressively builds your project configuration based on observed patterns. Instead of manually creating commands, agents, and rules, KERNEL watches how you work and suggests artifacts that automate your workflows.
+KERNEL is a Claude Code plugin that creates tailored configuration for your project. Instead of copy-pasting generic templates, KERNEL analyzes your codebase and builds configuration that actually fits - commands for workflows you repeat, rules for patterns you follow, hooks for tools you use.
 
-## What KERNEL Does
+---
 
-When you work with Claude Code, patterns emerge:
-- You repeat the same multi-step workflow
-- You need specialized expertise for certain tasks
-- You integrate external services
-- You state preferences about how things should be done
+## Why KERNEL?
 
-KERNEL captures these patterns and creates the appropriate Claude Code artifacts:
+Claude Code is powerful out of the box, but every project is different:
+- A Python CLI needs different tooling than a React app
+- A production API needs stricter rules than a hackathon project
+- Your deploy workflow isn't the same as anyone else's
 
-| Pattern | Artifact Created |
-|---------|------------------|
-| Repeated workflow | `.claude/commands/workflow-name.md` |
-| Specialized task | `.claude/agents/specialist-name.md` |
-| External service | Entry in `.mcp.json` |
-| Pre/post processing | Hook in `.claude/settings.json` |
-| Domain capability | `.claude/skills/capability.md` |
-| Explicit preference | `.claude/rules/topic.md` |
+KERNEL bridges this gap by:
+1. **Analyzing your project** - stack, patterns, conventions
+2. **Creating tailored config** - only what this project needs
+3. **Providing methodology** - banks of knowledge for planning, debugging, reviewing
+4. **Evolving over time** - configuration grows as patterns emerge
+
+---
 
 ## Quick Start
 
 ### 1. Install the Plugin
 
-**Via Plugin Menu (Recommended):**
-
-1. In Claude Code, run `/plugin`
-2. Navigate to **Marketplaces** tab
-3. Select **+ Add Marketplace**
-4. Enter: `https://github.com/ariaxhan/kernel-plugin`
-5. Go to **Discover** tab and enable the KERNEL plugin
-
+In Claude Code, run:
 ```
-┌─ Add Marketplace ───────────────────────────────────────────────────────┐
-│ Enter marketplace source:                                               │
-│     https://github.com/ariaxhan/kernel-plugin                           │
-╰─────────────────────────────────────────────────────────────────────────╯
+/plugin
 ```
 
-**Programmatic (for teams):**
-
-Add to `~/.claude/settings.json` or your project's `.claude/settings.json`:
-```json
-{
-  "extraKnownMarketplaces": {
-    "kernel-marketplace": {
-      "source": { "source": "github", "repo": "ariaxhan/kernel-plugin" }
-    }
-  },
-  "enabledPlugins": { "kernel@kernel-marketplace": {} }
-}
+Navigate to **Marketplaces** → **+ Add Marketplace** and enter:
+```
+https://github.com/ariaxhan/kernel-plugin
 ```
 
-See [SETUP.md](SETUP.md) for detailed installation instructions.
+Then go to **Discover** and enable the KERNEL plugin.
 
-### 2. Initialize KERNEL in Your Project
+### 2. Initialize Your Project
 
 ```bash
 cd your-project
 claude
 
-# Inside Claude Code, run:
+# Inside Claude Code:
 /kernel-init
 ```
 
-This analyzes your project and creates a customized `.claude/CLAUDE.md` with:
-- Detected tier (T1 hackathon, T2 production, T3 critical)
-- Stack-specific coding rules
-- KERNEL artifact templates
+KERNEL will analyze your project and create `.claude/CLAUDE.md` with:
+- Project-specific coding rules
+- Commands tailored to your workflows (only if needed)
+- Hooks for your stack's tools (only if beneficial)
 
-### 3. Work Normally
+### 3. Use Methodology Banks
 
-As you work, KERNEL observes patterns and asks before creating artifacts:
+When you need structured thinking:
+
+| Command | When to Use |
+|---------|-------------|
+| `/plan` | Before implementing something complex |
+| `/debug` | When systematically diagnosing an issue |
+| `/review` | When validating correctness of changes |
+| `/discover` | When exploring an unfamiliar codebase |
+| `/research` | Before writing code, find existing solutions |
+| `/build` | Full pipeline from idea to working code |
+| `/iterate` | Improving existing code systematically |
+| `/tearitapart` | Critical review before implementation |
+
+---
+
+## Philosophy
+
+### Tailored, Not Templated
+
+KERNEL never just copies files. Every artifact is created because your project needs it:
 
 ```
-"I noticed you've run this 3-step deployment workflow twice.
-Should I create a /deploy command for it?"
+Good: "Created /test-all because this project has 4 test modules"
+Bad:  "Created /test-all because the template includes it"
 ```
 
-## Features
+### Minimal Surface Area
 
-### Knowledge Banks
+Less is more. KERNEL only creates:
+- Commands for workflows you actually repeat
+- Rules for patterns that differ from defaults
+- Hooks for tools the project actually uses
 
-KERNEL includes token-optimized methodology banks:
+If something isn't needed, it doesn't exist.
 
-- **PLANNING-BANK** - Get-it-right-first-time methodology
-- **DEBUGGING-BANK** - Systematic diagnosis and root cause fixing
-- **DISCOVERY-BANK** - Codebase reconnaissance and pattern extraction
-- **REVIEW-BANK** - Correctness, consistency, completeness validation
-- **DOCUMENTATION-BANK** - Docs style selection, budgets, maintenance
-- **RESEARCH-BANK** - Find existing solutions before writing code
-- **BUILD-BANK** - Full pipeline from idea to working code
-- **ITERATION-BANK** - Continuous improvement methodology
-- **TEARITAPART-BANK** - Critical review before implementation
+### Banks as Guides, Not Scripts
 
-Banks load on-demand via mode commands (~100-150 lines each, zero cost until used).
+Knowledge banks contain methodology, not procedures to execute blindly:
 
-### Arbiter Context Compression
+```
+PLANNING-BANK teaches:
+- "Simulate execution mentally before coding"
+- "Define interfaces before implementations"
+- Not: "Step 1: Create file X. Step 2: Write function Y."
+```
 
-KERNEL includes **arbiter** - a propositional logic engine for mathematical context compression.
+You adapt the methodology to your context.
 
-**Why Arbiter?**
-- Conversations accumulate context that must eventually be compacted
-- Traditional summarization loses precision and nuance
-- Arbiter represents knowledge as logical facts, preserving exactness
+### Progressive Evolution
 
-**How It Works**:
-1. Extract conversation facts in propositional logic format:
-   ```
-   use_python
-   use_fastapi
-   authenticated -> can_read
-   admin & authenticated -> can_write
-   ```
+Configuration grows organically:
+1. Start minimal (just CLAUDE.md)
+2. Notice repeated workflows → create commands
+3. Discover patterns → codify as rules
+4. Set up automation → add hooks
 
-2. Compress via logical redundancy removal:
-   - Removes tautologies (always-true statements)
-   - Eliminates semantic redundancies
-   - Validates consistency (no contradictions)
+Don't front-load decisions. Let patterns emerge.
 
-3. Result: **95% token reduction** with zero information loss
+---
 
-**Manual Usage**: `/arbiter-compact`
+## What Gets Created
 
-**Automatic Usage**: Enable PreCompact hook in `.claude/settings.json`:
+### Always: `.claude/CLAUDE.md`
+
+Your project's intelligence file:
+- Project context (tier, stack, domain)
+- Coding rules specific to this codebase
+- Commands that exist and why
+- Methodology references
+
+### Sometimes: Commands
+
+Only created for workflows this project actually uses:
+
+```markdown
+# Example: /test-all (created for a Python project)
+---
+description: Run all pytest tests with coverage
+allowed-tools: Bash
+---
+
+Run the test suite for this project:
+1. Execute: `pytest tests/ -v --cov=src`
+2. Report coverage summary
+3. If tests fail, show failure details
+```
+
+### Sometimes: Hooks
+
+Only configured if the stack benefits:
+
 ```json
 {
   "hooks": {
-    "PreCompact": [{
-      "matcher": "*",
+    "PostToolUse": [{
+      "matcher": "Write",
       "hooks": [{
-        "type": "prompt",
-        "prompt": "Extract facts in arbiter syntax per .claude/rules/arbiter-syntax.md"
+        "type": "command",
+        "command": "if [[ \"$FILE_PATH\" == *.py ]]; then ruff format \"$FILE_PATH\"; fi"
       }]
     }]
   }
 }
 ```
 
-When enabled, arbiter automatically compresses context before every compaction, allowing seamless infinitely-long conversations.
+### Sometimes: Rules
 
-### Configuration Type Distinctions
+Only for project-specific patterns:
 
-**IMPORTANT**: See [CONFIG-TYPES.md](CONFIG-TYPES.md) for the complete guide on when to use each artifact type.
-
-This is the **most critical resource** for understanding KERNEL. It includes:
-- Decision tree for choosing the right artifact type
-- Detailed comparison of agents vs skills vs commands vs rules
-- Common confusion scenarios with examples
-- Anti-patterns to avoid
-- Validation checklist
-
-**Read CONFIG-TYPES.md BEFORE creating any artifacts** to ensure you're using the right type for your use case.
-
-### Artifact Types
-
-**Commands** (`/command-name`)
 ```markdown
----
-description: One-line description
-allowed-tools: Read, Write, Bash
----
-Instructions for Claude when /command-name is invoked.
+# .claude/rules/api-conventions.md
+
+All API endpoints in this project:
+- Return JSON with `{data, error, meta}` envelope
+- Use HTTP status codes correctly (201 for create, 204 for delete)
+- Include request-id header for tracing
 ```
 
-**Agents** (Specialized sub-agents)
-```markdown
 ---
-name: agent-name
-description: What it specializes in
-tools: Read, Write, Grep, Glob, Bash
-model: sonnet
+
+## Knowledge Banks
+
+KERNEL includes 10 methodology banks (~100-150 lines each):
+
+| Bank | Purpose |
+|------|---------|
+| **PLANNING-BANK** | Think before coding - mental simulation, interface-first design |
+| **DEBUGGING-BANK** | Reproduce → Isolate → Instrument → Root cause → Fix |
+| **DISCOVERY-BANK** | Map unfamiliar codebases - reconnaissance methodology |
+| **REVIEW-BANK** | Validate correctness, consistency, completeness |
+| **DOCUMENTATION-BANK** | Docs style selection, budgets, maintenance system |
+| **RESEARCH-BANK** | Find existing solutions before writing code |
+| **BUILD-BANK** | Full pipeline: research → plan → review → execute → validate |
+| **ITERATION-BANK** | Systematic improvement of existing code |
+| **TEARITAPART-BANK** | Critical review before implementation |
+| **CODING-PROMPT-BANK** | Core philosophy and tier-based requirements |
+
+Banks load on-demand via commands. Zero token cost until used.
+
 ---
-You are a specialist in X. Your job is to...
-```
 
-**MCP Servers** (External integrations)
-```json
-{"mcpServers": {"name": {"command": "npx", "args": ["package-name"]}}}
-```
+## Commands Reference
 
-**Hooks** (Pre/post processing)
-```json
-{"hooks": {"PostToolUse": [{"matcher": "Write", "hooks": [{"type": "command", "command": "prettier --write $CLAUDE_FILE_PATHS"}]}]}}
-```
+### Initialization
+| Command | Purpose |
+|---------|---------|
+| `/kernel-init` | Initialize KERNEL for a project |
+| `/kernel-user-init` | Set up user-level defaults (~/.claude/) |
 
-**Skills** (Domain capabilities)
-Markdown files describing patterns and examples for specific domains.
+### Methodology
+| Command | Purpose |
+|---------|---------|
+| `/discover` | Map codebase, extract conventions |
+| `/plan` | Get-it-right-first-time planning |
+| `/debug` | Systematic diagnosis |
+| `/review` | Correctness validation |
+| `/research` | Find existing solutions |
+| `/build` | Full implementation pipeline |
+| `/iterate` | Continuous improvement |
+| `/tearitapart` | Critical pre-implementation review |
+| `/docs` | Documentation mode |
 
-**Rules** (User preferences)
-Imperative rules grouped by topic that Claude follows.
+### Git Workflow
+| Command | Purpose |
+|---------|---------|
+| `/branch` | Create worktree for isolated work |
+| `/ship` | Push and create PR |
+| `/parallelize` | Set up multiple worktrees |
+| `/release` | Version bump, tag, push |
+| `/handoff` | Generate context for session continuation |
 
-### Included Commands
+### Maintenance
+| Command | Purpose |
+|---------|---------|
+| `/kernel-status` | Show config health |
+| `/kernel-prune` | Remove stale config entries |
+| `/arbiter-compact` | Compress conversation context |
 
-| Command | Description |
-|---------|-------------|
-| `/kernel-init` | Initialize KERNEL for any project |
-| `/discover` | Map codebase, find tooling, extract conventions |
-| `/plan` | Get-it-right-first-time planning mode |
-| `/debug` | Systematic diagnosis and root cause fixing |
-| `/review` | Correctness, consistency, completeness validation |
-| `/docs` | Documentation audit, generation, maintenance |
-| `/research` | Deep research - find solutions before writing code |
-| `/build` | Full pipeline from idea to working code |
-| `/iterate` | Continuous improvement for existing code |
-| `/tearitapart` | Critical review before implementation |
-| `/kernel-status` | Show config health and staleness report |
-| `/kernel-prune` | Review and remove stale config entries |
-| `/handoff` | Generate context handoff for session continuation |
-| `/parallelize` | Set up git worktrees for parallel development |
-| `/arbiter-compact` | Compress conversation context via propositional logic |
+---
 
 ## Project Structure
 
 ```
 kernel-plugin/
-├── kernel/                    # Templates (copied to projects)
-│   ├── banks/                 # Methodology banks
+├── commands/              # Plugin commands
+│   ├── kernel-init.md
+│   ├── discover.md
+│   ├── plan.md
+│   └── ...
+├── kernel/
+│   ├── banks/             # Methodology banks
 │   │   ├── PLANNING-BANK.md
 │   │   ├── DEBUGGING-BANK.md
-│   │   ├── DISCOVERY-BANK.md
-│   │   ├── REVIEW-BANK.md
-│   │   ├── DOCUMENTATION-BANK.md
-│   │   ├── RESEARCH-BANK.md
-│   │   ├── BUILD-BANK.md
-│   │   ├── ITERATION-BANK.md
-│   │   └── TEARITAPART-BANK.md
-│   ├── commands/              # Mode commands
-│   ├── hooks/                 # Hook templates
-│   ├── rules/                 # Rule templates
-│   └── state.md               # World model template
-├── commands/                  # Plugin commands
-├── docs/
-│   └── documentation-files/   # Doc templates & scripts
-├── CONFIG-TYPES.md            # Artifact type guide
-├── README.md
-└── SETUP.md
+│   │   └── ...
+│   ├── rules/             # Rule templates
+│   ├── hooks/             # Hook templates
+│   ├── tools/             # Arbiter compression engine
+│   └── state.md           # State template
+├── sample-project/        # Example showing KERNEL in action
+├── CONFIG-TYPES.md        # When to use each artifact type
+├── SETUP.md               # Detailed installation guide
+└── README.md              # This file
 ```
 
-## Philosophy
+---
 
-KERNEL follows these principles:
+## Example: Sample Project
 
-1. **Conservative**: Only create artifacts for clear, repeated patterns
-2. **Minimal**: Start simple, iterate later
-3. **Ask First**: Confirm with user before creating if unsure
-4. **Check Existing**: Read configs first to avoid duplicates
+`sample-project/` demonstrates KERNEL configuration for a Python CLI:
 
-Configuration should grow organically from actual usage, not speculation.
+```
+sample-project/.claude/CLAUDE.md shows:
+- Tier 1 (hackathon) classification
+- Python-specific coding rules (type hints, error handling)
+- 4 commands tailored to TaskMgr workflows
+- Hooks for Black, Pylint, Mypy
 
-## Config Lifecycle
-
-KERNEL doesn't just add configuration - it also identifies stale entries for removal.
-
-### Reference Tracking
-
-When you use a command, agent, skill, or rule, KERNEL updates `memory/config_registry.jsonl`:
-```json
-{"type": "command", "name": "deploy", "created": "2025-01-01T00:00:00Z", "last_referenced": "2025-01-09T00:00:00Z", "reference_count": 12}
+Note what's NOT included:
+- No Docker commands (project doesn't use Docker)
+- No frontend rules (it's a CLI)
+- No generic "best practices" (only project-specific patterns)
 ```
 
-### Health Check
+This is what good KERNEL config looks like: specific, minimal, grounded.
 
-Run `/kernel:status` to see config health:
-```
-Config entries: 12
-  Active (referenced last 7 days): 8
-  Stale (no reference 30+ days): 3
-  New (< 7 days old): 1
-```
+---
 
-### Pruning
+## Configuration Types
 
-Run `/kernel:prune` to review stale entries:
-```
-STALE: [command] old-workflow
-  Created: 2024-11-01
-  Last referenced: 2024-12-01 (39 days ago)
-  Reference count: 2
+Before creating artifacts, understand when to use each type:
 
-  Remove this entry? [Y/n/skip all]
-```
+| I want Claude to... | Create... |
+|---------------------|-----------|
+| Follow rules on all tasks | `.claude/CLAUDE.md` or `.claude/rules/` |
+| Run workflow when I say `/name` | `.claude/commands/name.md` |
+| Auto-run on file write/commit | Hook in `.claude/settings.json` |
+| Delegate to specialist sub-agent | `.claude/agents/name.md` |
+| Learn how to do something | `.claude/skills/name/SKILL.md` |
+| Connect to external service | `.mcp.json` entry |
 
-- KERNEL never auto-deletes; always prompts for confirmation
-- Entries flagged after 30 sessions with zero references
-- Rejecting keeps the entry and resets its staleness timer
-- All removals are logged for audit trail
+See [CONFIG-TYPES.md](CONFIG-TYPES.md) for the complete decision guide.
+
+---
 
 ## Requirements
 
-- Claude Code CLI **v1.0.33+** (plugins require this version or later)
-- Python 3.8+ (optional, for Claude Docs MCP server)
+- Claude Code CLI **v1.0.33+**
+- Python 3.8+ (optional, for arbiter compression)
 
-## Platform Support
+Works on macOS, Linux, and Windows.
 
-KERNEL works on **macOS**, **Linux**, and **Windows**. The plugin installation method (`/plugin` menu) works the same on all platforms.
+---
+
+## Contributing
+
+Contributions welcome. Before creating artifacts:
+1. Read [CONFIG-TYPES.md](CONFIG-TYPES.md)
+2. Review existing banks in `kernel/banks/`
+3. Check `sample-project/` for style reference
+
+---
 
 ## License
 
 MIT
 
-## Contributing
+---
 
-Contributions welcome. Read `CONFIG-TYPES.md` before creating artifacts and review the banks in `kernel/banks/` for methodology.
+## Author
+
+Aria Han — [github.com/ariaxhan](https://github.com/ariaxhan)
