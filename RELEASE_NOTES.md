@@ -1,10 +1,53 @@
 # KERNEL v1.5.0
 
-**Documentation Overhaul: Tailored, Not Templated**
+**Automatic Methodology + Tailored Configuration**
 
-This release establishes the core philosophy that KERNEL creates tailored configuration for each project, not copy-pasted templates.
+This release makes KERNEL methodology automatic. No more typing `/plan` or `/debug` - KERNEL detects context and applies the right approach. Commands reduced from 19 to 11.
 
 ---
+
+## Automatic Methodology
+
+**The big change:** Methodology now applies based on context, not commands.
+
+| You're doing... | KERNEL automatically... |
+|-----------------|-------------------------|
+| Implementing new feature | Researches, plans, defines interfaces first |
+| Fixing a bug | Reproduces, isolates, finds root cause |
+| Refactoring | Understands deeply before changing |
+| Completing work | Reviews against requirements |
+
+**Removed commands (now automatic):**
+- `/plan` → Applied when implementing
+- `/debug` → Applied when fixing bugs
+- `/review` → Applied before completing
+- `/research` → Applied before new functionality
+- `/discover` → Applied in unfamiliar codebases
+- `/iterate` → Applied when refactoring
+- `/tearitapart` → Applied before complex implementations
+- `/arbiter-compact` → Available as hook configuration
+
+**Remaining commands (11):**
+- Setup: `/kernel-init`, `/kernel-user-init`
+- Pipelines: `/build`, `/docs`
+- Git: `/branch`, `/ship`, `/parallelize`, `/release`
+- Maintenance: `/kernel-status`, `/kernel-prune`, `/handoff`
+
+## Redundancy Layers
+
+Methodology applied through three layers (if one misses, others catch):
+
+1. **`kernel/rules/methodology.md`** - Context detection rules
+2. **Project CLAUDE.md** - Default behaviors section
+3. **`kernel/banks/`** - Deep methodology when needed
+
+## Default Behaviors in CLAUDE.md
+
+`/kernel-init` now creates a "Default Behaviors" section:
+- When Implementing New Features
+- When Debugging
+- When Refactoring
+- Before Completing Any Task
 
 ## Philosophy Shift
 
@@ -12,37 +55,15 @@ KERNEL now explicitly:
 - Uses banks as **methodology guides**, not copy-paste templates
 - Only creates artifacts the specific project **actually needs**
 - **Tailors everything** to the actual codebase patterns
+- **Applies methodology automatically** based on task context
 
-## README Rewrite
+## Cleanup
 
-Complete rewrite focused on developers wanting to try KERNEL:
-- Clear pitch explaining what KERNEL does and why
-- Philosophy section (Tailored not Templated, Minimal Surface Area, Banks as Guides)
-- All 10 methodology banks documented
-- Quick start with 3 clear steps
-
-## kernel-init Overhaul
-
-The `/kernel-init` command now:
-- Analyzes the project before creating anything
-- Only creates directories/files that are needed
-- Writes project-specific rules, not generic ones
-- Explicitly avoids copy-pasting bank content
-
-## Sample Project Update
-
-`sample-project/.claude/CLAUDE.md` now demonstrates:
-- Proper tailored configuration
-- Why each command exists for THIS project
-- What was intentionally NOT included
-- Clear narrative structure
-
-## Cleanup (-2329 lines)
-
+- Removed 8 methodology commands (now automatic)
 - Removed duplicate directories (`hooks/`, `rules/`, `state.md` at root)
 - Removed outdated `BASELINE-*.md` design docs
-- Removed `ARBITER_HANDOFF.md` dev file
 - Consolidated `DOCUMENTATION-BANK.md` (now 643 lines)
+- Net reduction: ~3000 lines removed
 
 ## Fixes
 

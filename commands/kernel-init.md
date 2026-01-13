@@ -7,7 +7,7 @@ allowed-tools: Read, Write, Glob, Bash, Grep, AskUserQuestion
 
 Create project-specific Claude Code configuration by analyzing the codebase and tailoring every artifact to this project's actual needs.
 
-**Philosophy**: KERNEL uses banks as methodology guides, not as copy-paste templates. Every command, rule, and hook should exist because THIS project needs it.
+**Philosophy**: KERNEL uses banks as methodology guides, not as copy-paste templates. Methodology is applied automatically based on context - no commands needed.
 
 ---
 
@@ -96,9 +96,41 @@ Create `.claude/CLAUDE.md` with content tailored to THIS project:
 
 ---
 
+## Default Behaviors
+
+These behaviors apply automatically based on task context:
+
+### When Implementing New Features
+1. Research existing solutions before writing custom code
+2. Plan the approach and define interfaces first
+3. Mentally simulate execution before coding
+4. Review against requirements before completing
+
+### When Debugging
+1. Reproduce the issue with exact steps
+2. Isolate to smallest failing case
+3. Instrument to understand actual behavior
+4. Fix root cause, not symptoms
+
+### When Refactoring
+1. Understand current implementation deeply first
+2. Identify specific improvements (not vague refactoring)
+3. Make one change at a time, verify each
+4. Less code is usually better code
+
+### Before Completing Any Task
+1. Review against original requirements
+2. Check convention adherence
+3. Validate edge cases handled
+4. Confirm no regressions
+
+Methodology banks in `kernel/banks/` provide deeper guidance when needed.
+
+---
+
 ## Commands
 
-[Only list commands that were created for this project]
+[Only list project-specific commands that were created]
 
 | Command | Purpose |
 |---------|---------|
@@ -106,15 +138,22 @@ Create `.claude/CLAUDE.md` with content tailored to THIS project:
 
 ---
 
-## Methodology
+## KERNEL Reference
 
-KERNEL provides methodology banks for common workflows:
-- `/plan` — Think before coding, using PLANNING-BANK methodology
-- `/debug` — Systematic diagnosis, using DEBUGGING-BANK methodology
-- `/review` — Correctness validation, using REVIEW-BANK methodology
-- `/discover` — Map codebase, populate understanding
+**Banks** (auto-applied based on context):
+- `PLANNING-BANK.md` — Interface-first design, mental simulation
+- `DEBUGGING-BANK.md` — Reproduce → Isolate → Root cause → Fix
+- `RESEARCH-BANK.md` — Find existing solutions before custom code
+- `REVIEW-BANK.md` — Correctness, consistency, completeness
+- `DISCOVERY-BANK.md` — Map unfamiliar codebases
+- `ITERATION-BANK.md` — Systematic improvement
+- `TEARITAPART-BANK.md` — Critical review before implementation
 
-Banks are guides, not scripts. Adapt methodology to context.
+**Explicit commands** (when you need them):
+- `/build` — Full pipeline from idea to working code
+- `/docs` — Documentation mode
+- `/branch`, `/ship`, `/release` — Git workflow
+- `/handoff` — Session continuation
 ```
 
 ---
@@ -182,7 +221,7 @@ Detected:
   Domain: [domain]
 
 Created:
-  .claude/CLAUDE.md     — Project-specific configuration
+  .claude/CLAUDE.md     — Project intelligence + default behaviors
   [.claude/commands/]   — [N commands, if any]
   [.claude/rules/]      — [N rules, if any]
   [.claude/settings.json] — [Hooks, if any]
@@ -190,16 +229,22 @@ Created:
 Not created (not needed for this project):
   [List anything intentionally skipped and why]
 
-Methodology available:
-  /discover  — Map codebase
-  /plan      — Planning methodology
-  /debug     — Debugging methodology
-  /review    — Review methodology
+Automatic methodology:
+  Planning, debugging, research, review behaviors are applied
+  automatically based on task context. No commands needed.
+
+Explicit commands available:
+  /build    — Full implementation pipeline
+  /docs     — Documentation mode
+  /branch   — Create worktree
+  /ship     — Push and create PR
+  /release  — Tag and publish
+  /handoff  — Session continuation
 
 Next steps:
   1. Review .claude/CLAUDE.md and adjust if needed
-  2. Use /discover if codebase is unfamiliar
-  3. Work normally - patterns will emerge
+  2. Start working - methodology applies automatically
+  3. Patterns will emerge as you work
 ```
 
 ---
