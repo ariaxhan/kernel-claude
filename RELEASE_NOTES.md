@@ -1,3 +1,64 @@
+# KERNEL v1.6.0
+
+**Session Tracking + Long-Term Maintainability**
+
+This release adds the `_meta/` structure for session continuity and project maintainability.
+
+---
+
+## _meta Structure
+
+New folder structure for tracking work across sessions:
+
+```
+_meta/
+├── INDEX.md              # Navigation hub
+├── _session.md           # Session context (blockers, decisions, infrastructure)
+├── _learnings.md         # Change log (append-only, dated entries)
+├── context/
+│   └── active.md         # Current work state
+└── research/
+    └── *.md              # Investigation outputs
+```
+
+## Session Protocol
+
+Updated `.claude/CLAUDE.md` with session protocol:
+
+```
+SESSION START:
+1. Read _meta/_session.md for context
+2. Read _meta/context/active.md for current work
+3. Check kernel/state.md for project reality
+
+DURING:
+- Update active.md as you work
+- Log learnings to _meta/_learnings.md immediately
+
+SESSION END:
+- Update _meta/_session.md
+- Commit and push
+```
+
+## Why This Matters
+
+- **Context survives sessions** - No more re-explaining project state
+- **Learnings compound** - Patterns discovered once, available forever
+- **Research persists** - Investigation outputs saved, not lost
+- **Work visibility** - Clear tracking of what's in progress
+
+## Files Added
+
+| File | Purpose |
+|------|---------|
+| `_meta/INDEX.md` | Navigation hub for metadata |
+| `_meta/_session.md` | Session context and infrastructure notes |
+| `_meta/_learnings.md` | Append-only change/problem log |
+| `_meta/context/active.md` | Current work state |
+| `_meta/research/*.md` | Investigation outputs |
+
+---
+
 # KERNEL v1.5.0
 
 **Automatic Methodology + Tailored Configuration**
