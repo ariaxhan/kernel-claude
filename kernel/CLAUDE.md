@@ -68,6 +68,12 @@ This project uses KERNEL for development intelligence.
 - `kernel/banks/` — Methodology references (load via modes)
 - `.claude/rules/` — Project patterns (evolves over time)
 
+**Project memory (check FIRST):**
+- `kernel/project-notes/bugs.md` — Past bugs and solutions
+- `kernel/project-notes/decisions.md` — Architecture decisions (ADRs)
+- `kernel/project-notes/key_facts.md` — Infrastructure knowledge
+- `kernel/project-notes/issues.md` — Work log
+
 ---
 
 ## Defaults
