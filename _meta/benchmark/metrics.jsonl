@@ -1,0 +1,3 @@
+# Benchmark Metrics Log
+# Format: One JSON object per line (JSONL)
+# Append new sessions, never edit old ones

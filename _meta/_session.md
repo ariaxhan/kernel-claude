@@ -14,6 +14,8 @@ tokens: ~200 | type: context | evolving
 
 ## Recent Decisions
 
+- 2026-01-19: Added benchmark system to _meta/ for automatic performance tracking
+- 2026-01-19: Preparing for Gumroad release as "AI Dev OS" ($9)
 - 2026-01-17: Released v2.0.0 with agents, skills, and complete development intelligence
 - 2026-01-17: Bumped to 2.0.0 (was going to be 1.7.0) due to significance of changes
 - 2026-01-17: Added 13 agents, 3 skills, 4 rules, 3 commands from CodingVault patterns
