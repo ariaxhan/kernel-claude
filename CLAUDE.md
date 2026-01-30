@@ -162,11 +162,11 @@ Before committing:
 
 ## COMPONENTS
 
-### Commands (16)
+### Commands (14)
 
 | cmd | purpose |
 |-----|---------|
-| /kernel-init | Initialize KERNEL for a project |
+| /repo-init | Generate KERNEL config for any codebase |
 | /kernel-user-init | Set up user-level defaults (~/.claude/) |
 | /kernel-status | Config health and staleness report |
 | /kernel-prune | Remove stale config entries |
@@ -177,10 +177,8 @@ Before committing:
 | /branch | create worktree for isolated work |
 | /ship | commit → push → create PR |
 | /parallelize | multi-worktree parallel development |
-| /release | bump version → tag → push |
 | /docs | documentation mode |
 | /design | load philosophy → audit UI → build |
-| /repo-init | generate KERNEL config for any codebase |
 | /handoff | context brief for session continuity |
 
 ### Agents (19)

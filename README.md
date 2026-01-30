@@ -34,7 +34,7 @@ cd your-project
 claude
 
 # Inside Claude Code:
-/kernel-init
+/repo-init
 ```
 
 KERNEL analyzes your project and creates:
@@ -237,13 +237,13 @@ Agents spawn proactively based on context. You don't invoke them — they activa
 
 ---
 
-## Commands (16)
+## Commands (14)
 
 ### Setup & Maintenance
 
 | Command | Purpose |
 |---------|---------|
-| `/kernel-init` | Initialize KERNEL for a project — analyzes codebase, creates tailored config |
+| `/repo-init` | Generate KERNEL config for any codebase — analyzes codebase, creates tailored config |
 | `/kernel-user-init` | Set up user-level defaults at `~/.claude/` |
 | `/kernel-status` | Show config health, staleness, and untracked artifacts |
 | `/kernel-prune` | Review and remove stale config entries |
@@ -258,7 +258,6 @@ Agents spawn proactively based on context. You don't invoke them — they activa
 | `/validate` | Pre-commit gate: run types, lint, and tests in parallel |
 | `/design` | Design mode: load philosophy, audit UI, build with intention |
 | `/docs` | Documentation mode: audit, generate, maintain docs |
-| `/repo-init` | Generate KERNEL config for any codebase (standalone) |
 
 ### Git Workflow
 
@@ -267,7 +266,6 @@ Agents spawn proactively based on context. You don't invoke them — they activa
 | `/branch` | Create worktree for isolated development work |
 | `/ship` | Commit, push, and create PR from current branch |
 | `/parallelize` | Set up multiple worktrees for parallel development streams |
-| `/release` | Bump version, update release notes, tag, and push |
 | `/handoff` | Generate context brief for session continuity |
 
 ---

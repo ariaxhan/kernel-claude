@@ -17,7 +17,7 @@ PRECEDENCE: Project > User > Plugin defaults
 ├── rules/           User rules (always loaded)
 └── changelog.md     Track evolution
 
-./CLAUDE.md          <-- PROJECT-SPECIFIC (kernel-init)
+./CLAUDE.md          <-- PROJECT-SPECIFIC (repo-init)
 └── kernel/          Project methodology
 ```
 
@@ -132,7 +132,7 @@ These principles apply to ALL projects, regardless of stack or domain.
 
 ## KERNEL Integration
 
-When KERNEL is initialized in a project (`/kernel-init`), project-level config takes precedence over these user defaults.
+When KERNEL is initialized in a project (`/repo-init`), project-level config takes precedence over these user defaults.
 
 **Layer hierarchy:**
 1. Project `.claude/CLAUDE.md` + `kernel/` (highest priority)
@@ -196,7 +196,7 @@ Git Workflow Summary:
 Next steps:
   1. Customize ~/.claude/CLAUDE.md response preferences
   2. Add user rules to ~/.claude/rules/ as patterns emerge
-  3. Run /kernel-init in projects to add project-specific config
+  3. Run /repo-init in projects to add project-specific config
 
 Note: These foundations apply to ALL Claude Code sessions.
 Project-level config (when present) takes precedence.
