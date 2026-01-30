@@ -247,5 +247,4 @@ Solution: Cannot use worktrees, suggest regular subagents
 
 ## Related
 
-- See `.claude/skills/worktree-parallelization/SKILL.md` for detection criteria
 - Integration with existing subagent workflows

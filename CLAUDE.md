@@ -1,6 +1,6 @@
 # KERNEL
 
-**The AI Coding OS** | v4.0.0
+**The AI Coding OS** | v4.1.0
 
 tokens: ~800 | standalone | self-evolving
 
@@ -229,7 +229,7 @@ kernel/project-notes/             # Persistent knowledge
 ●system_fonts_first|never:Inter,Geist
 ●no_emoji_in_UI|no_AI_aesthetic
 ●one_signature_element|customize_until_unrecognizable
-●see:rules/frontend-conventions.md + rules/design-philosophy.md
+●see:.claude/rules/frontend-conventions.md
 
 ---
 

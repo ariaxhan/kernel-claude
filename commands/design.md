@@ -9,9 +9,9 @@ Activated when building or reviewing frontend/UI work.
 
 ## Startup
 
-1. Read `.claude/rules/design-philosophy.md` (core aesthetic)
-2. Read `.claude/banks/DESIGN-BANK.md` (deep methodology)
-3. Read `.claude/rules/frontend-conventions.md` (implementation patterns)
+1. Read `.claude/rules/frontend-conventions.md` (implementation patterns + aesthetic)
+2. Read `kernel/banks/BUILD-BANK.md` (methodology reference)
+3. If available, read `${CLAUDE_PLUGIN_ROOT}/kernel/banks/BUILD-BANK.md` (plugin source)
 
 ## Context Gathering
 

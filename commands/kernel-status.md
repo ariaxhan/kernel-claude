@@ -8,12 +8,13 @@ Analyze the current KERNEL configuration and report health status.
 ## Steps
 
 1. **Scan config directories** for all artifacts:
-   - `.claude/commands/*.md` (excluding this file)
-   - `.claude/agents/*.md`
-   - `.claude/skills/*.md`
+   - `commands/*.md` (excluding this file)
+   - `agents/*.md`
+   - `skills/*/SKILL.md`
    - `.claude/rules/*.md`
    - `.mcp.json` entries
-   - `.claude/settings.json` hooks
+   - `hooks/hooks.json` hooks
+   - `.claude/settings.json` project hooks
 
 2. **Read registry** from `memory/config_registry.jsonl`:
    - Parse each line as JSON

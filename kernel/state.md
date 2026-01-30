@@ -4,8 +4,9 @@
 ## Repo Map (max 15 lines)
 
 - Entry: kernel-claude (Claude Code plugin, not executable)
-- Core: .claude/ (agents, commands, rules, skills, hooks, settings)
-- Templates: kernel/ (banks, rules, skills, hooks, project-notes)
+- Plugin interface: commands/, agents/, skills/, hooks/ (root-level, auto-discovered)
+- Self-config: .claude/ (rules, settings — KERNEL's own project config)
+- Templates: kernel/ (banks, rules, skills, hooks, project-notes — for /repo-init distribution)
 - Banks: kernel/banks/ (10 methodology templates)
 - Meta: _meta/ (session, learnings, context, benchmark)
 - Memory: memory/ (config registry)
@@ -20,13 +21,13 @@
 | Typecheck | N/A | N/A |
 | Tests | N/A (documentation project) | N/A |
 | Git | git | available |
-| Hooks | .claude/settings.json | 2 hooks active |
+| Hooks | hooks/hooks.json + .claude/settings.json | 2 hooks active |
 
 ## Conventions (max 10 bullets)
 
 - Naming: kebab-case for files, SCREAMING-CAPS for banks
 - Frontmatter: YAML with name, model, description (agents) or description, allowed-tools (commands)
-- Structure: .claude/ for active config, kernel/ for distributable templates
+- Structure: root-level for plugin components, .claude/ for self-dev config, kernel/ for distributable templates
 - Syntax: Compact Unicode markers (Ψ, →, ≠, Σ, Φ, Ω, Ξ, Δ, ∇, Γ) in CLAUDE.md
 - Inline rules: ●rule_name|condition→action
 - Slots: Explicit caps (max N items) to prevent bloat
@@ -35,8 +36,8 @@
 
 ## Last Validation
 - Date: 2026-01-28
-- Status: v4.0.0 update in progress
-- Changes: Compact syntax, hooks, model routing, new commands/rules/skills
+- Status: v4.1.0 — plugin structure fix
+- Changes: Moved commands/, agents/, skills/ to root level for plugin discovery
 
 ## Active Preferences
 → See .claude/rules/preferences.md

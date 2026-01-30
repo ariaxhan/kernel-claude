@@ -1,23 +1,21 @@
 # KERNEL
 
-**The AI Coding OS for Claude Code** | v4.0.0
+**The AI Coding OS for Claude Code** | v4.1.0
 
 KERNEL is a Claude Code plugin that transforms how you develop. It analyzes your codebase, creates tailored configuration, spawns specialized agents, applies methodology automatically, and evolves over time. Your coding assistant becomes a coding OS.
 
 ---
 
-## What's New in v4.0.0
+## What's New in v4.1.0
 
-- **Compact Unicode syntax** — Token-efficient configuration using symbolic markers (Ψ, →, ≠, Σ, Φ, Ω, Ξ, Δ, ∇, Γ)
-- **5-tier model routing** — Ollama → Gemini → Sonnet → Opus → Haiku with purpose-driven selection
-- **Hooks system** — Auto-detect project type on session start, auto-validate after code edits
-- **Magic keywords** — `ulw` (ultrawork), `ralph` (persistence), `eco` (cost-optimized)
-- **Autonomy rules** — ACT/PAUSE/ASK boundaries for safe autonomous operation
-- **16 commands** — Added `/design` (UI philosophy) and `/repo-init` (generate config for any project)
-- **13 rules** — Added `frontend-conventions` for design-intentional UI development
-- **coding-prompt-bank skill** — Base AI coding philosophy with tier-based complexity
-- **Memory system** — `_memory/` templates for persistent project knowledge
-- **Frontend design philosophy** — Anti-AI-aesthetic enforcement, signature element approach
+- **Plugin structure fix** — Commands, agents, skills, hooks moved to root level for correct plugin discovery
+- **Updated manifest** — `plugin.json` now includes repository, license, keywords metadata
+
+### v4.0.0 (Previous)
+
+- Compact Unicode syntax, 5-tier model routing, hooks system, magic keywords
+- Autonomy rules, 16 commands, 13 rules, coding-prompt-bank skill
+- Memory system, frontend design philosophy
 
 ---
 
@@ -362,13 +360,19 @@ kernel-claude/
 ├── .claude-plugin/              # Plugin metadata
 │   ├── plugin.json
 │   └── marketplace.json
-├── .claude/                     # KERNEL's own configuration
-│   ├── settings.json            # Hooks (SessionStart, PostToolUse)
-│   ├── agents/                  # 19 agent definitions
-│   ├── rules/                   # 13 rule definitions
-│   ├── commands/                # 16 command definitions
-│   └── skills/                  # 3 skill definitions
-├── kernel/                      # Templates distributed to projects
+├── commands/                    # 16 plugin commands (auto-discovered)
+├── agents/                      # 19 plugin agents (auto-discovered)
+├── skills/                      # 3 plugin skills (auto-discovered)
+│   ├── debug/SKILL.md
+│   ├── research/SKILL.md
+│   └── coding-prompt-bank/SKILL.md
+├── hooks/                       # Plugin hooks (auto-discovered)
+│   └── hooks.json
+├── .claude/                     # KERNEL self-development config
+│   ├── settings.json            # Project-level hooks
+│   ├── settings.local.json      # Local permissions (gitignored)
+│   └── rules/                   # 13 rule definitions
+├── kernel/                      # Templates distributed via /repo-init
 │   ├── CLAUDE.md                # Project intelligence template
 │   ├── state.md                 # Shared world model
 │   ├── banks/                   # 10 methodology banks
@@ -376,18 +380,8 @@ kernel-claude/
 │   ├── skills/                  # Skill templates
 │   ├── hooks/                   # Hook templates
 │   └── project-notes/           # Project memory templates
-│       ├── bugs.md
-│       ├── decisions.md
-│       ├── key_facts.md
-│       └── issues.md
 ├── _meta/                       # Session tracking
-│   ├── _session.md
-│   ├── _learnings.md
-│   ├── context/
-│   │   └── active.md
-│   └── benchmark/
 ├── memory/                      # Config registry
-│   └── config_registry.jsonl
 └── .mcp.json                    # MCP servers config
 ```
 
@@ -395,14 +389,14 @@ kernel-claude/
 
 ## Configuration Types
 
-| I want Claude to... | Create... |
-|---------------------|-----------|
-| Follow rules on all tasks | `.claude/CLAUDE.md` or `.claude/rules/` |
-| Run workflow when I say `/name` | `.claude/commands/name.md` |
-| Auto-run on code changes | Hook in `.claude/settings.json` |
-| Delegate to specialist | `.claude/agents/name.md` |
-| Auto-trigger on keywords | `.claude/skills/name/SKILL.md` |
-| Connect to external service | `.mcp.json` entry |
+| I want Claude to... | Plugin location | Project location |
+|---------------------|----------------|------------------|
+| Follow rules on all tasks | N/A (not distributable) | `.claude/CLAUDE.md` or `.claude/rules/` |
+| Run workflow when I say `/name` | `commands/name.md` | `.claude/commands/name.md` |
+| Auto-run on code changes | `hooks/hooks.json` | `.claude/settings.json` |
+| Delegate to specialist | `agents/name.md` | `.claude/agents/name.md` |
+| Auto-trigger on keywords | `skills/name/SKILL.md` | `.claude/skills/name/SKILL.md` |
+| Connect to external service | `.mcp.json` | `.mcp.json` |
 
 ---
 

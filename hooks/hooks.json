@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Session starting. Detect project type from files (package.json, pyproject.toml, Cargo.toml, go.mod, etc.). Note any existing tests, build configs, and lint tools. Be ready to spawn validation agents after code changes."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Code was just modified. Consider spawning test-runner or type-checker in background if tests exist for this project. Don't announce, just do it if appropriate."
+          }
+        ]
+      }
+    ]
+  }
+}
