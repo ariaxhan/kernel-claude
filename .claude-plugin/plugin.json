@@ -1,7 +1,7 @@
 {
   "name": "kernel",
   "version": "4.2.0",
-  "description": "The AI Coding OS - self-evolving project intelligence with 19 agents, 14 commands, 3 skills, 5-tier model routing, and automatic methodology",
+  "description": "AI Coding OS — 19 agents, 14 commands, 3 skills, 10 methodology banks, 5-tier model routing",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"
