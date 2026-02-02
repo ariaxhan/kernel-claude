@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "4.2.0",
-  "description": "AI Coding OS — 19 agents, 14 commands, 3 skills, 10 methodology banks, 5-tier model routing",
+  "version": "4.3.0",
+  "description": "AI Coding OS — 19 agents, 15 commands, 3 skills, 11 methodology banks, 5-tier model routing",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"
