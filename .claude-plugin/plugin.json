@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "4.3.0",
-  "description": "AI Coding OS — 19 agents, 15 commands, 3 skills, 11 methodology banks, 5-tier model routing",
+  "version": "5.0.0",
+  "description": "AI Coding OS — AgentDB context persistence, 19 agents, 15 commands, lifecycle hooks, 11 methodology banks",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"
@@ -11,12 +11,12 @@
   "license": "MIT",
   "keywords": [
     "coding-os",
-    "methodology",
+    "agentdb",
+    "context-persistence",
+    "hooks",
     "agents",
-    "debugging",
-    "planning",
-    "design-philosophy",
-    "self-evolution",
+    "methodology",
+    "multi-agent",
     "memory-protocol"
   ]
 }
