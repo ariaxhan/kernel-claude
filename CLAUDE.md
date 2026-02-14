@@ -1,6 +1,6 @@
 # KERNEL
 
-**The AI Coding OS** | v5.0.0
+**The AI Coding OS** | v4.2.0
 
 tokens: ~800 | standalone | self-evolving
 
@@ -99,7 +99,6 @@ Auto-detect task type → load relevant bank. No commands needed.
 | "what's in this codebase" | map_structure→detect_tooling→patterns | DISCOVERY |
 | "refactor","improve","optimize" | understand_deeply→identify→prioritize | ITERATION |
 | "what could go wrong","critique" | challenge_assumptions→find_risks | TEARITAPART |
-| "seo","ai search","citations","GEO" | audit→structure→authority→measure | SEO |
 
 ---
 
@@ -163,7 +162,7 @@ Before committing:
 
 ## COMPONENTS
 
-### Commands (15)
+### Commands (14)
 
 | cmd | purpose |
 |-----|---------|
@@ -181,7 +180,6 @@ Before committing:
 | /docs | documentation mode |
 | /design | load philosophy → audit UI → build |
 | /handoff | context brief for session continuity |
-| /seo | AI-age SEO: audit → optimize → measure |
 
 ### Agents (19)
 
@@ -193,9 +191,9 @@ Before committing:
 
 assumptions, commit-discipline, context-cascade, decisions, fail-fast, frontend-conventions, invariants, investigation-first, memory-protocol, methodology, patterns, preferences, self-evolution
 
-### Banks (11)
+### Banks (10)
 
-PLANNING, DEBUGGING, RESEARCH, REVIEW, DISCOVERY, ITERATION, TEARITAPART, DOCUMENTATION, BUILD, CODING-PROMPT, SEO
+PLANNING, DEBUGGING, RESEARCH, REVIEW, DISCOVERY, ITERATION, TEARITAPART, DOCUMENTATION, BUILD, CODING-PROMPT
 
 ### Skills (3)
 

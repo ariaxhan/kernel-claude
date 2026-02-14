@@ -1,30 +1,21 @@
 # KERNEL
 
-**The AI Coding OS for Claude Code** | v5.0.0
+**The AI Coding OS for Claude Code** | v4.1.0
 
 KERNEL is a Claude Code plugin that transforms how you develop. It analyzes your codebase, creates tailored configuration, spawns specialized agents, applies methodology automatically, and evolves over time. Your coding assistant becomes a coding OS.
 
 ---
 
-## What's New in v5.0.0
+## What's New in v4.1.0
 
-### AgentDB: Context Persistence Architecture
+- **Plugin structure fix** — Commands, agents, skills, hooks moved to root level for correct plugin discovery
+- **Updated manifest** — `plugin.json` now includes repository, license, keywords metadata
 
-Agent context is now a first-class, versioned primitive:
+### v4.0.0 (Previous)
 
-- **Agent Registry** (`_meta/agents/`) — Multi-agent coordination with session tracking
-- **Lifecycle Hooks** — SessionStart, PreCompact, SessionEnd automation
-- **Context Checkpoints** — Save state before compaction, resume across sessions
-- **Mutation Logging** — Track file changes, tool calls, token usage
-
-See `_meta/docs/agentdb-architecture.md` for full documentation.
-See `hooks/examples/` for ready-to-use hook implementations.
-
-### Previous Versions
-
-**v4.x**: Compact Unicode syntax, 5-tier model routing, 19 agents, 15 commands
-**v3.x**: Project memory system, performance tracking
-**v2.x**: Agents, skills, development intelligence
+- Compact Unicode syntax, 5-tier model routing, hooks system, magic keywords
+- Autonomy rules, 16 commands, 13 rules, coding-prompt-bank skill
+- Memory system, frontend design philosophy
 
 ---
 

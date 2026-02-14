@@ -139,26 +139,6 @@ Apply methodology automatically based on task context. Banks provide depth; thes
 
 ---
 
-### AI-SEO (kernel/banks/SEO-BANK.md)
-
-**Trigger when task involves:**
-- "seo", "search optimization", "ai search", "citations"
-- "GEO", "generative engine optimization", "AEO", "LLMEO"
-- "ai visibility", "ai crawlers", "getting cited"
-- Content optimization for AI discovery
-- Search performance auditing
-
-**Auto-apply:**
-1. Audit current AI-readiness (technical + content + authority)
-2. Check for anti-patterns first (what's actively harmful)
-3. Structure content for passage-level extraction
-4. Build third-party presence and E-E-A-T signals
-5. Measure with AI-native metrics, not traditional rankings
-
-**Signal phrases:** "optimize for AI search", "get cited by ChatGPT", "AI visibility", "SEO audit", "content not showing in AI"
-
----
-
 ## Redundancy Layers
 
 ### Layer 1: Rule Detection (This File)
@@ -195,4 +175,3 @@ Full methodology available in `kernel/banks/`. Reference when:
 | New codebase | Discover first | DISCOVERY |
 | Complex plan | Tear apart before implementing | TEARITAPART |
 | Before shipping | Review thoroughly | REVIEW |
-| AI search optimization | Audit → Structure → Authority → Measure | SEO |
