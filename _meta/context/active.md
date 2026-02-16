@@ -2,46 +2,65 @@
 
 **Current focus and in-progress tasks.**
 
-## Status: In Progress — v4.0.0
+## Status: Complete — v5.1.0
 
-Major update mirroring local CodingVault config improvements.
+Plugin cleanup and restructure complete.
 
-## Completed This Session
+## Completed This Session (2026-02-15)
 
-- [x] Rewrite CLAUDE.md with compact Unicode syntax (Ψ, →, ≠, Σ, Φ, Ω, Ξ, Δ, ∇, Γ)
-- [x] Integrate NEXUS features (model routing, magic keywords, autonomy rules, parallel-first)
-- [x] Add hooks system (SessionStart + PostToolUse) to settings.json
-- [x] Add /design command
-- [x] Add /repo-init command
-- [x] Add frontend-conventions rule
-- [x] Swap worktree-parallelization for coding-prompt-bank skill
-- [x] Version bump all plugin.json files to 4.0.0
-- [x] Update marketplace.json description
-- [x] Rewrite README.md for v4.0.0 with full documentation
-- [x] Refresh _meta files
-- [x] Update kernel/state.md
+### Cleanup Surgery
+- [x] Archive legacy files (arbiter.py, MCP server, stale session)
+- [x] Consolidate duplicate rules (kernel/rules/ → .claude/rules/)
+- [x] Consolidate duplicate skills (kernel/skills/ → skills/)
+- [x] Restructure agents (orchestration agents → agents/orchestration/)
+- [x] Clean cruft (.DS_Store, empty dirs, broken hooks)
+- [x] Fix version mismatch (plugin.json → v5.1.0)
+
+### Structure After Cleanup
+```
+kernel-claude/
+├── .claude-plugin/plugin.json     (v5.1.0)
+├── CLAUDE.md                      (core config)
+├── README.md
+├── agents/                        (25 total)
+│   ├── [19 standard agents]
+│   └── orchestration/             (6 orchestration agents)
+├── commands/                      (16 commands)
+├── skills/                        (3 skills)
+├── .claude/
+│   ├── settings.json              (hooks)
+│   └── rules/                     (14 rules - single source of truth)
+├── kernel/                        (templates for /repo-init)
+│   ├── CLAUDE.md, state.md
+│   ├── banks/                     (10 methodology banks)
+│   ├── hooks/                     (hook templates)
+│   ├── orchestration/agentdb/     (SQLite setup)
+│   └── project-notes/
+├── _meta/
+│   ├── context/active.md
+│   ├── _learnings.md
+│   └── benchmark/
+└── archive/
+    └── deprecated/                (legacy files preserved)
+```
+
+## Key Changes (v4.2.0 → v5.1.0)
+
+| Area | Before | After |
+|------|--------|-------|
+| Rules | 27 files (2 locations) | 14 files (single source) |
+| Skills | 6 dirs (2 locations) | 3 dirs (single source) |
+| Agents | 19 + 6 split locations | 25 unified (agents/) |
+| Cruft | .DS_Store, empty dirs, broken hooks | Cleaned |
+| Orchestration | kernel/orchestration/agents/ | agents/orchestration/ |
+| Legacy | Scattered | archive/deprecated/ |
 
 ## Pending
 
-- [ ] Clean up stale files (CONFIG-TYPES.md, SETUP.md if they exist)
-- [ ] Copy frontend-conventions to kernel/rules/ template
-- [ ] Create GitHub release v4.0.0
+- [ ] Commit cleanup changes
 - [ ] Push to remote
-
-## Key Changes (v3.0.0 → v4.0.0)
-
-| Area | Change |
-|------|--------|
-| CLAUDE.md | Verbose markdown → compact Unicode syntax (~800 tokens) |
-| Model routing | None → 5-tier (Ollama/Gemini/Sonnet/Opus/Haiku) |
-| Hooks | Empty → SessionStart + PostToolUse |
-| Magic keywords | None → ulw, ralph, eco |
-| Autonomy | None → ACT/PAUSE/ASK boundaries |
-| Commands | 14 → 16 (+design, +repo-init) |
-| Rules | 12 → 13 (+frontend-conventions) |
-| Skills | worktree-parallelization → coding-prompt-bank |
-| README | v2.0.0 docs → v4.0.0 with syntax guide |
+- [ ] Update README.md agent counts if needed
 
 ---
 
-*Updated 2026-01-28*
+*Updated 2026-02-15*
