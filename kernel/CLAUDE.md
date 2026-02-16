@@ -87,45 +87,49 @@ This project uses KERNEL for development intelligence.
 
 ---
 
-## Orchestration Mode
+## Ψ:ORCHESTRATION
 
-For Tier 3 tasks (6+ files, complex debugging, architectural changes):
+```
+●orchestrator_clean|subagents:heavy_lifting|agentdb:bus
+●contract_first|no_work_without:goal,constraints,failure_conditions
+●spawn_parallel|search:code+web|→gather_context
+●tier_route|1-2:direct|3-5:exec|6+:full_pipeline
+```
 
-**Pattern:** Orchestrator stays context-light. Spawn disposable subagents for heavy lifting. All communicate via AgentDB.
+**Init:** `./kernel/orchestration/agentdb/init.sh`
 
-**Initialize:** `./kernel/orchestration/agentdb/init.sh`
+## Ω:ORCHESTRATION_AGENTS
 
-**Agents:**
-| Agent | Focus | Writes |
-|-------|-------|--------|
-| orchestrator | route, contract, reconcile | directives |
-| searcher | code search | packets |
-| researcher | web/docs | packets |
-| architect | discovery, scope, risk | packets |
-| surgeon | minimal diff, commit | checkpoints |
-| adversary | QA, break it | verdicts |
+| agent | tab | writes |
+|-------|-----|--------|
+| orchestrator | main | directives |
+| architect | plan | packets |
+| surgeon | exec | checkpoints |
+| adversary | qa | verdicts |
+| searcher | search | packets |
+| researcher | research | packets |
 
-**Flow:**
-1. Orchestrator creates CONTRACT (GOAL, CONSTRAINTS, FAILURE_CONDITIONS)
-2. Spawns parallel search/research agents
-3. Reads packets, routes to architect
-4. Architect discovers scope, returns packet
-5. Surgeon implements, writes checkpoint
-6. Adversary QA, writes verdict
-7. Orchestrator ships or iterates
+## ●:ORCHESTRATION_FLOW
 
-**Tier Routing:**
-| Tier | Files | Flow |
+```
+1. main: CONTRACT → directive → agentdb
+2. search+research: parallel → packets → agentdb
+3. plan: reads → discovery → packet → agentdb
+4. exec: reads → implements → checkpoint → agentdb
+5. qa: reads → verifies → verdict → agentdb
+6. main: reads verdict → SHIP|iterate
+```
+
+## ●:ORCHESTRATION_TIERS
+
+| tier | files | flow |
 |------|-------|------|
-| 1 | 1-2 | Execute directly |
-| 2 | 3-5 | main → exec |
-| 3 | 6+ | main → plan → exec → qa |
+| 1 | 1-2 | main_executes |
+| 2 | 3-5 | main→exec |
+| 3 | 6+ | main→plan→exec→qa |
 
-**Commands:**
-- `/orchestrate` — Enter orchestration mode
-- `/contract` — Create contract-first scope
-
-**Location:** `kernel/orchestration/`
+**Commands:** /orchestrate, /contract
+**Location:** kernel/orchestration/
 
 ---
 
