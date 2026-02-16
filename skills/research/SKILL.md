@@ -184,7 +184,7 @@ Quality of sources (highest to lowest):
 
 ## Documentation Structure
 
-Create `.claude/research/{feature-name}-research.md`:
+Create `_meta/research/{feature-name}-research.md`:
 
 ```markdown
 # Research: {Feature Name}

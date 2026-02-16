@@ -1,6 +1,6 @@
 ---
 description: Set up git worktrees for parallel development
-allowed-tools: Bash, Read, Write, AskUserQuestion, Task, TodoWrite
+allowed-tools: Bash, Read, Write, AskUserQuestion, Task, TaskCreate
 ---
 
 # Parallelize Command
@@ -156,7 +156,7 @@ Spawn agents in each worktree using Task tool:
 
 ```
 For each stream:
-  1. Use TodoWrite to add task for this stream
+  1. Use TaskCreate to add task for this stream
   2. Use Task tool to spawn agent with:
      - subagent_type: "general-purpose"
      - prompt: "You are working in worktree [path] on branch [branch-name].

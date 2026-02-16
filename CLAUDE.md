@@ -33,7 +33,7 @@ tokens: ~200 | vn-native | plugin | agentdb-bus
 ●prove|not:assert
 ●read|before:edit
 ●commit|every:working_state
-●memory_first|check:_memory/→_meta/
+●memory_first|check:_meta/
 ●lsp_first|goToDefinition,findReferences,hover
 ```
 

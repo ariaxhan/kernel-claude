@@ -11,4 +11,4 @@ Tier 3 specialized agents for multi-agent coordination. Invoked via `/orchestrat
 | searcher | Deep codebase exploration | search |
 | researcher | External research, docs, patterns | research |
 
-These agents communicate via AgentDB (SQLite). See `kernel/orchestration/agentdb/` for setup.
+These agents communicate via AgentDB (SQLite). See `orchestration/agentdb/` for setup.

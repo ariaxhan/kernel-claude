@@ -7,7 +7,7 @@ Identify stale configuration entries and prompt for removal.
 
 ## Steps
 
-1. **Load registry** from `memory/config_registry.jsonl`
+1. **Load registry** from `_meta/config_registry.jsonl`
 
 2. **Identify stale entries** (no reference in 30+ days):
    - Commands not invoked
@@ -32,7 +32,7 @@ STALE: [type] name
    - Delete the artifact file (command, agent, skill, rule)
    - Or remove entry from config file (`.mcp.json`, `settings.json`)
    - Remove entry from `config_registry.jsonl`
-   - Log removal to `.claude/rules/kernel-pruning-log.md`
+   - Log removal to `_meta/logs/kernel-pruning-log.md`
 
 5. **On rejection (n)**:
    - Update `last_referenced` to now (resets staleness timer)

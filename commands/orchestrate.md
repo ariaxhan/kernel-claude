@@ -16,7 +16,7 @@ Entering ORCHESTRATION mode for complex tasks.
 ## Initialize
 
 ```bash
-./kernel/orchestration/agentdb/init.sh
+./orchestration/agentdb/init.sh
 ```
 
 ## Pattern
@@ -43,7 +43,7 @@ Entering ORCHESTRATION mode for complex tasks.
 
 ## Agents
 
-Load from `kernel/orchestration/agents/`:
+Load from `orchestration/agents/`:
 
 | Agent | Focus | Writes to AgentDB |
 |-------|-------|-------------------|

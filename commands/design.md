@@ -10,8 +10,8 @@ Activated when building or reviewing frontend/UI work.
 ## Startup
 
 1. Read `.claude/rules/frontend-conventions.md` (implementation patterns + aesthetic)
-2. Read `kernel/banks/BUILD-BANK.md` (methodology reference)
-3. If available, read `${CLAUDE_PLUGIN_ROOT}/kernel/banks/BUILD-BANK.md` (plugin source)
+2. Read `skills/BUILD-BANK.md` (methodology reference)
+3. If available, read `${CLAUDE_PLUGIN_ROOT}/skills/BUILD-BANK.md` (plugin source)
 
 ## Context Gathering
 

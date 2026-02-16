@@ -60,7 +60,7 @@ This skill activates when detecting:
 
 ## Convention Adherence
 
-Check against `kernel/state.md` conventions:
+Check against `_meta/context/active.md` conventions:
 ```
 □ Naming: Follows project naming pattern
 □ Error handling: Matches project error pattern

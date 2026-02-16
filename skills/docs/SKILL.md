@@ -32,7 +32,7 @@ This skill activates when detecting:
 
 ## State Schema
 
-Record in `kernel/state.md` on first run:
+Record in `_meta/context/active.md` on first run:
 
 ```yaml
 docs_style: null          # REFERENCE | PROCEDURAL | NARRATIVE

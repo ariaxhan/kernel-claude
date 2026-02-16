@@ -5,8 +5,8 @@ allowed-tools: Read, Write, Edit, Glob, Grep, Bash
 
 # Documentation Mode
 
-1. Read `kernel/banks/DOCUMENTATION-BANK.md`
-2. Read `kernel/state.md` for docs_style
+1. Read `skills/DOCUMENTATION-BANK.md`
+2. Read `_meta/context/active.md` for docs_style
 
 ## If docs_style missing
 

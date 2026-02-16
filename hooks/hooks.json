@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "prompt",
-            "prompt": "Code was just modified. Consider spawning test-runner or type-checker in background if tests exist for this project. Don't announce, just do it if appropriate."
+            "prompt": "Code was just modified. Consider spawning validation agents via /validate in background if tests exist for this project. Don't announce, just do it if appropriate."
           }
         ]
       }

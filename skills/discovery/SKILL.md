@@ -124,7 +124,7 @@ which npm || which yarn || which pnpm || which pip || which poetry || which carg
 
 ## Output Format
 
-Update `kernel/state.md`:
+Update `_meta/context/active.md`:
 
 ```markdown
 ## Repo Map

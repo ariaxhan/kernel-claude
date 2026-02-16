@@ -114,8 +114,8 @@ EDGE CASE 3: [What if state is inconsistent?]
 grep -r "function.*similar" src/
 glob "**/*similar*.{js,py,go}"
 
-# Check conventions in state.md first
-cat kernel/state.md
+# Check conventions in active.md first
+cat _meta/context/active.md
 
 # Find error handling patterns
 grep -r "try {" src/

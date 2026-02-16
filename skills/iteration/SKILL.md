@@ -157,7 +157,7 @@ AFTER:
 ## Iteration Workspace
 
 ```
-.claude/iterations/
+_meta/iterations/
   {target-name}/
     understanding.md     # Deep understanding
     improvements.md      # Identified improvements

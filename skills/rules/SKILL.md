@@ -121,14 +121,14 @@ Answers often already exist.
 
 ### Before Architecture
 ```
-→ Check kernel/project-notes/decisions.md
+→ Check _meta/project-notes/decisions.md
 → Ask: "Was this already decided? Why?"
 → If conflict: surface it, don't override
 ```
 
 ### Before Debugging
 ```
-→ Search kernel/project-notes/bugs.md
+→ Search _meta/project-notes/bugs.md
 → Ask: "Have we fixed this before?"
 → If found: apply solution, verify
 → If new: fix, then ADD to bugs.md
@@ -136,7 +136,7 @@ Answers often already exist.
 
 ### Before Infrastructure
 ```
-→ Check kernel/project-notes/key_facts.md
+→ Check _meta/project-notes/key_facts.md
 → Ask: "Is this documented?"
 → If missing: discover once, ADD to key_facts.md
 ```

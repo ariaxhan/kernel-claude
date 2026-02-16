@@ -145,7 +145,7 @@ FIX PROTOCOL:
 1. Fix the ROOT CAUSE, not the symptom
 2. Write a test that would have caught this
 3. Verify the fix doesn't break other things
-4. Document in kernel/project-notes/bugs.md
+4. Document in _meta/project-notes/bugs.md
 
 TEST REQUIREMENT:
 Every bug fix MUST include a test that:

@@ -16,7 +16,7 @@ Analyze the current KERNEL configuration and report health status.
    - `hooks/hooks.json` hooks
    - `.claude/settings.json` project hooks
 
-2. **Read registry** from `memory/config_registry.jsonl`:
+2. **Read registry** from `_meta/config_registry.jsonl`:
    - Parse each line as JSON
    - Build map of {type+name -> entry}
 

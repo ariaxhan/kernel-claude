@@ -24,7 +24,7 @@ PRECEDENCE: Project > User > Plugin defaults
 ## Step 1: Locate CODING-PROMPT-BANK
 
 Search for the bank in order:
-1. Plugin location: `kernel/banks/CODING-PROMPT-BANK.md`
+1. Plugin location: `skills/CODING-PROMPT-BANK.md`
 2. User override: `~/.claude/CODING-PROMPT-BANK.md`
 
 Read the entire bank. This is the substrate for building user config.

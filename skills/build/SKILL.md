@@ -114,7 +114,7 @@ Confirm (not guess) max 6 per category:
 **Code:** ~{X} lines
 **Deps:** {list}
 
-See `.claude/research/{feature-name}-research.md` for alternatives.
+See `_meta/research/{feature-name}-research.md` for alternatives.
 
 ## Steps
 1. [ ] {step 1}

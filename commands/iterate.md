@@ -14,7 +14,7 @@ Deep improvement of existing code.
 2. Understand its purpose and context
 3. Map dependencies and callers
 4. Document current behavior
-5. Write to `.claude/iterations/{target}/understanding.md`
+5. Write to `_meta/iterations/{target}/understanding.md`
 
 ### Phase 2: Improvement Identification
 
@@ -26,7 +26,7 @@ Analyze for:
 - **Readability** - Easy to understand?
 - **UX** - Better for users?
 
-Write findings to `.claude/iterations/{target}/improvements.md`
+Write findings to `_meta/iterations/{target}/improvements.md`
 
 ### Phase 3: Research
 
@@ -44,7 +44,7 @@ For each improvement:
 
 ### Phase 5: Documentation
 
-Log changes to `.claude/iterations/{target}/history.md`:
+Log changes to `_meta/iterations/{target}/history.md`:
 ```markdown
 ## {date}
 

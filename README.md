@@ -2,492 +2,238 @@
 
 **The AI Coding OS for Claude Code** | v5.1.0
 
-KERNEL is a Claude Code plugin that transforms how you develop. It analyzes your codebase, creates tailored configuration, spawns specialized agents, applies methodology automatically, and evolves over time. Your coding assistant becomes a coding OS.
+A plugin that transforms Claude Code from assistant to operating system. Multi-agent orchestration. Contract-first workflow. Zero human relay.
 
 ---
 
-## What's New in v5.1.0
+## Why KERNEL?
 
-- **Orchestration Mode** — Multi-agent coordination for Tier 3 tasks (6+ files)
-- **AgentDB** — SQLite-based communication bus for disposable subagents
-- **Contract-first workflow** — GOAL, CONSTRAINTS, FAILURE_CONDITIONS before any work
-- **6 orchestration agents** — orchestrator, architect, surgeon, adversary, searcher, researcher
-- **New commands** — `/orchestrate` and `/contract`
+Claude Code is powerful. It's also stateless. Every session starts fresh. Context gets lost. Agents can't communicate. You become the relay.
 
-### v5.0.0 (Previous)
+KERNEL fixes this.
 
-- Plugin structure fix — Commands, agents, skills, hooks at root level
-- Updated manifest with repository, license, keywords metadata
+**The problem:** AI coding assistants require humans to copy/paste context between sessions, between agents, between tasks. This is slow and lossy.
 
-### v4.0.0
-
-- Compact Unicode syntax, 5-tier model routing, hooks system, magic keywords
-- Autonomy rules, 16 commands, 13 rules, coding-prompt-bank skill
-- Memory system, frontend design philosophy
+**The solution:** A persistent communication bus (AgentDB), contract-scoped work, and disposable subagents that read/write directly to shared state. The orchestrator stays clean. Heavy lifting is delegated. Nothing gets lost.
 
 ---
 
 ## Quick Start
 
-### 1. Install the Plugin
+**1. Install**
 
-```
+```bash
 /install-plugin https://github.com/ariaxhan/kernel-claude
 ```
 
-### 2. Initialize Your Project
+**2. Initialize**
 
 ```bash
 cd your-project
-claude
-
-# Inside Claude Code:
 /repo-init
 ```
 
-KERNEL analyzes your project and creates:
-- `.claude/CLAUDE.md` — Project-specific coding rules
-- `.claude/rules/` — Patterns discovered in your codebase
-- `_meta/` — Session tracking structure
-- `_memory/` — Project knowledge base
+KERNEL analyzes your codebase and creates tailored configuration:
+- `.claude/CLAUDE.md` — Project-specific rules
+- `.claude/rules/` — Discovered patterns
+- `_meta/` — Session tracking
 
-### 3. Work Normally
+**3. Work**
 
-Methodology applies automatically:
-- **Implementing a feature?** KERNEL researches and plans first
-- **Fixing a bug?** KERNEL debugs systematically (reproduce → isolate → root cause)
-- **Writing code?** KERNEL spawns test-runner and type-checker
-- **Before completing?** KERNEL reviews for correctness
-
-No commands to remember. Just work.
+Methodology applies automatically. No commands to remember. Just describe what you want.
 
 ---
 
-## Understanding the Syntax
+## Architecture
 
-KERNEL uses a compact, token-efficient syntax in its `CLAUDE.md`. Here's what each symbol means:
-
-### Section Markers
-
-| Symbol | Section | Purpose |
-|--------|---------|---------|
-| `Ψ:CORE` | Core Philosophy | Foundational principles that guide all behavior |
-| `→:AUTONOMY` | Autonomy Rules | When to act, pause, or ask |
-| `≠:ANTI` | Anti-Patterns | Behaviors to explicitly avoid |
-| `Γ:SESSION` | Session Protocol | How to start, work through, and end sessions |
-| `Σ:METHODOLOGY` | Auto-Methodology | Task detection → bank loading |
-| `Φ:ROUTING` | Model Routing | Which AI model for which task |
-| `Ω:KEYWORDS` | Magic Keywords | Shortcut modes for power users |
-| `Ξ:GIT` | Git Discipline | Commit format, push protocol |
-| `Δ:QUALITY` | Quality Gates | Pre-commit validation requirements |
-| `∇:EVOLUTION` | Self-Evolution | How the system learns and updates itself |
-
-### Inline Rules
-
-Rules use a compact notation:
+Four tabs. One database. Zero relay.
 
 ```
-●rule_name|condition→action
+┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
+│  main   │  │  plan   │  │  exec   │  │   qa    │
+│orchestr │  │architect│  │ surgeon │  │adversary│
+└────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘
+     │            │            │            │
+     └────────────┴─────┬──────┴────────────┘
+                        │
+                   ┌────▼────┐
+                   │ agentdb │
+                   │sqlite   │
+                   └─────────┘
 ```
 
-Examples:
-- `●fail_fast|exit_early|clear_errors|no_silent_failures` — Always exit early with clear errors
-- `●atomic_commits|one_logical_change=one_commit` — Each commit is one logical unit
-- `●pattern_repeats(2+)|→encode_to_rules` — When a pattern repeats, encode it as a rule
+**Agents poll AgentDB.** No manual context passing. No copy/paste relay. The orchestrator writes directives; subagents read them. Subagents write packets; the orchestrator reads them.
 
-### Why This Syntax?
-
-1. **Token efficiency** — ~800 tokens vs ~2000+ for verbose markdown. Less context consumed = more room for your code.
-2. **Scannable** — Symbols create visual landmarks. Find sections instantly.
-3. **Precise** — No ambiguity. Each rule is a clear directive.
-4. **Evolvable** — Easy to add/remove rules without restructuring.
+Communication is persistent. Sessions can crash, restart, continue. Nothing is lost.
 
 ---
 
-## Features
+## How It Works
 
-### Automatic Methodology
+### Contract-First Workflow
 
-KERNEL detects what you're doing and applies the right approach:
-
-| You're doing... | KERNEL automatically... | Bank |
-|-----------------|-------------------------|------|
-| Implementing a feature | Researches, plans, defines interfaces | PLANNING |
-| Fixing a bug | Reproduces, isolates, finds root cause | DEBUGGING |
-| Choosing an approach | Searches packages, finds 3+ sources | RESEARCH |
-| Completing work | Reviews correctness, conventions, edge cases | REVIEW |
-| Exploring new codebase | Maps structure, detects tooling, extracts patterns | DISCOVERY |
-| Refactoring | Understands deeply, identifies specifics, prioritizes | ITERATION |
-| Planning complex work | Challenges assumptions, finds risks | TEARITAPART |
-
-Banks are loaded automatically. You don't invoke them.
-
-### 5-Tier Model Routing
-
-KERNEL routes work to the right model for cost and quality:
-
-| Tier | Model | Best For | Cost |
-|------|-------|----------|------|
-| 1 | Ollama | Drafts, brainstorming, variations | Free (local) |
-| 2 | Gemini | Web search, bulk file reads (50+), research | Free tier (2M context) |
-| 3 | Sonnet | Implementation, synthesis, file writes | $3/1M input |
-| 4 | Opus | Planning, design, orchestration, review | $15/1M input |
-| 5 | Haiku | Test execution, lint, type checking | $0.25/1M input |
-
-**The orchestrator (you) always runs on Opus.** Subagents are routed by task complexity.
-
-### Magic Keywords
-
-Type these anywhere to activate special modes:
-
-| Keyword | Mode | What Happens |
-|---------|------|-------------|
-| `ulw` or `fast` | Ultrawork | Spawns 3-5 parallel agents for maximum throughput |
-| `ralph` | Persistence | Loops until the task is verified complete — no stopping early |
-| `eco` | Ecomode | Routes everything to the cheapest capable model |
-
-### Hooks System
-
-KERNEL includes prompt-based hooks that fire automatically:
-
-**SessionStart** — When you open Claude Code, KERNEL detects your project type (package.json, pyproject.toml, etc.), notes existing tests and build configs, and prepares to spawn validation agents.
-
-**PostToolUse (Edit|Write)** — After any code modification, KERNEL considers spawning test-runner or type-checker in the background. No announcement — it just validates.
-
-### Autonomy Rules
-
-KERNEL knows when to act and when to ask:
-
-| Action | Examples |
-|--------|---------|
-| **ACT** (just do it) | Read files, explore code, run allowed tools, reversible operations |
-| **PAUSE** (be careful) | Destructive operations, irreversible changes, security-sensitive actions |
-| **ASK** (get approval) | Multi-step plans, design decisions, ambiguous intent, uncertainty |
-
-### Memory-First Protocol
-
-Before every task, KERNEL checks existing knowledge:
+No work without a contract.
 
 ```
-_memory/               → Architecture, conventions, dependencies, hotspots, bugs, decisions
-kernel/project-notes/  → Past bug solutions, ADRs, infrastructure knowledge, work logs
-_meta/                 → Session context, learnings, active work state
+CONTRACT: CR-001
+GOAL: User can reset password via email link
+CONSTRAINTS: Scope: auth/ | Tier: 2 | No new deps
+FAILURE CONDITIONS: Breaks existing login, no tests
 ```
 
-**Why?** Memory check takes 10 seconds. Re-discovery takes 10+ minutes. KERNEL breaks the rediscovery loop.
+The contract defines scope before any code is written. This prevents drift, scope creep, and ambiguous deliverables.
 
-### Quality Gates
+### Tier Routing
 
-Before any commit, KERNEL validates:
+Complexity determines workflow:
 
-1. Tests pass
-2. Types check
-3. Lint clean
-4. Security scan
+| Tier | Files | Flow |
+|------|-------|------|
+| 1 | 1-2 | Orchestrator executes directly |
+| 2 | 3-5 | Orchestrator spawns surgeon |
+| 3 | 6+ | Full pipeline: architect -> surgeon -> adversary |
 
-**If any gate fails, the commit is blocked.** Quality is non-negotiable.
+Tier 1 tasks don't need coordination overhead. Tier 3 tasks need the full system.
 
-### Self-Evolution
+### The Communication Bus
 
-KERNEL updates itself:
+```sql
+-- Any agent writes
+INSERT INTO context_log (tab, type, vn, detail, contract, files)
+VALUES ('exec', 'checkpoint', 'CP-001', '...', 'CR-001', '["auth/reset.ts"]');
 
-- Pattern repeats 2+ times → encoded as a rule
-- Mistake repeats → prevention rule added
-- Discovery made → logged to `_meta/_learnings.md` + config updated
-- Stale rule found → deleted (deletion is evolution too)
+-- Other agents read
+SELECT * FROM context_log WHERE contract = 'CR-001' ORDER BY ts DESC;
+```
 
-### Frontend Design Philosophy
+| Type | Writer | Reader |
+|------|--------|--------|
+| directive | main | plan, exec, qa |
+| packet | plan, exec | main |
+| checkpoint | exec | all |
+| verdict | qa | main |
 
-KERNEL enforces intentional design:
-
-- **System fonts first** — Never Inter or Geist (AI aesthetic signatures)
-- **No emoji in UI** — Professional, not playful
-- **Sophistication through restraint** — Every element earns its place
-- **One signature element** — Customize until unrecognizable
-- **Anti-pattern enforcement** — Rejects AI slop (purple gradients, shadcn defaults, three-column grids)
-
-Use `/design` to activate full design mode with audit, build, review, and token generation.
+This is what eliminates the relay. Agents don't need you to pass context. They read it directly.
 
 ---
 
-## Agents (25)
+## Agents
 
-Agents spawn proactively based on context. You don't invoke them — they activate when needed.
+Six specialized agents. Each has a role.
 
-### Fast Validation (Haiku)
+| Agent | Tab | Focus |
+|-------|-----|-------|
+| **orchestrator** | main | Route, contract, reconcile, decide ship |
+| **architect** | plan | Discovery, scoping, risk identification |
+| **surgeon** | exec | Minimal diff implementation, commit working state |
+| **adversary** | qa | Assume broken, find edge cases, prove with evidence |
+| **searcher** | - | Deep code search, trace calls, map dependencies |
+| **researcher** | - | Web/docs research, find 3+ sources |
 
-| Agent | Trigger | Purpose |
-|-------|---------|---------|
-| `test-runner` | Code written | Run tests, report failures |
-| `type-checker` | TS/Python changes | Validate types |
-| `lint-fixer` | Any code | Auto-fix lint issues |
-| `build-validator` | Significant changes | Verify builds |
-| `dependency-auditor` | package.json changes | Check CVEs, outdated packages |
-| `git-historian` | "why" questions, legacy code | Analyze git history |
-| `git-sync` | End of response | Auto-commit and push |
-| `metadata-sync` | End of response | Update `_meta/` files |
-
-### Deep Analysis (Opus)
-
-| Agent | Trigger | Purpose |
-|-------|---------|---------|
-| `code-reviewer` | Before commit, "review this" | Find issues |
-| `security-scanner` | Auth/input code | Find vulnerabilities |
-| `test-generator` | New function/module | Generate tests |
-| `api-documenter` | API changes | Update docs |
-| `perf-profiler` | "slow" mentions | Profile bottlenecks |
-| `refactor-scout` | "improve" mentions | Find refactoring opportunities |
-| `migration-planner` | Major changes | Plan transitions |
-| `frontend-stylist` | UI/CSS work | Design with philosophy enforcement |
-| `media-handler` | Image/video/audio | Process multimedia |
-| `database-architect` | Schema/query work | Design data layer |
-| `debugger-deep` | Complex bugs | Root cause analysis (5-phase) |
-
-### Orchestration Agents (Opus)
-
-| Agent | Tab | Purpose |
-|-------|-----|---------|
-| `orchestrator` | main | Route, contract, reconcile, decide ship |
-| `architect` | plan | Discovery, scoping, risk identification |
-| `surgeon` | exec | Minimal diff implementation, commit working state |
-| `adversary` | qa | Assume broken, find edge cases, verify with evidence |
-| `searcher` | search | Deep code search, trace calls, map dependencies |
-| `researcher` | research | Web/docs research, find 3+ sources |
-
-These agents communicate via **AgentDB** (SQLite). See [Orchestration Mode](#orchestration-mode) below.
+The orchestrator stays context-light. Disposable subagents do the heavy lifting. When work is done, they terminate. The orchestrator remains clean for the next task.
 
 ---
 
-## Commands (16)
+## Commands
 
-### Setup & Maintenance
+16 commands organized by workflow.
 
+### Setup
 | Command | Purpose |
 |---------|---------|
-| `/repo-init` | Generate KERNEL config for any codebase — analyzes codebase, creates tailored config |
+| `/repo-init` | Generate KERNEL config for any codebase |
 | `/kernel-user-init` | Set up user-level defaults at `~/.claude/` |
-| `/kernel-status` | Show config health, staleness, and untracked artifacts |
-| `/kernel-prune` | Review and remove stale config entries |
+| `/kernel-status` | Show config health and staleness |
+| `/kernel-prune` | Remove stale config entries |
 
 ### Development
-
 | Command | Purpose |
 |---------|---------|
-| `/build` | Full pipeline: research → plan → implement → validate |
-| `/iterate` | Continuous improvement: analyze → identify → apply → test |
-| `/tearitapart` | Critical review: challenge assumptions, find risks before implementing |
-| `/validate` | Pre-commit gate: run types, lint, and tests in parallel |
-| `/orchestrate` | Multi-agent coordination for Tier 3 tasks (6+ files) |
-| `/contract` | Contract-first scope with GOAL, CONSTRAINTS, FAILURE_CONDITIONS |
-| `/design` | Design mode: load philosophy, audit UI, build with intention |
-| `/docs` | Documentation mode: audit, generate, maintain docs |
+| `/build` | Full pipeline: research -> plan -> implement -> validate |
+| `/iterate` | Continuous improvement loop |
+| `/tearitapart` | Critical review before implementing |
+| `/validate` | Pre-commit gate: types, lint, tests in parallel |
+| `/design` | Design mode with philosophy enforcement |
+| `/docs` | Documentation mode |
+| `/orchestrate` | Enter multi-agent coordination |
+| `/contract` | Define scope before work |
 
-### Git Workflow
-
+### Git
 | Command | Purpose |
 |---------|---------|
-| `/branch` | Create worktree for isolated development work |
-| `/ship` | Commit, push, and create PR from current branch |
-| `/parallelize` | Set up multiple worktrees for parallel development streams |
+| `/branch` | Create worktree for isolated work |
+| `/ship` | Commit, push, create PR |
+| `/parallelize` | Set up multiple worktrees |
 | `/handoff` | Generate context brief for session continuity |
 
 ---
 
-## Rules (13)
+## Skills
 
-Foundational constraints applied across all work.
+11 skills loaded on-demand. Not always present. Triggered when relevant.
 
-| Rule | Purpose |
-|------|---------|
-| `assumptions` | Extract and confirm assumptions before executing any task |
-| `commit-discipline` | Atomic, frequent, conventional commits — push immediately |
-| `context-cascade` | Pass outputs between phases, not full context (prevents token bloat) |
-| `decisions` | Architecture Decision Records — logged choices with rationale |
-| `fail-fast` | Exit early, clear errors, no silent failures |
-| `frontend-conventions` | Implementation patterns for intentional UI development |
-| `invariants` | Non-negotiable contracts: security, integrity, data safety |
-| `investigation-first` | Search for existing patterns before implementing |
-| `memory-protocol` | Check project memory before acting (10s vs 10min) |
-| `methodology` | Auto-detect task type and load relevant knowledge bank |
-| `patterns` | Discovered codebase patterns (naming, errors, logging) |
-| `preferences` | Negotiable defaults (formatting, tool choices) |
-| `self-evolution` | Update system when patterns emerge or mistakes repeat |
+| Skill | When Loaded |
+|-------|-------------|
+| **planning** | Before implementing features |
+| **debug** | When fixing bugs |
+| **research** | Before choosing approaches |
+| **review** | Before completing work |
+| **discovery** | First time in unfamiliar code |
+| **iteration** | When refactoring |
+| **tearitapart** | Before implementing complex plans |
+| **docs** | Documentation tasks |
+| **build** | Full implementation pipeline |
+| **rules** | Rule management |
+| **coding-prompt-bank** | Core AI coding philosophy |
 
----
-
-## Knowledge Banks (10)
-
-Methodology templates loaded automatically based on task context.
-
-| Bank | When It Applies |
-|------|-----------------|
-| **PLANNING-BANK** | Before implementing features — interface design, mental simulation |
-| **DEBUGGING-BANK** | When fixing bugs — reproduce, isolate, root cause, fix |
-| **RESEARCH-BANK** | Before writing new functionality — find packages, compare approaches |
-| **REVIEW-BANK** | Before completing any task — correctness, conventions, edge cases |
-| **DISCOVERY-BANK** | First time in unfamiliar codebase — map structure, detect tooling |
-| **ITERATION-BANK** | When refactoring or improving — prioritize by impact |
-| **TEARITAPART-BANK** | Before implementing complex plans — challenge every assumption |
-| **DOCUMENTATION-BANK** | When working on docs — audience analysis, structure |
-| **BUILD-BANK** | Full implementation pipeline — idea → code → validate |
-| **CODING-PROMPT-BANK** | Core AI coding philosophy — tier system, execution laws |
+This is methodology loaded from banks. The skill files contain full instructions. They're read when needed, not stuffed into every conversation.
 
 ---
 
-## Skills (3)
+## Key Innovations
 
-Auto-triggered capabilities based on keywords in your messages.
+### 1. AgentDB Bus
 
-| Skill | Triggers | Purpose |
-|-------|----------|---------|
-| `debug` | "bug", "error", "broken", "fix", "not working" | Systematic 5-phase debugging methodology |
-| `research` | "research", "investigate", "learn about", "deep dive" | Structured investigation with source tracking |
-| `coding-prompt-bank` | "coding rules", "initialize project", "new codebase" | Base AI coding philosophy, tier-based complexity |
-
----
-
-## Session Tracking
-
-KERNEL maintains context across sessions:
+SQLite eliminates copy/paste relay between agents. Agents write to shared state. Other agents poll it. The human is removed from the communication loop.
 
 ```
-_meta/
-├── _session.md           # Session context (blockers, decisions, infrastructure)
-├── _learnings.md         # Evolution log (append-only, dated entries)
-├── context/
-│   └── active.md         # Current work state
-└── benchmark/
-    ├── metrics.jsonl      # Quantitative performance data
-    ├── journal.md         # Qualitative reflections
-    └── summary.md         # Weekly rollup
+_meta/agentdb/agent.db
+├── context_log    # Communication bus
+├── contracts      # Active work agreements
+├── rules          # Project learnings
+└── learnings      # Session insights
 ```
 
-### Session Protocol
+### 2. Contract-First
+
+GOAL, CONSTRAINTS, FAILURE_CONDITIONS before any work. This prevents:
+- Scope creep (constraints are explicit)
+- Ambiguous deliverables (goal is specific)
+- Invisible failures (failure conditions are defined)
+
+### 3. Disposable Subagents
+
+The orchestrator stays clean by delegating to subagents that terminate after their work is done. No context accumulation. No pollution.
+
+### 4. VN-Native Syntax
+
+The core CLAUDE.md is ~200 tokens. Compare to ~2000 for verbose markdown. Every byte costs context window.
 
 ```
-START → Read _meta/_session.md, active.md, kernel/state.md, git status
-DURING → Update active.md, log learnings, spawn agents proactively
-END → @metadata-sync + @git-sync (both run in parallel, automatic)
+●relentless|until:code_works,work_done,qa_exhausted
+●contract_first|no_work_without_scope
+●prove|not:assert
 ```
 
----
+Machine-parseable. Human-scannable. Compact.
 
-## Project Structure
+### 5. Skills from Banks
 
-```
-kernel-claude/
-├── CLAUDE.md                    # Core config (compact Unicode syntax)
-├── README.md                    # This file
-├── .claude-plugin/              # Plugin metadata
-│   ├── plugin.json
-│   └── marketplace.json
-├── commands/                    # 16 plugin commands (auto-discovered)
-├── agents/                      # 19 plugin agents (auto-discovered)
-├── skills/                      # 3 plugin skills (auto-discovered)
-│   ├── debug/SKILL.md
-│   ├── research/SKILL.md
-│   └── coding-prompt-bank/SKILL.md
-├── hooks/                       # Plugin hooks (auto-discovered)
-│   └── hooks.json
-├── .claude/                     # KERNEL self-development config
-│   ├── settings.json            # Project-level hooks
-│   ├── settings.local.json      # Local permissions (gitignored)
-│   └── rules/                   # 13 rule definitions
-├── kernel/                      # Templates distributed via /repo-init
-│   ├── CLAUDE.md                # Project intelligence template
-│   ├── state.md                 # Shared world model
-│   ├── banks/                   # 10 methodology banks
-│   ├── rules/                   # Rule templates
-│   ├── skills/                  # Skill templates
-│   ├── hooks/                   # Hook templates
-│   ├── project-notes/           # Project memory templates
-│   └── orchestration/           # Multi-agent coordination
-│       ├── agentdb/             # SQLite schema + init script
-│       │   ├── init.sh          # Bootstrap command
-│       │   └── migrations/      # Schema definitions
-│       └── agents/              # 6 orchestration agents
-├── _meta/                       # Session tracking
-├── memory/                      # Config registry
-└── .mcp.json                    # MCP servers config
-```
+Methodology isn't always-on. It's loaded when needed. `/debug` loads the debugging bank. `/build` loads the build pipeline. Context is conserved.
 
----
+### 6. Zero Human Relay
 
-## Configuration Types
-
-| I want Claude to... | Plugin location | Project location |
-|---------------------|----------------|------------------|
-| Follow rules on all tasks | N/A (not distributable) | `.claude/CLAUDE.md` or `.claude/rules/` |
-| Run workflow when I say `/name` | `commands/name.md` | `.claude/commands/name.md` |
-| Auto-run on code changes | `hooks/hooks.json` | `.claude/settings.json` |
-| Delegate to specialist | `agents/name.md` | `.claude/agents/name.md` |
-| Auto-trigger on keywords | `skills/name/SKILL.md` | `.claude/skills/name/SKILL.md` |
-| Connect to external service | `.mcp.json` | `.mcp.json` |
-
----
-
-## Orchestration Mode
-
-For complex tasks (Tier 3: 6+ files), KERNEL uses multi-agent coordination:
-
-### The Pattern
-
-**Orchestrator stays context-light.** Spawn disposable subagents for heavy lifting. All communicate via AgentDB (SQLite).
-
-```
-ORCHESTRATOR (main)
-├─ spawns → searcher agents (code search)
-├─ spawns → researcher agents (web/docs)
-├─ spawns → architect agents (discovery/scoping)
-├─ spawns → surgeon agents (implementation)
-├─ spawns → adversary agents (QA)
-└─ ALL write to AgentDB → orchestrator reads, routes, decides
-```
-
-### Initialize AgentDB
-
-```bash
-./kernel/orchestration/agentdb/init.sh
-```
-
-This creates `_meta/agentdb/agent.db` with tables for:
-- `context_log` — Communication bus (directives, packets, checkpoints, verdicts)
-- `contracts` — Active work agreements
-- `rules` — Project-specific learnings
-- `learnings` — Session insights
-
-### Tier Routing
-
-| Tier | Files | Flow |
-|------|-------|------|
-| 1 | 1-2 | Execute directly |
-| 2 | 3-5 | main → surgeon |
-| 3 | 6+ | main → architect → surgeon → adversary |
-
-### Contract-First Workflow
-
-No work without a contract:
-
-```
-CONTRACT: CR-001
-─────────────
-GOAL: User can reset password via email link
-CONSTRAINTS: Scope: auth/ | Tier: 2 | No deps
-FAILURE CONDITIONS: Breaks existing login, no tests
-ASSIGN: surgeon
-```
-
-### Commands
-
-- `/orchestrate` — Enter orchestration mode
-- `/contract` — Create contract before work
-
-### Why This Pattern?
-
-- **Context discipline** — Orchestrator stays clean, subagents do heavy lifting
-- **Persistence** — AgentDB survives session restarts
-- **Parallelism** — Spawn multiple searcher/researcher agents simultaneously
-- **Evidence-based** — All decisions traceable via `context_log`
+Agents read AgentDB on startup. They don't need you to summarize what happened. They don't need handoff documents. They read the log.
 
 ---
 
@@ -495,31 +241,66 @@ ASSIGN: surgeon
 
 ### Correctness Over Speed
 
-KERNEL prioritizes working code on the first attempt. Mental simulation catches 80% of bugs before execution. Think before typing.
+Mental simulation catches 80% of bugs before execution. Think before typing. Get it right on the first attempt.
 
 ### Every Line Is Liability
 
-Config over code. Native over custom. Existing over new. Delete what doesn't earn its place. The best code is code you don't write.
+Config over code. Native over custom. Existing over new. Delete what doesn't earn its place.
 
 ### Investigate Before Implement
 
-Never assume. Find existing patterns first. Copy what works. Adapt minimally. Fighting the framework causes pain.
+Never assume. Find existing patterns first. Copy what works. Adapt minimally.
 
-### Tailored, Not Templated
+### Memory Before Discovery
 
-Every artifact is created because your project needs it:
+Check `_meta/` before re-learning what the project already knows. Memory check takes 10 seconds. Re-discovery takes 10 minutes.
+
+---
+
+## Installation
+
+### Requirements
+
+- Claude Code CLI v1.0.33+
+- macOS, Linux, or Windows
+
+### Plugin Installation
+
+```bash
+/install-plugin https://github.com/ariaxhan/kernel-claude
+```
+
+### AgentDB Initialization
+
+For orchestration mode (Tier 3 tasks):
+
+```bash
+./orchestration/agentdb/init.sh
+```
+
+Creates `_meta/agentdb/agent.db` with the communication schema.
+
+---
+
+## Project Structure
 
 ```
-Good: "Created test-runner because project has pytest"
-Bad:  "Created test-runner because the template includes it"
+kernel-claude/
+├── CLAUDE.md              # Core config (~200 tokens, VN-native)
+├── commands/              # 16 plugin commands
+├── agents/                # 6 orchestration agents
+├── skills/                # 11 on-demand skills
+├── hooks/                 # Automatic triggers
+└── orchestration/
+    └── agentdb/
+        └── init.sh        # Database bootstrap
 ```
 
 ---
 
-## Requirements
+## Contributing
 
-- Claude Code CLI **v1.0.33+**
-- Works on macOS, Linux, and Windows
+Issues and PRs welcome at [github.com/ariaxhan/kernel-claude](https://github.com/ariaxhan/kernel-claude).
 
 ---
 

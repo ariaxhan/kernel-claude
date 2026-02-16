@@ -61,7 +61,7 @@ How does this behave at:
 
 ## Output
 
-Write review to `.claude/reviews/{feature-name}-teardown.md`:
+Write review to `_meta/reviews/{feature-name}-teardown.md`:
 
 ```markdown
 # Tear Down: {feature name}
