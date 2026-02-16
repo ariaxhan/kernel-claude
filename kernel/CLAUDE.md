@@ -87,6 +87,48 @@ This project uses KERNEL for development intelligence.
 
 ---
 
+## Orchestration Mode
+
+For Tier 3 tasks (6+ files, complex debugging, architectural changes):
+
+**Pattern:** Orchestrator stays context-light. Spawn disposable subagents for heavy lifting. All communicate via AgentDB.
+
+**Initialize:** `./kernel/orchestration/agentdb/init.sh`
+
+**Agents:**
+| Agent | Focus | Writes |
+|-------|-------|--------|
+| orchestrator | route, contract, reconcile | directives |
+| searcher | code search | packets |
+| researcher | web/docs | packets |
+| architect | discovery, scope, risk | packets |
+| surgeon | minimal diff, commit | checkpoints |
+| adversary | QA, break it | verdicts |
+
+**Flow:**
+1. Orchestrator creates CONTRACT (GOAL, CONSTRAINTS, FAILURE_CONDITIONS)
+2. Spawns parallel search/research agents
+3. Reads packets, routes to architect
+4. Architect discovers scope, returns packet
+5. Surgeon implements, writes checkpoint
+6. Adversary QA, writes verdict
+7. Orchestrator ships or iterates
+
+**Tier Routing:**
+| Tier | Files | Flow |
+|------|-------|------|
+| 1 | 1-2 | Execute directly |
+| 2 | 3-5 | main → exec |
+| 3 | 6+ | main → plan → exec → qa |
+
+**Commands:**
+- `/orchestrate` — Enter orchestration mode
+- `/contract` — Create contract-first scope
+
+**Location:** `kernel/orchestration/`
+
+---
+
 ## Configuration Layers
 
 This project uses a layered configuration:
