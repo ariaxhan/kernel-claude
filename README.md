@@ -1,17 +1,25 @@
 # KERNEL
 
-**The AI Coding OS for Claude Code** | v4.1.0
+**The AI Coding OS for Claude Code** | v4.3.0
 
 KERNEL is a Claude Code plugin that transforms how you develop. It analyzes your codebase, creates tailored configuration, spawns specialized agents, applies methodology automatically, and evolves over time. Your coding assistant becomes a coding OS.
 
 ---
 
-## What's New in v4.1.0
+## What's New in v4.3.0
 
-- **Plugin structure fix** — Commands, agents, skills, hooks moved to root level for correct plugin discovery
-- **Updated manifest** — `plugin.json` now includes repository, license, keywords metadata
+- **Orchestration Mode** — Multi-agent coordination for Tier 3 tasks (6+ files)
+- **AgentDB** — SQLite-based communication bus for disposable subagents
+- **Contract-first workflow** — GOAL, CONSTRAINTS, FAILURE_CONDITIONS before any work
+- **6 orchestration agents** — orchestrator, architect, surgeon, adversary, searcher, researcher
+- **New commands** — `/orchestrate` and `/contract`
 
-### v4.0.0 (Previous)
+### v4.1.0 (Previous)
+
+- Plugin structure fix — Commands, agents, skills, hooks at root level
+- Updated manifest with repository, license, keywords metadata
+
+### v4.0.0
 
 - Compact Unicode syntax, 5-tier model routing, hooks system, magic keywords
 - Autonomy rules, 16 commands, 13 rules, coding-prompt-bank skill
@@ -202,7 +210,7 @@ Use `/design` to activate full design mode with audit, build, review, and token 
 
 ---
 
-## Agents (19)
+## Agents (25)
 
 Agents spawn proactively based on context. You don't invoke them — they activate when needed.
 
@@ -235,9 +243,22 @@ Agents spawn proactively based on context. You don't invoke them — they activa
 | `database-architect` | Schema/query work | Design data layer |
 | `debugger-deep` | Complex bugs | Root cause analysis (5-phase) |
 
+### Orchestration Agents (Opus)
+
+| Agent | Tab | Purpose |
+|-------|-----|---------|
+| `orchestrator` | main | Route, contract, reconcile, decide ship |
+| `architect` | plan | Discovery, scoping, risk identification |
+| `surgeon` | exec | Minimal diff implementation, commit working state |
+| `adversary` | qa | Assume broken, find edge cases, verify with evidence |
+| `searcher` | search | Deep code search, trace calls, map dependencies |
+| `researcher` | research | Web/docs research, find 3+ sources |
+
+These agents communicate via **AgentDB** (SQLite). See [Orchestration Mode](#orchestration-mode) below.
+
 ---
 
-## Commands (14)
+## Commands (16)
 
 ### Setup & Maintenance
 
@@ -256,6 +277,8 @@ Agents spawn proactively based on context. You don't invoke them — they activa
 | `/iterate` | Continuous improvement: analyze → identify → apply → test |
 | `/tearitapart` | Critical review: challenge assumptions, find risks before implementing |
 | `/validate` | Pre-commit gate: run types, lint, and tests in parallel |
+| `/orchestrate` | Multi-agent coordination for Tier 3 tasks (6+ files) |
+| `/contract` | Contract-first scope with GOAL, CONSTRAINTS, FAILURE_CONDITIONS |
 | `/design` | Design mode: load philosophy, audit UI, build with intention |
 | `/docs` | Documentation mode: audit, generate, maintain docs |
 
@@ -377,7 +400,12 @@ kernel-claude/
 │   ├── rules/                   # Rule templates
 │   ├── skills/                  # Skill templates
 │   ├── hooks/                   # Hook templates
-│   └── project-notes/           # Project memory templates
+│   ├── project-notes/           # Project memory templates
+│   └── orchestration/           # Multi-agent coordination
+│       ├── agentdb/             # SQLite schema + init script
+│       │   ├── init.sh          # Bootstrap command
+│       │   └── migrations/      # Schema definitions
+│       └── agents/              # 6 orchestration agents
 ├── _meta/                       # Session tracking
 ├── memory/                      # Config registry
 └── .mcp.json                    # MCP servers config
@@ -395,6 +423,71 @@ kernel-claude/
 | Delegate to specialist | `agents/name.md` | `.claude/agents/name.md` |
 | Auto-trigger on keywords | `skills/name/SKILL.md` | `.claude/skills/name/SKILL.md` |
 | Connect to external service | `.mcp.json` | `.mcp.json` |
+
+---
+
+## Orchestration Mode
+
+For complex tasks (Tier 3: 6+ files), KERNEL uses multi-agent coordination:
+
+### The Pattern
+
+**Orchestrator stays context-light.** Spawn disposable subagents for heavy lifting. All communicate via AgentDB (SQLite).
+
+```
+ORCHESTRATOR (main)
+├─ spawns → searcher agents (code search)
+├─ spawns → researcher agents (web/docs)
+├─ spawns → architect agents (discovery/scoping)
+├─ spawns → surgeon agents (implementation)
+├─ spawns → adversary agents (QA)
+└─ ALL write to AgentDB → orchestrator reads, routes, decides
+```
+
+### Initialize AgentDB
+
+```bash
+./kernel/orchestration/agentdb/init.sh
+```
+
+This creates `_meta/agentdb/agent.db` with tables for:
+- `context_log` — Communication bus (directives, packets, checkpoints, verdicts)
+- `contracts` — Active work agreements
+- `rules` — Project-specific learnings
+- `learnings` — Session insights
+
+### Tier Routing
+
+| Tier | Files | Flow |
+|------|-------|------|
+| 1 | 1-2 | Execute directly |
+| 2 | 3-5 | main → surgeon |
+| 3 | 6+ | main → architect → surgeon → adversary |
+
+### Contract-First Workflow
+
+No work without a contract:
+
+```
+CONTRACT: CR-001
+─────────────
+GOAL: User can reset password via email link
+CONSTRAINTS: Scope: auth/ | Tier: 2 | No deps
+FAILURE CONDITIONS: Breaks existing login, no tests
+ASSIGN: surgeon
+```
+
+### Commands
+
+- `/orchestrate` — Enter orchestration mode
+- `/contract` — Create contract before work
+
+### Why This Pattern?
+
+- **Context discipline** — Orchestrator stays clean, subagents do heavy lifting
+- **Persistence** — AgentDB survives session restarts
+- **Parallelism** — Spawn multiple searcher/researcher agents simultaneously
+- **Evidence-based** — All decisions traceable via `context_log`
 
 ---
 

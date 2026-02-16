@@ -1,6 +1,6 @@
 # KERNEL
 
-**The AI Coding OS** | v4.2.0
+**The AI Coding OS** | v4.3.0
 
 tokens: ~800 | standalone | self-evolving
 
@@ -162,7 +162,7 @@ Before committing:
 
 ## COMPONENTS
 
-### Commands (14)
+### Commands (16)
 
 | cmd | purpose |
 |-----|---------|
@@ -174,6 +174,8 @@ Before committing:
 | /iterate | analyze → improve → test |
 | /tearitapart | critical review → challenge → report |
 | /validate | parallel: types, lint, tests |
+| /orchestrate | multi-agent coordination for Tier 3 tasks |
+| /contract | contract-first scope before work |
 | /branch | create worktree for isolated work |
 | /ship | commit → push → create PR |
 | /parallelize | multi-worktree parallel development |
@@ -181,11 +183,13 @@ Before committing:
 | /design | load philosophy → audit UI → build |
 | /handoff | context brief for session continuity |
 
-### Agents (19)
+### Agents (25)
 
 **Fast (haiku):** test-runner, type-checker, lint-fixer, build-validator, dependency-auditor, git-historian, git-sync, metadata-sync
 
 **Deep (opus):** code-reviewer, security-scanner, test-generator, api-documenter, perf-profiler, refactor-scout, migration-planner, frontend-stylist, media-handler, database-architect, debugger-deep
+
+**Orchestration (opus):** orchestrator, architect, surgeon, adversary, searcher, researcher
 
 ### Rules (13)
 
