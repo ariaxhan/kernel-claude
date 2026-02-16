@@ -1,12 +1,12 @@
 # KERNEL
 
-**The AI Coding OS for Claude Code** | v4.3.0
+**The AI Coding OS for Claude Code** | v5.1.0
 
 KERNEL is a Claude Code plugin that transforms how you develop. It analyzes your codebase, creates tailored configuration, spawns specialized agents, applies methodology automatically, and evolves over time. Your coding assistant becomes a coding OS.
 
 ---
 
-## What's New in v4.3.0
+## What's New in v5.1.0
 
 - **Orchestration Mode** — Multi-agent coordination for Tier 3 tasks (6+ files)
 - **AgentDB** — SQLite-based communication bus for disposable subagents
@@ -14,7 +14,7 @@ KERNEL is a Claude Code plugin that transforms how you develop. It analyzes your
 - **6 orchestration agents** — orchestrator, architect, surgeon, adversary, searcher, researcher
 - **New commands** — `/orchestrate` and `/contract`
 
-### v4.1.0 (Previous)
+### v5.0.0 (Previous)
 
 - Plugin structure fix — Commands, agents, skills, hooks at root level
 - Updated manifest with repository, license, keywords metadata
