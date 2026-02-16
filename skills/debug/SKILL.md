@@ -1,15 +1,24 @@
 ---
 name: debug
 description: Systematic debugging methodology - auto-triggers on bug/error/not working signals
+triggers:
+  - bug
+  - error
+  - fix
+  - broken
+  - not working
+  - fails
+  - crashed
+  - unexpected
 ---
 
 # Debug Skill
 
 ## Purpose
 
-This skill provides a systematic methodology for diagnosing and fixing bugs. It auto-triggers when context suggests debugging is needed.
+Reproduce first. Isolate via binary search. Instrument, don't guess. Fix root cause, not symptom.
 
-**Key Concept**: Most debugging failures come from jumping to solutions before understanding the problem. This skill enforces a disciplined approach.
+**Key Concept**: Most debugging failures come from jumping to solutions before understanding the problem. Systematic debugging beats random changes.
 
 ---
 
@@ -23,9 +32,20 @@ This skill activates when detecting:
 
 ---
 
-## The Four-Phase Protocol
+## Process
 
-### PHASE 1: Deep Reproduction
+```
+1. REPRODUCE → Can you trigger it consistently? If no, gather more data.
+2. ISOLATE → Binary search the call chain, find exact location
+3. INSTRUMENT → Add logging/breakpoints, observe state
+4. UNDERSTAND ROOT CAUSE → Why does this happen? (Not just what fails)
+5. FIX ROOT CAUSE → Not the symptom
+6. VERIFY → Original bug + edge cases + regression check
+```
+
+---
+
+## PHASE 1: Deep Reproduction
 
 Before touching ANY code:
 
@@ -41,13 +61,14 @@ DOCUMENT:
 - Expected: [what should happen]
 - Actual: [what happens instead]
 - Environment: [OS, versions, state]
+- Frequency: Always, sometimes, specific conditions?
 ```
 
 **Anti-pattern**: "It sometimes fails" - get SPECIFIC.
 
 ---
 
-### PHASE 2: Systematic Isolation (Binary Search)
+## PHASE 2: Systematic Isolation (Binary Search)
 
 Don't grep randomly. Use binary search:
 
@@ -69,9 +90,24 @@ This is O(log n), not O(n) random guessing.
 - Check inputs/outputs at each step
 - Verify data shapes match expectations
 
+**Logging Strategy:**
+```javascript
+console.log('1. Input:', JSON.stringify(input))
+console.log('2. After transform:', result1)
+console.log('3. Before external call:', params)
+console.log('4. After external call:', response)
+console.log('5. Final:', output)
+```
+
+**Dependency Removal:**
+- Comment out external API calls, use mock data
+- Comment out database queries, use in-memory data
+- Remove complex logic, use simple placeholder
+- Isolate which dependency causes failure
+
 ---
 
-### PHASE 3: Root Cause Analysis
+## PHASE 3: Root Cause Analysis
 
 Once isolated, ask WHY:
 
@@ -88,9 +124,21 @@ AVOID:
 - "It works now" without understanding why
 ```
 
+**Common Root Causes:**
+- Wrong assumption about input shape/type
+- Off-by-one error (loop bounds, array indices)
+- Missing null/undefined/None check
+- Race condition (async timing issue)
+- Mutating shared state
+- Wrong operator (=, ==, ===, >, >=)
+- Variable scope issue
+- Incorrect error handling (swallowing errors)
+- API mismatch (expected response vs actual)
+- Timezone/datetime handling
+
 ---
 
-### PHASE 4: Permanent Fix + Regression Test
+## PHASE 4: Permanent Fix + Regression Test
 
 ```
 FIX PROTOCOL:
@@ -106,6 +154,51 @@ Every bug fix MUST include a test that:
 - Prevents regression
 ```
 
+**Regression Validation:**
+1. Original bug case - Should now work
+2. Edge cases - Null, empty, boundary values still work
+3. Happy path - Normal case still works
+4. Integration - Adjacent code still works
+5. Add test - Prevent regression
+
+---
+
+## Debugging Checklist
+
+**Data Flow:**
+```
+□ Check input shape/type (log it)
+□ Check each transformation step
+□ Check output shape/type
+□ Verify no mutation of shared data
+```
+
+**Logic:**
+```
+□ Are conditions correct? (>, >=, ==, ===)
+□ Are all branches covered?
+□ Is loop termination correct?
+□ Are variables in correct scope?
+```
+
+**Async (if applicable):**
+```
+□ Are promises awaited?
+□ Is race condition possible?
+□ Are callbacks called?
+□ Is event handler registered?
+```
+
+---
+
+## When Stuck
+
+1. Explain to rubber duck (or write it out)
+2. Read error message carefully (contains answer 80% of time)
+3. Check docs (might be using API wrong)
+4. Simplify (make minimal reproduction case)
+5. Take a break (fresh eyes find bugs faster)
+
 ---
 
 ## Quick Reference
@@ -119,11 +212,14 @@ Every bug fix MUST include a test that:
 
 ---
 
-## Integration
+## Stack-Specific Instrumentation
 
-- **Memory First**: Check `kernel/project-notes/bugs.md` before debugging
-- **Bank Reference**: Load `kernel/banks/DEBUGGING-BANK.md` for complex bugs
-- **Log When Done**: Add solved bug to bugs.md for future reference
+| Stack | Debugger | Logging |
+|-------|----------|---------|
+| JavaScript | `debugger`, Chrome DevTools | `console.log` |
+| Python | `import pdb; pdb.set_trace()` | `print()`, logging |
+| Go | delve | `fmt.Printf`, `log.Printf` |
+| Rust | rust-gdb | `println!`, `dbg!` |
 
 ---
 
@@ -134,6 +230,7 @@ Every bug fix MUST include a test that:
 - Fixing symptoms instead of root cause
 - Not writing regression tests
 - Not documenting the fix
+- Guessing without evidence
 
 ---
 

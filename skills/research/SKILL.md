@@ -1,15 +1,24 @@
 ---
 name: research
 description: Deep research methodology - auto-triggers on research/investigate/find out signals
+triggers:
+  - research
+  - find out
+  - learn about
+  - investigate
+  - deep dive
+  - what is
+  - how does
+  - best way to
 ---
 
 # Research Skill
 
 ## Purpose
 
-This skill provides a systematic methodology for researching unknowns before implementation. It auto-triggers when context suggests investigation is needed.
+Find existing solutions before writing any code. The best code is code you don't write. Popular = reliable (most downloads means most battle-tested).
 
-**Key Concept**: The best code is code you don't write. Research existing solutions before building custom ones.
+**Key Concept**: Diversity beats depth - multiple perspectives reveal simplest solution. If the solution seems complex, you haven't found the right package yet.
 
 ---
 
@@ -21,6 +30,18 @@ This skill activates when detecting:
 - "best way to...", "how should I..."
 - New technologies or libraries not in project
 - Integration with external services/APIs
+
+---
+
+## Process
+
+```
+1. PLAN → Create research plan before any searches
+2. EXISTING SOLUTIONS → Find most popular package (check download stats)
+3. OFFICIAL DOCS → Check for built-in solutions
+4. PROBLEM DISCOVERY → Document 3-5 common pitfalls with fixes
+5. DOCUMENT → Create comprehensive research doc
+```
 
 ---
 
@@ -43,42 +64,68 @@ Search "X not working", "X issues", "X problems"
 
 ---
 
-## The Research Protocol
+## Research Planning Template
 
-### PHASE 1: Search for Complaints First
+```markdown
+## Research Plan
 
+### Goal
+{What we're trying to find}
+
+### Key Questions
+1. {Question 1}
+2. {Question 2}
+3. {Question 3}
+
+### Planned Searches (5-8 max)
+
+#### Search 1: Existing Solutions
+- Purpose: Find most popular package for {problem}
+- Query: "{problem} npm package" or "{problem} python library"
+- Expected: Package name, popularity stats, minimal code
+
+#### Search 2: Official Documentation
+- Purpose: Check for built-in solution
+- Query: "{technology} {feature} documentation"
+- Expected: Built-in API or official pattern
+
+#### Search 3: Common Problems
+- Purpose: Find common pitfalls/errors
+- Query: "{technology} {use case} common mistakes"
+- Expected: 3-5 pitfalls with fixes
 ```
-SEARCH PATTERNS:
-- "[library] not working"
-- "[feature] issues"
-- "[tool] problems with [your use case]"
 
-WHERE TO SEARCH:
-- GitHub Issues (real bugs, real solutions)
-- Stack Overflow (common pitfalls)
-- Reddit (honest opinions)
-- Discord (up-to-date community knowledge)
-```
+---
 
-### PHASE 2: Map the Failure Modes
+## Source Diversity Categories
 
-```
-BUILD A FAILURE MAP:
-- What breaks?
-- What are the common misunderstandings?
-- What did people try that didn't work?
-- What are the version-specific gotchas?
-```
+**Category 1: Official Sources**
+- Official documentation
+- Best practices guides
+- Migration/upgrade guides
+- API reference
 
-### PHASE 3: Then Look for Solutions
+**Category 2: Community Problem-Solving**
+- GitHub Issues (closed with solutions)
+- Stack Overflow (high-vote accepted)
+- Reddit r/{technology}
+- Discourse forums
 
-```
-NOW YOU'RE EQUIPPED:
-- You know what to avoid
-- You can evaluate if a solution addresses real problems
-- You won't waste hours on abandoned approaches
-- You can ask better questions
-```
+**Category 3: Real-World Experiences**
+- Developer blogs (war stories)
+- Medium/Dev.to (pitfall mentions)
+- Company engineering blogs
+- Conference talks
+
+**Category 4: Code Examples**
+- GitHub repos ("{tech} example")
+- Official example repositories
+- Community starter projects
+
+**Category 5: Troubleshooting**
+- Error message databases
+- "Common mistakes" articles
+- Debugging guides
 
 ---
 
@@ -95,21 +142,76 @@ Quality of sources (highest to lowest):
 
 ---
 
-## MCP Server Pattern
+## Package Evaluation Criteria
 
-When researching external services:
+| Criterion | What to Check |
+|-----------|---------------|
+| Downloads | npm: 1M+/week, pypi: check trends |
+| Last update | Within 6 months |
+| Open issues | Security issues? |
+| Lines required | Less is better |
+| Bundle size | Impact on build |
+| Maintenance | Active maintainers |
+| Community | Size and activity |
+| Documentation | Quality and completeness |
 
+---
+
+## Pitfall Documentation Structure
+
+```markdown
+### Pitfall: {Name}
+
+**Error/Symptom:**
+{exact error message or behavior}
+
+**Why it happens:**
+{root cause explanation}
+
+**Prevention:**
+- {preventive measure}
+- {best practice}
+
+**Fix:**
+1. {step-by-step solution}
+2. {code example if needed}
+
+**Sources:** [Link](URL)
+**Confidence:** High/Medium/Low
 ```
-ASK CLAUDE:
-"Is there an MCP server for [Stripe/Supabase/etc]?
-If so, set it up. If not, build a minimal one
-that can query their docs."
 
-WHAT HAPPENS:
-- Claude searches for existing MCP servers
-- Evaluates them for quality
-- Installs and configures (or scaffolds custom)
-- You get live access to current docs
+---
+
+## Documentation Structure
+
+Create `.claude/research/{feature-name}-research.md`:
+
+```markdown
+# Research: {Feature Name}
+
+**Date:** {date}
+**Sources:** {count} across {count} categories
+
+## Recommended Solution
+
+**Package:** {name} v{version}
+**Why:** {simplest, most reliable}
+**Popularity:** {download stats}
+**Code Required:** ~{X} lines
+
+**Implementation:**
+\`\`\`{language}
+{minimal example}
+\`\`\`
+
+## Alternatives Considered
+{Why rejected}
+
+## Common Pitfalls & Fixes
+{Documented pitfalls}
+
+## Sources
+{Full reference list}
 ```
 
 ---
@@ -145,11 +247,29 @@ THEN: Synthesize findings before implementing
 
 ---
 
-## Integration
+## Research Quality Checklist
 
-- **Bank Reference**: Load `kernel/banks/RESEARCH-BANK.md` for complex research
-- **Write Findings**: Always persist to `_meta/research/`
-- **Cite Sources**: Document where solutions came from
+```
+□ Research plan created and followed
+□ Token budget respected (~2000-3000 tokens)
+□ At least 1 popular package identified
+□ At least 3 common pitfalls documented
+□ Sources span at least 3 categories
+□ All sources cited with URLs
+□ Key questions answered
+```
+
+---
+
+## When To Research Again
+
+- Encounter undocumented error
+- Different version than researched
+- Integrating with new system
+- Scaling beyond researched use cases
+- Security/performance requirements change
+
+**Update existing research doc, don't start fresh.**
 
 ---
 

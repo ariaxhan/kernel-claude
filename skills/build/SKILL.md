@@ -1,21 +1,48 @@
-# Build Bank
+---
+name: build
+description: Unified planning and execution pipeline - from idea to working code
+triggers:
+  - build
+  - implement
+  - create feature
+  - make this
+  - build mode
+  - full implementation
+---
 
-## Philosophy
-Minimal code through maximum research. The best code is code you don't write. Your first solution is never right - always explore multiple approaches and choose simplest. Every line of code is liability. Delete code that doesn't earn its place.
+# Build Skill
 
-## Process Skeleton
-1. **Input Detection** - Raw idea? Existing plan? Partial implementation?
-2. **Planning** - Goal extraction, research, assumptions, multiple solutions, choose simplest
-3. **Execution** - Setup, iterative implementation, integration checkpoints
-4. **Validation** - Automated checks, manual verification, edge cases
-5. **Completion** - Update state, mark complete, final report
+## Purpose
+
+Minimal code through maximum research. The best code is code you don't write.
+
+**Key Concept**: Your first solution is never right - always explore multiple approaches and choose simplest. Every line of code is liability.
 
 ---
 
-## Slots (Designed to Fill)
+## Auto-Trigger Signals
 
-### Goal Extraction Template
-[TO EVOLVE: Add extraction patterns for THIS project type]
+This skill activates when detecting:
+- "build", "implement", "create"
+- "make this", "build mode"
+- "full implementation"
+- Feature requests, new functionality
+
+---
+
+## Process
+
+```
+1. INPUT DETECTION → Raw idea? Existing plan? Partial implementation?
+2. PLANNING → Goal extraction, research, assumptions, multiple solutions
+3. EXECUTION → Setup, iterative implementation, integration checkpoints
+4. VALIDATION → Automated checks, manual verification, edge cases
+5. COMPLETION → Update state, mark complete, final report
+```
+
+---
+
+## Goal Extraction Template
 
 ```
 GOAL: [What are we building?]
@@ -25,8 +52,9 @@ OUTPUTS: [What should exist when done?]
 DONE-WHEN: [How do we know it's complete?]
 ```
 
-### Solution Exploration Template (NEVER SKIP)
-[TO EVOLVE: Add solution comparison criteria for THIS tech stack]
+---
+
+## Solution Exploration (NEVER SKIP)
 
 **Solution 1: {Approach Name}**
 - How: {brief description}
@@ -54,9 +82,11 @@ DONE-WHEN: [How do we know it's complete?]
 4. Maintenance - active, clear docs
 5. Performance - only if bottleneck
 
-### Assumption Categories (max 6 per category)
-[TO EVOLVE: Add common assumptions in THIS codebase]
+---
 
+## Assumption Categories
+
+Confirm (not guess) max 6 per category:
 - Tech stack (languages, frameworks, versions)
 - File locations (where code lives, where to create)
 - Naming conventions (casing, patterns)
@@ -64,8 +94,9 @@ DONE-WHEN: [How do we know it's complete?]
 - Test expectations
 - Dependencies
 
-### Plan Document Structure
-[TO EVOLVE: Adjust based on what information matters]
+---
+
+## Plan Document Structure
 
 ```markdown
 # Plan: {Feature Name}
@@ -93,20 +124,17 @@ See `.claude/research/{feature-name}-research.md` for alternatives.
 ## Validate
 - [ ] {test 1}
 - [ ] {test 2}
-
----
-Created: {timestamp}
-Status: READY FOR EXECUTION
 ```
 
 **Keep plans under 50 lines. If longer, overthinking.**
 
-### Execution Workflow
-[TO EVOLVE: Add steps specific to THIS codebase]
+---
+
+## Execution Workflow
 
 ```
 BEFORE each step:
-  - Mark in_progress in todo
+  - Mark in_progress
   - State what you're doing
   - Review research doc
   - Check: fewer lines possible?
@@ -127,8 +155,9 @@ AFTER:
   - Update plan with progress
 ```
 
-### Validation Checklist
-[TO EVOLVE: Add validation steps for THIS tech stack]
+---
+
+## Validation Checklist
 
 **Automated:**
 ```bash
@@ -141,7 +170,6 @@ AFTER:
 # Lint
 [ -f .eslintrc* ] && npm run lint
 [ -f pyproject.toml ] && ruff check .
-[ -f rustfmt.toml ] && cargo fmt --check
 
 # Types
 [ -f tsconfig.json ] && npx tsc --noEmit
@@ -166,11 +194,7 @@ AFTER:
 1. STOP immediately
 2. Check research doc for this error
 3. If documented fix exists, apply it
-4. If not documented:
-   - Question: simpler solution missed?
-   - Search, add to research doc
-   - Consider different package/approach
-   - Document what failed and why
+4. If not documented: question simpler solution missed?
 5. Rollback to last known good state
 6. Re-evaluate: still simplest solution?
 7. Update plan
@@ -182,7 +206,6 @@ AFTER:
 3. Search: "{problem} simple solution"
 4. Can different approach use less code?
 5. Re-evaluate all solutions
-6. Choose simpler if found
 
 ### Tests Fail
 1. Identify failing test
@@ -198,7 +221,7 @@ AFTER:
 
 ---
 
-## Final Report Structure
+## Final Report
 
 ```
 BUILD COMPLETE
@@ -229,13 +252,28 @@ Next Steps:
 
 - **Default**: Full flow with confirmations
 - **--quick**: Skip confirmations, minimal prompts
-- **--plan-only**: Stop after Phase 1
+- **--plan-only**: Stop after planning
 - **--resume**: Continue in-progress work
-- **--validate-only**: Skip to Phase 3
+- **--validate-only**: Skip to validation
 
 ---
 
-## Template Notice
-This bank is scaffolding. Fill slots as you build in this codebase.
-Move stable build patterns to `.claude/rules/patterns.md` when they repeat.
-Respect caps; if full, replace least valuable or promote to rules.
+## Anti-Patterns
+
+- Building without research
+- First solution = final solution
+- Skipping solution exploration
+- Complex when simple exists
+- Not validating edge cases
+- Partial commits
+
+---
+
+## Success Metrics
+
+Build is working well when:
+- Solution is simplest possible
+- Code is minimal
+- All done-when criteria met
+- No regressions introduced
+- Plan matches implementation

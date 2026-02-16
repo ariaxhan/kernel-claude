@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "5.2.0",
+  "version": "5.1.0",
   "description": "The AI Coding OS - self-evolving project intelligence with 25 agents (19 standard + 6 orchestration), 16 commands, 3 skills, 5-tier model routing, AgentDB orchestration, and automatic methodology",
   "author": {
     "name": "Aria Han",
