@@ -1,6 +1,6 @@
 # KERNEL User Guide
 
-**Version:** 5.1.1
+**Version:** 5.2.0
 **Plugin for:** Claude Code CLI
 
 ---
@@ -19,65 +19,48 @@ After installation, KERNEL loads automatically for all projects.
 
 When you start a session in a new project:
 
-1. **Run `/repo-init`** - Analyzes your codebase, creates `_meta/` directory
-2. **AgentDB initializes** - SQLite database at `_meta/agentdb/agent.db`
+1. **AgentDB initializes** - SQLite database at `_meta/agentdb/kernel.db`
+2. **Run `agentdb read-start`** - Reads failures to avoid, active contract, last checkpoint
 3. **KERNEL detects stack** - Language, framework, test tools
 4. **Ready to work** - No templates to copy, plugin provides everything
 
-```
-/repo-init
+```bash
+agentdb read-start
 ```
 
-Output shows: stack detected, entry points found, patterns identified.
+Output shows: recent failures, active patterns, last checkpoint.
 
 ---
 
-## The 6 Orchestration Agents
+## The 2 Orchestration Agents
 
-KERNEL uses specialized agents in separate tabs, communicating via AgentDB.
+KERNEL uses two specialized agents for implementation and verification.
 
-### Core 4 (Multi-Tab Model)
-
-| Agent | Tab | Role | Model |
-|-------|-----|------|-------|
-| **orchestrator** | main | Route work, create contracts, reconcile conflicts, decide ship | opus |
-| **architect** | plan | Discovery, scoping, risk identification (Tier 3) | opus |
-| **surgeon** | exec | Minimal diff implementation, commit every working state | opus |
-| **adversary** | qa | Assume broken, find edge cases, prove/disprove | opus |
-
-### Support 2
-
-| Agent | Tab | Role | Model |
-|-------|-----|------|-------|
-| **searcher** | search | Deep code search, trace calls, map dependencies | sonnet |
-| **researcher** | research | External research - docs, APIs, best practices | sonnet |
+| Agent | Role | Model |
+|-------|------|-------|
+| **surgeon** | Minimal diff implementation, commit every working state | opus |
+| **adversary** | Assume broken, find edge cases, prove/disprove | opus |
 
 ### How They Work Together
 
 ```
-orchestrator creates CONTRACT
-       ↓
-architect discovers scope (Tier 3)
-       ↓
-orchestrator approves PACKET
-       ↓
+orchestrator (you) creates CONTRACT
+       |
 surgeon implements minimal diff
-       ↓
+       |
 adversary verifies CHECKPOINT
-       ↓
-orchestrator reads VERDICT → ship/iterate
+       |
+orchestrator reads VERDICT -> ship/iterate
 ```
 
 ---
 
-## Commands by Workflow
+## Commands
 
 ### Setup Commands
 
 | Command | Purpose |
 |---------|---------|
-| `/repo-init` | Analyze codebase, create `_meta/`, bootstrap context |
-| `/kernel-user-init` | Initialize user-level KERNEL at `~/.claude/` |
 | `/kernel-status` | Show KERNEL config health and staleness report |
 | `/kernel-prune` | Review and remove stale config entries |
 
@@ -86,10 +69,8 @@ orchestrator reads VERDICT → ship/iterate
 | Command | Purpose |
 |---------|---------|
 | `/build` | Full pipeline: idea -> research -> plan -> tearitapart -> execute -> validate |
-| `/iterate` | Continuous improvement mode: analyze, improve, iterate on existing code |
 | `/validate` | Pre-commit gate: types, lint, tests in parallel |
-| `/design` | Design mode: load philosophy, audit UI, build with intention |
-| `/docs` | Documentation mode: audit, generate, maintain docs |
+| `/ingest` | Universal entry point: classify -> route |
 
 ### Git Commands
 
@@ -97,7 +78,6 @@ orchestrator reads VERDICT → ship/iterate
 |---------|---------|
 | `/ship` | Commit, push, create PR (optionally release) |
 | `/branch` | Create worktree for isolated development |
-| `/parallelize` | Set up git worktrees for parallel development |
 
 ### Review Commands
 
@@ -106,70 +86,68 @@ orchestrator reads VERDICT → ship/iterate
 | `/tearitapart` | Critical review mode: world-class developer tears your plan apart |
 | `/handoff` | Generate structured context brief for session continuation |
 | `/contract` | Create explicit work agreement with scope, constraints, failure conditions |
-| `/orchestrate` | Invoke full orchestration with multi-agent coordination |
 
 ---
 
 ## Skills
 
-Skills are loaded on-demand via the Skill tool when relevant triggers occur.
+Skills are loaded on-demand when relevant triggers occur.
 
 | Skill | Triggers |
 |-------|----------|
-| **planning** | Complex multi-step tasks, architecture decisions |
 | **debug** | Bug reports, error investigation, "not working" signals |
 | **research** | "investigate", "find out", research signals |
-| **review** | PR reviews, code review requests |
 | **discovery** | Exploring unfamiliar codebase |
-| **iteration** | Continuous improvement, refactoring |
-| **tearitapart** | Critical pre-implementation review |
-| **docs** | Documentation generation requests |
 | **build** | Feature implementation from idea to code |
-| **rules** | Base coding rules, tier system |
-| **coding-prompt-bank** | Coding agent setup, project initialization |
 
 ---
 
 ## AgentDB
 
-SQLite database for agent communication. Located at `_meta/agentdb/agent.db`.
+SQLite database for agent memory and communication. Located at `_meta/agentdb/kernel.db`.
 
 ### Key Tables
 
-**context_log** - Communication bus between agents
+**context** - Work state: contracts, checkpoints, handoffs, verdicts
 ```sql
-SELECT tab, type, vn, detail FROM context_log
-WHERE contract = '{id}' ORDER BY ts DESC;
+SELECT id, type, agent, content FROM context
+WHERE contract_id = '{id}' ORDER BY ts DESC;
 ```
 
-**contracts** - Active work agreements
+Contracts are stored in the `context` table with `type='contract'`:
 ```sql
-SELECT id, goal, tier, status FROM contracts
-WHERE status = 'active';
+SELECT id, content FROM context
+WHERE type = 'contract' ORDER BY ts DESC;
 ```
 
-**rules** - Project-specific learnings
+**learnings** - Cross-session memory (survives forever)
 ```sql
-SELECT domain, rule FROM rules
-WHERE confidence = 'proven';
+SELECT type, insight, domain FROM learnings
+WHERE type IN ('failure', 'pattern')
+ORDER BY ts DESC LIMIT 10;
 ```
 
-**learnings** - Session insights
+**errors** - Automatic failure capture
 ```sql
-SELECT category, summary FROM learnings
-ORDER BY created_at DESC LIMIT 10;
+SELECT tool, error, file FROM errors
+ORDER BY ts DESC LIMIT 10;
 ```
 
 ### Basic Queries
 
-Check recent activity:
+Check recent context entries:
 ```bash
-sqlite3 _meta/agentdb/agent.db "SELECT tab, type, vn FROM context_log ORDER BY ts DESC LIMIT 10;"
+sqlite3 _meta/agentdb/kernel.db "SELECT type, agent, ts FROM context ORDER BY ts DESC LIMIT 10;"
 ```
 
 Check active contracts:
 ```bash
-sqlite3 _meta/agentdb/agent.db "SELECT id, goal, tier, status FROM contracts WHERE status = 'active';"
+sqlite3 _meta/agentdb/kernel.db "SELECT id, content FROM context WHERE type='contract' ORDER BY ts DESC;"
+```
+
+Check learnings:
+```bash
+sqlite3 _meta/agentdb/kernel.db "SELECT type, insight FROM learnings ORDER BY ts DESC LIMIT 10;"
 ```
 
 ---
@@ -201,7 +179,7 @@ sqlite3 _meta/agentdb/agent.db "SELECT id, goal, tier, status FROM contracts WHE
 ```
 1. /build "Add user authentication"
 2. Research phase - 3+ solution approaches
-3. Plan phase - architect scopes work
+3. Plan phase - scope work
 4. /tearitapart - critical review of plan
 5. Execute phase - surgeon implements
 6. QA phase - adversary verifies
@@ -211,8 +189,8 @@ sqlite3 _meta/agentdb/agent.db "SELECT id, goal, tier, status FROM contracts WHE
 ### Refactor (Tier 3)
 
 ```
-1. /iterate on authentication module
-2. Architect analyzes coupling, dependencies
+1. /build on authentication module
+2. Analyze coupling, dependencies
 3. Plan created with risk assessment
 4. /tearitapart on plan
 5. Incremental implementation with commits
@@ -228,7 +206,7 @@ sqlite3 _meta/agentdb/agent.db "SELECT id, goal, tier, status FROM contracts WHE
 |------|-------|------|
 | 1 | 1-2 files | orchestrator executes directly |
 | 2 | 3-5 files | orchestrator -> surgeon |
-| 3 | 6+ files | orchestrator -> architect -> surgeon -> adversary |
+| 3 | 6+ files | orchestrator -> surgeon -> adversary |
 
 KERNEL auto-detects tier based on scope. You can override:
 ```
@@ -256,15 +234,15 @@ KERNEL auto-detects tier based on scope. You can override:
 - **Commit every working state** - Never lose progress
 - **Prove, don't assert** - Evidence over claims
 - **Memory first** - Check `_meta/` before rediscovering
-- **LSP first** - goToDefinition, findReferences, hover
+- **AgentDB first** - Read at session start, write at session end
 
 ---
 
 ## Quick Reference
 
 ```bash
-# Start new project
-/repo-init
+# Start every session
+agentdb read-start
 
 # Develop feature
 /build "feature description"
@@ -283,4 +261,7 @@ KERNEL auto-detects tier based on scope. You can override:
 
 # Continue after break
 /handoff
+
+# End every session
+agentdb write-end '{"did":"X","next":"Y"}'
 ```

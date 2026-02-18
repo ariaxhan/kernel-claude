@@ -1,112 +1,90 @@
 # KERNEL Architecture
 
-**Version:** 5.1.1
+**Version:** 5.2.0
 **Deep-dive into system internals**
 
 ---
 
-## Multi-Tab Model
+## Agent Model
 
-KERNEL operates across 4 primary tabs, each with a specialized agent.
+KERNEL uses two specialized agents spawned by the orchestrator (main session).
 
 ```
-┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
-│  main   │  │  plan   │  │  exec   │  │   qa    │
-│orchestr │  │architect│  │ surgeon │  │adversary│
-└────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘
-     │            │            │            │
-     └────────────┴─────┬──────┴────────────┘
-                        │
-                   ┌────▼────┐
-                   │ agentdb │
-                   │context  │
-                   │  _log   │
-                   └─────────┘
+┌─────────────────────────────────────┐
+│         orchestrator (you)          │
+│         main session                │
+└────────────┬───────────┬────────────┘
+             |           |
+      ┌──────▼──────┐ ┌──▼──────────┐
+      │   surgeon   │ │  adversary  │
+      │ minimal diff│ │  break it   │
+      └──────┬──────┘ └──────┬──────┘
+             |               |
+             └───────┬───────┘
+                     |
+              ┌──────▼──────┐
+              │   agentdb   │
+              │  kernel.db  │
+              └─────────────┘
 ```
 
-### Tab Responsibilities
+### Agent Responsibilities
 
-| Tab | Agent | Frame | Writes |
-|-----|-------|-------|--------|
-| main | orchestrator | coordinate | directives |
-| plan | architect | discovery | packets |
-| exec | surgeon | minimal_diff | checkpoints |
-| qa | adversary | break_it | verdicts |
-
-### Support Tabs
-
-| Tab | Agent | Frame | Purpose |
-|-----|-------|-------|---------|
-| search | searcher | code_discovery | Deep codebase search |
-| research | researcher | external | Web docs, APIs |
+| Agent | Frame | Writes |
+|-------|-------|--------|
+| surgeon | minimal_diff | checkpoints |
+| adversary | break_it | verdicts |
 
 ---
 
 ## AgentDB Schema
 
-SQLite database at `_meta/agentdb/agent.db`.
+SQLite database at `_meta/agentdb/kernel.db`.
 
-### context_log (Communication Bus)
+### learnings (Cross-Session Memory)
 
 ```sql
-CREATE TABLE context_log (
+CREATE TABLE IF NOT EXISTS learnings (
+  id TEXT PRIMARY KEY,
+  ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  type TEXT NOT NULL CHECK(type IN ('failure', 'pattern', 'gotcha', 'preference')),
+  insight TEXT NOT NULL,
+  evidence TEXT,
+  domain TEXT,
+  hit_count INTEGER DEFAULT 0,
+  last_hit TEXT
+);
+```
+
+**Indexes:** type, domain
+
+### context (Work State)
+
+```sql
+CREATE TABLE IF NOT EXISTS context (
+  id TEXT PRIMARY KEY,
+  ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  type TEXT NOT NULL CHECK(type IN ('contract', 'checkpoint', 'handoff', 'verdict')),
+  contract_id TEXT,
+  agent TEXT,
+  content TEXT NOT NULL
+);
+```
+
+**Indexes:** type, contract_id, ts
+
+Contracts are entries with `type='contract'`. Checkpoints, handoffs, and verdicts link to a contract via `contract_id`.
+
+### errors (Automatic Failure Capture)
+
+```sql
+CREATE TABLE IF NOT EXISTS errors (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  tab TEXT NOT NULL,
-  type TEXT NOT NULL CHECK(type IN ('directive', 'packet', 'checkpoint', 'verdict')),
-  vn TEXT NOT NULL,
-  detail TEXT,
-  contract TEXT,
-  files TEXT
-);
-```
-
-**Indexes:** ts, contract, type
-
-### contracts (Work Agreements)
-
-```sql
-CREATE TABLE contracts (
-  id TEXT PRIMARY KEY,
-  goal TEXT NOT NULL,
-  constraints TEXT NOT NULL,
-  failure_conditions TEXT NOT NULL,
-  tier INTEGER NOT NULL CHECK(tier IN (1, 2, 3)),
-  status TEXT NOT NULL DEFAULT 'active'
-    CHECK(status IN ('active', 'completed', 'blocked', 'rejected')),
-  assigned_to TEXT,
-  created_at TEXT,
-  completed_at TEXT
-);
-```
-
-### rules (Project Learnings)
-
-```sql
-CREATE TABLE rules (
-  id TEXT PRIMARY KEY,
-  domain TEXT NOT NULL,
-  rule TEXT NOT NULL,
-  evidence TEXT,
-  confidence TEXT DEFAULT 'inferred'
-    CHECK(confidence IN ('proven', 'inferred', 'deprecated')),
-  session_count INTEGER DEFAULT 0,
-  created_at TEXT,
-  updated_at TEXT
-);
-```
-
-### learnings (Session Insights)
-
-```sql
-CREATE TABLE learnings (
-  id TEXT PRIMARY KEY,
-  category TEXT NOT NULL
-    CHECK(category IN ('pattern', 'failure', 'preference', 'tool')),
-  summary TEXT NOT NULL,
-  detail TEXT,
-  source TEXT,
-  created_at TEXT
+  tool TEXT NOT NULL,
+  error TEXT NOT NULL,
+  file TEXT,
+  context TEXT
 );
 ```
 
@@ -114,38 +92,28 @@ CREATE TABLE learnings (
 
 ## Contract Flow
 
-### Message Types
+### Context Entry Types
 
 | Type | Writer | Reader | Purpose |
 |------|--------|--------|---------|
-| directive | main | plan, exec, qa | Work assignment |
-| packet | plan, exec | main | Status/findings |
-| checkpoint | exec | all | Working state |
-| verdict | qa | main | Pass/fail |
+| contract | orchestrator | surgeon, adversary | Work assignment and scope |
+| checkpoint | surgeon | adversary, orchestrator | Working state after commit |
+| handoff | any | next session | Continuity context |
+| verdict | adversary | orchestrator | Pass/fail result |
 
 ### Flow Sequence
 
 ```
-1. main: CONTRACT created
-   ├── goal, constraints, failure_conditions
-   └── INSERT INTO contracts
+1. orchestrator: CONTRACT created
+   └── INSERT INTO context (type='contract', content={goal, constraints, failure_conditions, tier})
 
-2. main: DIRECTIVE written
-   └── INSERT INTO context_log (type='directive')
+2. surgeon: Reads contract, implements, commits
+   └── INSERT INTO context (type='checkpoint', contract_id={id}, content={commit, files})
 
-3. plan: Reads directive, discovers scope
-   └── INSERT INTO context_log (type='packet')
+3. adversary: Verifies checkpoint
+   └── INSERT INTO context (type='verdict', contract_id={id}, content={result, evidence})
 
-4. main: Reads packet, approves
-   └── INSERT INTO context_log (type='directive', assign='exec')
-
-5. exec: Implements, commits
-   └── INSERT INTO context_log (type='checkpoint')
-
-6. qa: Verifies checkpoint
-   └── INSERT INTO context_log (type='verdict')
-
-7. main: Reads verdict
+4. orchestrator: Reads verdict
    └── SHIP or iterate
 ```
 
@@ -157,7 +125,7 @@ CONTRACT: {id}
 GOAL: {outcome}
 CONSTRAINTS: {scope, tier, no_deps}
 FAILURE CONDITIONS: {rejected_if}
-ASSIGN: {plan|exec|qa}
+TIER: {1|2|3}
 ```
 
 ---
@@ -166,16 +134,16 @@ ASSIGN: {plan|exec|qa}
 
 | Tier | File Count | Orchestration Flow |
 |------|------------|-------------------|
-| 1 | 1-2 files | main executes directly |
-| 2 | 3-5 files | main → exec |
-| 3 | 6+ files | main → plan → exec → qa |
+| 1 | 1-2 files | orchestrator executes directly |
+| 2 | 3-5 files | orchestrator -> surgeon |
+| 3 | 6+ files | orchestrator -> surgeon -> adversary |
 
 ### Tier Detection
 
 Automatic based on scope analysis:
 - File count in change set
 - Dependency depth
-- Risk assessment from architect
+- Risk assessment
 
 ### Override
 
@@ -187,42 +155,32 @@ User can force tier:
 
 ---
 
-## VN Notation
+## Vector Native Notation
 
-Vector-native notation for token-efficient agent communication.
+Vector native notation for token-efficient agent communication.
 
 ### Symbols
 
 | Symbol | Meaning | Example |
 |--------|---------|---------|
 | `●` | Action/state | `●commit\|immediately` |
-| `→` | Flow/direction | `●packet\|→main` |
+| `→` | Flow/direction | `●checkpoint\|→adversary` |
 | `≠` | Negation/anti-pattern | `≠assume_silently` |
-| `Ψ` | Section/frame | `Ψ:orchestrator` |
+| `Ψ` | Section/frame | `Ψ:surgeon` |
 | `Ω` | Definition/structure | `Ω:AGENTS` |
 | `Δ` | Change/evolution | `Δ:ROUTING` |
-| `\|` | Separator | `type:directive\|contract:{id}` |
+| `\|` | Separator | `type:checkpoint\|contract:{id}` |
 
 ### Examples
 
-**Directive:**
-```
-●directive|contract:{id}|assign:exec|→implement
-```
-
-**Packet:**
-```
-●packet|contract:{id}|status:ready|tier:2|→main
-```
-
 **Checkpoint:**
 ```
-●checkpoint|contract:{id}|commit:{hash}|files:3|→qa
+●checkpoint|contract:{id}|commit:{hash}|files:3|→adversary
 ```
 
 **Verdict:**
 ```
-●verdict|contract:{id}|result:pass|→main
+●verdict|contract:{id}|result:pass|→orchestrator
 ```
 
 ---
@@ -231,25 +189,21 @@ Vector-native notation for token-efficient agent communication.
 
 ```
 kernel-claude/
-├── CLAUDE.md              # VN-native config (~200 tokens)
-├── agents/                # 6 agent definitions
-│   ├── orchestrator.md    # main tab
-│   ├── architect.md       # plan tab
-│   ├── surgeon.md         # exec tab
-│   ├── adversary.md       # qa tab
-│   ├── searcher.md        # search tab
-│   └── researcher.md      # research tab
-├── commands/              # 16 slash commands
-├── skills/                # 11 on-demand skills
+├── CLAUDE.md              # vector native config (~200 tokens)
+├── agents/                # 2 agent definitions
+│   ├── surgeon.md         # minimal diff implementation
+│   └── adversary.md       # verification and edge cases
+├── commands/              # 8 slash commands
+├── skills/                # 4 on-demand skills
 │   └── {name}/SKILL.md
 ├── orchestration/
 │   └── agentdb/
-│       ├── init.sh
-│       └── migrations/
-│           └── 001_init.sql
+│       ├── schema.sql
+│       └── init.sh
 ├── hooks/
 │   └── hooks.json
 ├── _meta/
+│   ├── agentdb/kernel.db  # created per-project
 │   ├── context/active.md
 │   └── _learnings.md
 └── docs/                  # You are here
@@ -274,12 +228,12 @@ kernel-claude/
 Encoded in CLAUDE.md under `≠:ANTI`:
 
 ```
-●assume_silently        → extract+confirm
-●implement_before_investigate → search_first
-●serial_when_parallel   → 2+_tasks=parallel
-●swallow_errors         → fail_fast
-●manual_git             → @git-sync
-●work_on_main           → branch/worktree
-●guess_APIs             → LSP_goToDefinition
-●rediscover_known       → check_memory_first
+●skip_agentdb_read      -> will repeat past failures
+●skip_agentdb_write     -> context lost on resume
+●assume_silently        -> extract+confirm
+●implement_before_investigate -> search_first
+●serial_when_parallel   -> 2+_tasks=parallel
+●swallow_errors         -> fail_fast
+●guess_APIs             -> LSP_goToDefinition
+●rediscover_known       -> check_memory_first
 ```
