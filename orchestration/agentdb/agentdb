@@ -10,6 +10,10 @@
 #   agentdb contract <json>         # Create contract
 #   agentdb verdict <pass|fail> <evidence>  # QA result
 #   agentdb query <sql>             # Raw query
+#   agentdb status                  # DB health, counts, last checkpoint time
+#   agentdb prune                   # Delete old checkpoints (keep last 10)
+#   agentdb export                  # Dump learnings to markdown
+#   agentdb recent                  # Show last 5 checkpoints
 
 set -e
 
@@ -71,6 +75,11 @@ cmd_init() {
         error TEXT,
         file TEXT
       );
+      CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
+      CREATE INDEX IF NOT EXISTS idx_learnings_domain ON learnings(domain);
+      CREATE INDEX IF NOT EXISTS idx_context_type ON context(type);
+      CREATE INDEX IF NOT EXISTS idx_context_contract ON context(contract_id);
+      CREATE INDEX IF NOT EXISTS idx_context_ts ON context(ts);
     "
   fi
   echo "Initialized: $DB"
@@ -178,6 +187,113 @@ cmd_stats() {
   echo "Errors: $(sqlite3 "$DB" "SELECT COUNT(*) FROM errors;")"
 }
 
+cmd_status() {
+  [ ! -f "$DB" ] && { echo "No DB at $DB — run: agentdb init"; exit 1; }
+
+  local db_size
+  db_size=$(du -sh "$DB" 2>/dev/null | cut -f1)
+
+  local last_cp_ts
+  last_cp_ts=$(sqlite3 "$DB" "SELECT ts FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1;" 2>/dev/null)
+
+  echo "# AgentDB Status"
+  echo ""
+  echo "DB:          $DB"
+  echo "Size:        $db_size"
+  echo ""
+  echo "Counts:"
+  echo "  learnings:   $(sqlite3 "$DB" "SELECT COUNT(*) FROM learnings;")"
+  echo "  checkpoints: $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='checkpoint';")"
+  echo "  contracts:   $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='contract';")"
+  echo "  verdicts:    $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='verdict';")"
+  echo "  errors:      $(sqlite3 "$DB" "SELECT COUNT(*) FROM errors;")"
+  echo ""
+  echo "Last checkpoint: ${last_cp_ts:-none}"
+  echo ""
+  echo "Learnings by type:"
+  sqlite3 "$DB" "SELECT '  ' || type || ': ' || COUNT(*) FROM learnings GROUP BY type ORDER BY type;" 2>/dev/null
+}
+
+cmd_prune() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  local keep="${1:-10}"
+
+  local before_count
+  before_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
+
+  sqlite3 "$DB" "
+    DELETE FROM context
+    WHERE type='checkpoint'
+      AND id NOT IN (
+        SELECT id FROM context
+        WHERE type='checkpoint'
+        ORDER BY ts DESC
+        LIMIT $keep
+      );
+  "
+
+  local after_count
+  after_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
+  local removed=$(( before_count - after_count ))
+
+  echo "Pruned $removed checkpoint(s). Kept $after_count (of last $keep)."
+}
+
+cmd_export() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  local out_file="$DB_DIR/learnings-export-$(date +%Y%m%d%H%M%S).md"
+
+  {
+    echo "# AgentDB Learnings Export"
+    echo ""
+    echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo ""
+
+    echo "## Failures"
+    echo ""
+    sqlite3 "$DB" "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || CASE WHEN evidence != '' THEN '- evidence: ' || evidence || char(10) ELSE '' END || '- ts: ' || ts FROM learnings WHERE type='failure' ORDER BY ts DESC;" 2>/dev/null || echo "None"
+    echo ""
+
+    echo "## Patterns"
+    echo ""
+    sqlite3 "$DB" "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || CASE WHEN evidence != '' THEN '- evidence: ' || evidence || char(10) ELSE '' END || '- hits: ' || hit_count || char(10) || '- ts: ' || ts FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+    echo ""
+
+    echo "## Gotchas"
+    echo ""
+    sqlite3 "$DB" "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || CASE WHEN evidence != '' THEN '- evidence: ' || evidence || char(10) ELSE '' END || '- ts: ' || ts FROM learnings WHERE type='gotcha' ORDER BY ts DESC;" 2>/dev/null || echo "None"
+    echo ""
+
+    echo "## Preferences"
+    echo ""
+    sqlite3 "$DB" "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || '- ts: ' || ts FROM learnings WHERE type='preference' ORDER BY ts DESC;" 2>/dev/null || echo "None"
+  } > "$out_file"
+
+  echo "Exported to: $out_file"
+}
+
+cmd_recent() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  local n="${1:-5}"
+
+  echo "# Last $n Checkpoints"
+  echo ""
+  sqlite3 -separator $'\t' "$DB" "
+    SELECT ts, agent, content
+    FROM context
+    WHERE type='checkpoint'
+    ORDER BY ts DESC
+    LIMIT $n;
+  " 2>/dev/null | while IFS=$'\t' read -r ts agent content; do
+    echo "[$ts] ($agent)"
+    echo "  $content"
+    echo ""
+  done
+}
+
 # === DISPATCH ===
 case "${1:-help}" in
   init)        cmd_init ;;
@@ -189,17 +305,25 @@ case "${1:-help}" in
   error)       shift; cmd_error "$@" ;;
   query)       shift; cmd_query "$@" ;;
   stats)       cmd_stats ;;
+  status)      cmd_status ;;
+  prune)       shift; cmd_prune "$@" ;;
+  export)      cmd_export ;;
+  recent)      shift; cmd_recent "$@" ;;
   *)
     echo "KERNEL AgentDB - Every agent reads on start, writes on end"
     echo ""
     echo "COMMANDS:"
-    echo "  init              Initialize DB in current project"
-    echo "  read-start        Context for starting work (failures, patterns, checkpoint)"
-    echo "  write-end <json>  Checkpoint before stopping"
+    echo "  init                    Initialize DB in current project"
+    echo "  read-start              Context for starting work (failures, patterns, checkpoint)"
+    echo "  write-end <json>        Checkpoint before stopping"
     echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"
-    echo "  contract <json>   Create new contract"
+    echo "  contract <json>         Create new contract"
     echo "  verdict <p|f> <evidence>  QA result"
-    echo "  stats             Show counts"
-    echo "  query <sql>       Raw query"
+    echo "  status                  DB health, counts, last checkpoint time"
+    echo "  prune [N]               Delete old checkpoints, keep last N (default 10)"
+    echo "  export                  Dump learnings to markdown file"
+    echo "  recent [N]              Show last N checkpoints (default 5)"
+    echo "  stats                   Show counts"
+    echo "  query <sql>             Raw query"
     ;;
 esac
