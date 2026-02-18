@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "5.2.0",
+  "version": "5.3.0",
   "description": "AgentDB-first coding OS. 2 agents (surgeon, adversary), 8 commands, 4 skills. Read at start, write at end.",
   "author": {
     "name": "Aria Han",
