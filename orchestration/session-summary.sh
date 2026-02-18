@@ -36,7 +36,7 @@ if command -v agentdb &>/dev/null; then
   agentdb learnings 3 2>/dev/null | sed 's/^/- /' || echo "- No learnings recorded"
 elif [ -f "$DB_PATH" ] && command -v sqlite3 &>/dev/null; then
   sqlite3 "$DB_PATH" \
-    "SELECT '**' || category || ':** ' || content FROM learnings ORDER BY created_at DESC LIMIT 3;" \
+    "SELECT '**' || type || ':** ' || insight FROM learnings ORDER BY ts DESC LIMIT 3;" \
     2>/dev/null | sed 's/^/- /' || echo "- No learnings recorded"
 else
   echo "- agentdb not available"
