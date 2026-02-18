@@ -1,28 +1,3 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v agentdb >/dev/null && agentdb read-start || { mkdir -p _meta/agentdb _meta/plans _meta/logs; echo '# Run: sudo ln -s '\"$(pwd)\"'/orchestration/agentdb/agentdb /usr/local/bin/agentdb'; }",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v agentdb >/dev/null && agentdb write-end '{\"session\":\"ended\"}' 2>/dev/null || true",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": {}
 }
