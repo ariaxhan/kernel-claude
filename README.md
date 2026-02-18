@@ -2,7 +2,7 @@
 
 **The AI Coding OS for Claude Code** | v5.2.0
 
-A plugin that transforms Claude Code from assistant to operating system. Multi-agent orchestration. Contract-first workflow. Zero human relay.
+A plugin that transforms Claude Code from assistant to operating system. Contract-first workflow. AgentDB communication bus. Zero human relay.
 
 ---
 
@@ -46,23 +46,30 @@ Methodology applies automatically. No commands to remember. Just describe what y
 
 ## Architecture
 
-Four tabs. One database. Zero relay.
+Orchestrator spawns agents. Agents communicate through AgentDB. No manual relay.
 
 ```
-┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
-│  main   │  │  plan   │  │  exec   │  │   qa    │
-│orchestr │  │architect│  │ surgeon │  │adversary│
-└────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘
-     │            │            │            │
-     └────────────┴─────┬──────┴────────────┘
-                        │
-                   ┌────▼────┐
-                   │ agentdb │
-                   │sqlite   │
-                   └─────────┘
+┌─────────────────────────────┐
+│       you (orchestrator)    │
+│  route, contract, decide    │
+└──────────┬──────────────────┘
+           │ spawns
+     ┌─────┴──────┐
+     │            │
+┌────▼────┐  ┌────▼────┐
+│ surgeon │  │adversary│
+│  impl   │  │   qa    │
+└────┬────┘  └────┬────┘
+     │            │
+     └─────┬──────┘
+           │
+      ┌────▼────┐
+      │ agentdb │
+      │ sqlite  │
+      └─────────┘
 ```
 
-**Agents poll AgentDB.** No manual context passing. No copy/paste relay. The orchestrator writes directives; subagents read them. Subagents write packets; the orchestrator reads them.
+You are the orchestrator. Surgeon handles implementation. Adversary handles QA. AgentDB is the communication bus — agents read and write directly, no copy/paste relay.
 
 Communication is persistent. Sessions can crash, restart, continue. Nothing is lost.
 
@@ -91,7 +98,7 @@ Complexity determines workflow:
 |------|-------|------|
 | 1 | 1-2 | Orchestrator executes directly |
 | 2 | 3-5 | Orchestrator spawns surgeon |
-| 3 | 6+ | Full pipeline: architect -> surgeon -> adversary |
+| 3 | 6+ | Full pipeline: surgeon -> adversary |
 
 Tier 1 tasks don't need coordination overhead. Tier 3 tasks need the full system.
 
@@ -108,10 +115,10 @@ SELECT * FROM context_log WHERE contract = 'CR-001' ORDER BY ts DESC;
 
 | Type | Writer | Reader |
 |------|--------|--------|
-| directive | main | plan, exec, qa |
-| packet | plan, exec | main |
-| checkpoint | exec | all |
-| verdict | qa | main |
+| directive | orchestrator | surgeon, adversary |
+| packet | surgeon | orchestrator |
+| checkpoint | surgeon | all |
+| verdict | adversary | orchestrator |
 
 This is what eliminates the relay. Agents don't need you to pass context. They read it directly.
 
@@ -119,74 +126,49 @@ This is what eliminates the relay. Agents don't need you to pass context. They r
 
 ## Agents
 
-Six specialized agents. Each has a role.
+Two specialized agents. Each has a role.
 
-| Agent | Tab | Focus |
-|-------|-----|-------|
-| **orchestrator** | main | Route, contract, reconcile, decide ship |
-| **architect** | plan | Discovery, scoping, risk identification |
-| **surgeon** | exec | Minimal diff implementation, commit working state |
-| **adversary** | qa | Assume broken, find edge cases, prove with evidence |
-| **searcher** | - | Deep code search, trace calls, map dependencies |
-| **researcher** | - | Web/docs research, find 3+ sources |
+| Agent | Focus |
+|-------|-------|
+| **surgeon** | Minimal diff implementation, commit working state |
+| **adversary** | Assume broken, find edge cases, prove with evidence |
 
-The orchestrator stays context-light. Disposable subagents do the heavy lifting. When work is done, they terminate. The orchestrator remains clean for the next task.
+The orchestrator (you) stays context-light. Disposable subagents do the heavy lifting. When work is done, they terminate. The orchestrator remains clean for the next task.
 
 ---
 
 ## Commands
 
-16 commands organized by workflow.
-
-### Setup
-| Command | Purpose |
-|---------|---------|
-| `/repo-init` | Generate KERNEL config for any codebase |
-| `/kernel-user-init` | Set up user-level defaults at `~/.claude/` |
-| `/kernel-status` | Show config health and staleness |
-| `/kernel-prune` | Remove stale config entries |
+8 commands organized by workflow.
 
 ### Development
 | Command | Purpose |
 |---------|---------|
 | `/build` | Full pipeline: research -> plan -> implement -> validate |
-| `/iterate` | Continuous improvement loop |
-| `/tearitapart` | Critical review before implementing |
-| `/validate` | Pre-commit gate: types, lint, tests in parallel |
-| `/design` | Design mode with philosophy enforcement |
-| `/docs` | Documentation mode |
-| `/orchestrate` | Enter multi-agent coordination |
 | `/contract` | Define scope before work |
+| `/ingest` | Universal entry point: classify and route any request |
+| `/tearitapart` | Critical review before implementing |
+| `/validate` | Pre-commit gate: types, lint, tests |
 
 ### Git
 | Command | Purpose |
 |---------|---------|
 | `/branch` | Create worktree for isolated work |
 | `/ship` | Commit, push, create PR |
-| `/parallelize` | Set up multiple worktrees |
 | `/handoff` | Generate context brief for session continuity |
 
 ---
 
 ## Skills
 
-11 skills loaded on-demand. Not always present. Triggered when relevant.
+4 skills loaded on-demand. Triggered when relevant, not stuffed into every conversation.
 
 | Skill | When Loaded |
 |-------|-------------|
-| **planning** | Before implementing features |
-| **debug** | When fixing bugs |
-| **research** | Before choosing approaches |
-| **review** | Before completing work |
-| **discovery** | First time in unfamiliar code |
-| **iteration** | When refactoring |
-| **tearitapart** | Before implementing complex plans |
-| **docs** | Documentation tasks |
 | **build** | Full implementation pipeline |
-| **rules** | Rule management |
-| **coding-prompt-bank** | Core AI coding philosophy |
-
-This is methodology loaded from banks. The skill files contain full instructions. They're read when needed, not stuffed into every conversation.
+| **debug** | When fixing bugs or errors |
+| **discovery** | First time in unfamiliar code |
+| **research** | Before choosing approaches |
 
 ---
 
@@ -197,7 +179,7 @@ This is methodology loaded from banks. The skill files contain full instructions
 SQLite eliminates copy/paste relay between agents. Agents write to shared state. Other agents poll it. The human is removed from the communication loop.
 
 ```
-_meta/agentdb/agent.db
+_meta/agentdb/kernel.db
 ├── context_log    # Communication bus
 ├── contracts      # Active work agreements
 ├── rules          # Project learnings
@@ -215,7 +197,7 @@ GOAL, CONSTRAINTS, FAILURE_CONDITIONS before any work. This prevents:
 
 The orchestrator stays clean by delegating to subagents that terminate after their work is done. No context accumulation. No pollution.
 
-### 4. VN-Native Syntax
+### 4. Vector-Native Syntax
 
 The core CLAUDE.md is ~200 tokens. Compare to ~2000 for verbose markdown. Every byte costs context window.
 
@@ -229,7 +211,7 @@ Machine-parseable. Human-scannable. Compact.
 
 ### 5. Skills from Banks
 
-Methodology isn't always-on. It's loaded when needed. `/debug` loads the debugging bank. `/build` loads the build pipeline. Context is conserved.
+Methodology isn't always-on. It's loaded when needed. `/build` loads the build pipeline. `/tearitapart` loads the review bank. Context is conserved.
 
 ### 6. Zero Human Relay
 
@@ -270,19 +252,15 @@ Check `_meta/` before re-learning what the project already knows. Memory check t
 /install-plugin https://github.com/ariaxhan/kernel-claude
 ```
 
-### Setup
+### AgentDB Initialization
 
-After plugin install, run the setup script from the plugin directory:
+For orchestration mode (Tier 3 tasks):
 
 ```bash
-./setup.sh
+./orchestration/agentdb/init.sh
 ```
 
-This is idempotent — safe to run multiple times. It:
-- Verifies sqlite3 is available
-- Creates `_meta/agentdb/`, `_meta/context/`, `_meta/logs/`
-- Initializes `_meta/agentdb/kernel.db` with the communication schema
-- Symlinks the `agentdb` CLI to `/usr/local/bin/agentdb` (requires sudo)
+Creates `_meta/agentdb/kernel.db` with the communication schema.
 
 ### Updating
 
@@ -306,10 +284,10 @@ claude plugin update kernel@kernel-marketplace
 
 ```
 kernel-claude/
-├── CLAUDE.md              # Core config (~200 tokens, VN-native)
-├── commands/              # 16 plugin commands
-├── agents/                # 6 orchestration agents
-├── skills/                # 11 on-demand skills
+├── CLAUDE.md              # Core config (~200 tokens, vector-native)
+├── commands/              # 8 plugin commands
+├── agents/                # 2 orchestration agents
+├── skills/                # 4 on-demand skills
 ├── hooks/                 # Automatic triggers
 └── orchestration/
     └── agentdb/
