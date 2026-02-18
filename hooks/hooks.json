@@ -6,8 +6,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "agentdb read-start 2>/dev/null || true",
+            "command": "AGENTDB=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb; ERRLOG=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/_meta/agentdb/errors.log; mkdir -p \"$(dirname \"$ERRLOG\")\"; $AGENTDB read-start 2>>\"$ERRLOG\" || echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] SessionStart: agentdb read-start failed\" >> \"$ERRLOG\"",
             "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "AGENTDB=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb; ERRLOG=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/_meta/agentdb/errors.log; mkdir -p \"$(dirname \"$ERRLOG\")\"; $AGENTDB checkpoint \"{\\\"event\\\":\\\"PostToolUse\\\",\\\"tool\\\":\\\"Edit|Write\\\",\\\"ts\\\":\\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\"}\" 2>>\"$ERRLOG\" || echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] PostToolUse: agentdb checkpoint failed\" >> \"$ERRLOG\"",
+            "timeout": 3
           }
         ]
       }
@@ -18,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "agentdb write-end '{\"session\":\"ended\"}' 2>/dev/null || true",
+            "command": "AGENTDB=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb; ERRLOG=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/_meta/agentdb/errors.log; mkdir -p \"$(dirname \"$ERRLOG\")\"; $AGENTDB write-end \"{\\\"session\\\":\\\"ended\\\",\\\"ts\\\":\\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\"}\" 2>>\"$ERRLOG\" || echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Stop: agentdb write-end failed\" >> \"$ERRLOG\"",
             "timeout": 5
           }
         ]
