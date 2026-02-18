@@ -108,8 +108,6 @@ head -1 RELEASE_NOTES.md
 
 - Change 1
 - Change 2
-
-Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
