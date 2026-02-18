@@ -1,13 +1,4 @@
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 name: discovery
 description: Codebase reconnaissance - map terrain before action
 triggers:
@@ -19,6 +10,8 @@ triggers:
   - understand project
 ---
 
+# Discovery Skill
+
 ## ●:ON_START (REQUIRED)
 
 ```bash
@@ -26,9 +19,6 @@ agentdb read-start
 ```
 
 Check existing patterns and learnings before exploring.
-
-
-# Discovery Skill
 
 ## Purpose
 
@@ -37,15 +27,6 @@ Reconnaissance before action. Map the terrain. Identify tooling. Extract convent
 **Key Concept**: Never assume - always investigate.
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Auto-Trigger Signals
 
@@ -56,15 +37,6 @@ This skill activates when detecting:
 - First interaction with unfamiliar repo
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Process
 
@@ -77,15 +49,6 @@ Check existing patterns and learnings before exploring.
 ```
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Repo Map Patterns
 
@@ -104,15 +67,6 @@ Config Files:
 ```
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Tooling Detection
 
@@ -135,15 +89,6 @@ which npm || which yarn || which pnpm || which pip || which poetry || which carg
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## Convention Extraction
 
 | Convention | How to Find |
@@ -155,15 +100,6 @@ Check existing patterns and learnings before exploring.
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## Risk Identification
 
 **Critical - Do Not Touch Without Backup:**
@@ -173,15 +109,6 @@ Check existing patterns and learnings before exploring.
 - Files with TODO: remove, deprecated, legacy
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Stack-Specific Discovery
 
@@ -202,15 +129,6 @@ Check existing patterns and learnings before exploring.
 - Look for build.rs
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Output Format
 
@@ -242,15 +160,6 @@ Update `_meta/context/active.md`:
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## Anti-Patterns
 
 - Assuming conventions without verifying
@@ -260,15 +169,6 @@ Check existing patterns and learnings before exploring.
 - Touching auth/migration without understanding
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Success Metrics
 
@@ -283,6 +183,7 @@ Discovery is working well when:
 ## ●:ON_END (REQUIRED)
 
 ```bash
-agentdb write-end '{"discovered":"X","key_files":["a","b"]}'
-agentdb learn pattern "what I learned about this codebase" "evidence"
+agentdb write-end '{"skill":"discovery","codebase":"X","patterns":["A","B"],"gotchas":["C"]}'
 ```
+
+Always record what you found so future sessions don't re-explore from scratch.

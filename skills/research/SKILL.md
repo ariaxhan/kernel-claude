@@ -1,13 +1,4 @@
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 name: research
 description: Deep research methodology - auto-triggers on research/investigate/find out signals
 triggers:
@@ -21,6 +12,8 @@ triggers:
   - best way to
 ---
 
+# Research Skill
+
 ## ●:ON_START (REQUIRED)
 
 ```bash
@@ -28,9 +21,6 @@ agentdb read-start
 ```
 
 Check existing patterns and learnings before exploring.
-
-
-# Research Skill
 
 ## Purpose
 
@@ -39,15 +29,6 @@ Find existing solutions before writing any code. The best code is code you don't
 **Key Concept**: Diversity beats depth - multiple perspectives reveal simplest solution. If the solution seems complex, you haven't found the right package yet.
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Auto-Trigger Signals
 
@@ -60,15 +41,6 @@ This skill activates when detecting:
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## Process
 
 ```
@@ -80,15 +52,6 @@ Check existing patterns and learnings before exploring.
 ```
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## The Research Inversion
 
@@ -108,15 +71,6 @@ Search "X not working", "X issues", "X problems"
 ```
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Research Planning Template
 
@@ -151,15 +105,6 @@ Check existing patterns and learnings before exploring.
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## Source Diversity Categories
 
 **Category 1: Official Sources**
@@ -192,15 +137,6 @@ Check existing patterns and learnings before exploring.
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## Source Hierarchy
 
 Quality of sources (highest to lowest):
@@ -213,15 +149,6 @@ Quality of sources (highest to lowest):
 6. **AI Responses** - Verify everything, training data is old
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Package Evaluation Criteria
 
@@ -237,15 +164,6 @@ Check existing patterns and learnings before exploring.
 | Documentation | Quality and completeness |
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Pitfall Documentation Structure
 
@@ -271,15 +189,6 @@ Check existing patterns and learnings before exploring.
 ```
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Documentation Structure
 
@@ -315,15 +224,6 @@ Create `_meta/research/{feature-name}-research.md`:
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## Subagent Research Pattern
 
 For parallel research:
@@ -344,15 +244,6 @@ THEN: Synthesize findings before implementing
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## Quick Reference
 
 | Phase | Question | Output |
@@ -363,15 +254,6 @@ Check existing patterns and learnings before exploring.
 | Synthesis | What's our path? | Implementation plan |
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Research Quality Checklist
 
@@ -387,15 +269,6 @@ Check existing patterns and learnings before exploring.
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## When To Research Again
 
 - Encounter undocumented error
@@ -408,15 +281,6 @@ Check existing patterns and learnings before exploring.
 
 ---
 
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
-
 ## Anti-Patterns
 
 - Jumping to implementation without research
@@ -426,15 +290,6 @@ Check existing patterns and learnings before exploring.
 - Letting research stay in context (write to files)
 
 ---
-
-## ●:ON_START (REQUIRED)
-
-```bash
-agentdb read-start
-```
-
-Check existing patterns and learnings before exploring.
-
 
 ## Success Metrics
 
@@ -449,6 +304,7 @@ Research is working well when:
 ## ●:ON_END (REQUIRED)
 
 ```bash
-agentdb write-end '{"discovered":"X","key_files":["a","b"]}'
-agentdb learn pattern "what I learned about this codebase" "evidence"
+agentdb write-end '{"skill":"research","topic":"X","sources":N,"conclusion":"Y"}'
 ```
+
+Always persist findings - research in context is research lost.

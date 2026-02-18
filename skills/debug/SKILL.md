@@ -255,8 +255,7 @@ Debugging is working well when:
 ## ●:ON_END (REQUIRED)
 
 ```bash
-agentdb write-end '{"debugged":"bug X","root_cause":"Y","fix":"Z"}'
-agentdb learn failure "what caused this bug" "stack trace or evidence"
+agentdb write-end '{"skill":"debug","bug":"description","fix":"what fixed it","learned":"pattern to remember"}'
 ```
 
 Always record debugging learnings - they prevent repeat bugs.

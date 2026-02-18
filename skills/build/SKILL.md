@@ -291,8 +291,7 @@ Build is working well when:
 ## ●:ON_END (REQUIRED)
 
 ```bash
-agentdb write-end '{"built":"feature X","commits":N,"validation":"pass/fail"}'
-agentdb learn pattern "what worked well" "evidence"
+agentdb write-end '{"skill":"build","feature":"X","files":["A","B"],"approach":"Y"}'
 ```
 
 Always checkpoint and capture learnings before stopping.
