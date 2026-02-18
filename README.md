@@ -6,10 +6,71 @@
 
 ## Install
 
-Copy this into Claude Code:
+Copy this entire block into Claude Code:
 
 ```
-Install the kernel plugin and set up AgentDB for this project. Run /install-plugin https://github.com/ariaxhan/kernel-claude then create _meta/agentdb/agent.db with tables for learnings (id, ts, type, insight, evidence) and context (id, ts, type, contract_id, agent, content). Show me the agentdb status when done.
+I want to install the KERNEL plugin and set up AgentDB for this project.
+
+1. First, run this command to install the plugin:
+/install-plugin https://github.com/ariaxhan/kernel-claude
+
+2. Then create the AgentDB directory and SQLite database:
+- Create directory: _meta/agentdb/
+- Create SQLite database at: _meta/agentdb/agent.db
+
+3. Initialize the database with this exact schema:
+
+PRAGMA journal_mode=WAL;
+PRAGMA foreign_keys=ON;
+
+CREATE TABLE IF NOT EXISTS learnings (
+  id TEXT PRIMARY KEY,
+  ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  type TEXT NOT NULL CHECK(type IN ('failure', 'pattern', 'gotcha', 'preference')),
+  insight TEXT NOT NULL,
+  evidence TEXT,
+  domain TEXT,
+  hit_count INTEGER DEFAULT 0,
+  last_hit TEXT
+);
+
+CREATE TABLE IF NOT EXISTS context (
+  id TEXT PRIMARY KEY,
+  ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  type TEXT NOT NULL CHECK(type IN ('contract', 'checkpoint', 'handoff', 'verdict')),
+  contract_id TEXT,
+  agent TEXT,
+  content TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS errors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  tool TEXT NOT NULL,
+  error TEXT NOT NULL,
+  file TEXT,
+  context TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
+CREATE INDEX IF NOT EXISTS idx_learnings_domain ON learnings(domain);
+CREATE INDEX IF NOT EXISTS idx_context_type ON context(type);
+CREATE INDEX IF NOT EXISTS idx_context_contract ON context(contract_id);
+CREATE INDEX IF NOT EXISTS idx_context_ts ON context(ts);
+
+4. After setup, verify by running:
+sqlite3 _meta/agentdb/agent.db ".tables"
+
+It should show: context  errors  learnings
+
+5. The plugin gives you these commands: /build, /ship, /validate, /contract, /ingest, /tearitapart, /branch, /handoff
+
+6. The core methodology is AgentDB-first:
+- At the START of every session: query learnings for past failures to avoid
+- At the END of every session: insert a checkpoint into context with what was done
+- When you learn something (failure, pattern): insert into learnings immediately
+
+Show me the database tables when done so I know it worked.
 ```
 
 That's it. Claude handles everything.
