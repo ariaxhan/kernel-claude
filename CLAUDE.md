@@ -1,153 +1,140 @@
-# KERNEL v5.1.1
+# KERNEL v5.2.0
 
-tokens: ~200 | vn-native | plugin | agentdb-bus
-
----
-
-## Ψ:ARCHITECTURE
-
-```
-4 orchestration agents + 1 agentdb = zero relay
-
-┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐
-│  main   │  │  plan   │  │  exec   │  │   qa    │
-│orchestr │  │architect│  │ surgeon │  │adversary│
-└────┬────┘  └────┬────┘  └────┬────┘  └────┬────┘
-     │            │            │            │
-     └────────────┴─────┬──────┴────────────┘
-                        │
-                   ┌────▼────┐
-                   │ agentdb │
-                   │context  │
-                   │  _log   │
-                   └─────────┘
-```
+AgentDB-first. Read at start. Write at end.
 
 ---
 
-## Ψ:POSTURE
+## ●:AGENTDB (NON-NEGOTIABLE)
 
+```bash
+# EVERY session starts with this
+agentdb read-start
+
+# EVERY session ends with this
+agentdb write-end '{"did":"X","next":"Y","blocked":"Z"}'
+
+# Learn from failures
+agentdb learn failure "what went wrong" "evidence"
+agentdb learn pattern "what works" "evidence"
 ```
-●relentless|until:code_works,work_done,qa_exhausted
-●contract_first|no_work_without_scope
-●prove|not:assert
-●read|before:edit
-●commit|every:working_state
-●memory_first|check:_meta/
-●lsp_first|goToDefinition,findReferences,hover
-```
+
+**Location:** `_meta/agentdb/kernel.db` (auto-created)
 
 ---
 
-## Ω:AGENTS
-
-| Agent | Tab | Focus | Writes |
-|-------|-----|-------|--------|
-| orchestrator | main | route, contract, reconcile | directives |
-| architect | plan | discover, scope, risk | packets |
-| surgeon | exec | minimal diff, commit | checkpoints |
-| adversary | qa | break it, prove it | verdicts |
-
-Agent files: `agents/{name}.md`
-
----
-
-## ●:AGENTDB_BUS
-
-```sql
--- Write (any agent)
-INSERT INTO context_log (tab, type, vn, detail, contract, files)
-VALUES ('{tab}', '{type}', '{vn}', '{detail}', '{contract_id}', '{files_json}');
-
--- Read (session start)
-SELECT tab, type, vn, detail FROM context_log
-WHERE contract = '{id}' OR ts > datetime('now', '-1h')
-ORDER BY ts DESC LIMIT 20;
-```
-
-| Type | Writer | Reader |
-|------|--------|--------|
-| directive | main | plan, exec, qa |
-| packet | plan, exec | main |
-| verdict | qa | main |
-| checkpoint | exec | all |
-
----
-
-## ●:AGENTDB_INIT
+## ●:POSTURE
 
 ```
-if !exists(orchestration/agentdb/) → run orchestration/agentdb/init.sh
-```
-
----
-
-## ●:FLOW
-
-```
-1. main: CONTRACT → directive → agentdb
-2. plan: reads → discovery → packet → agentdb
-3. main: reads packet → approves → directive
-4. exec: reads → implements → checkpoint → agentdb
-5. qa: reads checkpoint → verifies → verdict → agentdb
-6. main: reads verdict → SHIP or iterate
+read_agentdb|before:any_work
+contract_first|scope_before_code
+prove|not:assert
+spawn_agents|tier_2+_auto
+write_agentdb|before:stop
 ```
 
 ---
 
 ## ●:TIERS
 
-| Tier | Scope | Flow |
-|------|-------|------|
-| 1 | 1-2 files | main executes |
-| 2 | 3-5 files | main → exec |
-| 3 | 6+ files | main → plan → exec → qa |
+| Tier | Files | Action |
+|------|-------|--------|
+| 1 | 1-2 | Execute directly |
+| 2 | 3-5 | Spawn surgeon agent |
+| 3 | 6+ | Contract → surgeon → adversary |
+
+**Auto-spawn:** Don't ask. Detect tier from file count, spawn appropriate agents.
 
 ---
 
-## ●:ROUTING
+## ●:AGENTS
 
-| tier | model | use_for |
-|------|-------|---------|
-| 1 | ollama | drafts,brainstorm,variations |
-| 2 | gemini | web_search,bulk_read,research |
-| 3 | sonnet | secondary_impl,synthesis |
-| 4 | opus | core_impl,planning,orchestrate |
-| 5 | haiku | test_exec,lint,typecheck |
+| Agent | When | Focus |
+|-------|------|-------|
+| surgeon | Tier 2+ | Minimal diff, commit working state |
+| adversary | Before ship | Assume broken, find edge cases, prove |
+
+Orchestrator = you (main session). No separate orchestrator agent needed.
 
 ---
 
-## ●:STRUCTURE
+## ●:FLOW
 
-| Type | Location | Trigger |
-|------|----------|---------|
-| Commands | commands/ | /name |
-| Skills | skills/ | Skill tool |
-| Agents | agents/ | Tab load |
+```
+1. READ: agentdb read-start (failures to avoid, patterns, checkpoint)
+2. SCOPE: Determine tier (file count), create contract if Tier 2+
+3. WORK: Execute or spawn agents
+4. VERIFY: Run adversary for Tier 2+
+5. WRITE: agentdb write-end, commit
+```
+
+---
+
+## ●:CONTRACT (Tier 2+)
+
+```
+CONTRACT: {id}
+GOAL: {observable_outcome}
+CONSTRAINTS: {files, no_deps, no_schema_changes}
+FAILURE: {rejected_if}
+TIER: {2|3}
+```
+
+```bash
+agentdb contract '{"goal":"X","constraints":"Y","failure":"Z","tier":2}'
+```
+
+---
+
+## ●:COMMANDS
+
+| Command | Purpose |
+|---------|---------|
+| /build | Full pipeline: research → plan → implement → verify |
+| /validate | Pre-commit gate: types, lint, tests |
+| /ship | Commit, push, PR |
+| /contract | Create scoped work agreement |
+| /ingest | Universal entry point (classify → route) |
+
+---
+
+## ●:SKILLS
+
+| Skill | Trigger |
+|-------|---------|
+| debug | bug, error, fix, broken |
+| research | investigate, find out, how does |
+| discovery | first time in codebase |
+| build | implement, add, create |
+
+Skills auto-trigger. Don't invoke manually unless needed.
 
 ---
 
 ## ≠:ANTI
 
 ```
-●assume_silently|→extract+confirm
-●implement_before_investigate|→search_first
-●serial_when_parallel|→2+_tasks=parallel
-●swallow_errors|→fail_fast
-●manual_git|→@git-sync
-●work_on_main|→branch/worktree
-●guess_APIs|→LSP_goToDefinition
-●rediscover_known|→check_memory_first
+skip_agentdb_read → will repeat past failures
+skip_agentdb_write → context lost on resume
+prompt_hooks → token waste, use command hooks
+multi_tab_architecture → one session spawns agents
+write_only_logs → if never read, delete it
 ```
 
 ---
 
-## →:LOAD
+## ●:GIT
 
-| Always | On-demand |
-|--------|-----------|
-| agents/{role}.md | skills/{name}/SKILL.md |
+```bash
+# Checkpoint every 15 min of work
+git add -A && git commit -m "wip: checkpoint"
+
+# Before any risky operation
+git stash
+
+# Learning from commit messages
+git log --grep="Learning:" -5
+```
 
 ---
 
-*KERNEL = coding OS. LSP-first. Memory-first. Quality gates enforced.*
+*KERNEL = agentdb-first. Read failures before work. Write checkpoint before stop.*

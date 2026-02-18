@@ -12,6 +12,14 @@ triggers:
 
 # Build Skill
 
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check past failures, patterns, active contract before building.
+
 ## Purpose
 
 Minimal code through maximum research. The best code is code you don't write.
@@ -277,3 +285,14 @@ Build is working well when:
 - All done-when criteria met
 - No regressions introduced
 - Plan matches implementation
+
+---
+
+## ●:ON_END (REQUIRED)
+
+```bash
+agentdb write-end '{"built":"feature X","commits":N,"validation":"pass/fail"}'
+agentdb learn pattern "what worked well" "evidence"
+```
+
+Always checkpoint and capture learnings before stopping.

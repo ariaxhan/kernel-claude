@@ -7,8 +7,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "The AI Coding OS - agents, methodology, design philosophy, self-evolution",
-      "version": "5.1.1"
+      "description": "AgentDB-first coding OS. Read at start, write at end.",
+      "version": "5.2.0"
     }
   ]
 }

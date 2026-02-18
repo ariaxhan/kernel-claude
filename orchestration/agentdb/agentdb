@@ -1,0 +1,205 @@
+#!/bin/bash
+# KERNEL AgentDB CLI
+# Every agent reads on start, writes on end. No exceptions.
+#
+# USAGE:
+#   agentdb init                    # Initialize per-project DB
+#   agentdb read-start              # What to know before working
+#   agentdb write-end <json>        # Checkpoint before stopping
+#   agentdb learn <type> <insight>  # Record learning
+#   agentdb contract <json>         # Create contract
+#   agentdb verdict <pass|fail> <evidence>  # QA result
+#   agentdb query <sql>             # Raw query
+
+set -e
+
+# Find project root (where .claude/ or _meta/ exists)
+find_project_root() {
+  local dir="$PWD"
+  while [ "$dir" != "/" ]; do
+    if [ -d "$dir/_meta" ] || [ -d "$dir/.claude" ]; then
+      echo "$dir"
+      return
+    fi
+    dir=$(dirname "$dir")
+  done
+  echo "$PWD"  # fallback
+}
+
+PROJECT_ROOT=$(find_project_root)
+DB_DIR="$PROJECT_ROOT/_meta/agentdb"
+DB="$DB_DIR/kernel.db"
+SCHEMA_DIR="$(dirname "$0")"
+
+# === COMMANDS ===
+
+cmd_init() {
+  mkdir -p "$DB_DIR"
+  if [ -f "$DB" ]; then
+    echo "DB exists: $DB"
+    return
+  fi
+
+  # Try local schema first, fall back to inline
+  if [ -f "$SCHEMA_DIR/schema.sql" ]; then
+    sqlite3 "$DB" < "$SCHEMA_DIR/schema.sql"
+  else
+    # Inline minimal schema
+    sqlite3 "$DB" "
+      PRAGMA journal_mode=WAL;
+      CREATE TABLE IF NOT EXISTS learnings (
+        id TEXT PRIMARY KEY,
+        ts TEXT DEFAULT CURRENT_TIMESTAMP,
+        type TEXT CHECK(type IN ('failure','pattern','gotcha','preference')),
+        insight TEXT NOT NULL,
+        evidence TEXT,
+        domain TEXT,
+        hit_count INTEGER DEFAULT 0
+      );
+      CREATE TABLE IF NOT EXISTS context (
+        id TEXT PRIMARY KEY,
+        ts TEXT DEFAULT CURRENT_TIMESTAMP,
+        type TEXT CHECK(type IN ('contract','checkpoint','handoff','verdict')),
+        contract_id TEXT,
+        agent TEXT,
+        content TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS errors (
+        id INTEGER PRIMARY KEY,
+        ts TEXT DEFAULT CURRENT_TIMESTAMP,
+        tool TEXT,
+        error TEXT,
+        file TEXT
+      );
+    "
+  fi
+  echo "Initialized: $DB"
+}
+
+cmd_read_start() {
+  # Ensure DB exists
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  echo "# AgentDB Context"
+  echo ""
+
+  echo "## Recent Failures (AVOID THESE)"
+  sqlite3 "$DB" "SELECT '- ' || insight FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  echo ""
+
+  echo "## Active Patterns"
+  sqlite3 "$DB" "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  echo ""
+
+  echo "## Active Contract"
+  sqlite3 "$DB" "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
+  echo ""
+
+  echo "## Last Checkpoint"
+  sqlite3 "$DB" "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
+}
+
+cmd_write_end() {
+  local content="$1"
+  local agent="${2:-orchestrator}"
+
+  [ -z "$content" ] && { echo "Usage: agentdb write-end <json> [agent]"; exit 1; }
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  local id="CP-$(date +%Y%m%d%H%M%S)-$$"
+  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content) VALUES ('$id', 'checkpoint', '$agent', '$content');"
+  echo "Checkpoint: $id"
+}
+
+cmd_learn() {
+  local type="$1"
+  local insight="$2"
+  local evidence="${3:-}"
+  local domain="${4:-}"
+
+  [ -z "$type" ] || [ -z "$insight" ] && { echo "Usage: agentdb learn <type> <insight> [evidence] [domain]"; exit 1; }
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  local id="LRN-$(date +%Y%m%d%H%M%S)-$$"
+  sqlite3 "$DB" "INSERT INTO learnings (id, type, insight, evidence, domain) VALUES ('$id', '$type', '$insight', '$evidence', '$domain');"
+  echo "Learned: [$type] $insight"
+}
+
+cmd_contract() {
+  local content="$1"
+
+  [ -z "$content" ] && { echo "Usage: agentdb contract <json>"; exit 1; }
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  local id="CR-$(date +%Y%m%d%H%M%S)-$$"
+  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'contract', 'orchestrator', '$content', '$id');"
+  echo "Contract: $id"
+}
+
+cmd_verdict() {
+  local result="$1"
+  local evidence="$2"
+  local contract_id="${3:-}"
+
+  [ -z "$result" ] && { echo "Usage: agentdb verdict <pass|fail> <evidence> [contract_id]"; exit 1; }
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  local id="VD-$(date +%Y%m%d%H%M%S)-$$"
+  local content="{\"result\":\"$result\",\"evidence\":\"$evidence\"}"
+  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'verdict', 'adversary', '$content', '$contract_id');"
+  echo "Verdict: $result"
+}
+
+cmd_error() {
+  local tool="$1"
+  local error="$2"
+  local file="${3:-}"
+
+  [ -z "$tool" ] || [ -z "$error" ] && { echo "Usage: agentdb error <tool> <error> [file]"; exit 1; }
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  sqlite3 "$DB" "INSERT INTO errors (tool, error, file) VALUES ('$tool', '$error', '$file');"
+}
+
+cmd_query() {
+  local sql="$1"
+  [ -z "$sql" ] && { echo "Usage: agentdb query <sql>"; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  sqlite3 -header -column "$DB" "$sql"
+}
+
+cmd_stats() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  echo "Learnings: $(sqlite3 "$DB" "SELECT COUNT(*) FROM learnings;")"
+  echo "Checkpoints: $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='checkpoint';")"
+  echo "Contracts: $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='contract';")"
+  echo "Errors: $(sqlite3 "$DB" "SELECT COUNT(*) FROM errors;")"
+}
+
+# === DISPATCH ===
+case "${1:-help}" in
+  init)        cmd_init ;;
+  read-start)  cmd_read_start ;;
+  write-end)   shift; cmd_write_end "$@" ;;
+  learn)       shift; cmd_learn "$@" ;;
+  contract)    shift; cmd_contract "$@" ;;
+  verdict)     shift; cmd_verdict "$@" ;;
+  error)       shift; cmd_error "$@" ;;
+  query)       shift; cmd_query "$@" ;;
+  stats)       cmd_stats ;;
+  *)
+    echo "KERNEL AgentDB - Every agent reads on start, writes on end"
+    echo ""
+    echo "COMMANDS:"
+    echo "  init              Initialize DB in current project"
+    echo "  read-start        Context for starting work (failures, patterns, checkpoint)"
+    echo "  write-end <json>  Checkpoint before stopping"
+    echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"
+    echo "  contract <json>   Create new contract"
+    echo "  verdict <p|f> <evidence>  QA result"
+    echo "  stats             Show counts"
+    echo "  query <sql>       Raw query"
+    ;;
+esac

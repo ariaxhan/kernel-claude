@@ -1,4 +1,13 @@
 ---
+
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
 name: discovery
 description: Codebase reconnaissance - map terrain before action
 triggers:
@@ -10,6 +19,15 @@ triggers:
   - understand project
 ---
 
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
+
 # Discovery Skill
 
 ## Purpose
@@ -20,6 +38,15 @@ Reconnaissance before action. Map the terrain. Identify tooling. Extract convent
 
 ---
 
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
+
 ## Auto-Trigger Signals
 
 This skill activates when detecting:
@@ -29,6 +56,15 @@ This skill activates when detecting:
 - First interaction with unfamiliar repo
 
 ---
+
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
 
 ## Process
 
@@ -41,6 +77,15 @@ This skill activates when detecting:
 ```
 
 ---
+
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
 
 ## Repo Map Patterns
 
@@ -59,6 +104,15 @@ Config Files:
 ```
 
 ---
+
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
 
 ## Tooling Detection
 
@@ -81,6 +135,15 @@ which npm || which yarn || which pnpm || which pip || which poetry || which carg
 
 ---
 
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
+
 ## Convention Extraction
 
 | Convention | How to Find |
@@ -92,6 +155,15 @@ which npm || which yarn || which pnpm || which pip || which poetry || which carg
 
 ---
 
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
+
 ## Risk Identification
 
 **Critical - Do Not Touch Without Backup:**
@@ -101,6 +173,15 @@ which npm || which yarn || which pnpm || which pip || which poetry || which carg
 - Files with TODO: remove, deprecated, legacy
 
 ---
+
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
 
 ## Stack-Specific Discovery
 
@@ -121,6 +202,15 @@ which npm || which yarn || which pnpm || which pip || which poetry || which carg
 - Look for build.rs
 
 ---
+
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
 
 ## Output Format
 
@@ -152,6 +242,15 @@ Update `_meta/context/active.md`:
 
 ---
 
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
+
 ## Anti-Patterns
 
 - Assuming conventions without verifying
@@ -162,6 +261,15 @@ Update `_meta/context/active.md`:
 
 ---
 
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check existing patterns and learnings before exploring.
+
+
 ## Success Metrics
 
 Discovery is working well when:
@@ -169,3 +277,12 @@ Discovery is working well when:
 - Tooling is identified and documented
 - Conventions are explicit, not assumed
 - Risk zones are marked and respected
+
+---
+
+## ●:ON_END (REQUIRED)
+
+```bash
+agentdb write-end '{"discovered":"X","key_files":["a","b"]}'
+agentdb learn pattern "what I learned about this codebase" "evidence"
+```

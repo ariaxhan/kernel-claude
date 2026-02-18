@@ -14,6 +14,14 @@ triggers:
 
 # Debug Skill
 
+## ●:ON_START (REQUIRED)
+
+```bash
+agentdb read-start
+```
+
+Check past failures - you may have seen this bug pattern before.
+
 ## Purpose
 
 Reproduce first. Isolate via binary search. Instrument, don't guess. Fix root cause, not symptom.
@@ -241,3 +249,14 @@ Debugging is working well when:
 - Root cause is understood, not just symptoms
 - Regression test prevents recurrence
 - Bug is documented for team knowledge
+
+---
+
+## ●:ON_END (REQUIRED)
+
+```bash
+agentdb write-end '{"debugged":"bug X","root_cause":"Y","fix":"Z"}'
+agentdb learn failure "what caused this bug" "stack trace or evidence"
+```
+
+Always record debugging learnings - they prevent repeat bugs.

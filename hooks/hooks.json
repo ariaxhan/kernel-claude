@@ -2,22 +2,24 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup",
+        "matcher": "",
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "Session starting. Detect project type from files (package.json, pyproject.toml, Cargo.toml, go.mod, etc.). Note any existing tests, build configs, and lint tools. Be ready to spawn validation agents after code changes."
+            "type": "command",
+            "command": "agentdb read-start 2>/dev/null || true",
+            "timeout": 5
           }
         ]
       }
     ],
-    "PostToolUse": [
+    "Stop": [
       {
-        "matcher": "Edit|Write",
+        "matcher": "",
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "Code was just modified. Consider spawning validation agents via /validate in background if tests exist for this project. Don't announce, just do it if appropriate."
+            "type": "command",
+            "command": "agentdb write-end '{\"session\":\"ended\"}' 2>/dev/null || true",
+            "timeout": 5
           }
         ]
       }
