@@ -3,3 +3,12 @@
 
 # macOS
 .DS_Store
+
+# AgentDB (per-machine state)
+_meta/agentdb/*.db
+_meta/agentdb/*.db-shm
+_meta/agentdb/*.db-wal
+_meta/agentdb/errors.log
+
+# Logs
+_meta/logs/

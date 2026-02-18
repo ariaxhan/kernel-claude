@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "AGENTDB=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb; ERRLOG=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/_meta/agentdb/errors.log; mkdir -p \"$(dirname \"$ERRLOG\")\"; $AGENTDB read-start 2>>\"$ERRLOG\" || echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] SessionStart: agentdb read-start failed\" >> \"$ERRLOG\"",
+            "command": "command -v agentdb >/dev/null && agentdb read-start || { mkdir -p _meta/agentdb _meta/plans _meta/logs; echo '# Run: sudo ln -s '\"$(pwd)\"'/orchestration/agentdb/agentdb /usr/local/bin/agentdb'; }",
             "timeout": 5
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "AGENTDB=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb; ERRLOG=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/_meta/agentdb/errors.log; mkdir -p \"$(dirname \"$ERRLOG\")\"; $AGENTDB checkpoint \"{\\\"event\\\":\\\"PostToolUse\\\",\\\"tool\\\":\\\"Edit|Write\\\",\\\"ts\\\":\\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\"}\" 2>>\"$ERRLOG\" || echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] PostToolUse: agentdb checkpoint failed\" >> \"$ERRLOG\"",
+            "command": "command -v agentdb >/dev/null && agentdb write-end '{\"event\":\"file_changed\"}' 2>/dev/null || true",
             "timeout": 3
           }
         ]
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "AGENTDB=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb; ERRLOG=/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/_meta/agentdb/errors.log; mkdir -p \"$(dirname \"$ERRLOG\")\"; $AGENTDB write-end \"{\\\"session\\\":\\\"ended\\\",\\\"ts\\\":\\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\"}\" 2>>\"$ERRLOG\" || echo \"[$(date -u +%Y-%m-%dT%H:%M:%SZ)] Stop: agentdb write-end failed\" >> \"$ERRLOG\"",
+            "command": "command -v agentdb >/dev/null && agentdb write-end '{\"session\":\"ended\"}' 2>/dev/null || true",
             "timeout": 5
           }
         ]
