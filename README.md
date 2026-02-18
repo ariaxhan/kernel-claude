@@ -100,4 +100,4 @@ CREATE TABLE context (
 
 ---
 
-MIT | [github.com/ariaxhan/kernel-claude](https://github.com/ariaxhan/kernel-claude)
+MIT | By [Aria Han](https://github.com/ariaxhan)
