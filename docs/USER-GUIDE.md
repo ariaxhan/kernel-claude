@@ -1,6 +1,6 @@
 # KERNEL User Guide
 
-**Version:** 5.1.0
+**Version:** 5.1.1
 **Plugin for:** Claude Code CLI
 
 ---

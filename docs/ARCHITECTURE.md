@@ -1,6 +1,6 @@
 # KERNEL Architecture
 
-**Version:** 5.1.0
+**Version:** 5.1.1
 **Deep-dive into system internals**
 
 ---
