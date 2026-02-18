@@ -32,7 +32,7 @@ find_project_root() {
 
 PROJECT_ROOT=$(find_project_root)
 DB_DIR="$PROJECT_ROOT/_meta/agentdb"
-DB="$DB_DIR/kernel.db"
+DB="$DB_DIR/agent.db"
 SCHEMA_DIR="$(dirname "$0")"
 
 # === COMMANDS ===
