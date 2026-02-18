@@ -11,66 +11,37 @@ Copy this entire block into Claude Code:
 ```
 I want to install the KERNEL plugin and set up AgentDB for this project.
 
-1. First, run this command to install the plugin:
+STEP 1: Install the plugin
 /install-plugin https://github.com/ariaxhan/kernel-claude
 
-2. Then create the AgentDB directory and SQLite database:
-- Create directory: _meta/agentdb/
-- Create SQLite database at: _meta/agentdb/agent.db
+STEP 2: Find the installed plugin location
+Look in ~/.claude/plugins/cache/kernel-marketplace/kernel/ for the latest version
 
-3. Initialize the database with this exact schema:
+STEP 3: Create symlink for the agentdb CLI
+Create a symlink so the agentdb command is available globally:
+sudo ln -sf ~/.claude/plugins/cache/kernel-marketplace/kernel/*/orchestration/agentdb/agentdb /usr/local/bin/agentdb
 
-PRAGMA journal_mode=WAL;
-PRAGMA foreign_keys=ON;
+STEP 4: Initialize AgentDB for this project
+Run: agentdb init
 
-CREATE TABLE IF NOT EXISTS learnings (
-  id TEXT PRIMARY KEY,
-  ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  type TEXT NOT NULL CHECK(type IN ('failure', 'pattern', 'gotcha', 'preference')),
-  insight TEXT NOT NULL,
-  evidence TEXT,
-  domain TEXT,
-  hit_count INTEGER DEFAULT 0,
-  last_hit TEXT
-);
+This creates _meta/agentdb/agent.db with the schema.
 
-CREATE TABLE IF NOT EXISTS context (
-  id TEXT PRIMARY KEY,
-  ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  type TEXT NOT NULL CHECK(type IN ('contract', 'checkpoint', 'handoff', 'verdict')),
-  contract_id TEXT,
-  agent TEXT,
-  content TEXT NOT NULL
-);
+STEP 5: Verify it works
+Run: agentdb status
 
-CREATE TABLE IF NOT EXISTS errors (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  tool TEXT NOT NULL,
-  error TEXT NOT NULL,
-  file TEXT,
-  context TEXT
-);
+It should show the DB path and table counts.
 
-CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
-CREATE INDEX IF NOT EXISTS idx_learnings_domain ON learnings(domain);
-CREATE INDEX IF NOT EXISTS idx_context_type ON context(type);
-CREATE INDEX IF NOT EXISTS idx_context_contract ON context(contract_id);
-CREATE INDEX IF NOT EXISTS idx_context_ts ON context(ts);
+DONE. The agentdb CLI commands are:
+- agentdb read-start     → Run at session start (shows failures to avoid, last checkpoint)
+- agentdb write-end JSON → Run at session end (saves checkpoint)
+- agentdb learn TYPE "insight" "evidence" → Record a learning (failure/pattern/gotcha)
+- agentdb contract JSON  → Create a work contract
+- agentdb status         → Show DB health
+- agentdb recent         → Show last 5 checkpoints
 
-4. After setup, verify by running:
-sqlite3 _meta/agentdb/agent.db ".tables"
+The plugin commands are: /build, /ship, /validate, /contract, /ingest, /tearitapart, /branch, /handoff
 
-It should show: context  errors  learnings
-
-5. The plugin gives you these commands: /build, /ship, /validate, /contract, /ingest, /tearitapart, /branch, /handoff
-
-6. The core methodology is AgentDB-first:
-- At the START of every session: query learnings for past failures to avoid
-- At the END of every session: insert a checkpoint into context with what was done
-- When you learn something (failure, pattern): insert into learnings immediately
-
-Show me the database tables when done so I know it worked.
+Show me `agentdb status` when done.
 ```
 
 That's it. Claude handles everything.
@@ -88,17 +59,18 @@ That's it. Claude handles everything.
 
 ## Usage
 
-Every session, Claude should:
+Every session:
 
 ```bash
-# Start: check what to avoid and where you left off
-sqlite3 _meta/agentdb/agent.db "SELECT type, insight FROM learnings ORDER BY ts DESC LIMIT 5;"
+# START of session - see failures to avoid and where you left off
+agentdb read-start
 
-# End: save what you did
-sqlite3 _meta/agentdb/agent.db "INSERT INTO context (id, ts, type, content) VALUES ('$(date +%s)', datetime('now'), 'checkpoint', '{\"did\":\"X\"}');"
+# END of session - save what you did
+agentdb write-end '{"did":"implemented auth","next":"add tests","blocked":""}'
 
-# Learn from failures
-sqlite3 _meta/agentdb/agent.db "INSERT INTO learnings (id, ts, type, insight) VALUES ('$(date +%s)', datetime('now'), 'failure', 'what went wrong');"
+# When you learn something - save immediately
+agentdb learn failure "API returns 500 when token expired" "saw in logs"
+agentdb learn pattern "always validate token before API call" "fixed 3 bugs"
 ```
 
 The plugin commands (`/build`, `/ship`, `/validate`, etc.) do this automatically.
