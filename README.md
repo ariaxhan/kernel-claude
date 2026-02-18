@@ -1,6 +1,6 @@
 # KERNEL
 
-**The AI Coding OS for Claude Code** | v5.1.1
+**The AI Coding OS for Claude Code** | v5.2.0
 
 A plugin that transforms Claude Code from assistant to operating system. Multi-agent orchestration. Contract-first workflow. Zero human relay.
 
