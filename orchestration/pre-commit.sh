@@ -9,7 +9,8 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 
 # 1. AgentDB checkpoint
 if command -v agentdb &>/dev/null; then
-  agentdb checkpoint "pre-commit: $(git diff --cached --name-only | head -5 | tr '\n' ' ')" 2>/dev/null || true
+  STAGED="$(git diff --cached --name-only | head -5 | tr '\n' ' ')"
+  agentdb write-end "{\"event\":\"pre-commit\",\"files\":\"$STAGED\"}" 2>/dev/null || true
 fi
 
 # 2. Secret scan on staged files
