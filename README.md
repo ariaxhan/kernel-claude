@@ -270,15 +270,19 @@ Check `_meta/` before re-learning what the project already knows. Memory check t
 /install-plugin https://github.com/ariaxhan/kernel-claude
 ```
 
-### AgentDB Initialization
+### Setup
 
-For orchestration mode (Tier 3 tasks):
+After plugin install, run the setup script from the plugin directory:
 
 ```bash
-./orchestration/agentdb/init.sh
+./setup.sh
 ```
 
-Creates `_meta/agentdb/agent.db` with the communication schema.
+This is idempotent — safe to run multiple times. It:
+- Verifies sqlite3 is available
+- Creates `_meta/agentdb/`, `_meta/context/`, `_meta/logs/`
+- Initializes `_meta/agentdb/kernel.db` with the communication schema
+- Symlinks the `agentdb` CLI to `/usr/local/bin/agentdb` (requires sudo)
 
 ### Updating
 
