@@ -4,6 +4,12 @@ description: Critical review mode - world-class developer tears your plan apart 
 
 # Tear It Apart Command
 
+## ●:ON_START
+
+```bash
+agentdb read-start
+```
+
 Critical review before implementation. Activate your inner senior engineer.
 
 ## Purpose
@@ -98,3 +104,9 @@ Run after planning, before implementing. If verdict is REVISE or RETHINK, update
 - Ignoring critical issues
 - "We'll fix it later"
 - Proceeding with RETHINK verdict
+
+## ●:ON_END
+
+```bash
+agentdb write-end '{"command":"tearitapart","did":"critical review complete","verdict":"PROCEED|REVISE|RETHINK","review":"_meta/reviews/<feature-name>-teardown.md"}'
+```

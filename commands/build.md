@@ -4,6 +4,12 @@ description: Unified planning and execution pipeline - from idea to working code
 
 # Build Mode
 
+## ●:ON_START
+
+```bash
+agentdb read-start
+```
+
 Entering BUILD mode.
 
 1. Read `skills/BUILD-BANK.md` for methodology
@@ -27,3 +33,9 @@ Entering BUILD mode.
 - `--quick`: Skip confirmations
 - `--plan-only`: Stop after planning
 - `--resume`: Continue in-progress work
+
+## ●:ON_END
+
+```bash
+agentdb write-end '{"command":"build","did":"implemented feature","result":"success|fail","plan":"_meta/plans/<feature-name>.md"}'
+```

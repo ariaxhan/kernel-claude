@@ -5,6 +5,12 @@ allowed-tools: Bash, Read, AskUserQuestion
 
 # Ship Command
 
+## ●:ON_START
+
+```bash
+agentdb read-start
+```
+
 Commit remaining work, push branch, create PR. Optionally tag a release.
 
 ## Steps
@@ -107,3 +113,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+
+## ●:ON_END
+
+```bash
+agentdb write-end '{"command":"ship","did":"pushed to remote and created PR","branch":"<branch-name>","pr":"<PR-URL>"}'
+```

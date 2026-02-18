@@ -5,6 +5,12 @@ allowed-tools: Read, Glob, Bash
 
 # Context Handoff
 
+## ●:ON_START
+
+```bash
+agentdb read-start
+```
+
 Generate a token-optimized brief that enables seamless conversation continuation.
 
 ## When to Use
@@ -115,3 +121,9 @@ If gaps exist, add missing context or flag as `[NEEDS CLARIFICATION: ...]`
 Present the handoff in a code block for easy copy-paste, then ask:
 - "Should I save this handoff to a file?"
 - "Ready to continue on Claude web, or need adjustments?"
+
+## ●:ON_END
+
+```bash
+agentdb write-end '{"command":"handoff","did":"generated context handoff brief","saved_to":"<path-or-none>"}'
+```

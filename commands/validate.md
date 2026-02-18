@@ -4,6 +4,12 @@ description: Quick pre-commit validation - types, lint, tests in parallel
 
 # Validate Command
 
+## ●:ON_START
+
+```bash
+agentdb read-start
+```
+
 Pre-commit gate: run all checks before committing.
 
 ## Behavior
@@ -68,3 +74,9 @@ Pre-commit gate: run all checks before committing.
 ```
 
 Run before every commit. Blocks if any check fails.
+
+## ●:ON_END
+
+```bash
+agentdb write-end '{"command":"validate","did":"ran gates","passed":"types,lint,tests","result":"PASS|FAIL"}'
+```

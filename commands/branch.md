@@ -5,6 +5,12 @@ allowed-tools: Bash, AskUserQuestion
 
 # Branch Command (Worktree-Based)
 
+## ●:ON_START
+
+```bash
+agentdb read-start
+```
+
 Create an isolated worktree before starting work. Never work directly on main.
 
 ## Philosophy
@@ -173,3 +179,9 @@ Cannot create worktrees outside of git repos.
 - `/ship` - Push branch and create PR from worktree
 - `/parallelize` - Set up multiple worktrees for parallel streams
 - See CODING-PROMPT-BANK.md "GIT WORKFLOW" section
+
+## ●:ON_END
+
+```bash
+agentdb write-end '{"command":"branch","did":"created worktree","branch":"<type>/<description>","path":"<worktree-path>"}'
+```

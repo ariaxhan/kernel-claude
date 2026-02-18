@@ -4,6 +4,12 @@ description: Create contract-first scope before any work
 
 # Contract Mode
 
+## ●:ON_START
+
+```bash
+agentdb read-start
+```
+
 Force contract-first framing before any work begins.
 
 ## Why Contracts
@@ -76,3 +82,9 @@ Do NOT proceed without a complete contract. Unclear inputs → blocked state →
 - Used by `/orchestrate` before any Tier 2-3 work
 - Used by `/build` for complex features
 - Referenced in all agent packets and verdicts
+
+## ●:ON_END
+
+```bash
+agentdb write-end '{"command":"contract","did":"created contract","contract_id":"<id>","tier":<tier>,"assigned_to":"<role>"}'
+```
