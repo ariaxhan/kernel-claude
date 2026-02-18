@@ -26,14 +26,14 @@ KERNEL fixes this.
 /install-plugin https://github.com/ariaxhan/kernel-claude
 ```
 
-**2. Set up**
+**2. Set up (one time)**
 
 ```bash
-cd /path/to/kernel-claude
+cd ~/.claude/plugins/cache/kernel-marketplace/kernel/*/
 ./setup.sh
 ```
 
-Initializes AgentDB and wires the plugin into your environment.
+Initializes AgentDB and symlinks the `agentdb` CLI.
 
 **3. Work**
 
@@ -266,14 +266,21 @@ Check `_meta/` before re-learning what the project already knows. Memory check t
 After installing the plugin, run setup once:
 
 ```bash
-cd ~/.claude/plugins/kernel@kernel-marketplace
+# Find your installed version
+cd ~/.claude/plugins/cache/kernel-marketplace/kernel/*/
+./setup.sh
+```
+
+Or if developing locally:
+```bash
+cd /path/to/kernel-claude
 ./setup.sh
 ```
 
 This:
 - Creates `_meta/agentdb/kernel.db` with the schema
 - Creates `_meta/plans/`, `_meta/logs/`, `_meta/context/`
-- Symlinks `agentdb` CLI to `/usr/local/bin/`
+- Symlinks `agentdb` CLI to `/usr/local/bin/` (requires sudo)
 
 To verify: `./orchestration/health-check.sh`
 
