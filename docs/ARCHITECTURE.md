@@ -24,7 +24,7 @@ KERNEL uses two specialized agents spawned by the orchestrator (main session).
                      |
               ┌──────▼──────┐
               │   agentdb   │
-              │  kernel.db  │
+              │  agent.db  │
               └─────────────┘
 ```
 
@@ -39,7 +39,7 @@ KERNEL uses two specialized agents spawned by the orchestrator (main session).
 
 ## AgentDB Schema
 
-SQLite database at `_meta/agentdb/kernel.db`.
+SQLite database at `_meta/agentdb/agent.db`.
 
 ### learnings (Cross-Session Memory)
 
@@ -203,7 +203,7 @@ kernel-claude/
 ├── hooks/
 │   └── hooks.json
 ├── _meta/
-│   ├── agentdb/kernel.db  # created per-project
+│   ├── agentdb/agent.db  # created per-project
 │   ├── context/active.md
 │   └── _learnings.md
 └── docs/                  # You are here

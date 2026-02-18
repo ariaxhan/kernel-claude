@@ -6,7 +6,7 @@ set -e
 
 PROJECT="${1:-.}"
 AGENTDB_DIR="$PROJECT/_meta/agentdb"
-DB="$AGENTDB_DIR/kernel.db"
+DB="$AGENTDB_DIR/agent.db"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 mkdir -p "$AGENTDB_DIR"

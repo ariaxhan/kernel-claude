@@ -31,7 +31,7 @@ echo ""
 # Last 3 learnings from agentdb
 echo "## Recent Learnings"
 echo ""
-DB_PATH="${REPO_ROOT}/_meta/agentdb/kernel.db"
+DB_PATH="${REPO_ROOT}/_meta/agentdb/agent.db"
 if command -v agentdb &>/dev/null; then
   agentdb learnings 3 2>/dev/null | sed 's/^/- /' || echo "- No learnings recorded"
 elif [ -f "$DB_PATH" ] && command -v sqlite3 &>/dev/null; then

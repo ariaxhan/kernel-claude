@@ -20,24 +20,33 @@ KERNEL fixes this.
 
 ## Quick Start
 
-**1. Install**
+**1. Install plugin (once)**
 
 ```bash
 /install-plugin https://github.com/ariaxhan/kernel-claude
 ```
 
-**2. Set up (one time)**
+**2. Set up CLI (once)**
 
 ```bash
 cd ~/.claude/plugins/cache/kernel-marketplace/kernel/*/
 ./setup.sh
 ```
 
-Initializes AgentDB and symlinks the `agentdb` CLI.
+This symlinks the `agentdb` CLI to `/usr/local/bin/`.
 
-**3. Work**
+**3. Initialize each project**
 
-Methodology applies automatically. No commands to remember. Just describe what you want.
+```bash
+cd your-project
+agentdb init
+```
+
+Creates `_meta/agentdb/agent.db` for that project. Each project has its own DB.
+
+**4. Work**
+
+Every session reads/writes automatically via hooks. Methodology applies. Just describe what you want.
 
 ---
 
@@ -187,7 +196,7 @@ The orchestrator (you) stays context-light. Disposable subagents do the heavy li
 SQLite eliminates copy/paste relay between agents. Agents write to shared state. Other agents poll it. The human is removed from the communication loop.
 
 ```
-_meta/agentdb/kernel.db
+_meta/agentdb/agent.db
 ├── learnings   # failures, patterns, gotchas (persist across sessions)
 ├── context     # contracts, checkpoints, handoffs, verdicts
 └── errors      # tool failures for debugging
@@ -278,7 +287,7 @@ cd /path/to/kernel-claude
 ```
 
 This:
-- Creates `_meta/agentdb/kernel.db` with the schema
+- Creates `_meta/agentdb/agent.db` with the schema
 - Creates `_meta/plans/`, `_meta/logs/`, `_meta/context/`
 - Symlinks `agentdb` CLI to `/usr/local/bin/` (requires sudo)
 

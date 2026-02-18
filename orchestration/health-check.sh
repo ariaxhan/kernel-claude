@@ -7,7 +7,7 @@ set -uo pipefail
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_DIR="$(dirname "$SCRIPT_DIR")"
-DB_PATH="${REPO_ROOT}/_meta/agentdb/kernel.db"
+DB_PATH="${REPO_ROOT}/_meta/agentdb/agent.db"
 SCHEMA="${PLUGIN_DIR}/orchestration/agentdb/schema.sql"
 AGENTDB_BIN="${PLUGIN_DIR}/orchestration/agentdb/agentdb"
 needs_manual=0
@@ -38,12 +38,12 @@ done
 
 # 3. AgentDB file (auto-init)
 if [ -f "$DB_PATH" ] && [ -r "$DB_PATH" ]; then
-  ok "kernel.db"
+  ok "agent.db"
 elif [ -f "$SCHEMA" ] && command -v sqlite3 &>/dev/null; then
-  sqlite3 "$DB_PATH" < "$SCHEMA" 2>/dev/null && fix "initialized kernel.db" || fail "cannot init DB"
+  sqlite3 "$DB_PATH" < "$SCHEMA" 2>/dev/null && fix "initialized agent.db" || fail "cannot init DB"
 else
-  fail "kernel.db missing and cannot auto-init"
-  echo "     → run: ${PLUGIN_DIR}/setup.sh"
+  fail "agent.db missing and cannot auto-init"
+  echo "     → run: agentdb init"
 fi
 
 # 4. agentdb CLI

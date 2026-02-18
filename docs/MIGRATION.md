@@ -113,7 +113,7 @@ cd ~/.claude/plugins/kernel@kernel-marketplace
 ```
 
 This creates:
-- `_meta/agentdb/kernel.db`
+- `_meta/agentdb/agent.db`
 - `_meta/plans/`
 - `_meta/logs/`
 - Symlinks `agentdb` to `/usr/local/bin/`

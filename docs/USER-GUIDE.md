@@ -19,7 +19,7 @@ After installation, KERNEL loads automatically for all projects.
 
 When you start a session in a new project:
 
-1. **AgentDB initializes** - SQLite database at `_meta/agentdb/kernel.db`
+1. **AgentDB initializes** - SQLite database at `_meta/agentdb/agent.db`
 2. **Run `agentdb read-start`** - Reads failures to avoid, active contract, last checkpoint
 3. **KERNEL detects stack** - Language, framework, test tools
 4. **Ready to work** - No templates to copy, plugin provides everything
@@ -104,7 +104,7 @@ Skills are loaded on-demand when relevant triggers occur.
 
 ## AgentDB
 
-SQLite database for agent memory and communication. Located at `_meta/agentdb/kernel.db`.
+SQLite database for agent memory and communication. Located at `_meta/agentdb/agent.db`.
 
 ### Key Tables
 
@@ -137,17 +137,17 @@ ORDER BY ts DESC LIMIT 10;
 
 Check recent context entries:
 ```bash
-sqlite3 _meta/agentdb/kernel.db "SELECT type, agent, ts FROM context ORDER BY ts DESC LIMIT 10;"
+sqlite3 _meta/agentdb/agent.db "SELECT type, agent, ts FROM context ORDER BY ts DESC LIMIT 10;"
 ```
 
 Check active contracts:
 ```bash
-sqlite3 _meta/agentdb/kernel.db "SELECT id, content FROM context WHERE type='contract' ORDER BY ts DESC;"
+sqlite3 _meta/agentdb/agent.db "SELECT id, content FROM context WHERE type='contract' ORDER BY ts DESC;"
 ```
 
 Check learnings:
 ```bash
-sqlite3 _meta/agentdb/kernel.db "SELECT type, insight FROM learnings ORDER BY ts DESC LIMIT 10;"
+sqlite3 _meta/agentdb/agent.db "SELECT type, insight FROM learnings ORDER BY ts DESC LIMIT 10;"
 ```
 
 ---

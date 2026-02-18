@@ -1,5 +1,5 @@
 -- KERNEL AgentDB Schema
--- Location: _meta/agentdb/kernel.db (created per-project)
+-- Location: _meta/agentdb/agent.db (created per-project)
 -- Philosophy: Read at start, write at end. 2 core tables.
 
 PRAGMA journal_mode=WAL;

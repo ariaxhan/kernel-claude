@@ -24,7 +24,7 @@ agentdb learn failure "what went wrong" "evidence"
 agentdb learn pattern "what works" "evidence"
 ```
 
-**Location:** `_meta/agentdb/kernel.db` (auto-created)
+**Location:** `_meta/agentdb/agent.db` (auto-created)
 
 ---
 

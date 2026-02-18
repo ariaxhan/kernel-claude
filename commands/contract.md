@@ -55,7 +55,7 @@ ASSIGN: {architect|surgeon|adversary}
 ## Log to AgentDB
 
 ```bash
-sqlite3 _meta/agentdb/kernel.db \
+sqlite3 _meta/agentdb/agent.db \
   "INSERT INTO contracts (id, goal, constraints, failure_conditions, tier, assigned_to)
    VALUES ('{id}', '{goal}', '{constraints_json}', '{failures_json}', {tier}, '{assign}');"
 ```
