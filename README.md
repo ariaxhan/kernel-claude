@@ -280,6 +280,22 @@ For orchestration mode (Tier 3 tasks):
 
 Creates `_meta/agentdb/agent.db` with the communication schema.
 
+### Updating
+
+To update KERNEL to the latest version, you must update both the marketplace and the plugin:
+
+```bash
+# Step 1: Update the marketplace cache
+claude plugin marketplace update kernel-marketplace
+
+# Step 2: Update the plugin
+claude plugin update kernel@kernel-marketplace
+
+# Step 3: Restart Claude Code to apply changes
+```
+
+**Note:** Running only `claude plugin update` without updating the marketplace first may report you're already at the latest version when you're not.
+
 ---
 
 ## Project Structure
