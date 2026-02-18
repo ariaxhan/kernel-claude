@@ -6,14 +6,20 @@ AgentDB-first. Read at start. Write at end.
 
 ## ●:AGENTDB (NON-NEGOTIABLE)
 
+**Every artifact reads on start, writes on end. No exceptions.**
+
+Commands, skills, agents — all have ON_START and ON_END hooks.
+Skip the read → repeat past failures.
+Skip the write → context lost on resume.
+
 ```bash
-# EVERY session starts with this
+# Session/command/skill/agent start
 agentdb read-start
 
-# EVERY session ends with this
+# Session/command/skill/agent end
 agentdb write-end '{"did":"X","next":"Y","blocked":"Z"}'
 
-# Learn from failures
+# Capture learnings immediately when discovered
 agentdb learn failure "what went wrong" "evidence"
 agentdb learn pattern "what works" "evidence"
 ```
