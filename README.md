@@ -26,17 +26,14 @@ KERNEL fixes this.
 /install-plugin https://github.com/ariaxhan/kernel-claude
 ```
 
-**2. Initialize**
+**2. Set up**
 
 ```bash
-cd your-project
-/repo-init
+cd /path/to/kernel-claude
+./setup.sh
 ```
 
-KERNEL analyzes your codebase and creates tailored configuration:
-- `.claude/CLAUDE.md` — Project-specific rules
-- `.claude/rules/` — Discovered patterns
-- `_meta/` — Session tracking
+Initializes AgentDB and wires the plugin into your environment.
 
 **3. Work**
 
