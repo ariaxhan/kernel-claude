@@ -12,18 +12,6 @@
         ]
       }
     ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "command -v agentdb >/dev/null && agentdb write-end '{\"event\":\"file_changed\"}' 2>/dev/null || true",
-            "timeout": 3
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "matcher": "",
