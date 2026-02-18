@@ -99,25 +99,36 @@ Complexity determines workflow:
 
 Tier 1 tasks don't need coordination overhead. Tier 3 tasks need the full system.
 
-### The Communication Bus
+### The Communication Bus (AgentDB)
 
-```sql
--- Any agent writes
-INSERT INTO context_log (tab, type, vn, detail, contract, files)
-VALUES ('exec', 'checkpoint', 'CP-001', '...', 'CR-001', '["auth/reset.ts"]');
+Every command, skill, and agent reads on start, writes on end:
 
--- Other agents read
-SELECT * FROM context_log WHERE contract = 'CR-001' ORDER BY ts DESC;
+```bash
+# Start of any work
+agentdb read-start
+
+# End of any work
+agentdb write-end '{"did":"implemented auth","next":"add tests"}'
+
+# Record learnings immediately
+agentdb learn failure "JWT expired silently" "no error thrown"
+agentdb learn pattern "always check token.exp" "caught 3 bugs"
 ```
 
-| Type | Writer | Reader |
-|------|--------|--------|
-| directive | orchestrator | surgeon, adversary |
-| packet | surgeon | orchestrator |
-| checkpoint | surgeon | all |
-| verdict | adversary | orchestrator |
+```sql
+-- Contracts stored in context table
+INSERT INTO context (id, type, agent, content)
+VALUES ('CR-001', 'contract', 'orchestrator', '{"goal":"password reset"}');
 
-This is what eliminates the relay. Agents don't need you to pass context. They read it directly.
+-- Checkpoints for session continuity
+INSERT INTO context (id, type, agent, content, contract_id)
+VALUES ('CP-001', 'checkpoint', 'surgeon', '{"files":["auth.ts"]}', 'CR-001');
+
+-- Query recent failures before starting
+SELECT insight FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 5;
+```
+
+This is what eliminates the relay. Agents don't need you to pass context. They read it directly from AgentDB.
 
 ---
 
@@ -177,11 +188,12 @@ SQLite eliminates copy/paste relay between agents. Agents write to shared state.
 
 ```
 _meta/agentdb/kernel.db
-├── context_log    # Communication bus
-├── contracts      # Active work agreements
-├── rules          # Project learnings
-└── learnings      # Session insights
+├── learnings   # failures, patterns, gotchas (persist across sessions)
+├── context     # contracts, checkpoints, handoffs, verdicts
+└── errors      # tool failures for debugging
 ```
+
+Every artifact (commands, skills, agents) has `ON_START` and `ON_END` hooks that read/write AgentDB. Skip the read → repeat past failures. Skip the write → context lost on resume.
 
 ### 2. Contract-First
 
@@ -249,15 +261,21 @@ Check `_meta/` before re-learning what the project already knows. Memory check t
 /install-plugin https://github.com/ariaxhan/kernel-claude
 ```
 
-### AgentDB Initialization
+### Setup
 
-For orchestration mode (Tier 3 tasks):
+After installing the plugin, run setup once:
 
 ```bash
-./orchestration/agentdb/init.sh
+cd ~/.claude/plugins/kernel@kernel-marketplace
+./setup.sh
 ```
 
-Creates `_meta/agentdb/kernel.db` with the communication schema.
+This:
+- Creates `_meta/agentdb/kernel.db` with the schema
+- Creates `_meta/plans/`, `_meta/logs/`, `_meta/context/`
+- Symlinks `agentdb` CLI to `/usr/local/bin/`
+
+To verify: `./orchestration/health-check.sh`
 
 ### Updating
 

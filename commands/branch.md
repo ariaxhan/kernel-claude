@@ -177,8 +177,6 @@ Cannot create worktrees outside of git repos.
 ## Related
 
 - `/ship` - Push branch and create PR from worktree
-- `/parallelize` - Set up multiple worktrees for parallel streams
-- See CODING-PROMPT-BANK.md "GIT WORKFLOW" section
 
 ## ●:ON_END
 

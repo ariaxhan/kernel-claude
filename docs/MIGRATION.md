@@ -1,7 +1,7 @@
-# Migration Guide: v4.x to v5.x
+# Migration Guide: v4.x to v5.2.0
 
 **From:** KERNEL v4.x (25 agents, verbose config)
-**To:** KERNEL v5.1.0 (6 agents, VN-native, AgentDB)
+**To:** KERNEL v5.2.0 (2 agents, AgentDB-first)
 
 ---
 
@@ -9,179 +9,84 @@
 
 v5 is a complete rewrite. The old structure is incompatible.
 
-| Aspect | v4.x | v5.x |
-|--------|------|------|
-| Agents | 25 specialized | 6 orchestration |
-| Config | Verbose CLAUDE.md | VN-native (~200 tokens) |
+| Aspect | v4.x | v5.2.0 |
+|--------|------|--------|
+| Agents | 25 specialized | 2 (surgeon, adversary) |
+| Commands | 16+ | 8 |
+| Skills | 11 | 4 |
+| Config | Verbose CLAUDE.md | Compact (~200 tokens) |
 | Memory | File-based | AgentDB (SQLite) |
-| Rules | `.claude/rules/` | `skills/rules/` |
-| Banks | `banks/` | `skills/` |
-| Communication | Direct | Via AgentDB bus |
 
 ---
 
-## Structure Changes
+## What Changed
 
-### Directory Mapping
+### Agents: 25 → 2
 
-| v4.x | v5.x | Notes |
-|------|------|-------|
-| `kernel/` | (root) | Flattened |
-| `.claude/` | (deleted) | Plugin IS config |
-| `.claude/rules/` | `skills/rules/SKILL.md` | Merged |
-| `banks/` | `skills/` | Renamed |
-| `agents/` (25) | `agents/` (6) | Consolidated |
-| `_meta/memory/` | `_meta/agentdb/` | SQLite |
+All specialized agents consolidated into two:
 
-### Agent Consolidation
+| v5.2 Agent | Absorbs |
+|------------|---------|
+| **surgeon** | executor, refactorer, implementer, lint-fixer, type-fixer |
+| **adversary** | validator, tester, reviewer, qa |
 
-**Removed agents** (functionality absorbed):
+The orchestrator is YOU (the main session). No separate orchestrator agent.
 
-| Old Agent | Now Handled By |
-|-----------|---------------|
-| test-runner | `/validate` command |
-| lint-fixer | `/validate` command |
-| type-checker | `/validate` command |
-| doc-writer | `/docs` command |
-| refactorer | surgeon agent |
-| debugger | `/debug` skill |
-| reviewer | `/tearitapart` command |
-| planner | architect agent |
-| researcher | researcher agent (kept) |
-| searcher | searcher agent (kept) |
-| executor | surgeon agent |
-| validator | adversary agent |
-
-**New agent mapping:**
-
-| v5 Agent | Absorbs |
-|----------|---------|
-| orchestrator | coordinator, router, decider |
-| architect | planner, scopper, risk-assessor |
-| surgeon | executor, refactorer, implementer |
-| adversary | validator, tester, reviewer |
-| searcher | code-searcher, tracer |
-| researcher | doc-reader, api-finder |
-
----
-
-## Config Migration
-
-### Old CLAUDE.md (v4.x)
-
-```markdown
-# KERNEL
-
-## Agents
-- test-runner: Run tests
-- lint-fixer: Fix lint errors
-- type-checker: Verify types
-... (hundreds of lines)
-```
-
-### New CLAUDE.md (v5.x)
-
-```markdown
-# KERNEL v5.1.0
-
-tokens: ~200 | vn-native | plugin | agentdb-bus
-
-## Ψ:ARCHITECTURE
-4 orchestration agents + 1 agentdb = zero relay
-...
-```
-
-**No migration needed.** Delete old project CLAUDE.md. Plugin provides everything.
-
----
-
-## New Patterns
-
-### AgentDB (Replaces File Memory)
-
-**Old (v4.x):**
-```markdown
-# _meta/memory/session.md
-Last action: implemented auth
-Files touched: user.py, auth.py
-```
-
-**New (v5.x):**
-```sql
-INSERT INTO context_log (tab, type, vn, detail, contract)
-VALUES ('exec', 'checkpoint', '●checkpoint|commit:abc123', '{"files":["user.py"]}', 'auth-001');
-```
-
-### Contracts (Replaces Implicit Work)
-
-**Old:** Start working immediately
-**New:** Create contract first
-
-```
-CONTRACT: auth-001
-─────────────
-GOAL: Add JWT authentication
-CONSTRAINTS: Tier 2, no new deps
-FAILURE CONDITIONS: Breaks existing auth
-ASSIGN: exec
-```
-
-### Tier Routing (Replaces Ad-Hoc)
-
-**Old:** Manual decision on complexity
-**New:** Auto-detected, explicit tiers
-
-| Tier | Files | Flow |
-|------|-------|------|
-| 1 | 1-2 | main executes |
-| 2 | 3-5 | main → exec |
-| 3 | 6+ | main → plan → exec → qa |
-
----
-
-## Command Changes
-
-### Renamed
-
-| v4.x | v5.x |
-|------|------|
-| `/test` | `/validate` |
-| `/lint` | `/validate` |
-| `/typecheck` | `/validate` |
-| `/init` | `/repo-init` |
-| `/plan` | `/build --plan-only` |
-| `/review` | `/tearitapart` |
-
-### New Commands
+### Commands: 8 Total
 
 | Command | Purpose |
 |---------|---------|
-| `/contract` | Create explicit work agreement |
-| `/orchestrate` | Full multi-agent coordination |
-| `/kernel-status` | Config health check |
-| `/kernel-prune` | Remove stale entries |
-| `/handoff` | Session continuation brief |
+| `/branch` | Create worktree for isolated work |
+| `/build` | Full pipeline: research → plan → implement → verify |
+| `/contract` | Create scoped work agreement |
+| `/handoff` | Generate context brief for session continuity |
+| `/ingest` | Universal entry point (classify → route) |
+| `/ship` | Commit, push, create PR |
+| `/tearitapart` | Critical review before implementing |
+| `/validate` | Pre-commit gate: types, lint, tests |
 
-### Removed Commands
+### Skills: 4 Total
 
-| v4.x | Replacement |
-|------|-------------|
-| `/spawn-agent` | Automatic via tiers |
-| `/memory` | Query AgentDB directly |
-| `/rules` | `skills/rules/SKILL.md` |
+| Skill | When Used |
+|-------|-----------|
+| **build** | Full implementation pipeline |
+| **debug** | Bug investigation and fixing |
+| **discovery** | First time in unfamiliar codebase |
+| **research** | Before choosing approaches |
 
----
+### AgentDB Schema
 
-## Path Changes
+```sql
+-- learnings: failures, patterns, gotchas
+CREATE TABLE learnings (
+  id TEXT PRIMARY KEY,
+  ts TEXT DEFAULT CURRENT_TIMESTAMP,
+  type TEXT CHECK(type IN ('failure','pattern','gotcha','preference')),
+  insight TEXT NOT NULL,
+  evidence TEXT,
+  domain TEXT,
+  hit_count INTEGER DEFAULT 0
+);
 
-| v4.x | v5.x |
-|------|------|
-| `kernel/CLAUDE.md` | `CLAUDE.md` (root) |
-| `kernel/agents/` | `agents/` |
-| `kernel/banks/` | `skills/` |
-| `.claude/rules/` | `skills/rules/SKILL.md` |
-| `.claude/plans/` | `_meta/plans/` |
-| `_meta/memory/` | `_meta/agentdb/` |
+-- context: contracts, checkpoints, handoffs, verdicts
+CREATE TABLE context (
+  id TEXT PRIMARY KEY,
+  ts TEXT DEFAULT CURRENT_TIMESTAMP,
+  type TEXT CHECK(type IN ('contract','checkpoint','handoff','verdict')),
+  contract_id TEXT,
+  agent TEXT,
+  content TEXT NOT NULL
+);
+
+-- errors: tool failures
+CREATE TABLE errors (
+  id INTEGER PRIMARY KEY,
+  ts TEXT DEFAULT CURRENT_TIMESTAMP,
+  tool TEXT,
+  error TEXT,
+  file TEXT
+);
+```
 
 ---
 
@@ -200,32 +105,26 @@ rm -f CLAUDE.md  # if project-specific
 /install-plugin https://github.com/ariaxhan/kernel-claude
 ```
 
-### 3. Initialize New Project
+### 3. Run Setup
 
 ```bash
-/repo-init
+cd ~/.claude/plugins/kernel@kernel-marketplace
+./setup.sh
 ```
 
 This creates:
-- `_meta/context/active.md`
-- `_meta/_learnings.md`
-- `_meta/agentdb/` (on first contract)
+- `_meta/agentdb/kernel.db`
+- `_meta/plans/`
+- `_meta/logs/`
+- Symlinks `agentdb` to `/usr/local/bin/`
 
-### 4. Migrate Project Rules
+### 4. Start Working
 
-If you had project-specific rules in `.claude/rules/`:
-
-1. Review each rule
-2. Add to `_meta/_learnings.md` as patterns
-3. Or contribute to `skills/rules/SKILL.md` if universal
-
-### 5. Migrate Memory
-
-Old session memory is incompatible. Start fresh:
-
-1. Review `_meta/memory/` for critical context
-2. Add key learnings to AgentDB rules table
-3. Delete old memory files
+Every session:
+```bash
+agentdb read-start   # at start
+agentdb write-end '{"did":"X"}'  # at end
+```
 
 ---
 
@@ -233,10 +132,10 @@ Old session memory is incompatible. Start fresh:
 
 1. **No project CLAUDE.md** - Plugin provides all config
 2. **No `.claude/` directory** - Removed entirely
-3. **25 agents → 6 agents** - Specialized agents consolidated
+3. **25 agents → 2 agents** - Specialized agents consolidated
 4. **File memory → SQLite** - AgentDB replaces markdown
-5. **Implicit work → Contracts** - Explicit scope required
-6. **Manual routing → Tier system** - Auto-detected complexity
+5. **16 commands → 8** - Consolidated
+6. **11 skills → 4** - Consolidated
 
 ---
 
@@ -246,6 +145,5 @@ Old session memory is incompatible. Start fresh:
 |---------|--------------|--------|
 | Existing code | Compatible | No change |
 | `.claude/` | Incompatible | Delete |
-| `_meta/memory/` | Incompatible | Migrate or delete |
+| `_meta/memory/` | Incompatible | Delete |
 | Project CLAUDE.md | Ignored | Delete |
-| Commands | Changed | Learn new names |
