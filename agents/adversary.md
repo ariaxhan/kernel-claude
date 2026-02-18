@@ -15,7 +15,7 @@ Assume it's broken. Prove otherwise with evidence.
 agentdb read-start
 ```
 
-Read last checkpoint, contract scope, past failures.
+Check recent failures. Do not repeat them.
 
 ## →:DO
 
@@ -57,6 +57,13 @@ agentdb verdict pass '{"tested":["X","Y"],"evidence":"test output shows..."}'
 
 # Fail
 agentdb verdict fail '{"failed":["edge case Z"],"evidence":"error: ...","recommendation":"fix by..."}'
+
+agentdb write-end '{"agent":"adversary","contract":"CR-XXX","result":"pass|fail"}'
+```
+
+If you learned something (failure pattern, gotcha, useful technique):
+```bash
+agentdb learn <type> "<insight>" "<evidence>"
 ```
 
 ## ●:VERDICT_FORMAT

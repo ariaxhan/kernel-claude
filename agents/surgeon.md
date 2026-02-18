@@ -15,7 +15,7 @@ Minimal diff. Commit immediately. No scope creep.
 agentdb read-start
 ```
 
-Read failures to avoid, active contract, last checkpoint.
+Check recent failures. Do not repeat them.
 
 ## →:DO
 
@@ -54,7 +54,12 @@ Contract: {contract_id}"
 ## ●:ON_END (REQUIRED)
 
 ```bash
-agentdb write-end '{"did":"implemented X","commit":"abc123","files":["a.ts","b.ts"],"next":"qa verification"}'
+agentdb write-end '{"agent":"surgeon","contract":"CR-XXX","result":"<outcome>","files":["<changed>"],"commits":["<sha>"]}'
+```
+
+If you learned something (failure pattern, gotcha, useful technique):
+```bash
+agentdb learn <type> "<insight>" "<evidence>"
 ```
 
 Always checkpoint before stopping.
