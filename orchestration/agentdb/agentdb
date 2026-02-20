@@ -100,6 +100,10 @@ cmd_read_start() {
   sqlite3 "$DB" "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || echo "None"
   echo ""
 
+  echo "## Recent Errors"
+  sqlite3 "$DB" "SELECT '- [' || tool || '] ' || error || COALESCE(' (' || file || ')', '') FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  echo ""
+
   echo "## Active Contract"
   sqlite3 "$DB" "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
   echo ""

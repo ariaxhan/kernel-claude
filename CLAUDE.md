@@ -1,4 +1,4 @@
-# KERNEL v5.3.0
+# KERNEL v5.4.0
 
 AgentDB-first. Read at start. Write at end.
 

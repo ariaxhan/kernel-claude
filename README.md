@@ -1,6 +1,6 @@
 # KERNEL
 
-**AgentDB-first coding methodology for Claude Code** | v5.3.0
+**AgentDB-first coding methodology for Claude Code** | v5.4.0
 
 ---
 
@@ -14,26 +14,35 @@ I want to install the KERNEL plugin and set up AgentDB for this project.
 STEP 1: Install the plugin
 /install-plugin https://github.com/ariaxhan/kernel-claude
 
-STEP 2: Find the installed plugin location
-Look in ~/.claude/plugins/cache/kernel-marketplace/kernel/ for the latest version
+STEP 2: Find the installed plugin location and set KERNEL_PATH
+KERNEL_PATH=$(find ~/.claude/plugins/cache -name "kernel-claude" -o -name "kernel" 2>/dev/null | head -1)
+echo "Found: $KERNEL_PATH"
 
 STEP 3: Create symlink for the agentdb CLI
-Create a symlink so the agentdb command is available globally:
-sudo ln -sf ~/.claude/plugins/cache/kernel-marketplace/kernel/*/orchestration/agentdb/agentdb /usr/local/bin/agentdb
+sudo ln -sf "$KERNEL_PATH/orchestration/agentdb/agentdb" /usr/local/bin/agentdb
 
-STEP 4: Initialize AgentDB for this project
+STEP 4: Copy CLAUDE.md to this project (plugin CLAUDE.md isn't auto-loaded)
+mkdir -p .claude
+cp "$KERNEL_PATH/CLAUDE.md" .claude/CLAUDE.md
+
+STEP 5: Initialize AgentDB for this project
 Run: agentdb init
 
 This creates _meta/agentdb/agent.db with the schema.
 
-STEP 5: Verify it works
+STEP 6: Verify it works
 Run: agentdb status
 
 It should show the DB path and table counts.
 
-DONE. The agentdb CLI commands are:
-- agentdb read-start     → Run at session start (shows failures to avoid, last checkpoint)
-- agentdb write-end JSON → Run at session end (saves checkpoint)
+DONE. The plugin includes:
+- SessionStart hook that outputs KERNEL philosophy + runs agentdb read-start
+- PostToolUseFailure hook that captures errors automatically
+- CLAUDE.md copied to your project for persistent philosophy
+
+The agentdb CLI commands are:
+- agentdb read-start     → Context for starting work
+- agentdb write-end JSON → Checkpoint before stopping
 - agentdb learn TYPE "insight" "evidence" → Record a learning (failure/pattern/gotcha)
 - agentdb contract JSON  → Create a work contract
 - agentdb status         → Show DB health
