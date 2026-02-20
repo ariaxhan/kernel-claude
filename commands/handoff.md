@@ -3,7 +3,7 @@ description: Generate a structured context handoff brief for seamless conversati
 allowed-tools: Read, Glob, Bash
 ---
 
-# Context Handoff
+# /kernel:handoff
 
 ## ●:ON_START
 

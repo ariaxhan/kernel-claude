@@ -3,7 +3,7 @@ description: Ship branch - commit, push, create PR, and optionally release
 allowed-tools: Bash, Read, AskUserQuestion
 ---
 
-# Ship Command
+# /kernel:ship
 
 ## ●:ON_START
 
@@ -70,7 +70,7 @@ If user explicitly requests a release with `/ship`:
 ### Pre-release Checks
 1. Verify version consistency across files:
    - `.claude-plugin/plugin.json`
-   - `kernel/.claude-plugin/plugin.json`
+   - `.claude-plugin/marketplace.json`
    - `RELEASE_NOTES.md`
 
 2. Ensure RELEASE_NOTES.md documents the version
@@ -95,7 +95,7 @@ gh release create v<VERSION> \
 ### Version Consistency Check
 ```bash
 # Verify all version references match
-grep -r '"version"' .claude-plugin/ kernel/.claude-plugin/ | grep -o '"[0-9.]*"'
+grep -r '"version"' .claude-plugin/ | grep -o '"[0-9.]*"'
 head -1 RELEASE_NOTES.md
 ```
 

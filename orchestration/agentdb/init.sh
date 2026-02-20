@@ -12,12 +12,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mkdir -p "$AGENTDB_DIR"
 
 if [ ! -f "$DB" ]; then
-    sqlite3 "$DB" < "$SCRIPT_DIR/migrations/001_init.sql"
+    sqlite3 "$DB" < "$SCRIPT_DIR/schema.sql"
     echo "AgentDB initialized at $DB"
 else
     echo "AgentDB already exists at $DB"
 fi
 
-sqlite3 "$DB" "SELECT count(*) FROM _migrations;" >/dev/null 2>&1 && \
+sqlite3 "$DB" "SELECT count(*) FROM learnings;" >/dev/null 2>&1 && \
     echo "Schema verified" || \
     echo "Schema verification failed"

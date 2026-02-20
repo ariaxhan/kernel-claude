@@ -1,14 +1,37 @@
-# Orchestration Agents
+# Agents
 
-Tier 3 specialized agents for multi-agent coordination. Invoked via `/orchestrate` command.
+Spawned by the orchestrator (main session) for Tier 2+ work. All communication via AgentDB.
 
-| Agent | Role | Frame |
-|-------|------|-------|
-| orchestrator | Coordinate contracts, route work | coordinate |
-| architect | Discovery, scoping, risk analysis | discover |
-| surgeon | Minimal diff implementation | execute |
-| adversary | QA, break it, verify claims | verify |
-| searcher | Deep codebase exploration | search |
-| researcher | External research, docs, patterns | research |
+| Agent | Role | Reads | Writes |
+|-------|------|-------|--------|
+| surgeon | Minimal diff implementation | contract | checkpoint |
+| adversary | QA — assume broken, prove | checkpoint | verdict |
 
-These agents communicate via AgentDB (SQLite). See `orchestration/agentdb/` for setup.
+## Communication Flow
+
+```
+1. Orchestrator creates CONTRACT → AgentDB
+2. Surgeon reads contract, writes CHECKPOINT → AgentDB
+3. Orchestrator reads checkpoint, spawns adversary (Tier 3)
+4. Adversary reads checkpoint, writes VERDICT → AgentDB
+5. Orchestrator reads verdict, reports to user
+```
+
+## Spawning
+
+Use `Task` tool with `kernel:surgeon` or `kernel:adversary` subagent type.
+
+Include in prompt:
+- Contract ID and goal
+- Explicit file list (scope)
+- Anti-patterns (what not to do)
+- Failure paths (what to do when stuck)
+- AgentDB write instructions
+
+## Anti-Patterns
+
+```
+agents_report_verbally     → They write to AgentDB
+orchestrator_writes_code   → Spawn surgeon instead (Tier 2+)
+skip_contract              → No agent work without contract
+```

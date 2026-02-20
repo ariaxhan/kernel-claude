@@ -1,4 +1,4 @@
-# KERNEL v5.4.0
+# KERNEL v5.5.0
 
 AgentDB-first. Read at start. Write at end.
 
@@ -42,35 +42,37 @@ write_agentdb|before:stop
 
 ## ●:TIERS
 
-| Tier | Files | Action |
-|------|-------|--------|
-| 1 | 1-2 | Execute directly |
-| 2 | 3-5 | Spawn surgeon agent |
-| 3 | 6+ | Contract → surgeon → adversary |
+| Tier | Files | Your Role |
+|------|-------|-----------|
+| 1 | 1-2 | Execute directly (you write code) |
+| 2 | 3-5 | Orchestrate: contract → surgeon → review |
+| 3 | 6+ | Orchestrate: contract → surgeon → adversary |
 
-**Auto-spawn:** Don't ask. Detect tier from file count, spawn appropriate agents.
+**Tier 2+:** You are the orchestrator. Create contracts, spawn agents, read AgentDB. Don't write code.
 
 ---
 
 ## ●:AGENTS
 
-| Agent | When | Focus |
-|-------|------|-------|
-| surgeon | Tier 2+ | Minimal diff, commit working state |
-| adversary | Before ship | Assume broken, find edge cases, prove |
+| Agent | Role | Writes To |
+|-------|------|-----------|
+| surgeon | Minimal diff implementation | checkpoint → AgentDB |
+| adversary | QA, assume broken, prove | verdict → AgentDB |
 
-Orchestrator = you (main session). No separate orchestrator agent needed.
+**You = orchestrator.** Create contracts, spawn agents, read their output from AgentDB.
 
 ---
 
 ## ●:FLOW
 
 ```
-1. READ: agentdb read-start (failures to avoid, patterns, checkpoint)
-2. SCOPE: Determine tier (file count), create contract if Tier 2+
-3. WORK: Execute or spawn agents
-4. VERIFY: Run adversary for Tier 2+
-5. WRITE: agentdb write-end, commit
+1. READ: agentdb read-start (failures, patterns, contracts, errors)
+2. CLASSIFY: bug/feature/refactor/question
+3. TIER: Count files → 1 (do it) / 2-3 (orchestrate)
+4. CONTRACT: agentdb contract '{...}' for Tier 2+
+5. SPAWN: surgeon (Tier 2+), then adversary (Tier 3)
+6. READ: Agent checkpoints/verdicts from AgentDB
+7. WRITE: agentdb write-end with summary
 ```
 
 ---
@@ -95,11 +97,12 @@ agentdb contract '{"goal":"X","constraints":"Y","failure":"Z","tier":2}'
 
 | Command | Purpose |
 |---------|---------|
-| /build | Full pipeline: research → plan → implement → verify |
-| /validate | Pre-commit gate: types, lint, tests |
-| /ship | Commit, push, PR |
-| /contract | Create scoped work agreement |
-| /ingest | Universal entry point (classify → route) |
+| /kernel:ingest | Universal entry — classify, scope, contract, orchestrate |
+| /kernel:validate | Pre-commit gate: types, lint, tests |
+| /kernel:ship | Commit, push, PR |
+| /kernel:tearitapart | Critical review before implementing |
+| /kernel:branch | Create worktree for isolated work |
+| /kernel:handoff | Generate context brief for continuity |
 
 ---
 

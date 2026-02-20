@@ -2,7 +2,7 @@
 description: Critical review mode - world-class developer tears your plan apart before you write code
 ---
 
-# Tear It Apart Command
+# /kernel:tearitapart
 
 ## ●:ON_START
 
@@ -93,7 +93,7 @@ Write review to `_meta/reviews/{feature-name}-teardown.md`:
 ## Usage
 
 ```
-/tearitapart
+/kernel:tearitapart
 ```
 
 Run after planning, before implementing. If verdict is REVISE or RETHINK, update plan and run again.

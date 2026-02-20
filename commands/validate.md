@@ -2,7 +2,7 @@
 description: Quick pre-commit validation - types, lint, tests in parallel
 ---
 
-# Validate Command
+# /kernel:validate
 
 ## ●:ON_START
 
@@ -70,7 +70,7 @@ Pre-commit gate: run all checks before committing.
 ## Usage
 
 ```
-/validate
+/kernel:validate
 ```
 
 Run before every commit. Blocks if any check fails.

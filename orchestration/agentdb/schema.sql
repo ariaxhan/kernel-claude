@@ -1,6 +1,6 @@
 -- KERNEL AgentDB Schema
 -- Location: _meta/agentdb/agent.db (created per-project)
--- Philosophy: Read at start, write at end. 2 core tables.
+-- Philosophy: Read at start, write at end. 3 core tables: learnings, context, errors.
 
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;

@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "5.3.0",
-  "description": "AgentDB-first coding OS. 2 agents (surgeon, adversary), 8 commands, 4 skills. Read at start, write at end.",
+  "version": "5.5.0",
+  "description": "Self-improving multi-agent methodology. Persistent memory across sessions. Learns from failures, contracts before code, proves before ship.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"

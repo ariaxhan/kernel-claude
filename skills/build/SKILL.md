@@ -18,7 +18,7 @@ triggers:
 agentdb read-start
 ```
 
-Check past failures, patterns, active contract before building.
+Check past failures, patterns, and active contracts before building.
 
 ## Purpose
 

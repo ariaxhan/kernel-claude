@@ -3,7 +3,7 @@ description: Create worktree for isolated development work
 allowed-tools: Bash, AskUserQuestion
 ---
 
-# Branch Command (Worktree-Based)
+# /kernel:branch
 
 ## ●:ON_START
 
@@ -86,7 +86,7 @@ New Terminal window opened at the worktree location.
 You can now:
   1. Start Claude Code in the new terminal
   2. Work on your feature in isolation
-  3. When done, use /ship to push and create PR
+  3. When done, use /kernel:ship to push and create PR
 
 Cleanup (after merge):
   git worktree remove ../${PROJECT}-<type>-<description>
@@ -176,7 +176,7 @@ Cannot create worktrees outside of git repos.
 
 ## Related
 
-- `/ship` - Push branch and create PR from worktree
+- `/kernel:ship` - Push branch and create PR from worktree
 
 ## ●:ON_END
 

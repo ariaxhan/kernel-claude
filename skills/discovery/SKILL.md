@@ -132,7 +132,7 @@ which npm || which yarn || which pnpm || which pip || which poetry || which carg
 
 ## Output Format
 
-Update `_meta/context/active.md`:
+Update `_meta/context/active.md` with findings:
 
 ```markdown
 ## Repo Map
@@ -164,7 +164,7 @@ Update `_meta/context/active.md`:
 
 - Assuming conventions without verifying
 - Missing critical paths
-- Not updating state.md
+- Not updating active.md
 - Skipping tooling detection
 - Touching auth/migration without understanding
 
@@ -173,7 +173,7 @@ Update `_meta/context/active.md`:
 ## Success Metrics
 
 Discovery is working well when:
-- State.md reflects actual codebase
+- active.md reflects actual codebase
 - Tooling is identified and documented
 - Conventions are explicit, not assumed
 - Risk zones are marked and respected

@@ -1,6 +1,6 @@
 # KERNEL
 
-**AgentDB-first coding methodology for Claude Code** | v5.4.0
+**AgentDB-first coding methodology for Claude Code** | v5.5.0
 
 ---
 
@@ -41,14 +41,19 @@ DONE. The plugin includes:
 - CLAUDE.md copied to your project for persistent philosophy
 
 The agentdb CLI commands are:
-- agentdb read-start     → Context for starting work
-- agentdb write-end JSON → Checkpoint before stopping
-- agentdb learn TYPE "insight" "evidence" → Record a learning (failure/pattern/gotcha)
-- agentdb contract JSON  → Create a work contract
-- agentdb status         → Show DB health
-- agentdb recent         → Show last 5 checkpoints
+- agentdb init                          → Initialize DB in current project
+- agentdb read-start                    → Context for starting work (failures, patterns, checkpoint)
+- agentdb write-end <json> [agent]      → Checkpoint before stopping
+- agentdb learn <type> <insight> [evidence] [domain] → Record a learning (failure/pattern/gotcha/preference)
+- agentdb contract <json>               → Create a work contract
+- agentdb verdict <pass|fail> <evidence> [contract_id] → QA result
+- agentdb status                        → DB health, counts, last checkpoint time
+- agentdb recent [N]                    → Show last N checkpoints (default 5)
+- agentdb prune [N]                     → Delete old checkpoints, keep last N (default 10)
+- agentdb export                        → Dump learnings to markdown file
+- agentdb query <sql>                   → Raw SQL query
 
-The plugin commands are: /build, /ship, /validate, /contract, /ingest, /tearitapart, /branch, /handoff
+The plugin commands are: /kernel:ingest, /kernel:validate, /kernel:ship, /kernel:tearitapart, /kernel:branch, /kernel:handoff
 
 Show me `agentdb status` when done.
 ```
@@ -59,10 +64,11 @@ That's it. Claude handles everything.
 
 ## What It Does
 
-- **AgentDB**: SQLite database at `_meta/agentdb/agent.db` that persists context across sessions
-- **Learnings**: Failures and patterns you discover get saved, never repeated
+- **AgentDB**: SQLite database (3 tables: learnings, context, errors) that persists across sessions
+- **Orchestration**: For Tier 2+ work, you become the orchestrator — spawn agents, don't write code
 - **Contracts**: Scope work before coding (goal, constraints, failure conditions)
-- **Agents**: Spawn surgeon (implementation) and adversary (QA) for complex tasks
+- **Agent Communication**: Agents write to AgentDB (checkpoints, verdicts), you read from it
+- **Self-Improving**: Failures and patterns get saved, never repeated
 
 ---
 
@@ -82,7 +88,7 @@ agentdb learn failure "API returns 500 when token expired" "saw in logs"
 agentdb learn pattern "always validate token before API call" "fixed 3 bugs"
 ```
 
-The plugin commands (`/build`, `/ship`, `/validate`, etc.) do this automatically.
+The plugin commands (`/kernel:build`, `/kernel:ship`, etc.) do this automatically.
 
 ---
 
@@ -90,46 +96,60 @@ The plugin commands (`/build`, `/ship`, `/validate`, etc.) do this automatically
 
 | Command | Purpose |
 |---------|---------|
-| `/build` | Research → plan → implement → verify |
-| `/validate` | Pre-commit: types, lint, tests |
-| `/ship` | Commit, push, create PR |
-| `/contract` | Define scope before work |
-| `/ingest` | Classify and route any request |
-| `/tearitapart` | Critical review before implementing |
-| `/branch` | Create worktree for isolated work |
-| `/handoff` | Generate context brief for continuity |
+| `/kernel:ingest` | Universal entry — classify, scope, orchestrate |
+| `/kernel:validate` | Pre-commit: types, lint, tests |
+| `/kernel:ship` | Commit, push, create PR |
+| `/kernel:tearitapart` | Critical review before implementing |
+| `/kernel:branch` | Create worktree for isolated work |
+| `/kernel:handoff` | Generate context brief for continuity |
 
 ---
 
 ## Agents
 
-| Agent | When | Focus |
-|-------|------|-------|
-| surgeon | Tier 2+ (3-5 files) | Minimal diff, commit working state |
-| adversary | Before ship | Assume broken, find edge cases |
+| Agent | Role | Writes To |
+|-------|------|-----------|
+| surgeon | Minimal diff implementation | checkpoint → AgentDB |
+| adversary | QA — assume broken, prove | verdict → AgentDB |
+
+**You = orchestrator** for Tier 2+. Create contracts, spawn agents, read their AgentDB output.
 
 ---
 
-## Schema
+## Schema (3 tables)
 
 ```sql
+-- Cross-session memory (failures, patterns, gotchas)
 CREATE TABLE learnings (
   id TEXT PRIMARY KEY,
   ts TEXT DEFAULT CURRENT_TIMESTAMP,
   type TEXT CHECK(type IN ('failure','pattern','gotcha','preference')),
   insight TEXT NOT NULL,
-  evidence TEXT
+  evidence TEXT,
+  domain TEXT
 );
 
+-- Agent communication bus (contracts, checkpoints, verdicts)
 CREATE TABLE context (
   id TEXT PRIMARY KEY,
   ts TEXT DEFAULT CURRENT_TIMESTAMP,
   type TEXT CHECK(type IN ('contract','checkpoint','handoff','verdict')),
-  contract_id TEXT,
-  agent TEXT,
+  contract_id TEXT,    -- links entries to a contract
+  agent TEXT,          -- orchestrator, surgeon, adversary
   content TEXT NOT NULL
 );
+
+-- Auto-captured tool failures
+CREATE TABLE errors (
+  id INTEGER PRIMARY KEY,
+  ts TEXT DEFAULT CURRENT_TIMESTAMP,
+  tool TEXT NOT NULL,
+  error TEXT NOT NULL,
+  file TEXT
+);
 ```
+
+**That's it.** Three tables. Ultra-lightweight.
 
 ---
 
