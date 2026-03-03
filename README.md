@@ -1,6 +1,6 @@
 # KERNEL
 
-**AgentDB-first coding methodology for Claude Code** | v5.5.0
+**AgentDB-first coding methodology for Claude Code** | v5.6.0
 
 ---
 

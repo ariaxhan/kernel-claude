@@ -20,6 +20,15 @@ tokens: ~200 | type: log | append-only
 
 <!-- append new learnings here, newest at top -->
 
+## 2026-03-03 (v5.6.0)
+
+**Context:** Design skill creation
+**Type:** pattern
+**What:** Created `/design` skill with 4 aesthetic variants (abyss, spatial, verdant, substrate) to break distributional convergence in AI-generated interfaces.
+**Why:** Every AI-built interface looks the same — Inter font, rounded corners, blue accent. The design skill provides distinctive aesthetics that fight homogenization.
+
+---
+
 ## 2026-02-20 (v5.5.0)
 
 **Context:** Command consolidation

@@ -1,4 +1,4 @@
-# KERNEL v5.5.0
+# KERNEL v5.6.0
 
 AgentDB-first. Read at start. Write at end.
 
@@ -114,8 +114,20 @@ agentdb contract '{"goal":"X","constraints":"Y","failure":"Z","tier":2}'
 | research | investigate, find out, how does |
 | discovery | first time in codebase |
 | build | implement, add, create |
+| design | frontend, ui, css, styling, visual |
 
 Skills auto-trigger. Don't invoke manually unless needed.
+
+**Design skill**: Break distributional convergence, create distinctive interfaces.
+
+| Variant | Aesthetic | Use |
+|---------|-----------|-----|
+| abyss | Deep-sea bioluminescent | Data-dense dashboards |
+| spatial | 3D datascape | WebGL, immersive |
+| verdant | Growth/vegetation | Financial, health |
+| substrate | Cognitive glass | Portfolios, cerebral |
+
+Load: `/design` or `/design --variant=abyss`
 
 ---
 

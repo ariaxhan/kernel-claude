@@ -1,4 +1,4 @@
-# KERNEL v5.5.0
+# KERNEL v5.6.0
 
 status: complete | orchestrator-pattern | agentdb-bus
 
@@ -92,6 +92,13 @@ Tier 2+ (3+ files): Contract → Spawn agents → Read AgentDB
 | adversary | Verify | checkpoint | verdict |
 
 ---
+
+## Δ:v5.6.0
+
+- `/design` skill with 4 aesthetic variants (abyss, spatial, verdant, substrate)
+- Break distributional convergence — distinctive interfaces that fight AI homogenization
+- Each variant includes complete philosophy + implementation guidance
+- Design observations reference document for frontend conventions
 
 ## Δ:v5.5.0
 

@@ -1,3 +1,46 @@
+# v5.6.0 - Design Skill
+
+## What's New
+
+### `/design` skill with 4 aesthetic variants
+
+Break distributional convergence — every AI-generated interface looks the same (Inter font, rounded corners, blue accent). The design skill provides distinctive aesthetics:
+
+| Variant | Aesthetic | Use Case |
+|---------|-----------|----------|
+| `abyss` | Deep-sea bioluminescent | Data-dense dashboards |
+| `spatial` | 3D datascape | WebGL, immersive visualization |
+| `verdant` | Growth/vegetation metaphors | Financial, health data |
+| `substrate` | Cognitive glass, transparent systems | Portfolios, cerebral interfaces |
+
+### Usage
+
+```
+/design                    → Load core philosophy
+/design --variant=abyss    → Load specific variant
+```
+
+### Files Added
+
+- `skills/design/SKILL.md` — Core philosophy and routing
+- `skills/design/abyss.md` — Bioluminescent deep-sea aesthetic
+- `skills/design/spatial.md` — 3D datascape aesthetic
+- `skills/design/verdant.md` — Growth/vegetation aesthetic
+- `skills/design/substrate.md` — Cognitive glass aesthetic
+- `_meta/reference/design-observations.md` — Frontend conventions
+
+### Philosophy
+
+"Sophistication through restraint. No Inter, no emoji, no AI aesthetic."
+
+The goal: interfaces that are distinctively *yours*, not interchangeable with every other AI-built product.
+
+## Upgrade
+
+No breaking changes. New skill is additive.
+
+---
+
 # v5.5.0 - Unified Entry Point
 
 ## What's New
