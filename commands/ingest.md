@@ -131,7 +131,7 @@ agentdb write-end '{"agent":"surgeon","contract":"{contract_id}","did":"<what_yo
 If you learned something:
 agentdb learn <type> "<insight>" "<evidence>"
 
-READ AGENTDB FIRST. WRITE AGENTDB LAST. NO EXCEPTIONS.
+Read AgentDB first. Write AgentDB last.
 ```
 
 ---
@@ -173,7 +173,7 @@ ON COMPLETION:
 agentdb verdict <pass|fail> '{"tested":["X","Y"],"evidence":"<actual_output>","issues":["<if_any>"]}'
 agentdb write-end '{"agent":"adversary","contract":"{contract_id}","result":"pass|fail"}'
 
-READ AGENTDB FIRST. WRITE AGENTDB LAST. NO EXCEPTIONS.
+Read AgentDB first. Write AgentDB last.
 ```
 
 ---
@@ -283,7 +283,20 @@ skip_contract              → always scope Tier 2+
 report_verbally            → agents write to DB
 guess_tier                 → count files explicitly
 serial_when_parallel       → spawn concurrent agents
+overengineer               → only requested changes
 ```
+
+---
+
+## ●:ANTI-OVERENGINEERING
+
+When implementing, follow these constraints:
+- Only make changes directly requested or clearly necessary
+- No features beyond scope
+- No docstrings/comments on unchanged code
+- No refactoring "while you're there"
+- Three similar lines is better than a premature abstraction
+- No error handling for scenarios that cannot happen
 
 ---
 

@@ -4,9 +4,9 @@ AgentDB-first. Read at start. Write at end.
 
 ---
 
-## ●:AGENTDB (NON-NEGOTIABLE)
+## ●:AGENTDB
 
-**Every artifact reads on start, writes on end. No exceptions.**
+Every artifact reads on start, writes on end.
 
 Commands, skills, agents — all have ON_START and ON_END hooks.
 Skip the read → repeat past failures.
@@ -131,6 +131,17 @@ Load: `/design` or `/design --variant=abyss`
 
 ---
 
+## ●:CONTRACT_CLOSING
+
+Contracts close when user confirms: done, confirmed, looks good, approved, ship it.
+
+On close:
+```bash
+agentdb query "UPDATE context SET content = replace(content, 'active', 'closed') WHERE contract_id = 'X'"
+```
+
+---
+
 ## ≠:ANTI
 
 ```
@@ -139,6 +150,7 @@ skip_agentdb_write → context lost on resume
 prompt_hooks → token waste, use command hooks
 multi_tab_architecture → one session spawns agents
 write_only_logs → if never read, delete it
+overengineer → only make changes directly requested
 ```
 
 ---

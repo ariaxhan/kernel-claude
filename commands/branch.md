@@ -15,12 +15,7 @@ Create an isolated worktree before starting work. Never work directly on main.
 
 ## Philosophy
 
-```
-NEVER WORK ON MAIN
-All work happens on isolated worktrees.
-Create worktree first, then code.
-Each worktree = isolated context = own Claude session.
-```
+All work happens on isolated worktrees, not main. Create worktree first, then code. Each worktree has its own isolated context.
 
 ## Steps
 
