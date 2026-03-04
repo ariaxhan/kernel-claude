@@ -1,267 +1,176 @@
-# KERNEL Quickstart for Founders
+# KERNEL Setup Guide
 
-You don't need to be an engineer. You need to know how to talk to one.
-Claude Code is your engineer. KERNEL teaches it how to remember, scope, and ship.
-
----
-
-## What You Just Installed
-
-**Claude Code** runs in your terminal. It reads your entire project, writes code, runs commands, and takes real actions. It's not a chatbot; it's a developer on your team.
-
-**Cursor** is your code editor. Use it to see files, make quick edits, and navigate your project visually. Think of Cursor as the whiteboard, Claude Code as the builder.
-
-**KERNEL** is the methodology layer. It gives Claude Code persistent memory (AgentDB), scope control (contracts), and quality gates (adversary review). Without it, Claude Code forgets everything between sessions and has no discipline.
+You don't need technical knowledge. Just follow these steps and KERNEL will handle everything.
 
 ---
 
-## The Two-Tool Workflow
+## What You're Setting Up
 
-| Tool | When to Use | Examples |
-|------|-------------|---------|
-| Claude Code (terminal) | Heavy lifting, multi-file changes, research, debugging, shipping | "Build me an API endpoint," "Fix the auth bug," "Research payment integrations" |
-| Cursor (editor) | Quick edits, reading code, visual navigation, small tweaks | Change a color, fix a typo, read through a file, understand structure |
+**Claude Code** is like having a developer who can read your entire project, write working features, and take real action. But it forgets everything when you close it.
 
-**Rule of thumb:** If the task touches 3+ files or requires thinking, use Claude Code. If you can point at exactly what to change, use Cursor.
+**KERNEL** gives Claude Code permanent memory. It remembers what worked, what broke, and where you left off. Every conversation makes it smarter about YOUR project.
+
+Think of it like this: Claude Code is the worker. KERNEL is the training program that makes the worker better every day.
 
 ---
 
-## Daily Workflow
+## Installation
+
+Copy this entire block into Claude Code and press Enter. Claude Code will do everything automatically:
+
+```
+I want to install the KERNEL plugin and set up memory for this project.
+
+STEP 1: Install the plugin
+/install-plugin https://github.com/ariaxhan/kernel-claude
+
+STEP 2: Find the installed plugin location and set KERNEL_PATH
+KERNEL_PATH=$(find ~/.claude/plugins/cache -name "kernel-claude" -o -name "kernel" 2>/dev/null | head -1)
+echo "Found: $KERNEL_PATH"
+
+STEP 3: Create symlink for the agentdb CLI
+sudo ln -sf "$KERNEL_PATH/orchestration/agentdb/agentdb" /usr/local/bin/agentdb
+
+STEP 4: Copy CLAUDE.md to this project
+mkdir -p .claude
+cp "$KERNEL_PATH/CLAUDE.md" .claude/CLAUDE.md
+
+STEP 5: Initialize memory for this project
+Run: agentdb init
+
+STEP 6: Verify it works
+Run: agentdb status
+
+DONE. Show me the status when complete.
+```
+
+That's it. Claude Code handles all the technical work.
+
+---
+
+## What Just Happened
+
+KERNEL created a small workspace in your project where Claude Code saves:
+- Mistakes it should never repeat
+- Solutions that work well
+- Where you left off last time
+- What you're working on now
+
+This workspace stays with your project forever. Close Claude Code, come back tomorrow, and it remembers everything.
+
+---
+
+## Your Daily Workflow
 
 ### Starting Work
 
-Open your terminal in your project folder:
-```
-claude
-```
-Claude Code starts. KERNEL's session hook automatically loads your context (last checkpoint, past failures, active contracts).
+Open Claude Code in your project. Just describe what you want in plain English:
+
+- "Add a contact form to the homepage"
+- "Fix the bug where users can't log in"
+- "Make the buttons bigger"
+
+KERNEL reads what's been tried before, checks what broke last time, and picks up where you left off.
 
 ### Doing Work
 
-Just describe what you want in plain English:
-```
-"Add a contact form to the landing page that sends emails via Resend"
-```
+Claude Code builds what you asked for. For small changes, it just does it. For bigger projects, it breaks the work into focused pieces and checks everything works.
 
-KERNEL classifies this, counts affected files, and either executes directly (small task) or creates a contract and spawns agents (bigger task).
+You don't need to manage this. Just describe what you want. KERNEL handles the complexity.
 
-### Ending Work
+### Checking Work
 
-Before closing your terminal:
-```
-agentdb write-end '{"did":"added contact form","next":"style the form","blocked":""}'
-```
-This saves your progress. Tomorrow's session picks up exactly where you left off.
+Before sharing your changes, tell Claude Code: "validate my work"
 
----
+It automatically checks everything is correct and working.
 
-## Commands You'll Actually Use
+### Saving Progress
 
-| Command | What It Does |
-|---------|-------------|
-| `agentdb read-start` | See where you left off, past mistakes to avoid |
-| `agentdb write-end '{"did":"X","next":"Y"}'` | Save your progress before stopping |
-| `/kernel:ingest` | Universal entry: describe any task, KERNEL routes it |
-| `/kernel:validate` | Check everything before committing (types, lint, tests) |
-| `/kernel:ship` | Commit, push, create PR |
-| `/compact` | When conversation gets long, compress context |
+Before closing Claude Code, say: "Remember that I finished the contact form and need to style it next"
+
+Claude Code saves this. Tomorrow starts exactly there.
 
 ---
 
-## How KERNEL Thinks
+## Common Situations
 
-KERNEL uses a tier system based on how many files a task touches:
+### "Claude Code is doing too much"
 
-| Files | Tier | What Happens |
-|-------|------|-------------|
-| 1-2 | Tier 1 | Claude Code does it directly |
-| 3-5 | Tier 2 | Creates a contract, spawns a "surgeon" agent |
-| 6+ | Tier 3 | Contract, surgeon, then "adversary" agent to verify |
+Say "stop" and be more specific. Instead of "improve the website," try "make the homepage header bigger."
 
-You don't need to think about tiers. Just describe what you want. KERNEL figures out the complexity.
+### "Something broke"
 
----
+Your work is saved automatically. You can undo recent changes or go back to any earlier version. Just ask Claude Code: "undo my recent changes."
 
-## The Memory System (AgentDB)
+### "Claude Code is confused"
 
-AgentDB is a tiny database that lives in your project (`_meta/agentdb/agent.db`). It stores:
+Restate what you want more clearly. Focus on one thing at a time. "Fix the login" is clearer than "improve user experience."
 
-- **Failures:** Mistakes Claude made so it never repeats them
-- **Patterns:** Things that work well so it keeps doing them
-- **Checkpoints:** Where you left off so tomorrow starts clean
-- **Contracts:** Scope agreements so Claude doesn't go rogue
+### "Same mistake keeps happening"
 
-This is the superpower. Without it, every session starts from zero. With it, Claude Code gets smarter about YOUR project over time.
+Tell Claude Code: "Remember this keeps breaking and why."
 
----
-
-## When Things Go Wrong
-
-**Claude Code is doing too much:** Say "stop" or press Ctrl+C. Then be more specific about what you want.
-
-**It broke something:** Run `git stash` to save changes, `git stash pop` to bring them back after fixing. Or just `git checkout .` to undo everything since last commit.
-
-**It's confused:** Run `/compact` to compress the conversation, then restate what you need.
-
-**It keeps making the same mistake:** Run `agentdb learn failure "description of what keeps breaking" "evidence"` to permanently record the issue.
-
----
-
-## Your CLAUDE.md
-
-Your project has a CLAUDE.md file that tells Claude Code about your specific project. Edit it in Cursor to add:
-
-- Your tech stack
-- Your conventions
-- Things Claude should never do
-- Things Claude should always do
-
-This file is read at the start of every session. It's your standing instructions.
+It saves this permanently so the mistake never happens again.
 
 ---
 
 ## Understanding the Tools
 
-### Claude Code vs Cursor
+If you're using both Claude Code and Cursor:
 
-Claude Code and Cursor serve different purposes:
+**Claude Code (the builder):**
+- Handles big projects
+- Remembers context across days
+- Can think through problems
+- Takes real action
 
-| Aspect | Claude Code | Cursor |
-|--------|-------------|--------|
-| Interface | Terminal | Visual editor |
-| Strength | Multi-file changes, complex reasoning | Quick edits, navigation |
-| Memory | AgentDB persists across sessions | None |
-| Scope | Entire project | Single file at a time |
-
-### When to Use Which
-
-**Use Claude Code when:**
-- Building new features
-- Debugging complex issues
-- Refactoring across files
-- Research and decision-making
-- Anything requiring context
-
-**Use Cursor when:**
-- Reading through code
-- Small single-file edits
+**Cursor (the editor):**
+- Quick small edits
+- Reading through files
+- Visual navigation
 - Copy-pasting snippets
-- Visual diff review
+
+Use Claude Code for building. Use Cursor for browsing and tiny tweaks.
 
 ---
 
-## The AgentDB Schema
+## Your Project Instructions
 
-Three tables. Ultra-lightweight:
+Your project has a special file that tells Claude Code about your specific project. You can edit this file to add:
 
-```sql
--- Cross-session memory (failures, patterns, gotchas)
-learnings: id, ts, type, insight, evidence, domain
+- What technologies you're using
+- Your preferences
+- Things Claude Code should never do
+- Things Claude Code should always do
 
--- Agent communication bus (contracts, checkpoints, verdicts)
-context: id, ts, type, contract_id, agent, content
-
--- Auto-captured tool failures
-errors: id, ts, tool, error, file
-```
-
-You don't need to understand SQL. The `agentdb` CLI handles everything.
+Claude Code reads this file at the start of every conversation. Think of it as standing instructions that persist forever.
 
 ---
 
-## CLI Commands Reference
+## If Something Goes Wrong
 
-```bash
-# Session management
-agentdb read-start                    # Load context at session start
-agentdb write-end '{"did":"X"}'       # Save checkpoint before stopping
+### "Claude Code says it can't find something"
 
-# Learning capture
-agentdb learn failure "insight" "evidence"   # Record a mistake
-agentdb learn pattern "insight" "evidence"   # Record what works
+Claude Code needs the memory system initialized. Say: "Initialize the memory system for this project."
 
-# Contract management (advanced)
-agentdb contract '{"goal":"X",...}'   # Create work contract
-agentdb verdict pass|fail '{"..."}'   # QA result
+### "Claude Code forgot everything"
 
-# Maintenance
-agentdb status                        # DB health check
-agentdb recent 5                      # Last 5 checkpoints
-agentdb prune 10                      # Keep only last 10 checkpoints
-agentdb export                        # Dump learnings to markdown
-```
+You didn't save your progress last time. Always end by saying: "Remember where I stopped and what I was doing."
+
+### "Claude Code keeps making the same mistake"
+
+Say: "Remember this mistake permanently so you never repeat it." Be specific about what went wrong and what you observed.
 
 ---
 
-## Plugin Commands Reference
+## Next Steps
 
-| Command | Purpose |
-|---------|---------|
-| `/kernel:ingest` | Universal entry — classify, scope, orchestrate |
-| `/kernel:validate` | Pre-commit: types, lint, tests |
-| `/kernel:ship` | Commit, push, create PR |
-| `/kernel:tearitapart` | Critical review before implementing |
-| `/kernel:branch` | Create worktree for isolated work |
-| `/kernel:handoff` | Generate context brief for continuity |
+That's it. You're ready to work.
+
+Just open Claude Code in your project and describe what you want. KERNEL handles everything else.
+
+The more you use it, the smarter Claude Code gets about YOUR project specifically.
 
 ---
 
-## Quick Reference Card
-
-```
-# Start your day
-claude                              # Opens Claude Code
-                                    # KERNEL auto-loads your context
-
-# Work
-"Build X"                           # Describe what you want
-/kernel:validate                    # Before committing
-
-# Ship
-/kernel:ship                        # Commit + push + PR
-
-# End your day
-agentdb write-end '{"did":"X"}'     # Save progress
-
-# If stuck
-/compact                            # Compress context
-agentdb learn failure "X" "Y"       # Record a mistake
-git stash                           # Undo recent changes safely
-```
-
----
-
-## Troubleshooting
-
-### "Command not found: agentdb"
-
-The symlink wasn't created during install. Run:
-```bash
-KERNEL_PATH=$(find ~/.claude/plugins/cache -name "kernel-claude" -o -name "kernel" 2>/dev/null | head -1)
-sudo ln -sf "$KERNEL_PATH/orchestration/agentdb/agentdb" /usr/local/bin/agentdb
-```
-
-### "No such table: learnings"
-
-AgentDB wasn't initialized. Run:
-```bash
-agentdb init
-```
-
-### Claude forgot my context
-
-You didn't checkpoint before stopping. Always run:
-```bash
-agentdb write-end '{"did":"what you did","next":"what's next"}'
-```
-
-### Claude keeps repeating the same mistake
-
-Record it as a failure so it never happens again:
-```bash
-agentdb learn failure "description of the mistake" "what you observed"
-```
-
----
-
-*Built with KERNEL v5.6.0 | [GitHub](https://github.com/ariaxhan/kernel-claude)*
+*Built with KERNEL v6.0.0 | [GitHub](https://github.com/ariaxhan/kernel-claude)*
