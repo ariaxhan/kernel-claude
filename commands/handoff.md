@@ -1,129 +1,233 @@
----
-description: Generate a structured context handoff brief for seamless conversation continuation across sessions or AI systems
-allowed-tools: Read, Glob, Bash
----
+<command id="kernel:handoff">
+<description>Generate token-optimized context handoff brief for session/system continuation.</description>
+<allowed_tools>Read, Glob, Bash</allowed_tools>
 
-# /kernel:handoff
-
-## ●:ON_START
-
-```bash
+<on_start>
 agentdb read-start
-```
+</on_start>
 
-Generate a token-optimized brief that enables seamless conversation continuation.
+<trigger terms="create a handoff,context handoff,prepare handoff,pause and resume,session summary,continue later"/>
 
-## When to Use
+<!-- ============================================ -->
+<!-- PHASE 1: EXTRACT STATE                       -->
+<!-- ============================================ -->
 
-- User says "create a handoff", "context handoff", "prepare handoff"
-- User needs to transfer conversation to Claude on web or future session
-- User needs to pause work and resume later
+<extract>
+  <field id="goal">What is the user trying to achieve? Include success criteria if defined.</field>
+  <field id="position">Where are we in the workflow? What phase/step/milestone?</field>
+  <field id="decisions">Choices made and why. Include rejected alternatives with rejection reason.</field>
+  <field id="open_threads">Unfinished or unresolved items. Flag blockers vs. nice-to-haves.</field>
+  <field id="artifacts">Files, code, frameworks created (with full paths and brief purpose).</field>
+  <field id="context">Critical background needed to continue. Domain knowledge, constraints, user preferences.</field>
+  <field id="warnings">Failed approaches, pitfalls to avoid, dead ends explored.</field>
+  <field id="dependencies">External services, APIs, libraries, credentials, environment requirements.</field>
+  <field id="mental_model">Key abstractions, naming conventions, or architectural patterns established this session.</field>
+</extract>
 
-## Step 1: Extract Current State
+<!-- ============================================ -->
+<!-- PHASE 2: GATHER EVIDENCE                     -->
+<!-- ============================================ -->
 
-Gather:
-- **Goal**: What is the user trying to achieve?
-- **Position**: Where are we in the workflow?
-- **Decisions**: What choices were made and why?
-- **Open Threads**: What's unfinished or unresolved?
-- **Artifacts**: What was created (files, code, frameworks)?
-- **Context**: Critical background needed to continue
-- **Warnings**: Failed approaches, pitfalls to avoid
-
-## Step 2: Check Recent Work
-
-```bash
-# Recent file changes
+<recon>
+<!-- Git state -->
 git status --short
 git diff --stat
+git log --oneline -10
+git branch --list
+git stash list
 
-# Recent commits
-git log --oneline -5
+<!-- Recent file activity -->
+find . -type f -mmin -120 | grep -v node_modules | grep -v .git | grep -v __pycache__
 
-# Files created this session (if tracked)
-find . -type f -mmin -60 | grep -v node_modules | grep -v .git
-```
+<!-- Check for uncommitted work -->
+git diff --name-only
+git diff --cached --name-only
 
-## Step 3: Generate Handoff
+<!-- Check AgentDB for active contracts -->
+agentdb query "SELECT contract_id, type, content FROM context WHERE type IN ('contract','checkpoint','verdict') ORDER BY ts DESC LIMIT 5"
+</recon>
 
-Use this format:
+<!-- ============================================ -->
+<!-- PHASE 3: GIT HYGIENE                         -->
+<!-- ============================================ -->
 
-```
+<git_protocol>
+  <rule>Before generating handoff: check for uncommitted changes.</rule>
+  <rule>If uncommitted changes exist: commit with message "wip: checkpoint before handoff" or stage and stash.</rule>
+  <rule>If on a feature branch: note branch name, base branch, and merge status in handoff.</rule>
+  <rule>If there are stashed changes: document stash contents in handoff.</rule>
+  <rule>Push current branch to remote so receiving session can access it.</rule>
+  <rule>Never leave dirty working tree undocumented in handoff.</rule>
+</git_protocol>
+
+<!-- ============================================ -->
+<!-- PHASE 4: GENERATE HANDOFF                    -->
+<!-- ============================================ -->
+
+<output_format>
 ## CONTEXT HANDOFF
+Generated: {timestamp}
+Session duration: {approximate}
 
-**Summary**: [One sentence capturing entire situation]
+**Summary**: [One sentence capturing the entire situation, outcome, and state]
 
-**Goal**: [What user is trying to achieve]
+**Goal**: [What user is trying to achieve, including success criteria]
 
-**Current state**: [Where things stand now - concrete, specific]
+**Current state**: [Where things stand now; concrete, specific, verifiable]
+
+**Branch**: [Current git branch, base branch, clean/dirty status]
 
 **Decisions made**:
-- [Decision 1: choice + rationale if non-obvious]
-- [Decision 2]
+- [Decision: choice + rationale + what was rejected and why]
 
 **Artifacts created**:
-- [File/framework 1 with path]
-- [File/framework 2 with path]
+- [path/to/file: brief purpose, current state (complete/partial/stub)]
+
+**Architecture / mental model**:
+- [Key abstractions, patterns, naming conventions to preserve]
+
+**Dependencies**:
+- [External service/lib/tool: version, purpose, any gotchas]
 
 **Open threads**:
-- [Unfinished item 1]
-- [Question needing resolution]
+- [BLOCKER: item that must resolve before continuing]
+- [TODO: item that should happen next]
+- [QUESTION: unresolved question needing user input]
 
-**Next steps**:
-1. [Recommended action 1 - specific, actionable]
-2. [Recommended action 2]
+**Next steps** (ordered by priority):
+1. [Specific, actionable, includes which files to touch]
+2. [Second priority action]
+3. [Third priority action]
 
 **Context essentials**:
-- [Critical background 1 - only what's needed to act]
-- [Critical background 2]
+- [Only what's needed to act; no redundancy with above sections]
 
 **Warnings**:
-- [Pitfall/failed approach to avoid]
+- [Failed approach: what was tried, why it failed, what to do instead]
 
-**File paths to read**:
-- [Key file 1]
-- [Key file 2]
+**Active AgentDB contracts**:
+- [Contract ID: status, last checkpoint summary]
 
-**Continuation prompt for new session**:
-> [Exact text to paste - 2-3 sentences max]
-> [Include: goal, current position, immediate next action]
-```
+**File paths to read first**:
+- [Key file 1: why it matters]
+- [Key file 2: why it matters]
 
-## Compression Rules
+**Uncommitted / stashed work**:
+- [Description of any WIP not yet committed]
 
-- **One sentence max per bullet**
-- **No redundancy** between sections
-- **Omit empty sections**
-- **Actionable over descriptive** (focus on what to DO)
-- **Concrete over vague** ("Created 6 banks in kernel/banks/" not "Made progress on banks")
+**Handoff saved to**: _meta/handoffs/{feature}-{date}.md
 
-## Continuation Prompt Guidelines
+**Continuation prompt**:
+> /kernel:ingest [goal statement]. [Current position]. [Immediate next action]. Read _meta/handoffs/{filename} for full context.
+</output_format>
 
-The continuation prompt should be 2-3 sentences that:
-1. State the goal
-2. State current position
-3. State immediate next action
+<!-- ============================================ -->
+<!-- CONSTRAINTS                                  -->
+<!-- ============================================ -->
 
-Example:
-> We're building a knowledge bank architecture for KERNEL to provide baseline coding practices without token bloat. We've created 6 banks + 7 skills + 4 commands with ~560 token cost (vs 6000+ old way). Next: Review and improve baseline artifact design for better universal applicability.
+<constraints>
+  <rule>One sentence max per bullet.</rule>
+  <rule>No redundancy between sections.</rule>
+  <rule>Omit empty sections entirely.</rule>
+  <rule>Actionable over descriptive: "Created 6 banks in kernel/banks/" not "Made progress on banks".</rule>
+  <rule>Concrete over vague: include paths, counts, specific names.</rule>
+  <rule>All output clear to non-technical readers. Zero code knowledge required.</rule>
+  <rule>Decisions section must include rejected alternatives (prevents re-exploring dead ends).</rule>
+  <rule>Warnings section must include what was tried, not just what to avoid.</rule>
+  <rule>Next steps must reference specific files or commands, not abstract goals.</rule>
+  <rule>If session touched more than 5 files, include a file manifest with status (new/modified/deleted).</rule>
+</constraints>
 
-## Validation Check
+<!-- ============================================ -->
+<!-- CONTINUATION PROMPT SPEC                     -->
+<!-- ============================================ -->
 
-Before outputting, ask:
-- Could a new AI instance continue productively with ONLY this brief?
-- Are there gaps that would cause confusion?
-- Is the continuation prompt self-contained?
+<continuation_prompt_spec>
+  <rule>2-3 sentences max.</rule>
+  <rule>Must contain: goal, current position, immediate next action.</rule>
+  <rule>Must be prefaced with /kernel:ingest.</rule>
+  <rule>Must reference the handoff file path for full context.</rule>
+  <rule>Self-contained: new instance can act on it with zero prior context.</rule>
+  <rule>Never assume the receiving agent has any memory of this session.</rule>
+  <rule>Include branch name if work is on a non-main branch.</rule>
+</continuation_prompt_spec>
 
-If gaps exist, add missing context or flag as `[NEEDS CLARIFICATION: ...]`
+<!-- ============================================ -->
+<!-- VALIDATION                                   -->
+<!-- ============================================ -->
 
-## Output
+<validation>
+  <check>Could a new AI instance continue productively with ONLY this brief?</check>
+  <check>Are there gaps that would cause confusion or re-exploration of dead ends?</check>
+  <check>Is the continuation prompt self-contained?</check>
+  <check>Does the git state section accurately reflect current repo state?</check>
+  <check>Are all uncommitted changes documented or committed?</check>
+  <check>Does decisions section include rejected alternatives?</check>
+  <check>Does warnings section explain WHY approaches failed, not just WHAT failed?</check>
+  <check>Are file paths absolute or relative-to-root (not ambiguous)?</check>
+  <check>If AgentDB has active contracts, are they referenced?</check>
+  <on_gap>Add missing context or flag as [NEEDS CLARIFICATION: ...]</on_gap>
+</validation>
 
-Present the handoff in a code block for easy copy-paste, then ask:
-- "Should I save this handoff to a file?"
-- "Ready to continue on Claude web, or need adjustments?"
+<!-- ============================================ -->
+<!-- ANTI-PATTERNS                                -->
+<!-- ============================================ -->
 
-## ●:ON_END
+<anti_patterns priority="critical">
+  <block action="vague_state_description">
+    Bad: "Made progress on the feature." 
+    Good: "Implemented auth middleware in src/middleware/auth.ts; token validation works, role-based access not started."
+  </block>
+  <block action="missing_rejection_rationale">
+    Bad: "Decided to use PostgreSQL." 
+    Good: "Decided PostgreSQL over SQLite (need concurrent writes) and MongoDB (relational schema fits better)."
+  </block>
+  <block action="orphaned_wip">
+    Never leave uncommitted work undocumented. Commit, stash, or describe explicitly.
+  </block>
+  <block action="abstract_next_steps">
+    Bad: "Continue working on the API." 
+    Good: "Add rate limiting to src/routes/api.ts; use express-rate-limit; test with curl."
+  </block>
+  <block action="redundant_sections">
+    If info appears in Decisions, don't repeat in Context Essentials.
+  </block>
+  <block action="assuming_shared_memory">
+    The receiving agent knows NOTHING. Every critical fact must be in the handoff.
+  </block>
+  <block action="skipping_git_state">
+    Always document branch, uncommitted changes, stashes, remote sync status.
+  </block>
+  <block action="no_failure_context">
+    Dead ends without explanation guarantee re-exploration. Always say WHY it failed.
+  </block>
+  <block action="handoff_without_file">
+    Always save to _meta/handoffs/. Never deliver handoff only in conversation.
+  </block>
+  <block action="oversized_handoff">
+    If handoff exceeds 500 words, compress. The receiving agent has limited context too.
+  </block>
+  <block action="missing_dependency_versions">
+    "Uses Redis" is insufficient. "Uses Redis 7.2, connection string in .env, required for session store" is correct.
+  </block>
+  <block action="no_mental_model_transfer">
+    If session established naming conventions, architectural patterns, or key abstractions, these must transfer.
+  </block>
+</anti_patterns>
 
-```bash
-agentdb write-end '{"command":"handoff","did":"generated context handoff brief","saved_to":"<path-or-none>"}'
-```
+<!-- ============================================ -->
+<!-- DELIVERY                                     -->
+<!-- ============================================ -->
+
+<delivery>
+  <rule>Present in code block for copy-paste.</rule>
+  <rule>Save to _meta/handoffs/{feature}-{YYYY-MM-DD}.md as file.</rule>
+  <rule>Provide user the file path.</rule>
+  <rule>If git is available, commit the handoff file: "docs: context handoff for {feature}".</rule>
+  <rule>Push to remote if possible.</rule>
+</delivery>
+
+<on_end>
+agentdb write-end '{"command":"handoff","did":"generated context handoff brief","saved_to":"<path>","git_state":"clean|dirty|committed","branch":"<branch>"}'
+</on_end>
+</command>

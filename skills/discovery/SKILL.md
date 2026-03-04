@@ -1,189 +1,66 @@
 ---
 name: discovery
-description: Codebase reconnaissance - map terrain before action
-triggers:
-  - discover
-  - explore codebase
-  - new codebase
-  - what's in this repo
-  - map the code
-  - understand project
+description: >
+  Codebase reconnaissance. Map structure, detect tooling, extract conventions,
+  identify risks. Use on first interaction with unfamiliar repo or when
+  onboarding to a new project.
+  Triggers: discover, explore codebase, new codebase, map the code, understand project, what's in this repo.
+allowed-tools: Read, Bash, Grep, Glob
 ---
 
-# Discovery Skill
+<skill id="discovery">
 
-## ●:ON_START (REQUIRED)
+<purpose>
+Reconnaissance before action. Map terrain. Extract conventions. Spot risks.
+Populate state with discovered reality, not assumptions.
+</purpose>
 
-```bash
-agentdb read-start
-```
+<prerequisite>
+  KERNEL active. Check AgentDB for prior discovery results before re-exploring.
+</prerequisite>
 
-Check existing patterns and learnings before exploring.
+<!-- PROCESS -->
 
-## Purpose
+<phase id="inventory" label="What exists?">
+  Entry points: main.py, index.js, main.go, lib.rs, etc.
+  Directories: src/, lib/, pkg/, tests/, config/.
+  Config: package.json, pyproject.toml, Cargo.toml, go.mod, docker-compose.yml.
+</phase>
 
-Reconnaissance before action. Map the terrain. Identify tooling. Extract conventions. Spot risks. Populate state with discovered reality, not assumptions.
+<phase id="tooling" label="What tools are available?">
+  Detect: formatter, linter, typechecker, test runner, package manager.
+  Run --version or --help to confirm availability.
+  Check config files for tool settings (.eslintrc, pyproject.toml, tsconfig.json).
+</phase>
 
-**Key Concept**: Never assume - always investigate.
+<phase id="conventions" label="What patterns are used?">
+  Naming: grep function/class definitions, identify casing patterns.
+  Error handling: search for try/catch, Result, if err != nil.
+  Logging: find logger imports and usage patterns.
+  Config: check .env, config/, environment variable patterns.
+  Tests: find test files, identify framework and naming conventions.
+</phase>
 
----
+<phase id="risks" label="What's dangerous?">
+  Flag: migration files, auth modules, database schemas, external API calls.
+  Flag: files marked TODO, deprecated, legacy, hack, workaround.
+  Flag: files with high churn (git log --format='%H' -- {file} | wc -l).
+</phase>
 
-## Auto-Trigger Signals
+<!-- OUTPUT -->
 
-This skill activates when detecting:
-- "new codebase", "explore", "discover"
-- "what's in this", "understand this"
-- "map the code", "learn the codebase"
-- First interaction with unfamiliar repo
+<output>
+  Update _meta/context/active.md with:
+  - Repo map (entry, core, tests, config).
+  - Tooling inventory (tool, command, status).
+  - Conventions (naming, errors, config, tests).
+  - Risk zones (do not touch without understanding).
 
----
+  <rule>Never assume conventions without verifying against actual code.</rule>
+</output>
 
-## Process
-
-```
-1. INVENTORY → Find what exists (files, tools, config)
-2. MAP → Identify structure (entrypoints, modules, boundaries)
-3. EXTRACT → Discover conventions (naming, errors, logging)
-4. IDENTIFY RISKS → Flag critical paths and danger zones
-5. UPDATE STATE → Populate state.md with findings
-```
-
----
-
-## Repo Map Patterns
-
-```
-Entry Points:
-- main.py, index.js, main.go, lib.rs
-
-Code Directories:
-- src/, lib/, pkg/
-
-Test Directories:
-- tests/, test/, __tests__/
-
-Config Files:
-- package.json, pyproject.toml, Cargo.toml, go.mod
-```
-
----
-
-## Tooling Detection
-
-```bash
-# Formatter
-which prettier || which black || which gofmt || which rustfmt
-
-# Linter
-which eslint || which pylint || which flake8 || which golangci-lint
-
-# Typecheck
-which tsc || which mypy || which pyright
-
-# Tests
-npm test --help || pytest --version || go test --help || cargo test --help
-
-# Package manager
-which npm || which yarn || which pnpm || which pip || which poetry || which cargo
-```
-
----
-
-## Convention Extraction
-
-| Convention | How to Find |
-|------------|-------------|
-| Naming | Grep function/class definitions, look for patterns |
-| Error handling | Search for try/catch, Result<T>, if err != nil |
-| Logging | Find logger imports and usage |
-| Config | Check .env, config/, settings.py |
-
----
-
-## Risk Identification
-
-**Critical - Do Not Touch Without Backup:**
-- Files named migration, schema, auth
-- Database connection strings
-- External API calls
-- Files with TODO: remove, deprecated, legacy
-
----
-
-## Stack-Specific Discovery
-
-**JavaScript/TypeScript:**
-- Check package.json scripts
-- Look for tsconfig.json
-
-**Python:**
-- Check pyproject.toml, setup.py, requirements.txt
-- Look for pytest.ini, tox.ini
-
-**Go:**
-- Check go.mod for module structure
-- Look for Makefile
-
-**Rust:**
-- Check Cargo.toml for workspace structure
-- Look for build.rs
-
----
-
-## Output Format
-
-Update `_meta/context/active.md` with findings:
-
-```markdown
-## Repo Map
-- Entry: src/main.py
-- Core: src/core/, src/services/
-- Tests: tests/
-- Config: config/settings.py
-
-## Tooling Inventory
-| Tool | Command | Status |
-|------|---------|--------|
-| Formatter | black | available |
-| Linter | flake8 | available |
-| Tests | pytest | available |
-
-## Conventions
-- Naming: snake_case for functions/variables
-- Errors: raise custom exceptions, log with logger.error()
-- Config: environment variables via python-dotenv
-
-## Do Not Touch
-- migrations/ directory
-- src/auth/ - security-critical
-```
-
----
-
-## Anti-Patterns
-
-- Assuming conventions without verifying
-- Missing critical paths
-- Not updating active.md
-- Skipping tooling detection
-- Touching auth/migration without understanding
-
----
-
-## Success Metrics
-
-Discovery is working well when:
-- active.md reflects actual codebase
-- Tooling is identified and documented
-- Conventions are explicit, not assumed
-- Risk zones are marked and respected
-
----
-
-## ●:ON_END (REQUIRED)
-
-```bash
-agentdb write-end '{"skill":"discovery","codebase":"X","patterns":["A","B"],"gotchas":["C"]}'
-```
-
-Always record what you found so future sessions don't re-explore from scratch.
+<on_complete>
+  agentdb write-end with skill="discovery", codebase, patterns found, gotchas.
+  <rule>Record findings so future sessions don't re-explore from scratch.</rule>
+</on_complete>
+</skill>
