@@ -53,6 +53,18 @@ Location: _meta/agentdb/agent.db
     <rule>Test: happy path, edge cases, regression, error paths, security.</rule>
     <rule>Evidence required: actual output, not claims.</rule>
   </agent>
+  <agent id="researcher" role="Find solutions before coding" output="research doc → _meta/research/">
+    <trigger>Unfamiliar tech, package selection, new integration.</trigger>
+    <rule>Search problems before solutions. Pitfalls are the point.</rule>
+  </agent>
+  <agent id="scout" role="Codebase reconnaissance" output="active.md → _meta/context/">
+    <trigger>First interaction with codebase, no active.md, stale discovery.</trigger>
+    <rule>Map terrain before action. Discover, don't assume.</rule>
+  </agent>
+  <agent id="validator" role="Pre-commit gate" output="verdict → AgentDB">
+    <trigger>/kernel:validate, before /kernel:ship, before commit.</trigger>
+    <rule>Secrets scan, types, lint, tests. PASS or FAIL, no soft passes.</rule>
+  </agent>
 
   <rule>You = orchestrator for tier 2+. Agents do not report verbally; they write to AgentDB.</rule>
 </agents>
@@ -130,12 +142,9 @@ BASE_COMMIT: {hash}
 <!-- ============================================ -->
 
 <commands>
-  <command id="/kernel:ingest" purpose="Universal entry: classify → scope → contract → orchestrate. Primary entry point for all work."/>
-  <command id="/kernel:tearitapart" purpose="Critical pre-implementation review. Adversarial plan analysis: criticals, concerns, architecture, scale, rollback. Verdict: PROCEED/REVISE/RETHINK."/>
-  <command id="/kernel:handoff" purpose="Context handoff brief: goal, state, decisions, artifacts, warnings, git state, continuation prompt. Saves to _meta/handoffs/."/>
-  <command id="/kernel:validate" purpose="Pre-commit: types + lint + tests."/>
-  <command id="/kernel:ship" purpose="Commit + push + PR."/>
-  <command id="/kernel:branch" purpose="Create worktree for isolation."/>
+  <command id="/kernel:ingest" purpose="Universal entry: classify → scope → contract → orchestrate."/>
+  <command id="/kernel:tearitapart" purpose="Critical pre-implementation review. Verdict: PROCEED/REVISE/RETHINK."/>
+  <command id="/kernel:handoff" purpose="Context handoff brief. Saves to _meta/handoffs/."/>
 </commands>
 
 <!-- ============================================ -->
@@ -143,14 +152,19 @@ BASE_COMMIT: {hash}
 <!-- ============================================ -->
 
 <skills>
-  <skill id="debug" trigger="bug, error, fix, broken, regression, exception"/>
-  <skill id="research" trigger="investigate, find out, how does, unfamiliar tech"/>
-  <skill id="discovery" trigger="first time in codebase, onboard, explore"/>
-  <skill id="build" trigger="implement, add, create, integrate"/>
+  <!-- Skills = methodology that enhances agents. Not standalone actors. -->
+  <skill id="debug" trigger="bug, error, fix, broken, regression, exception">
+    Methodology for HOW to debug. Loaded by surgeon during bug work.
+  </skill>
+  <skill id="build" trigger="implement, add, create, integrate">
+    Methodology for HOW to build. Loaded by surgeon during feature work.
+  </skill>
   <skill id="design" trigger="frontend, ui, css, styling, visual">
-    Variants: abyss (bioluminescent), spatial (3D), verdant (growth), substrate (glass).
+    Domain aesthetics. Variants: abyss, spatial, verdant, substrate.
     Load: /design or /design --variant=abyss
   </skill>
+
+  <!-- research/discovery promoted to agents (deterministic spawning) -->
 </skills>
 
 <!-- ============================================ -->

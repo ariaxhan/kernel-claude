@@ -123,17 +123,50 @@
 <heuristic id="agent_spawn">
   <when type="surgeon">Contract exists, tier 2+, implementation needed.</when>
   <when type="adversary">Surgeon checkpoint complete, tier 3, or user requests verification.</when>
+  <when type="researcher">Unfamiliar tech, package selection, new integration. See research_trigger.</when>
+  <when type="scout">First codebase interaction, no active.md, stale discovery. See discovery_trigger.</when>
+  <when type="validator">Pre-commit, before ship. See validation_trigger.</when>
   <rule>Never spawn agent without a contract in AgentDB.</rule>
   <rule>Never spawn adversary without surgeon checkpoint to verify.</rule>
 </heuristic>
 
-<!-- Skill Selection -->
+<!-- Research Trigger (deterministic, not skill auto-detect) -->
+<heuristic id="research_trigger">
+  <when>Unfamiliar technology or library encountered.</when>
+  <when>Package selection decision needed.</when>
+  <when>New external integration.</when>
+  <when>No existing _meta/research/ doc covers the topic.</when>
+  <action>Spawn researcher agent. Wait for output before proceeding to implementation.</action>
+  <rule>Never implement with unfamiliar tech without research agent output.</rule>
+  <rule>Researcher writes to _meta/research/{topic}-research.md.</rule>
+</heuristic>
+
+<!-- Discovery Trigger (deterministic, not skill auto-detect) -->
+<heuristic id="discovery_trigger">
+  <when>First session with a codebase.</when>
+  <when>No _meta/context/active.md exists or is stale (>7 days).</when>
+  <when>User says: explore, discover, what's in this repo, map the code.</when>
+  <action>Spawn scout agent. Wait for output before any implementation.</action>
+  <rule>Never implement in unfamiliar codebase without scout output.</rule>
+  <rule>Scout writes to _meta/context/active.md.</rule>
+</heuristic>
+
+<!-- Validation Trigger (deterministic) -->
+<heuristic id="validation_trigger">
+  <when>Before any commit (automatic).</when>
+  <when>Before /kernel:ship (automatic).</when>
+  <when>User says: validate, check, pre-commit.</when>
+  <action>Spawn validator agent.</action>
+  <rule>Nothing ships without validator pass.</rule>
+  <rule>Validator writes verdict to AgentDB.</rule>
+</heuristic>
+
+<!-- Skill Selection (methodology only, not actors) -->
 <heuristic id="skill_selection">
-  <when terms="bug,error,fix,broken,regression,exception,crash">Load debug skill.</when>
-  <when terms="investigate,research,find out,how does,unfamiliar">Load research skill.</when>
-  <when terms="first time,explore,onboard,new codebase">Load discovery skill.</when>
-  <when terms="implement,add,create,build,integrate">Load build skill.</when>
-  <when terms="frontend,ui,css,styling,visual,design">Load design skill.</when>
+  <when terms="bug,error,fix,broken,regression,exception,crash">Load debug skill (methodology for surgeon).</when>
+  <when terms="implement,add,create,build,integrate">Load build skill (methodology for surgeon).</when>
+  <when terms="frontend,ui,css,styling,visual,design">Load design skill (aesthetics).</when>
+  <!-- research/discovery are now AGENTS, not skills. See research_trigger and discovery_trigger. -->
 </heuristic>
 </rule>
 
