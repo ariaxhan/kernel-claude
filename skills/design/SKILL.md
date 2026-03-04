@@ -1,76 +1,100 @@
 ---
 name: design
-description: Frontend aesthetics - break distributional convergence, create distinctive interfaces
-triggers:
-  - design
-  - frontend
-  - ui
-  - styling
-  - css
-  - visual
+description: "Frontend aesthetics and UI implementation. Break generic AI aesthetic patterns. Create distinctive, surprising interfaces. Supports mood variants that guide aesthetic direction without constraining execution. Triggers: design, frontend, ui, styling, css, visual, theme, component, layout, abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal."
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 ---
 
-# /design
+<skill id="design">
 
-Load variation: `/design --variant=abyss|spatial|verdant|substrate`
+<purpose>
+Break distributional convergence. Every generation must feel intentional and distinct.
+Generic AI aesthetic ("slop") is the failure mode.
+You are good at CSS. You are bad at breaking patterns. This skill fixes the latter.
+</purpose>
 
----
+<invocation>
+/design                      → No variant. Choose your own direction. Surprise.
+/design --variant={name}     → Load variants/{name}.md for mood guidance.
 
-<frontend_aesthetics>
-You tend to converge toward generic, "on distribution" outputs. In frontend design, this creates what users call the "AI slop" aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.
+Variant files define VIBE not implementation.
+You choose fonts, colors, spacing, motion.
+Never copy same font/palette/layout between generations even within same variant.
+</invocation>
 
-## Focus Areas
+<variants>
+abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal
 
-**Typography:** Choose fonts that are beautiful, unique, and interesting. Avoid generic fonts like Inter, Roboto, Arial, system-ui. Opt for distinctive choices: JetBrains Mono, Space Grotesk, IBM Plex, Bricolage Grotesque. Use weight extremes (300 vs 700, not 400 vs 500). Size jumps of 3x+.
+Read variants/ directory for full mood definitions.
+Each defines sensory direction and emotional target—not specs.
+</variants>
 
-**Color & Theme:** Commit to a cohesive aesthetic. Use CSS variables for consistency. Dominant colors with sharp accents outperform timid, evenly-distributed palettes. Dark modes with layered depth (5+ background shades). Draw from IDE themes and cultural aesthetics for inspiration.
+<principles type="always-active">
 
-**Motion:** Use animations for effects and micro-interactions. Prioritize CSS-only solutions. Focus on high-impact moments: one well-orchestrated page load with staggered reveals creates more delight than scattered micro-interactions. Default easing: `cubic-bezier(0.4, 0, 0.2, 1)` (organic, not linear).
+<typography>
+- Distinctive fonts only. NEVER: Inter, Roboto, Arial, Open Sans, system-ui, Helvetica, SF Pro
+- Weight extremes: pair 300 with 700+. Avoid the 400-500 middle zone entirely
+- Size contrast: headers 3x+ body minimum. Go bigger
+- Tracking: tight on large text, relaxed on small. Never default
+- CRITICAL: If you've used the same font in your last 3 outputs, pick a different one
+</typography>
 
-**Backgrounds:** Create atmosphere and depth rather than defaulting to solid colors. Layer CSS gradients, use geometric patterns, or add contextual effects. Translucent surfaces with backdrop-blur. Subtle radial gradients at corners (2-3% opacity).
+<color>
+- Commit to a cohesive mood. CSS custom properties for all colors
+- One dominant + one sharp accent beats even distribution every time
+- Dark modes need 5+ background shade layers. Single dark color = amateur
+- Derive palette from variant mood. Never memorized hex values
+- Warm text colors. Bone/cream tones on dark. Never pure white on dark
+</color>
 
-## Anti-Patterns (Never)
+<motion>
+- CSS-only first. JS only when CSS literally cannot achieve it
+- One orchestrated entrance beats scattered micro-interactions
+- Organic easing always: cubic-bezier curves, never linear
+- Breathing > snapping. Drift > jump. Ease > instant
+- Vary timing per project. Don't reuse same duration scale
+</motion>
 
-- Inter, Roboto, Open Sans, system fonts
-- Purple gradients on white backgrounds
-- Neon cyan/pink/purple AI aesthetic
-- Flat, single-color backgrounds
-- Uniform sections (no visual variety)
-- Heavy font weights everywhere
-- Jarring transitions (use organic easing)
+<layout>
+- Asymmetry over symmetry. Grid-break moments over uniform grids
+- Whitespace as design element. Use aggressively where it creates tension
+- Full-bleed mixed with contained sections creates rhythm
+- Uniform section heights = amateur. Vary intentionally
+- Let content dictate structure, not templates
+</layout>
 
-## Principles
+<surfaces>
+- NEVER flat single-color backgrounds
+- Layer: gradients, translucent surfaces, backdrop-blur, subtle noise
+- Cards need visible depth: shadow, border, or background differentiation
+- Dark backgrounds need hue tint. Never pure black or pure gray
+- Light from within (glow, shadow-color) beats external illumination
+</surfaces>
 
-```
-restraint > noise        (every element serves meaning)
-semantic > decorative    (colors encode data/state)
-organic > mechanical     (breathing, not snapping)
-depth > flat             (layered backgrounds)
-warm > sterile           (bone tones, not pure white)
-```
+</principles>
 
-## Variations
+<anti-convergence>
+After generating, ask: "Have I seen this exact combination before?"
+If yes → change the most dominant visual element immediately.
+If variant starts producing similar outputs → interpret it more loosely.
+Constraints breed creativity. Variant mood is springboard not cage.
+</anti-convergence>
 
-| Variant | Aesthetic | Best For |
-|---------|-----------|----------|
-| abyss | Deep-sea bioluminescent, void depths | Data-dense dashboards |
-| spatial | 3D datascape, living geometry | WebGL, Three.js, immersive |
-| verdant | Growth/vegetation, green glow | Financial, health, progress |
-| substrate | Cognitive glass, neural layers | Portfolios, cerebral sites |
+<anti-patterns>
+<block>System/generic fonts (Inter, Roboto, Arial, system-ui)</block>
+<block>Purple-gradient-on-white (the AI slop signature)</block>
+<block>Neon cyan + pink + purple together (vaporwave cliché)</block>
+<block>Flat single-color backgrounds</block>
+<block>Uniform section heights and widths</block>
+<block>Heavy font weights on everything (use weight contrast)</block>
+<block>Repeating same aesthetic across generations</block>
+<block>Following variant too literally (it's a vibe not a spec)</block>
+<block>Centered everything (break the symmetry)</block>
+<block>Stock icon libraries without customization</block>
+<block>Rounded corners on everything (vary or eliminate)</block>
+</anti-patterns>
 
-Interpret creatively and make unexpected choices. Vary between themes, fonts, aesthetics. Even with this guidance, you may converge to new local maxima (Space Grotesk, for example). Avoid this: think outside the box for each generation.
-</frontend_aesthetics>
+<on_complete>
+agentdb write-end '{"skill":"design","variant":"<if-used>","fonts":["<list-for-tracking>"],"aesthetic":"<2-word-summary>","dominant_color":"<name-not-hex>"}'
+</on_complete>
 
----
-
-## ●:ON_START
-
-```bash
-agentdb read-start
-```
-
-## ●:ON_END
-
-```bash
-agentdb write-end '{"skill":"design","variant":"X","patterns":["Y"]}'
-```
+</skill>
