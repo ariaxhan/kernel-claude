@@ -20,6 +20,15 @@ tokens: ~200 | type: log | append-only
 
 <!-- append new learnings here, newest at top -->
 
+## 2026-03-04 (v6.0.0)
+
+**Context:** Version alignment
+**Type:** fix
+**What:** Bumped plugin and marketplace versions to 6.0.0 to match kernel CLAUDE.md.
+**Why:** Single source of truth. Plugin manifest, marketplace listing, and kernel tag must stay in sync.
+
+---
+
 ## 2026-03-03 (v5.6.0)
 
 **Context:** Design skill creation

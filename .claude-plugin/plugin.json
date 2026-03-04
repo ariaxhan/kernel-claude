@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "5.6.0",
+  "version": "6.0.0",
   "description": "Give Claude Code permanent memory. It remembers mistakes, saves your progress, and gets smarter about your project with every conversation.",
   "author": {
     "name": "Aria Han",

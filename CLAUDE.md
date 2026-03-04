@@ -1,4 +1,4 @@
-<kernel version="7.0.0">
+<kernel version="6.0.0">
 
 <!-- ============================================ -->
 <!-- PHILOSOPHY                                   -->
@@ -152,20 +152,102 @@ BASE_COMMIT: {hash}
 <!-- ============================================ -->
 
 <skills>
-  <!-- Skills = methodology that enhances agents. Not standalone actors. -->
-  <skill id="debug" trigger="bug, error, fix, broken, regression, exception">
-    Methodology for HOW to debug. Loaded by surgeon during bug work.
-  </skill>
-  <skill id="build" trigger="implement, add, create, integrate">
-    Methodology for HOW to build. Loaded by surgeon during feature work.
-  </skill>
-  <skill id="design" trigger="frontend, ui, css, styling, visual">
-    Domain aesthetics. Variants: abyss, spatial, verdant, substrate.
-    Load: /design or /design --variant=abyss
+<!--
+  HOW SKILLS WORK:
+  - Only name + description metadata loads at startup (~100 tokens each).
+  - Full SKILL.md loads ONLY when triggered by matching task context.
+  - Additional files inside skill directory load on demand (progressive disclosure).
+  - Skills are methodology (HOW to do work). Agents are actors (WHO does work).
+  - Skills enhance agents; they don't replace them.
+
+  WHEN TO LOAD A SKILL:
+  - Surgeon working on a bug → loads debug skill for methodology.
+  - Surgeon building a feature → loads build skill for solution exploration.
+  - Any frontend/UI task → loads design skill for aesthetic direction.
+  - Skills auto-trigger from description keywords, but if you detect the need, read the skill explicitly.
+-->
+
+  <skill id="build" trigger="implement, add, create, integrate, new feature">
+    Solution exploration and implementation methodology.
+    Loaded by surgeon or orchestrator during feature work.
+    Core value: never implement first idea; research, compare 2-3 approaches, choose simplest.
   </skill>
 
-  <!-- research/discovery promoted to agents (deterministic spawning) -->
+  <skill id="debug" trigger="bug, error, fix, broken, regression, exception, crash">
+    Systematic debugging methodology.
+    Loaded by surgeon during bug work.
+    Core value: reproduce first, binary search isolation, fix root cause not symptom.
+  </skill>
+
+  <skill id="design" trigger="frontend, ui, css, styling, visual, theme, component, layout">
+    Frontend aesthetics and anti-convergence system.
+    Supports mood variants loaded from .claude/skills/design/variants/.
+    Read reference/design-research.md for deeper context on demand.
+    Invoke: /design or /design --variant={name}
+    See design_principles below for always-active rules.
+  </skill>
 </skills>
+
+<!-- ============================================ -->
+<!-- DESIGN PRINCIPLES (always active)            -->
+<!-- ============================================ -->
+
+<!--
+  These load every session because design decisions happen everywhere,
+  not just when /design is invoked. Any UI work must follow these.
+  Full skill (variants, reference docs) loads on demand.
+-->
+
+<design_principles>
+  <core>
+    <rule>Prompt for taste, not implementation. Describe WHAT the user should feel; let the model choose HOW.</rule>
+    <rule>Intent over specification. Mood, constraints, and anti-patterns beat hex codes and font names.</rule>
+    <rule>Component-first. Build pieces (nav, hero, cards), then compose. Never generate full pages in one shot.</rule>
+    <rule>Mobile-first as constraint, not afterthought. Specify column limits and touch targets upfront.</rule>
+    <rule>Functional color. Color that encodes meaning (status, priority, state) always beats decorative color.</rule>
+    <rule>Accessibility is a design advantage. WCAG contrast ratios force better color decisions. 44px touch targets prevent cramped layouts.</rule>
+  </core>
+
+  <typography>
+    <rule>Never use: Inter, Roboto, Arial, Open Sans, system-ui, Helvetica.</rule>
+    <rule>Weight extremes: pair 300 with 700+. Avoid the 400-500 middle zone.</rule>
+    <rule>Size contrast: headers 3x+ body size.</rule>
+    <rule>Vary between generations. If a font appeared in last 3 outputs, pick a different one.</rule>
+  </typography>
+
+  <surfaces>
+    <rule>Never flat single-color backgrounds.</rule>
+    <rule>Layer: gradients, translucent surfaces, backdrop-blur, subtle patterns.</rule>
+    <rule>Dark modes: 5+ background shade layers for depth.</rule>
+    <rule>One dominant color + one sharp accent beats even distribution.</rule>
+  </surfaces>
+
+  <motion>
+    <rule>CSS-only first. One orchestrated entrance beats scattered micro-interactions.</rule>
+    <rule>Organic easing (cubic-bezier), never linear. Vary curves per project.</rule>
+  </motion>
+
+  <anti_convergence>
+    <rule>After generating any UI, ask: "Have I seen this exact combination before?" If yes, change the dominant visual element.</rule>
+    <rule>Generic AI aesthetic ("slop") is the failure mode: purple gradients on white, neon cyan/pink/purple, uniform sections, heavy weights everywhere.</rule>
+    <rule>Constraints breed creativity. Variant moods are springboards, not cages.</rule>
+  </anti_convergence>
+
+  <variants>
+    Mood-based presets in .claude/skills/design/variants/. Define vibe, not implementation.
+    <variant id="abyss">Deep ocean, bioluminescent, living light in void.</variant>
+    <variant id="spatial">3D datascape, floating geometry, dimensional depth.</variant>
+    <variant id="verdant">Growth, vegetation through structure, earth to canopy.</variant>
+    <variant id="substrate">Cognitive glass, neural layers, thought made material.</variant>
+    <variant id="ember">Dying fire, residual warmth, ash with concentrated glow.</variant>
+    <variant id="arctic">Ice field, extreme clarity, silence that rings.</variant>
+    <variant id="void">Absolute absence, content defines its own boundaries.</variant>
+    <variant id="patina">Aged material, time visible, beauty through wear.</variant>
+    <variant id="signal">Information density, mission control, every pixel carries data.</variant>
+    <rule>Load: /design --variant={name}. Variant files contain mood and sensory direction only.</rule>
+    <rule>For deeper design context, read .claude/skills/design/reference/design-research.md</rule>
+  </variants>
+</design_principles>
 
 <!-- ============================================ -->
 <!-- OUTPUT VALIDATION                            -->
@@ -199,6 +281,7 @@ BASE_COMMIT: {hash}
   <block action="refactor_while_there">Separate contract.</block>
   <block action="premature_abstraction">Three similar lines beats abstraction.</block>
   <block action="docstrings_on_unchanged_code">No.</block>
+  <block action="first_solution_bias">Never implement the first idea. Generate alternatives, compare, then choose.</block>
 
   <!-- Process -->
   <block action="skip_tearitapart_tier2+">Review before implementation. Always.</block>
@@ -209,6 +292,13 @@ BASE_COMMIT: {hash}
   <block action="merge_without_tests">Never.</block>
   <block action="hide_failures_from_user">Surface everything. Transparency mandatory.</block>
   <block action="serial_when_parallel">Independent tasks → concurrent agents.</block>
+
+  <!-- Design -->
+  <block action="generic_ai_aesthetic">No purple gradients on white. No neon cyan/pink/purple. No Inter/Roboto/Arial.</block>
+  <block action="decorative_color">Color must encode meaning (state, priority, category). Not decoration.</block>
+  <block action="skip_mobile_first">Specify mobile constraints upfront. Not "make it responsive" after.</block>
+  <block action="full_page_generation">Build components, then compose. Never generate entire pages in one shot.</block>
+  <block action="aesthetic_convergence">If output looks like previous output, change the dominant visual element.</block>
 
   <!-- Misc -->
   <block action="prompt_hooks">Token waste. Use command hooks.</block>
