@@ -1,7 +1,7 @@
 {
   "name": "kernel",
   "version": "5.6.0",
-  "description": "Self-improving multi-agent methodology. Persistent memory across sessions. Learns from failures, contracts before code, proves before ship.",
+  "description": "Give Claude Code permanent memory. It remembers mistakes, saves your progress, and gets smarter about your project with every conversation.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"
