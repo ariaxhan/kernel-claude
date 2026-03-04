@@ -112,6 +112,8 @@ head -1 RELEASE_NOTES.md
 
 Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
 
+**No AI attribution.** Never include `Co-Authored-By`, `Generated with Claude Code`, or any AI tool signature in commit messages. Commits are the user's work.
+
 ## ●:ON_END
 
 ```bash

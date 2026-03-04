@@ -2,6 +2,33 @@
 
 **AgentDB-first coding methodology for Claude Code** | v5.6.0
 
+You don't need to be an engineer. You need to know how to talk to one.
+Claude Code is your engineer. KERNEL teaches it how to remember, scope, and ship.
+
+---
+
+## For Non-Engineers
+
+**New to this?** See the full [Quickstart for Founders](docs/QUICKSTART.md).
+
+**The essentials:**
+
+| Tool | When to Use |
+|------|-------------|
+| Claude Code (terminal) | Heavy lifting, multi-file changes, research, debugging, shipping |
+| Cursor (editor) | Quick edits, reading code, visual navigation, small tweaks |
+
+**Rule of thumb:** If the task touches 3+ files or requires thinking, use Claude Code. If you can point at exactly what to change, use Cursor.
+
+**Daily workflow:**
+```bash
+claude                              # Start - KERNEL auto-loads context
+"Build X"                           # Work - describe what you want
+/kernel:validate                    # Check - before committing
+/kernel:ship                        # Ship - commit + push + PR
+agentdb write-end '{"did":"X"}'     # End - save progress
+```
+
 ---
 
 ## Install
@@ -88,7 +115,7 @@ agentdb learn failure "API returns 500 when token expired" "saw in logs"
 agentdb learn pattern "always validate token before API call" "fixed 3 bugs"
 ```
 
-The plugin commands (`/kernel:build`, `/kernel:ship`, etc.) do this automatically.
+The plugin commands (`/kernel:ingest`, `/kernel:ship`, etc.) do this automatically.
 
 ---
 

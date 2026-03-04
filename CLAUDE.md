@@ -157,6 +157,8 @@ overengineer → only make changes directly requested
 
 ## ●:GIT
 
+**No AI attribution in commits.** Never include `Co-Authored-By`, `Generated with Claude Code`, or any AI tool signature. Commits are the user's work.
+
 ```bash
 # Checkpoint every 15 min of work
 git add -A && git commit -m "wip: checkpoint"
