@@ -70,6 +70,26 @@ Each defines sensory direction and emotional target—not specs.
 - Light from within (glow, shadow-color) beats external illumination
 </surfaces>
 
+<core>
+- Prompt for taste, not implementation. Describe WHAT the user should feel; let the model choose HOW
+- Intent over specification. Mood, constraints, and anti-patterns beat hex codes and font names
+- Component-first. Build pieces (nav, hero, cards), then compose. Never generate full pages in one shot
+- Mobile-first as constraint, not afterthought. Specify column limits and touch targets upfront
+- Functional color. Color that encodes meaning (status, priority, state) always beats decorative color
+- Accessibility is a design advantage. WCAG contrast ratios force better color decisions. 44px touch targets prevent cramped layouts
+</core>
+
+<reference_docs>
+11 research docs available in skill reference/ directories. Load on demand:
+- skills/build/reference/: build, security, git, architecture, context, performance, orchestration
+- skills/debug/reference/: debug
+- skills/design/reference/: design
+- skills/testing/reference/: testing
+- skills/refactor/reference/: refactor
+
+Each contains 2026 research, academic sources, anti-patterns, KERNEL integration guidance.
+</reference_docs>
+
 </principles>
 
 <anti-convergence>
