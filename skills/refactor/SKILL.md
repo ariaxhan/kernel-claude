@@ -14,8 +14,12 @@ The goal is clarity, not cleverness. Three similar lines beats a premature abstr
 
 <prerequisite>
 AgentDB read-start has run. Check for prior refactor attempts on same code.
-For deeper context, read reference/refactor-research.md (vibe coding crisis, verification bottleneck).
 </prerequisite>
+
+<reference>
+Skill-specific: skills/refactor/reference/refactor-research.md
+General: reference/architecture-research.md
+</reference>
 
 <core_principles>
 1. TESTS FIRST: Run tests before refactoring. Green → refactor → green. Red at any point = stop.

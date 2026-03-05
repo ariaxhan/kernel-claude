@@ -15,8 +15,11 @@ The failure you see is NOT where the bug is. Binary search upstream.
 
 <prerequisite>
 AgentDB read-start has run. Check past failures—you may have seen this pattern.
-For deeper methodology, read reference/debug-research.md (Zeller, cognitive biases, anti-patterns).
 </prerequisite>
+
+<reference>
+Skill-specific: skills/debug/reference/debug-research.md
+</reference>
 
 <scientific_method>
 1. OBSERVE: What exactly failed? Document input, expected, actual.

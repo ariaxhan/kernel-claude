@@ -14,8 +14,11 @@ If you can't explain what the test verifies, the test is worthless.
 
 <prerequisite>
 AgentDB read-start has run. Check past test failures—patterns repeat.
-For deeper methodology, read reference/testing-research.md (JiT testing, AI test pitfalls, mutation testing).
 </prerequisite>
+
+<reference>
+Skill-specific: skills/testing/reference/testing-research.md
+</reference>
 
 <core_principles>
 1. TEST REQUIREMENTS, NOT CODE: AI generates tests from code. This validates bugs. Test what SHOULD happen.

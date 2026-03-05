@@ -79,16 +79,9 @@ Each defines sensory direction and emotional target—not specs.
 - Accessibility is a design advantage. WCAG contrast ratios force better color decisions. 44px touch targets prevent cramped layouts
 </core>
 
-<reference_docs>
-11 research docs available in skill reference/ directories. Load on demand:
-- skills/build/reference/: build, security, git, architecture, context, performance, orchestration
-- skills/debug/reference/: debug
-- skills/design/reference/: design
-- skills/testing/reference/: testing
-- skills/refactor/reference/: refactor
-
-Each contains 2026 research, academic sources, anti-patterns, KERNEL integration guidance.
-</reference_docs>
+<reference>
+Skill-specific: skills/design/reference/design-research.md
+</reference>
 
 </principles>
 

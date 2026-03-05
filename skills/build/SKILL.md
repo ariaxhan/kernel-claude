@@ -11,6 +11,11 @@ Your first solution is never right. Explore, compare, choose simplest.
   If tier 2+, a contract exists. Follow it.
 </prerequisite>
 
+<reference>
+Skill-specific: skills/build/reference/build-research.md
+General: reference/architecture-research.md, reference/orchestration-research.md
+</reference>
+
 <!-- GOAL EXTRACTION -->
 
 <goal_template>
