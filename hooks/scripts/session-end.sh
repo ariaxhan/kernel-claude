@@ -1,18 +1,32 @@
 #!/bin/bash
-# SessionEnd hook: Deregister agent, batch commit, push
+# SessionEnd hook: Write AgentDB checkpoint, deregister agent, batch commit, push
 # Multi-agent safe: only removes THIS agent's registration
 # Events: SessionEnd (all matchers)
 
 # Find project root dynamically
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(dirname "$0")")")}"
 AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
+AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M")
 
-# Agent name from env (set by SessionStart)
-AGENT="${AGENT_NAME:-unknown-$$}"
+# Agent name from file (set by SessionStart)
+AGENT_FILE="$AGENTS_DIR/.current"
+if [ -f "$AGENT_FILE" ]; then
+    AGENT=$(cat "$AGENT_FILE")
+else
+    AGENT="unknown-$$"
+fi
+
+# === STEP 0: WRITE AGENTDB CHECKPOINT ===
+if [ -f "$PROJECT_ROOT/_meta/agentdb/agent.db" ]; then
+    BRANCH=$(git branch --show-current 2>/dev/null || echo "none")
+    FILES_CHANGED=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    "$AGENTDB" write-end "{\"agent\":\"$AGENT\",\"event\":\"session-end\",\"branch\":\"$BRANCH\",\"uncommitted_files\":$FILES_CHANGED}" 2>/dev/null || true
+fi
 
 # === STEP 1: DEREGISTER THIS AGENT ===
-rm -f "$AGENTS_DIR/${AGENT}.json" "$AGENTS_DIR/${AGENT}-snapshot.md" 2>/dev/null
+rm -f "$AGENTS_DIR/${AGENT}.json" "$AGENTS_DIR/${AGENT}-snapshot.md" "$AGENTS_DIR/.current" 2>/dev/null
 
 # Also clean any stale agents while we're at it
 for f in "$AGENTS_DIR"/*.json; do

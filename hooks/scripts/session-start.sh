@@ -1,12 +1,32 @@
 #!/bin/bash
 # KERNEL: Session start hook
-# 1. Git state
-# 2. Core philosophy + orchestration role
-# 3. AgentDB context (failures, patterns, contracts, errors, checkpoints)
-# 4. Active contract check + tier guidance
+# 1. Set agent identity
+# 2. Git state
+# 3. Core philosophy + orchestration role
+# 4. AgentDB context (failures, patterns, contracts, errors, checkpoints)
+# 5. Active contract check + tier guidance
 
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(dirname "$0")")")}"
+PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+
+# Generate agent name and persist for other hooks
+AGENT_NAME="main-$$"
+AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
+mkdir -p "$AGENTS_DIR"
+
+# Write current agent name to file (other hooks read this)
+echo "$AGENT_NAME" > "$AGENTS_DIR/.current"
+
+# Register this agent in agent registry
+cat > "$AGENTS_DIR/${AGENT_NAME}.json" << EOF
+{
+  "agent_name": "$AGENT_NAME",
+  "started": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "branch": "$(git branch --show-current 2>/dev/null || echo "none")",
+  "project": "$PROJECT_ROOT"
+}
+EOF
 
 echo "# KERNEL"
 echo ""
