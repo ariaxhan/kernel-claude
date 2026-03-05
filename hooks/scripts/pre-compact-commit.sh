@@ -13,8 +13,13 @@ INPUT=$(cat)
 TRIGGER=$(echo "$INPUT" | jq -r '.trigger // "auto"')
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
-# Agent name from env (set by SessionStart) or fallback
-AGENT="${AGENT_NAME:-unknown-$$}"
+# Agent name from file (set by SessionStart) or fallback
+AGENT_FILE="$AGENTS_DIR/.current"
+if [ -f "$AGENT_FILE" ]; then
+    AGENT=$(cat "$AGENT_FILE")
+else
+    AGENT="unknown-$$"
+fi
 
 mkdir -p "$AGENTS_DIR"
 
@@ -70,5 +75,16 @@ FILES_CHANGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
 REPO_NAME=$(basename "$PROJECT_ROOT")
 git commit -m "chore(checkpoint): $REPO_NAME pre-compact [$AGENT] ($TRIGGER, $FILES_CHANGED files) $TIMESTAMP_SHORT" --no-verify 2>/dev/null
 git push 2>/dev/null || true
+
+# === STEP 4: RESTORE CONTEXT AFTER COMPACTION ===
+# Output the snapshot back to conversation so context is restored
+if [ -f "$SNAPSHOT" ]; then
+    echo "=== CONTEXT RESTORED FROM SNAPSHOT ==="
+    cat "$SNAPSHOT"
+    echo ""
+    echo "=== AGENTDB STATE ==="
+    # Restore AgentDB context
+    agentdb read-start 2>/dev/null || echo "AgentDB not available"
+fi
 
 exit 0
