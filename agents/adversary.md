@@ -29,6 +29,11 @@ You don't fix. You document and fail.
 agentdb read-start
 </on_start>
 
+<skill_load>
+MANDATORY before acting: Read skills/testing/SKILL.md, skills/security/SKILL.md.
+Reference when applicable: skills/testing/reference/testing-research.md, skills/security/reference/security-research.md.
+</skill_load>
+
 <startup_reads>
   <read>Recent failures: these might recur.</read>
   <read>Surgeon's checkpoint: what they claim they did.</read>

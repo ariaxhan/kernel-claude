@@ -45,12 +45,13 @@ Location: _meta/agentdb/agent.db
 <!-- ============================================ -->
 
 <agents>
-  <agent id="surgeon">Minimal diff. Only touch listed files. Checkpoint to AgentDB.</agent>
-  <agent id="adversary">QA. Assume broken. Prove with evidence. Verdict to AgentDB.</agent>
-  <agent id="researcher">Find solutions before coding. Unfamiliar tech trigger.</agent>
-  <agent id="scout">Codebase reconnaissance. First interaction trigger.</agent>
-  <agent id="validator">Pre-commit gate. Secrets, types, lint, tests.</agent>
+  <agent id="surgeon">agents/surgeon.md. Minimal diff. Only touch listed files. Checkpoint to AgentDB. Load skills/build, skills/refactor, skills/testing before acting.</agent>
+  <agent id="adversary">agents/adversary.md. QA. Assume broken. Prove with evidence. Verdict to AgentDB. Load skills/testing, skills/security before acting.</agent>
+  <agent id="researcher">agents/researcher.md. Find solutions before coding. Unfamiliar tech trigger. Load skills/build and reference build-research before searching.</agent>
+  <agent id="scout">agents/scout.md. Codebase reconnaissance. First interaction trigger. Load skills/context, skills/architecture before mapping.</agent>
+  <agent id="validator">agents/validator.md. Pre-commit gate. Secrets, types, lint, tests. Load skills/testing, skills/security before validating.</agent>
   <rule>Tier 2+: you orchestrate. Agents write to AgentDB, not conversation.</rule>
+  <rule>Every agent must load relevant skills/*/SKILL.md and reference skills/*/reference/*-research.md when applicable.</rule>
 </agents>
 
 <!-- ============================================ -->
@@ -92,9 +93,16 @@ CONTRACT: {id} | GOAL: {observable} | CONSTRAINTS: {files} | FAILURE: {condition
 <!-- ============================================ -->
 
 <commands>
-  <command id="/kernel:ingest" purpose="Universal entry: classify → scope → contract → orchestrate."/>
-  <command id="/kernel:tearitapart" purpose="Critical pre-implementation review. Verdict: PROCEED/REVISE/RETHINK."/>
-  <command id="/kernel:handoff" purpose="Context handoff brief. Saves to _meta/handoffs/."/>
+  <command id="/kernel:ingest" purpose="Universal entry: classify → scope → contract → orchestrate." file="commands/ingest.md">
+    Load skills/orchestration/SKILL.md, skills/build/SKILL.md before classifying. Reference orchestration-research, git-research for protocols.
+  </command>
+  <command id="/kernel:tearitapart" purpose="Critical pre-implementation review. Verdict: PROCEED/REVISE/RETHINK." file="commands/tearitapart.md">
+    Load skills/architecture/SKILL.md, skills/testing/SKILL.md, skills/security/SKILL.md before reviewing. Reference architecture-research, testing-research.
+  </command>
+  <command id="/kernel:handoff" purpose="Context handoff brief. Saves to _meta/handoffs/." file="commands/handoff.md">
+    Load skills/context/SKILL.md before generating. Reference context-research.md.
+  </command>
+  <rule>Commands must load relevant skills and reference research before executing.</rule>
 </commands>
 
 <!-- ============================================ -->
@@ -102,30 +110,36 @@ CONTRACT: {id} | GOAL: {observable} | CONSTRAINTS: {files} | FAILURE: {condition
 <!-- ============================================ -->
 
 <skills>
-<!-- Skills are methodology (HOW). Agents are actors (WHO). Skills load on demand from skills/*/SKILL.md -->
-  <skill id="build">Solution exploration. Never implement first idea.</skill>
-  <skill id="debug">Systematic debugging. Reproduce first.</skill>
-  <skill id="design">Frontend aesthetics. Anti-convergence. Invoke: /design</skill>
-  <skill id="testing">Testing methodology. Edge cases over happy paths.</skill>
-  <skill id="refactor">Safe refactoring. Tests green before AND after.</skill>
+<!-- Skills are methodology (HOW). Agents are actors (WHO). Load from skills/*/SKILL.md; reference skills/*/reference/*-research.md -->
+  <skill id="build">skills/build/SKILL.md | Solution exploration. Never implement first idea. Ref: build-research.md</skill>
+  <skill id="debug">skills/debug/SKILL.md | Systematic debugging. Reproduce first. Ref: debug-research.md</skill>
+  <skill id="design">skills/design/SKILL.md | Frontend aesthetics. Anti-convergence. Invoke: /design. Ref: design-research.md</skill>
+  <skill id="testing">skills/testing/SKILL.md | Testing methodology. Edge cases over happy paths. Ref: testing-research.md</skill>
+  <skill id="refactor">skills/refactor/SKILL.md | Safe refactoring. Tests green before AND after. Ref: refactor-research.md</skill>
+  <skill id="orchestration">skills/orchestration/SKILL.md | Multi-agent coordination. Ref: orchestration-research.md</skill>
+  <skill id="architecture">skills/architecture/SKILL.md | Structural design. Ref: architecture-research.md</skill>
+  <skill id="security">skills/security/SKILL.md | Input validation, secrets, OWASP. Ref: security-research.md</skill>
+  <skill id="context">skills/context/SKILL.md | Context engineering, handoff. Ref: context-research.md</skill>
+  <skill id="git">skills/git/SKILL.md | Git protocols. Ref: git-research.md</skill>
+  <skill id="performance">skills/performance/SKILL.md | Performance methodology. Ref: performance-research.md</skill>
+  <rule>Load relevant skill before acting. Reference research docs when methodology applies.</rule>
 </skills>
 
 <!-- ============================================ -->
 <!-- DESIGN PRINCIPLES (always active)            -->
 <!-- ============================================ -->
 
-<!-- Full design principles moved to skills/design/SKILL.md -->
-<!-- Load via: Read /Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/skills/design/SKILL.md -->
+<!-- Full design principles: skills/design/SKILL.md, skills/design/reference/design-research.md -->
 <design_note>Design principles (typography, color, surfaces, motion, anti-convergence) are in skills/design/SKILL.md. Load that file for frontend work.</design_note>
 
-<!-- Output validation rules moved to rules/kernel.md -->
+<!-- Output validation: rules/kernel.md invariants -->
 
 <!-- ============================================ -->
 <!-- ANTI-PATTERNS                                -->
 <!-- ============================================ -->
 
 <anti_patterns>
-  <!-- Critical only. Full list in rules/kernel.md -->
+  <!-- Critical only. Extended rules: _meta/reference/heuristics.md, conventions.md -->
   <block action="skip_agentdb_read">Repeat failures.</block>
   <block action="skip_agentdb_write">Lose context.</block>
   <block action="write_code_tier_2+">You orchestrate, not implement.</block>

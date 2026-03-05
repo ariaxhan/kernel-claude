@@ -68,9 +68,9 @@ Tell Claude Code what keeps breaking. It saves that forever so the problem never
 
 KERNEL adds three things to Claude Code:
 
-1. **Memory** - A small workspace where Claude Code saves lessons, progress, and what went wrong
+1. **Memory** - A `_meta/` folder where Claude Code saves lessons, progress, and what went wrong
 2. **Helpers** - Specialized assistants for big tasks (one builds, one checks the work)
-3. **Shortcuts** - Quick commands like "validate my work" or "ship this feature"
+3. **Shortcuts** - Quick commands like `/kernel:handoff` (save progress) or "validate my work"
 
 That's it. No configuration needed.
 

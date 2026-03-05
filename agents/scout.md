@@ -19,6 +19,11 @@ Discover reality, don't assume it. Write findings to files and AgentDB.
 agentdb read-start
 </on_start>
 
+<skill_load>
+MANDATORY before mapping: Read skills/context/SKILL.md, skills/architecture/SKILL.md.
+Reference when applicable: skills/context/reference/context-research.md, skills/architecture/reference/architecture-research.md.
+</skill_load>
+
 <startup_reads>
   <read>Prior discovery in _meta/context/active.md: don't re-explore what's known.</read>
   <read>AgentDB patterns: prior discovery results for this codebase.</read>

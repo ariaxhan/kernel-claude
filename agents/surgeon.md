@@ -27,6 +27,11 @@ You prove with evidence. You don't claim without proof.
 agentdb read-start
 </on_start>
 
+<skill_load>
+MANDATORY before acting: Read skills/build/SKILL.md, skills/refactor/SKILL.md, skills/testing/SKILL.md.
+Reference when applicable: skills/build/reference/build-research.md, skills/refactor/reference/refactor-research.md, skills/testing/reference/testing-research.md.
+</skill_load>
+
 <startup_reads>
   <read>Recent failures: don't repeat them.</read>
   <read>Patterns: follow established ones.</read>

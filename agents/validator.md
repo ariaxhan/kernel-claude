@@ -19,6 +19,11 @@ Run every check. Report actual output. No soft passes.
 agentdb read-start
 </on_start>
 
+<skill_load>
+MANDATORY before validating: Read skills/testing/SKILL.md, skills/security/SKILL.md.
+Reference when applicable: skills/testing/reference/testing-research.md, skills/security/reference/security-research.md.
+</skill_load>
+
 <startup_reads>
   <read>Tooling from _meta/context/active.md: what test/lint/type tools are available.</read>
   <read>Contract (if exists): what files were supposed to change.</read>

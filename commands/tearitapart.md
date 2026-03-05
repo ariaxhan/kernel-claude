@@ -5,6 +5,9 @@
 agentdb read-start
 </on_start>
 
+<!-- Load before reviewing: skills/architecture/SKILL.md, skills/testing/SKILL.md, skills/security/SKILL.md -->
+<!-- Reference: skills/architecture/reference/architecture-research.md, skills/testing/reference/testing-research.md -->
+
 <constraint>Run after planning, before implementing.</constraint>
 <constraint>If verdict is REVISE or RETHINK, update plan and re-run this command.</constraint>
 <constraint>All output clear to non-technical readers.</constraint>

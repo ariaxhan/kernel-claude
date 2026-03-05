@@ -147,11 +147,13 @@ If any violation: stop, correct, continue.
 <!-- ============================================ -->
 
 <reference>
-For detailed protocols, read on demand:
-- Agent templates: agents/surgeon.md, agents/adversary.md
-- Error recovery: _meta/reference/orchestration-protocol.md
-- Git protocol: _meta/reference/git-research.md
-- Classification signals: see CLAUDE.md classification section
+MANDATORY before classifying/routing:
+- skills/orchestration/SKILL.md, skills/orchestration/reference/orchestration-research.md
+- skills/build/SKILL.md (solution exploration)
+- skills/git/reference/git-research.md
+
+Agent templates: agents/surgeon.md, agents/adversary.md
+Classification signals: see CLAUDE.md classification section
 </reference>
 
 </command>

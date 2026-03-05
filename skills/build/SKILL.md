@@ -13,7 +13,7 @@ Your first solution is never right. Explore, compare, choose simplest.
 
 <reference>
 Skill-specific: skills/build/reference/build-research.md
-General: reference/architecture-research.md, reference/orchestration-research.md
+General: skills/architecture/reference/architecture-research.md, skills/orchestration/reference/orchestration-research.md
 </reference>
 
 <!-- GOAL EXTRACTION -->

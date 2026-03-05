@@ -16,47 +16,51 @@ Think of it like this: Claude Code is the worker. KERNEL is the training program
 
 ## Installation
 
-Copy this entire block into Claude Code and press Enter. Claude Code will do everything automatically:
+Copy this entire block into Claude Code and paste it. Claude Code will perform all steps automatically:
 
 ```
-I want to install the KERNEL plugin and set up memory for this project.
+Set up KERNEL for this project. Perform these steps in order:
 
-STEP 1: Install the plugin
-/install-plugin https://github.com/ariaxhan/kernel-claude
+1. Install the plugin:
+   /install-plugin https://github.com/ariaxhan/kernel-claude
 
-STEP 2: Find the installed plugin location and set KERNEL_PATH
-KERNEL_PATH=$(find ~/.claude/plugins/cache -name "kernel-claude" -o -name "kernel" 2>/dev/null | head -1)
-echo "Found: $KERNEL_PATH"
+2. Find the plugin location, then run:
+   KERNEL_PATH=$(find ~/.claude/plugins/cache -name "kernel-claude" -o -name "kernel" 2>/dev/null | head -1)
+   echo "Found: $KERNEL_PATH"
 
-STEP 3: Create symlink for the agentdb CLI
-sudo ln -sf "$KERNEL_PATH/orchestration/agentdb/agentdb" /usr/local/bin/agentdb
+3. Make agentdb available and copy CLAUDE.md:
+   sudo ln -sf "$KERNEL_PATH/orchestration/agentdb/agentdb" /usr/local/bin/agentdb
+   mkdir -p .claude
+   cp "$KERNEL_PATH/CLAUDE.md" .claude/CLAUDE.md
 
-STEP 4: Copy CLAUDE.md to this project
-mkdir -p .claude
-cp "$KERNEL_PATH/CLAUDE.md" .claude/CLAUDE.md
+4. Initialize the project: create _meta/{agentdb,context,plans,research,handoffs,reviews,agents}, run agentdb init, and create _meta/context/active.md if it doesn't exist. (This is /kernel:init—follow commands/init.md from the plugin if available.)
 
-STEP 5: Initialize memory for this project
-Run: agentdb init
+5. Verify: run agentdb status
 
-STEP 6: Verify it works
-Run: agentdb status
-
-DONE. Show me the status when complete.
+Report completion and show status.
 ```
 
 That's it. Claude Code handles all the technical work.
+
+**What /kernel:init does:** Creates the `_meta/` folder structure, initializes AgentDB (memory), and prepares the project. You only run this once per project. See [commands/init.md](../commands/init.md) for details.
 
 ---
 
 ## What Just Happened
 
-KERNEL created a small workspace in your project where Claude Code saves:
-- Mistakes it should never repeat
-- Solutions that work well
-- Where you left off last time
-- What you're working on now
+KERNEL created a `_meta/` folder in your project where Claude Code saves everything:
 
-This workspace stays with your project forever. Close Claude Code, come back tomorrow, and it remembers everything.
+| Folder | Technical | Plain |
+|--------|-----------|-------|
+| `agentdb/` | AgentDB storage | Memory—what went wrong, what works, where you left off |
+| `context/` | active.md | Project notes—what your project does and what you're working on now |
+| `plans/` | Build pipeline output | Step-by-step plans for bigger changes |
+| `research/` | Researcher agent output | Notes when Claude looks up how to do something |
+| `handoffs/` | Session handoff briefs | Saved progress when you stop for the day |
+| `reviews/` | Tear-down reviews | A detailed look before making big changes |
+| `agents/` | Agent registry | List of helpers working on your project |
+
+These folders stay with your project forever. Close Claude Code, come back tomorrow, and it remembers everything.
 
 ---
 
@@ -70,25 +74,25 @@ Open Claude Code in your project. Just describe what you want in plain English:
 - "Fix the bug where users can't log in"
 - "Make the buttons bigger"
 
-KERNEL reads what's been tried before, checks what broke last time, and picks up where you left off.
+Behind the scenes, KERNEL runs **/ingest**: it classifies your request (bug, feature, refactor, question), decides scope by file count (1–2 files = Tier 1 direct, 3–5 = Tier 2 surgeon, 6+ = Tier 3 surgeon + adversary), and routes accordingly. In plain terms: it figures out what you need, how big it is, and the best way to do it. It reads what's been tried before, checks what broke last time, and picks up where you left off.
 
 ### Doing Work
 
-Claude Code builds what you asked for. For small changes, it just does it. For bigger projects, it breaks the work into focused pieces and checks everything works.
-
-You don't need to manage this. Just describe what you want. KERNEL handles the complexity.
+Claude Code builds what you asked for. For small changes (Tier 1), it executes directly. For bigger projects (Tier 2+: contract → surgeon → adversary), it breaks the work into steps, gets it done, and verifies everything works. In plain terms: you just describe what you want.
 
 ### Checking Work
 
 Before sharing your changes, tell Claude Code: "validate my work"
 
-It automatically checks everything is correct and working.
+It runs the **Validator** agent: checks for secrets, types, lint, and tests. In plain terms: no accidental secrets, everything looks correct, nothing's broken.
 
 ### Saving Progress
 
-Before closing Claude Code, say: "Remember that I finished the contact form and need to style it next"
+Before closing Claude Code, type: `/kernel:handoff`
 
-Claude Code saves this. Tomorrow starts exactly there.
+Or say: "Remember that I finished the contact form and need to style it next"
+
+Claude Code saves a handoff brief to `_meta/handoffs/`. In plain terms: a short summary of where you left off so tomorrow you can pick up exactly there.
 
 ---
 
@@ -114,14 +118,24 @@ It saves this permanently so the mistake never happens again.
 
 ---
 
-## Understanding the Tools
+## What's Inside KERNEL
 
-If you're using both Claude Code and Cursor:
+| Component | Technical | Plain |
+|-----------|-----------|-------|
+| **Memory** | AgentDB + `_meta/` | Remembers what worked, what broke, where you left off |
+| **Helpers** | Surgeon, Adversary, Researcher, Scout, Validator | Builds, checks work, finds solutions, explores project, pre-commit gate |
+| **Commands** | `/kernel:ingest`, `/kernel:handoff`, `/kernel:init`, `/kernel:help` | Start, save progress, setup, help |
+
+---
+
+## Claude Code vs Cursor
+
+If you're using both:
 
 **Claude Code (the builder):**
-- Handles big projects
-- Remembers context across days
-- Can think through problems
+- Handles big projects via /ingest (classify → tier → route)
+- Remembers context across days (AgentDB)
+- Spawns surgeon/adversary for 3+ file changes
 - Takes real action
 
 **Cursor (the editor):**
@@ -136,14 +150,14 @@ Use Claude Code for building. Use Cursor for browsing and tiny tweaks.
 
 ## Your Project Instructions
 
-Your project has a special file that tells Claude Code about your specific project. You can edit this file to add:
+The file `.claude/CLAUDE.md` (copied during installation) tells Claude Code about KERNEL. You can extend it or add project-specific rules:
 
 - What technologies you're using
 - Your preferences
 - Things Claude Code should never do
 - Things Claude Code should always do
 
-Claude Code reads this file at the start of every conversation. Think of it as standing instructions that persist forever.
+Claude Code reads this at the start of every conversation. Think of it as standing instructions that persist forever.
 
 ---
 
@@ -151,15 +165,15 @@ Claude Code reads this file at the start of every conversation. Think of it as s
 
 ### "Claude Code says it can't find something"
 
-Claude Code needs the memory system initialized. Say: "Initialize the memory system for this project."
+Run `/kernel:init` to create the `_meta/` folders and initialize AgentDB (memory). If the `agentdb` command is missing, the plugin may not be installed—see Installation above.
 
 ### "Claude Code forgot everything"
 
-You didn't save your progress last time. Always end by saying: "Remember where I stopped and what I was doing."
+You didn't save your progress last time. Always end by typing `/kernel:handoff` or saying: "Remember where I stopped and what I was doing."
 
 ### "Claude Code keeps making the same mistake"
 
-Say: "Remember this mistake permanently so you never repeat it." Be specific about what went wrong and what you observed.
+Say: "Remember this mistake permanently so you never repeat it." Be specific about what went wrong and what you observed. KERNEL saves it to AgentDB (memory) so it never happens again.
 
 ---
 

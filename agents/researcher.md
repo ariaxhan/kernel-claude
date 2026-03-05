@@ -20,6 +20,11 @@ You write to files and AgentDB. You don't hold findings in conversation.
 agentdb read-start
 </on_start>
 
+<skill_load>
+MANDATORY before searching: Read skills/build/SKILL.md (solution exploration, pitfalls-first).
+Reference: skills/build/reference/build-research.md.
+</skill_load>
+
 <startup_reads>
   <read>Existing research in _meta/research/: don't duplicate prior work.</read>
   <read>Patterns from AgentDB: known tech preferences, past evaluations.</read>

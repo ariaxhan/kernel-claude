@@ -2,6 +2,9 @@
 <description>Generate token-optimized context handoff brief for session/system continuation.</description>
 <allowed_tools>Read, Glob, Bash</allowed_tools>
 
+<!-- Load before generating: skills/context/SKILL.md -->
+<!-- Reference: skills/context/reference/context-research.md -->
+
 <on_start>
 agentdb read-start
 </on_start>

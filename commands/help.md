@@ -13,7 +13,7 @@
 | What you want | What to type |
 |---------------|--------------|
 | Set up a new project | `/kernel:init` |
-| Start working on something | Just describe what you want |
+| Start working on something | Just describe what you want (runs /ingest: classify → tier → route) |
 | Save your progress | `/kernel:handoff` |
 
 ---
@@ -45,7 +45,8 @@ Type `/kernel:handoff` before closing. This saves everything so you can pick up 
 
 | Command | What it does |
 |---------|--------------|
-| `/kernel:init` | Set up a new project |
+| `/kernel:ingest` | Universal entry—classify task, count files, route (direct/surgeon/adversary) |
+| `/kernel:init` | Set up _meta/ structure and memory for a new project |
 | `/kernel:handoff` | Save progress before stopping |
 | `/kernel:help` | Show this help |
 

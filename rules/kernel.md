@@ -3,8 +3,11 @@
 <!-- Non-negotiable contracts. Always loaded.     -->
 <!-- ============================================ -->
 
-<!-- Heuristics, conventions, and extended rules moved to _meta/reference/ -->
+<!-- Heuristics, conventions, and extended rules: _meta/reference/ -->
 <!-- Load on demand: heuristics.md, conventions.md, context-discipline.md, output-quality.md -->
+
+<!-- Skills (methodology): skills/*/SKILL.md. Reference docs: skills/*/reference/*-research.md -->
+<!-- Load relevant skill before acting. Agents must reference skills and research when applicable. -->
 
 <rule id="invariants" type="invariant" load="always">
 
