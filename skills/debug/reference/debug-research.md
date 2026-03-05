@@ -5,12 +5,11 @@ Not auto-loaded; read on demand via progressive disclosure.
 
 ## Sources
 
-Compiled from: Andreas Zeller's "Why Programs Fail" (ACM, Jolt Award winner;
-the standard reference on systematic debugging), Eisenstadt's study on debugging
-difficulties, UkrPROG'2025 taxonomy of software debugging, Atlassian's cognitive
-bias research for developers, systematic mapping studies on cognitive biases in
-software engineering (Academia.edu/ACM), ScienceDirect qualitative studies on
-enterprise debugging, and 2026 industry practices from WeAreBrain and AWS.
+Andreas Zeller "Why Programs Fail" (ACM, Jolt Award), Eisenstadt debugging studies,
+UkrPROG 2025 taxonomy, Atlassian cognitive bias research, ICSE 2026 Cognitive Biases
+in LLM-Assisted Development (arXiv 2601.08045), Microsoft debug-gym (arXiv 2503.21557),
+BugLens v2 (Jan 2026), DDMIN-LOC (Jan 2026), Visual Studio 2026 Debugger Agent,
+ChatDBG (ACM FSE 2025).
 
 ---
 
@@ -105,8 +104,12 @@ debugging effort compared to state-of-the-art analysis-based techniques.
 
 ## Cognitive Biases in Debugging
 
-Research from Atlassian, ACM systematic mapping studies, and cognitive science
-identifies specific biases that derail debugging:
+Research from Atlassian, ACM studies, and cognitive science identifies specific
+biases. **NEW ICSE 2026 research** (arXiv 2601.08045) adds LLM-specific findings:
+- **48.8% of programmer actions** exhibited bias
+- **56.4% bias rate** in LLM-related interactions (higher than non-LLM work)
+- 15 new bias categories identified specific to developer-LLM interactions
+- 90 total biases catalogued in human-AI programming contexts
 
 ### Confirmation Bias (most dangerous)
 You suspect module X is the cause. You look for evidence that X is broken.
@@ -279,6 +282,56 @@ design problem (invoke tearitapart) rather than an implementation problem.
 
 ---
 
+## LLM-Induced Biases (ICSE 2026)
+
+Over-acceptance: Accepting AI suggestions without verification because "it looks right."
+Mitigation: Treat every AI suggestion as a hypothesis requiring evidence.
+
+Explanation Anchoring: Trusting AI-generated explanations over independent analysis.
+Mitigation: Form your own hypothesis BEFORE asking the AI. Compare.
+
+Evaluation Fatigue: Reduced scrutiny of later AI suggestions after accepting earlier ones.
+Mitigation: Fresh review for each suggestion. No cumulative trust.
+
+Suggester Preference: Adopting LLM suggestions without questioning, especially for
+complex tasks. Mitigation: Always verify with evidence.
+
+---
+
+## AI-Assisted Debugging Tools (2026)
+
+### ChatDBG (ACM FSE 2025)
+AI-powered debugging assistant integrating LLMs with pdb, lldb, gdb.
+Allows open-ended questions ("why is x null?") with autonomous investigation.
+Achieves **67-85% root cause accuracy**. Download: github.com/plasma-umass/ChatDBG
+
+### debug-gym (Microsoft Research, arXiv 2503.21557)
+LLMs with interactive debugging tools (breakpoints, variable inspection)
+outperform static error-message approaches.
+- Claude 3.7 improved from 37.2% to **48.4%** with tool access.
+- OpenAI o1-preview jumped from 10.7% to **30.2%** (182% improvement).
+
+### VS 2026 Debugger Agent
+IDE-integrated agent automating unit test fixes: hypothesizes causes, edits code,
+reruns until success. Analyzes exceptions across entire repository including
+historical bugs. "Debug with Copilot" on right-click.
+
+### When to Use AI Tools
+- Use for initial hypothesis generation (AI is fast at pattern matching).
+- Always verify AI root cause claims with evidence (reproduce, observe).
+- AI excels at "where to look" but not always "what it means."
+- Complex bugs with large temporal chasms still require human binary search.
+
+---
+
+## 2026 Benchmark Reality Check
+
+SWE-bench Verified: ~80% (Claude Opus 4.6, GPT-5).
+SWE-bench Pro (realistic bugs): Only **23%** for best models.
+Gap indicates current benchmarks overstate real-world debugging capability.
+
+---
+
 ## Integration with KERNEL System
 
 The debug skill enhances the surgeon agent during bug work. Key integration
@@ -293,3 +346,5 @@ points:
   addresses the actual cause, not a symptom.
 - Error recovery circuit breaker: 2 failed fix attempts on the same bug triggers
   orchestrator escalation. The surgeon should not spiral.
+- **2026**: Consider ChatDBG or debug-gym methodology for initial hypothesis
+  generation, but verify all AI-suggested root causes with evidence.

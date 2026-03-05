@@ -10,6 +10,11 @@ and leaked system prompt, Vercel v0's prompting guides and system prompt, commun
 best practices from Design Systems Collective, and production testing across AI UI
 generators (Lovable, v0, Bolt, Replit).
 
+2026 updates: v0 Rebuild (Feb 3, 2026), Anti-Vibecoding Movement (Maya Brennan,
+Jan 2026), GenUI Guide (CopilotKit Jan 29, 2026), shadcn Best Practices 2026,
+Justin Wetch "Teaching Claude to Design Better" (Jan 5, 2026), Jakob Nielsen
+2026 Predictions.
+
 ---
 
 ## Key Insight: Intent Over Specification
@@ -29,6 +34,31 @@ Call out common defaults. Claude has strong knowledge of design principles but
 defaults to safe choices unless explicitly encouraged otherwise."
 
 The pattern: LLMs know CSS. They don't know taste. Prompt for taste.
+
+---
+
+## Anti-Vibecoding Movement (Jan 2026)
+
+2025 was "the year of vibecoding" - building software from simple prompts.
+Side effect: "a sad surge of homogenous, diluted designs" and "AI Product Slop."
+
+In 2026, designers actively reject: same-y, emoji-fueled, 8px-radius-everywhere,
+faux-minimalism. This is the named counter-movement to AI aesthetic convergence.
+
+Visual signals to avoid: generic purple gradients on white, neon cyan/pink/purple
+palette everywhere, uniform sections, heavy font weights everywhere.
+
+---
+
+## Generative UI (GenUI) Maturation (2026)
+
+Three patterns now production-ready (CopilotKit Jan 29, 2026):
+- **Static**: Pre-built components, agent selects which to show
+- **Declarative**: Agent returns JSON spec (A2UI, Open-JSON-UI standards)
+- **Open-ended**: Agent controls entire UI surfaces (MCP Apps)
+
+Jakob Nielsen 2026: "Designers don't create static screens—they design systems
+of capability." The mental model shifts from screens to constraint systems.
 
 ---
 
@@ -75,6 +105,12 @@ The pattern: LLMs know CSS. They don't know taste. Prompt for taste.
    optimized for this stack. The further you deviate, the more manual guidance
    needed. Use this to your advantage.
 
+6. **v0 Rebuild (Feb 3, 2026)**: v0 is no longer just a prototyping tool:
+   - Sandbox runtime imports any GitHub repo
+   - Git panel for branches, PRs, production deploys
+   - Full-stack apps and agents, not just UIs
+   - Production code in your repo, not disposable scaffolding
+
 ---
 
 ## What Anthropic's Frontend Cookbook Proves
@@ -85,6 +121,10 @@ Tested with and without design prompts across multiple generations:
    quality more than any other single element. The cookbook's font categories:
    code aesthetic, editorial, startup, technical, distinctive. Each suggests
    a world, not a specific typeface.
+
+   **Variable fonts (2026)**: Now "best practice, not trend." Single files that
+   adjust weight/width/style dynamically are the foundation of responsive typography.
+   Use variable fonts as default, not just distinctive static fonts.
 
 2. Calling out specific anti-patterns works better than positive instructions.
    "Never use Inter" is more effective than "use interesting fonts." The model
