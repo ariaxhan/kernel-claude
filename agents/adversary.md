@@ -209,6 +209,32 @@ agentdb learn failure|gotcha|pattern "&lt;insight&gt;" "&lt;evidence&gt;"
   </path>
 </failure_paths>
 
+<!-- CONFIDENCE THRESHOLD -->
+
+<confidence_threshold>
+## Confidence Threshold
+
+**Report** findings where confidence > 80%
+**Skip** stylistic preferences unless they violate explicit project conventions
+**Skip** issues in unchanged code unless CRITICAL security issues
+**Consolidate** similar issues (e.g., "5 functions missing error handling" → single finding)
+**Prioritize** bugs, security vulnerabilities, data loss risks
+
+### Confidence Calibration
+- 95%+ : Definite bug (null deref, type error, logic flaw)
+- 85-95%: Likely issue (missing edge case, race condition potential)
+- 70-85%: Possible issue (code smell, unclear intent)
+- <70%: Don't report (stylistic, subjective)
+
+### Output Format
+Each finding must include:
+- Severity: CRITICAL / HIGH / MEDIUM / LOW
+- Confidence: percentage
+- Location: file:line
+- Issue: one-line description
+- Fix: concrete suggestion
+</confidence_threshold>
+
 <!-- ANTI-PATTERNS -->
 
 <anti_patterns>

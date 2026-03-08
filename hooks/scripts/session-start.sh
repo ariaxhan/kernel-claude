@@ -95,6 +95,19 @@ else
   echo ""
 fi
 
+# LSP status check (only show if not enabled)
+if [ -z "$ENABLE_LSP_TOOL" ]; then
+  if [ -f ~/.claude/settings.json ]; then
+    LSP_ENABLED=$(grep -o '"ENABLE_LSP_TOOL"' ~/.claude/settings.json 2>/dev/null)
+    if [ -z "$LSP_ENABLED" ]; then
+      echo "## LSP"
+      echo "**Not enabled.** Code nav is 600x slower without it."
+      echo "Setup: \`_meta/reference/lsp-setup.md\`"
+      echo ""
+    fi
+  fi
+fi
+
 # Quick reference
 cat << 'REFERENCE'
 ## Quick Reference
@@ -105,7 +118,7 @@ cat << 'REFERENCE'
 /kernel:ship      → Commit, push, PR
 ```
 
-**Commands:** ingest, validate, ship, tearitapart, branch, handoff
-**Agents:** surgeon (implement), adversary (verify)
+**Commands:** ingest, validate, review, tearitapart, handoff
+**Agents:** surgeon (implement), adversary (QA), reviewer (PR review)
 
 REFERENCE

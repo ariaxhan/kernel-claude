@@ -13,7 +13,18 @@ agentdb read-start
 Output what you learned: failures to avoid, patterns to follow, active contracts.
 If AgentDB empty or missing: note it, continue.
 
-STEP 2: Show task understanding
+STEP 2: EXHAUST SEARCH (MANDATORY before ANY question)
+**NEVER ask user for file locations, configs, or values you can find.**
+Search order:
+1. Glob: `**/*keyword*`, `**/*.json`, `**/*.yaml`, `**/*config*`
+2. Grep: search file contents for error messages, tool names, keywords
+3. Common paths: `~/.config/`, `~/.claude/`, `.mcp.json`, `package.json`, `.env*`
+4. Error messages: they tell you what's missing and where
+
+If it exists on disk → FIND IT. If it's in an error message → READ IT.
+Only ask when information is TRULY not discoverable (credentials, decisions, preferences).
+
+STEP 3: Show task understanding
 ```
 TASK: {what user asked, one sentence}
 TYPE: {bug|feature|refactor|question|verify|handoff|review}
@@ -133,11 +144,16 @@ All explanations: plain language, no code terms unless user is technical.
 <violations>
 Before ANY action, check:
 
+❌ Am I about to ASK where a file is? STOP. SEARCH FIRST. Glob, Grep, find.
+❌ Am I about to ASK for a config value? STOP. READ THE CONFIG FILE.
+❌ Am I about to ASK what format something needs? STOP. CHECK DOCS, ERROR MESSAGES, EXISTING FILES.
 ❌ Am I writing code for tier 2+? STOP. Spawn surgeon.
 ❌ Did I skip AgentDB read? GO BACK.
 ❌ Did I skip tier declaration? GO BACK.
 ❌ Am I guessing file count? COUNT THEM.
 ❌ Is my output technical? SIMPLIFY.
+
+**SEARCH EXHAUSTION RULE:** If you ask a question that could have been answered by searching, you FAILED. The user's time is not yours to waste.
 
 If any violation: stop, correct, continue.
 </violations>

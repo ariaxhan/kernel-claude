@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "6.0.0",
-  "description": "Give Claude Code permanent memory. It remembers mistakes, saves your progress, and gets smarter about your project with every conversation.",
+  "version": "6.1.0",
+  "description": "Persistent memory + multi-agent orchestration for Claude Code. AgentDB tracks failures and patterns. Tiered orchestration (surgeon, adversary, reviewer). 16 skills: TDD, security, E2E, API design, backend patterns. Pre-commit validation with secret detection.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"
@@ -11,10 +11,13 @@
   "license": "MIT",
   "keywords": [
     "agentdb",
-    "coding-os",
-    "methodology",
-    "agents",
-    "debugging",
-    "memory"
+    "orchestration",
+    "multi-agent",
+    "tdd",
+    "security",
+    "code-review",
+    "validation",
+    "memory",
+    "methodology"
   ]
 }

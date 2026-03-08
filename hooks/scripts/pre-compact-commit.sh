@@ -2,10 +2,17 @@
 # PreCompact hook: Save agent context + commit before compaction
 # Multi-agent safe: each agent writes its OWN snapshot, never overwrites active.md
 # Events: PreCompact (all matchers: manual + auto)
+#
+# Key behaviors:
+# 1. Commit any uncommitted work before compaction (preserve work)
+# 2. Log compaction event to AgentDB (track patterns)
+# 3. Save context snapshot for post-compaction restoration
+# 4. Output critical context to conversation (survives compaction)
 
 # Find project root dynamically
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
+AGENTDB_PATH="$PROJECT_ROOT/_meta/agentdb/agent.db"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 TIMESTAMP_SHORT=$(date +"%Y-%m-%d %H:%M")
 
@@ -76,15 +83,55 @@ REPO_NAME=$(basename "$PROJECT_ROOT")
 git commit -m "chore(checkpoint): $REPO_NAME pre-compact [$AGENT] ($TRIGGER, $FILES_CHANGED files) $TIMESTAMP_SHORT" --no-verify 2>/dev/null
 git push 2>/dev/null || true
 
-# === STEP 4: RESTORE CONTEXT AFTER COMPACTION ===
-# Output the snapshot back to conversation so context is restored
-if [ -f "$SNAPSHOT" ]; then
-    echo "=== CONTEXT RESTORED FROM SNAPSHOT ==="
-    cat "$SNAPSHOT"
-    echo ""
-    echo "=== AGENTDB STATE ==="
-    # Restore AgentDB context
-    agentdb read-start 2>/dev/null || echo "AgentDB not available"
+# === STEP 4: LOG COMPACTION TO AGENTDB ===
+# Record compaction event for pattern tracking
+if [ -f "$AGENTDB_PATH" ]; then
+    BRANCH=$(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null || echo "unknown")
+    UNCOMMITTED=$(cd "$PROJECT_ROOT" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+
+    # Log compaction event
+    sqlite3 "$AGENTDB_PATH" <<SQL 2>/dev/null || true
+INSERT INTO context (type, content, ts) VALUES (
+    'compaction',
+    json_object(
+        'agent', '$AGENT',
+        'trigger', '$TRIGGER',
+        'branch', '$BRANCH',
+        'uncommitted_files', $UNCOMMITTED,
+        'files_committed', ${FILES_CHANGED:-0},
+        'timestamp', '$TIMESTAMP'
+    ),
+    datetime('now')
+);
+SQL
 fi
+
+# === STEP 5: OUTPUT CRITICAL CONTEXT (survives compaction) ===
+# This output appears in conversation after compaction
+echo "=== PRE-COMPACTION SUMMARY ==="
+echo "Agent: $AGENT | Branch: $(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null)"
+echo "Trigger: $TRIGGER | Time: $TIMESTAMP_SHORT"
+
+# Show uncommitted work that was committed
+if [ "${FILES_CHANGED:-0}" -gt 0 ]; then
+    echo ""
+    echo "Committed ${FILES_CHANGED} files before compaction."
+fi
+
+# Show recent commits for context
+echo ""
+echo "Recent commits:"
+cd "$PROJECT_ROOT" && git log --oneline -3 2>/dev/null
+
+# Show any remaining uncommitted changes
+REMAINING=$(cd "$PROJECT_ROOT" && git status --porcelain 2>/dev/null | head -5)
+if [ -n "$REMAINING" ]; then
+    echo ""
+    echo "Uncommitted (preserved):"
+    echo "$REMAINING"
+fi
+
+echo ""
+echo "=== POST-COMPACTION: Run 'agentdb read-start' to restore full context ==="
 
 exit 0

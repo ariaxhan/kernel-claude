@@ -48,6 +48,56 @@ After compaction:
 3. Check for pending checkpoints to review
 </compaction_protocol>
 
+<compaction_strategies>
+
+## Progressive Disclosure
+- Start with summary, expand on demand
+- Use AgentDB for full context, conversation for highlights
+- Pattern: "Details in AgentDB:contracts:{id}" or "See AgentDB:findings:{id}"
+
+## What to Preserve (Never Compact Away)
+- Current task context and goal
+- Active decisions and their rationale
+- Blocking issues and error states
+- Recent errors and their resolutions
+- File paths currently being worked on
+- Uncommitted changes description
+- Contract IDs and branch names
+
+## What to Aggressively Compact
+- Exploratory searches → "searched X, found Y at path:line"
+- File reads → "read file, key insight: Z"
+- Successful operations → "completed: X"
+- Debugging traces → "root cause: X, fix: Y"
+- Tool call history → "N tool calls, outcome: X"
+- Research context → offload to AgentDB, keep one-line summary
+
+## Compaction Format
+Before: [full exploration, multiple tool calls, iterations, dead ends]
+After: "Explored X → Found Y at path/to/file:line → Key insight: Z"
+
+Before: [read 5 files, searched patterns, traced imports]
+After: "Traced dependency: A→B→C. Issue in B:42. Fix: add null check."
+
+## AgentDB Offloading Pattern
+When context grows heavy:
+1. Write detailed findings to AgentDB: `agentdb learn pattern "finding" "evidence"`
+2. Keep one-line summary in conversation
+3. Reference: "See AgentDB:patterns for full trace"
+
+## Phase Transition Compaction
+
+| Transition | Compact? | Why |
+|------------|----------|-----|
+| Research → Planning | Yes | Research bulk served its purpose; plan is distilled output |
+| Planning → Implementation | Yes | Plan is in contract/file; free context for code |
+| Implementation → Testing | Maybe | Keep if tests reference recent code |
+| Debugging → Next feature | Yes | Debug traces pollute unrelated work |
+| Mid-implementation | No | Losing file paths, variable names, partial state is costly |
+| After failed approach | Yes | Clear dead-end reasoning before new approach |
+
+</compaction_strategies>
+
 <failure_modes>
 1. Agent tries too much at once → context exhausted mid-work
    Fix: Incremental progress with commits at each step
