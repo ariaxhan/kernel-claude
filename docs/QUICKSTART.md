@@ -87,13 +87,19 @@ These folders stay with your project forever. Close Claude Code, come back tomor
 
 ### Starting Work
 
-Open Claude Code in your project. Just describe what you want in plain English:
+**Always start with `/kernel:ingest`**
 
-- "Add a contact form to the homepage"
-- "Fix the bug where users can't log in"
-- "Make the buttons bigger"
+This is the universal entry point. Type `/kernel:ingest` followed by what you want:
 
-Behind the scenes, KERNEL runs `/kernel:ingest`: it classifies your request (bug, feature, refactor, question), decides scope by file count (1–2 files = Tier 1 direct, 3–5 = Tier 2 surgeon, 6+ = Tier 3 surgeon + adversary), and routes accordingly. In plain terms: it figures out what you need, how big it is, and the best way to do it. It reads what's been tried before, checks what broke last time, and picks up where you left off.
+```
+/kernel:ingest add a contact form to the homepage
+```
+
+Or type `/kernel:ingest` first, then describe your task on the next line.
+
+**Why this matters:** `/kernel:ingest` reads memory, classifies your request, and routes to the right approach. Without it, Claude Code skips the memory system entirely.
+
+Behind the scenes, it classifies your request (bug, feature, refactor, question), decides scope by file count (1–2 files = Tier 1 direct, 3–5 = Tier 2 surgeon, 6+ = Tier 3 surgeon + adversary), reads what's been tried before, checks what broke last time, and picks up where you left off.
 
 ### Doing Work
 
@@ -168,23 +174,31 @@ KERNEL includes specialized helpers that Claude Code can use:
 
 ---
 
-## Claude Code vs Cursor
+## Using KERNEL with Cursor
 
-If you're using both:
+If you have KERNEL installed in Claude Code and also use Cursor with Claude, KERNEL works automatically—no extra setup needed.
 
-**Claude Code (the builder):**
-- Handles big projects via `/kernel:ingest` (classify → tier → route)
-- Remembers context across days (AgentDB)
-- Spawns surgeon/adversary for 3+ file changes
-- Takes real action
+### How It Works
 
-**Cursor (the editor):**
-- Quick small edits
-- Reading through files
-- Visual navigation
-- Copy-pasting snippets
+Cursor uses the same Claude configuration as Claude Code. When you installed KERNEL in Claude Code, it registered globally. Cursor picks this up automatically.
 
-Use Claude Code for building. Use Cursor for browsing and tiny tweaks.
+### Verify It's Working
+
+In Cursor's Claude chat, type `/kernel:` and you should see the commands appear. If not:
+
+1. Make sure you ran `/plugin install kernel` in Claude Code first
+2. Restart Cursor
+3. The `_meta/` folder from `/kernel:init` must exist in your project
+
+### Best Practice
+
+- **Use Claude Code** for `/kernel:ingest` tasks (building features, multi-file changes)
+- **Use Cursor** for quick edits and file navigation
+- Both share the same AgentDB memory in `_meta/`
+
+### If Commands Don't Appear in Cursor
+
+The plugin system is Claude Code-specific. In Cursor, you can still reference KERNEL's memory by telling Claude to read `_meta/agentdb/` or by describing your task—Claude will see the KERNEL instructions in your project's CLAUDE.md.
 
 ---
 
@@ -265,4 +279,4 @@ The more you use it, the smarter Claude Code gets about YOUR project specificall
 
 ---
 
-*Built with KERNEL v6.1.4 | [GitHub](https://github.com/ariaxhan/kernel-claude)*
+*Built with KERNEL v6.1.5 | [GitHub](https://github.com/ariaxhan/kernel-claude)*
