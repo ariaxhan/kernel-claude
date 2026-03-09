@@ -1,5 +1,5 @@
 ---
-name: ingest
+name: kernel:ingest
 description: "Universal entry point. Classify task, determine tier, route to agent. Triggers: start, begin, do, implement, build, fix, create."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob, Task

@@ -1,5 +1,5 @@
 ---
-name: tearitapart
+name: kernel:tearitapart
 description: "Critical pre-implementation review. Find problems before coding. Verdict: PROCEED, REVISE, or RETHINK. Triggers: review plan, tear apart, critique, analyze."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob

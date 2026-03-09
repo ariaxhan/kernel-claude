@@ -1,5 +1,5 @@
 ---
-name: review
+name: kernel:review
 description: "Code review for PRs or staged changes. >80% confidence threshold. Verdict: APPROVE, REQUEST CHANGES, or COMMENT. Triggers: review, pr, code review."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob

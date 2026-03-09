@@ -1,5 +1,5 @@
 ---
-name: help
+name: kernel:help
 description: "Show KERNEL help. What commands do, how to use them. Triggers: help, how, what, commands."
 user-invocable: true
 ---

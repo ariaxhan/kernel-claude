@@ -1,5 +1,5 @@
 ---
-name: init
+name: kernel:init
 description: "Initialize KERNEL for a project. Creates _meta structure, AgentDB, context file. Run once per project. Triggers: init, setup, initialize."
 user-invocable: true
 allowed-tools: Read, Write, Bash, Grep, Glob

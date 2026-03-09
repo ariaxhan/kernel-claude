@@ -1,5 +1,5 @@
 ---
-name: handoff
+name: kernel:handoff
 description: "Generate context handoff brief for session continuation. Saves state, decisions, next steps. Triggers: handoff, save, pause, context, continue later."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob

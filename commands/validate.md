@@ -1,5 +1,5 @@
 ---
-name: validate
+name: kernel:validate
 description: "Pre-commit verification. Build, types, lint, tests, security scan. Blocks on failure. Triggers: validate, check, verify, pre-commit, ship."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob

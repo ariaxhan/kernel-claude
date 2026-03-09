@@ -2,6 +2,14 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [6.1.5] - 2026-03-08
+
+### Fixed
+- **Command namespacing** - Commands now explicitly include `kernel:` prefix in name field (e.g., `name: kernel:ingest`)
+- Commands now appear as `/kernel:ingest` instead of `/ingest` in autocomplete
+
+---
+
 ## [6.1.2] - 2026-03-08
 
 ### Fixed
