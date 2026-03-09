@@ -2,6 +2,15 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [6.1.1] - 2026-03-08
+
+### Fixed
+- **Commands not loading** - Added explicit `commands` array to plugin.json (commands require explicit registration, unlike skills which auto-discover)
+- **Plugin manifest** - Added `skills`, `agents`, `hooks` fields for proper component registration
+- **Marketplace sync** - Updated version and description to match plugin.json
+
+---
+
 ## [6.1.0] - 2026-03-08
 
 ### Added
