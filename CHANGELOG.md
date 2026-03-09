@@ -2,6 +2,19 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [6.1.2] - 2026-03-08
+
+### Fixed
+- **Command format** - Converted all commands from XML to YAML frontmatter (Claude Code requirement)
+- **Build skill format** - Added missing YAML frontmatter to skills/build/SKILL.md
+- **Frontmatter fields** - Added `name`, `description`, `user-invocable`, `allowed-tools` to all commands
+
+### Changed
+- Commands now use standard YAML frontmatter instead of custom XML tags
+- All commands include `user-invocable: true` for slash command registration
+
+---
+
 ## [6.1.1] - 2026-03-08
 
 ### Fixed

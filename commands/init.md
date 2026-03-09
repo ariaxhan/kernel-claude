@@ -1,138 +1,96 @@
-<command id="kernel:init">
-<description>Set up KERNEL for your project. Run this once when starting.</description>
+---
+name: init
+description: "Initialize KERNEL for a project. Creates _meta structure, AgentDB, context file. Run once per project. Triggers: init, setup, initialize."
+user-invocable: true
+allowed-tools: Read, Write, Bash, Grep, Glob
+---
 
-<!-- PREREQUISITE: Plugin installed, CLAUDE.md in .claude/, agentdb on PATH. See docs/QUICKSTART.md for full installation. -->
+# FOR NON-TECHNICAL USERS
 
-<!-- ============================================ -->
-<!-- FOR NON-TECHNICAL USERS                      -->
-<!-- ============================================ -->
-
-<user_message>
-Setting up your project to work with KERNEL. This creates the folders and files needed to:
+Setting up your project to work with KERNEL. This creates folders to:
 - Remember what works and what doesn't
-- Save your progress automatically
+- Save progress automatically
 - Track what you're working on
 
-You only need to do this once per project.
-</user_message>
+---
 
-<!-- ============================================ -->
-<!-- FILE STRUCTURE (what init creates)           -->
-<!-- ============================================ -->
+# FILE STRUCTURE
 
-<file_structure>
+```
 _meta/
-├── agentdb/      # Memory storage (agent.db). Learnings, contracts, checkpoints.
-├── context/      # Current state (active.md). Scout/researcher findings.
-├── plans/        # Implementation plans from /build.
-├── research/     # Research notes from researcher agent.
-├── handoffs/     # Session summaries from /kernel:handoff.
-├── reviews/      # Tear-down reviews from /kernel:tearitapart.
-└── agents/       # Active agent registry.
-</file_structure>
-
-<!-- ============================================ -->
-<!-- SETUP STEPS                                  -->
-<!-- ============================================ -->
-
-<steps>
-
-<step id="1" name="Create folders">
-Create these directories if they don't exist:
+├── agentdb/      # Memory storage (agent.db)
+├── context/      # Current state (active.md)
+├── plans/        # Implementation plans
+├── research/     # Research notes
+├── handoffs/     # Session summaries
+├── reviews/      # Tear-down reviews
+└── agents/       # Active agent registry
 ```
-_meta/{agentdb,context,plans,research,handoffs,reviews,agents}
+
+---
+
+# SETUP STEPS
+
+## Step 1: Create folders
+```bash
+mkdir -p _meta/{agentdb,context,plans,research,handoffs,reviews,agents}
 ```
-Run: mkdir -p _meta/{agentdb,context,plans,research,handoffs,reviews,agents}
-</step>
 
-<step id="2" name="Initialize memory">
-If _meta/agentdb/agent.db doesn't exist:
-Run: agentdb init
+## Step 2: Initialize memory
+```bash
+agentdb init
+```
 
-If agentdb command not found:
-- Plugin may not be installed. See docs/QUICKSTART.md for installation.
-- Check: which agentdb
-- Symlink: sudo ln -sf "$KERNEL_PATH/orchestration/agentdb/agentdb" /usr/local/bin/agentdb
-</step>
+If agentdb not found:
+```bash
+sudo ln -sf "$KERNEL_PATH/orchestration/agentdb/agentdb" /usr/local/bin/agentdb
+```
 
-<step id="3" name="Verify CLAUDE.md">
-Ensure project has KERNEL instructions:
-- .claude/CLAUDE.md must exist (copied during plugin install)
-- If missing: cp "$KERNEL_PATH/CLAUDE.md" .claude/CLAUDE.md
-</step>
+## Step 3: Verify git
+```bash
+git status
+# If not a repo: git init
+```
 
-<step id="4" name="Verify git">
-Check if project is a git repo:
-Run: git status
+## Step 4: Create context file
 
-If not a git repo and user wants version control:
-Run: git init
-</step>
-
-<step id="5" name="Create context file">
-If _meta/context/active.md doesn't exist, create it:
-
+Create `_meta/context/active.md`:
 ```markdown
 # Project Context
 
-**Last updated**: {today's date}
-**Branch**: {current branch}
+**Last updated**: {date}
+**Branch**: {branch}
 
 ## What This Project Is
-{Ask user to describe in 1-2 sentences}
+{Ask user}
 
 ## Current Focus
-{Ask user what they're working on}
-
-## Important Files
-{List key files discovered or ask user}
+{Ask user}
 ```
-</step>
 
-<step id="6" name="Confirm setup">
+---
+
+# CONFIRM SETUP
+
 Output to user:
 
+```
+Setup complete!
+
+KERNEL provides:
+- Memory: Remembers mistakes, patterns, progress
+- Helpers: Surgeon, Adversary, Researcher, Scout, Validator
+- Shortcuts: /kernel:ingest, /kernel:handoff, /kernel:help
+
+To start: Describe what you want
+To save: /kernel:handoff
+Need help: /kernel:help
+```
+
 ---
-**Setup complete!**
 
-Your project is ready. KERNEL provides:
-- **Memory**: Remembers mistakes, patterns, progress (AgentDB + _meta/)
-- **Helpers**: Surgeon (builds), Adversary (validates), Researcher, Scout, Validator (pre-commit gate)
-- **Shortcuts**: /kernel:ingest (start), /kernel:handoff (save), /kernel:help
+# ON END
 
-**To start working**: Describe what you want. KERNEL runs /ingest automatically: classify → tier → route.
-**To save progress**: Type `/kernel:handoff` before stopping.
-**Need help?**: Type `/kernel:help`
----
-</step>
-
-</steps>
-
-<!-- ============================================ -->
-<!-- OUTPUT RULES                                 -->
-<!-- ============================================ -->
-
-<output_rules>
-<rule>All messages to user: plain language, no code terms unless user is technical</rule>
-<rule>Never show file paths unless user asks</rule>
-<rule>Never show command output unless there's an error</rule>
-<rule>If something fails: explain what went wrong in simple terms + what to do</rule>
-<rule>Success messages: short, clear, actionable next step</rule>
-</output_rules>
-
-<!-- ============================================ -->
-<!-- AFTER SETUP                                  -->
-<!-- ============================================ -->
-
-<after_setup>
-Write to AgentDB:
-agentdb write-end '{"agent":"init","did":"setup_complete","project":"PROJECT_NAME"}'
-
-If _meta/_learnings.md exists, append:
-## {date}
-**Context:** Project initialization
-**Type:** pattern
-**What:** Initialized KERNEL for {project name}
-</after_setup>
-
-</command>
+```bash
+agentdb write-end '{"agent":"init","did":"setup_complete"}'
+```
