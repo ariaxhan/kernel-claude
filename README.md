@@ -49,7 +49,15 @@ KERNEL automatically routes your requests:
 
 ## Daily Use
 
-**Start:** Just describe what you want in plain English
+**Start every request with `/kernel:ingest`**
+
+This is the universal entry point. It reads memory, classifies your task, picks the right approach, and routes to the right agent. Always start here.
+
+```
+/kernel:ingest add user authentication to the app
+```
+
+Or just type `/kernel:ingest` and describe what you want on the next line.
 
 **Check:** `/kernel:validate` before committing
 
@@ -73,17 +81,29 @@ KERNEL automatically routes your requests:
 
 ## Troubleshooting
 
-**Commands not showing?**
+**Commands not showing up?**
 ```
 /plugin marketplace refresh
 ```
 Then restart Claude Code.
 
-**Claude forgot everything?**
-Always run `/kernel:handoff` before closing.
+**Claude isn't reading memory?**
+Start with `/kernel:ingest`. Plain requests skip the memory system.
 
-**Same mistake happening?**
-Tell Claude: "Remember this mistake permanently."
+**Claude forgot everything between sessions?**
+Run `/kernel:handoff` before closing. This saves context to AgentDB.
+
+**Same mistake keeps happening?**
+Say: "Remember this as a failure pattern." KERNEL will log it and avoid it next time.
+
+**"AgentDB not found" error?**
+Run `/kernel:init` first. This creates the `_meta/` folder and database.
+
+**Claude doing too much at once?**
+KERNEL routes big tasks (6+ files) to multiple agents. If you want simpler execution, say "Tier 1 only" or "just do it directly."
+
+**Agents not spawning?**
+Make sure you're using `/kernel:ingest`. Direct requests bypass the tiering system.
 
 ---
 
