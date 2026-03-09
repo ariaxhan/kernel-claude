@@ -1,24 +1,27 @@
 ---
 name: kernel:init
-description: "Initialize KERNEL for a project. Creates _meta structure, AgentDB, CLAUDE.md. Run once per project. Triggers: init, setup, initialize."
+description: "Initialize KERNEL for a project. Audits codebase, creates _meta, AgentDB, CLAUDE.md, and rules. Run once per project."
 user-invocable: true
 allowed-tools: Read, Write, Bash, Grep, Glob
 ---
 
-# AUTOMATIC SETUP
+# FULL PROJECT INITIALIZATION
 
-**Execute all steps immediately. Do not ask the user - just do it.**
+**Do everything automatically. Audit the project, detect patterns, create everything.**
 
-## Step 1: Create all folders
+---
 
-Run this command:
+## PHASE 1: Create Structure
+
 ```bash
-mkdir -p _meta/{agentdb,context,plans,research,handoffs,reviews,agents} && mkdir -p .claude
+mkdir -p _meta/{agentdb,context,plans,research,handoffs,reviews,agents}
+mkdir -p .claude/rules
 ```
 
-## Step 2: Initialize AgentDB
+---
 
-Run this command:
+## PHASE 2: Initialize AgentDB
+
 ```bash
 sqlite3 _meta/agentdb/agent.db "
 PRAGMA journal_mode=WAL;
@@ -51,105 +54,180 @@ CREATE INDEX IF NOT EXISTS idx_context_type ON context(type);
 "
 ```
 
-## Step 3: Create .claude/CLAUDE.md
+---
 
-Use the Write tool to create `.claude/CLAUDE.md` with this exact content:
+## PHASE 3: Audit Project
+
+**Detect everything about this project. Run these searches:**
+
+### Tech Stack Detection
+```bash
+# Check for package managers and languages
+ls -la package.json requirements.txt pyproject.toml go.mod Cargo.toml Gemfile composer.json pom.xml build.gradle 2>/dev/null
+```
+
+### Framework Detection
+```bash
+# Look for framework indicators
+grep -l "next\|react\|vue\|angular\|svelte" package.json 2>/dev/null
+grep -l "fastapi\|flask\|django\|express\|nestjs" package.json requirements.txt 2>/dev/null
+```
+
+### Project Structure
+```bash
+# Map top-level directories
+ls -d */ 2>/dev/null | head -20
+```
+
+### Existing Conventions
+```bash
+# Check for existing config files
+ls -la .eslintrc* .prettierrc* tsconfig.json .editorconfig pyproject.toml 2>/dev/null
+```
+
+### Git Info
+```bash
+git remote -v 2>/dev/null | head -2
+git log --oneline -5 2>/dev/null
+```
+
+**Read key files to understand the project:**
+- README.md (if exists)
+- package.json (if exists)
+- Any existing .claude/CLAUDE.md
+
+---
+
+## PHASE 4: Create .claude/CLAUDE.md
+
+Based on your audit, create `.claude/CLAUDE.md` with DETECTED information:
 
 ```markdown
-# Project Instructions
+# {Project Name from package.json or folder name}
+
+## Tech Stack
+{List detected technologies - be specific}
+- Language: {detected}
+- Framework: {detected}
+- Package manager: {detected}
+- Database: {detected if found}
+
+## Project Structure
+{Describe the directory structure you found}
 
 ## KERNEL Integration
 
-This project uses KERNEL for persistent memory and intelligent task routing.
-
-### How to Work
-
 **Always start with `/ingest`** (or `/kernel:ingest` in terminal)
 
-This reads memory, classifies your task, and routes to the right approach:
+Routing:
 - Tier 1 (1-2 files): Execute directly
 - Tier 2 (3-5 files): Spawn surgeon agent
-- Tier 3 (6+ files): Surgeon + adversary for verification
+- Tier 3 (6+ files): Surgeon + adversary
 
-### Memory
+**Run `/handoff` before closing** to save progress.
 
-KERNEL remembers across sessions:
-- What worked and what broke
-- Patterns discovered in this codebase
-- Where you left off
+## Conventions
+{Detected from eslint, prettier, editorconfig, or inferred from code}
 
-Memory lives in `_meta/agentdb/`. Never delete this folder.
-
-### Before Closing
-
-Run `/handoff` (or `/kernel:handoff`) to save progress.
-
-### Commands
+## Commands
 
 | Command | What It Does |
 |---------|--------------|
-| `/ingest` | Start any task (ALWAYS use this) |
+| `/ingest` | Start any task |
 | `/validate` | Pre-commit checks |
 | `/handoff` | Save progress |
-| `/review` | Code review |
-| `/help` | Show help |
-
-## Project-Specific Instructions
-
-<!-- Customize below for your project -->
-
-### Tech Stack
-<!-- List your technologies here -->
-
-### Conventions
-<!-- List your coding conventions here -->
-
-### Never Do
-<!-- List things Claude should avoid -->
 ```
 
-## Step 4: Create context file
+---
 
-Use the Write tool to create `_meta/context/active.md`:
+## PHASE 5: Create Rules
+
+Based on audit, create `.claude/rules/project.md`:
 
 ```markdown
-# Project Context
+# Project Rules
+
+## Tech Stack
+- {specific rules based on detected stack}
+
+## File Organization
+- {rules based on detected structure}
+
+## Code Style
+- {rules based on detected linters/formatters}
+
+## Testing
+- {rules based on detected test framework}
+
+## Never Do
+- Never commit secrets or .env files
+- Never delete _meta/ folder
+- {stack-specific warnings}
+```
+
+---
+
+## PHASE 6: Seed AgentDB
+
+**Add initial learnings so memory isn't empty:**
+
+```bash
+sqlite3 _meta/agentdb/agent.db "
+INSERT OR IGNORE INTO learnings (id, type, insight, evidence, domain) VALUES
+('init-stack', 'pattern', '{Detected tech stack summary}', 'Detected during init', 'project'),
+('init-structure', 'pattern', '{Detected project structure}', 'Detected during init', 'project'),
+('init-conventions', 'pattern', '{Detected conventions}', 'Detected during init', 'code-style');
+"
+```
+
+---
+
+## PHASE 7: Create Context File
+
+Create `_meta/context/active.md`:
+
+```markdown
+# {Project Name}
 
 **Initialized**: {current date}
+**Tech Stack**: {detected}
 **Status**: Ready
 
 ## What This Project Is
-<!-- Describe your project -->
+{Infer from README or package.json description}
+
+## Structure
+{Key directories and their purposes}
 
 ## Current Focus
-<!-- What are you working on? -->
-```
-
-## Step 5: Verify git (optional)
-
-Check if git repo exists:
-```bash
-git rev-parse --git-dir 2>/dev/null || echo "Not a git repo - consider running: git init"
+Newly initialized - ready for first task.
 ```
 
 ---
 
 # OUTPUT TO USER
 
-After completing ALL steps, tell the user:
+After ALL phases complete:
 
 ```
-✓ KERNEL initialized!
+✓ KERNEL initialized for {project name}!
+
+Detected:
+• Tech stack: {list}
+• Framework: {if found}
+• Test framework: {if found}
+• Linting: {if found}
 
 Created:
-• .claude/CLAUDE.md - Project instructions (customize this!)
-• _meta/agentdb/agent.db - Memory database
-• _meta/ folders - Context storage
+• .claude/CLAUDE.md - Project instructions (auto-populated!)
+• .claude/rules/project.md - Project-specific rules
+• _meta/agentdb/agent.db - Memory (seeded with project info)
+• _meta/context/active.md - Current state
 
-How to use:
-1. Start every request with /ingest
-2. Run /handoff before closing
-3. Run /help if stuck
+AgentDB seeded with:
+• Project structure patterns
+• Tech stack info
+• Detected conventions
 
-Next: Open .claude/CLAUDE.md and fill in your project details.
+Ready to work! Start with /ingest and describe your task.
 ```
