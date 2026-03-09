@@ -49,15 +49,17 @@ KERNEL automatically routes your requests:
 
 ## Daily Use
 
-**Start every request with `/kernel:ingest`**
+**Start every request with `/ingest`**
 
 This is the universal entry point. It reads memory, classifies your task, picks the right approach, and routes to the right agent. Always start here.
 
 ```
-/kernel:ingest add user authentication to the app
+/ingest add user authentication to the app
 ```
 
-Or just type `/kernel:ingest` and describe what you want on the next line.
+Or just type `/ingest` and describe what you want on the next line.
+
+> **Note:** In Claude Code terminal, commands use the `kernel:` prefix (`/kernel:ingest`). In Claude Desktop and Cursor, they appear without the prefix (`/ingest`). Same functionality, different naming.
 
 **Check:** `/kernel:validate` before committing
 
@@ -67,15 +69,15 @@ Or just type `/kernel:ingest` and describe what you want on the next line.
 
 ## Commands
 
-| Command | What It Does |
-|---------|--------------|
-| `/kernel:ingest` | Classify task, determine tier, route to agent |
-| `/kernel:validate` | Build, lint, test, security scan |
-| `/kernel:handoff` | Save progress for next session |
-| `/kernel:review` | Code review for PRs |
-| `/kernel:tearitapart` | Critical pre-implementation review |
-| `/kernel:init` | Setup (run once per project) |
-| `/kernel:help` | Show help |
+| Terminal | Desktop/Cursor | What It Does |
+|----------|----------------|--------------|
+| `/kernel:ingest` | `/ingest` | Classify task, determine tier, route to agent |
+| `/kernel:validate` | `/validate` | Build, lint, test, security scan |
+| `/kernel:handoff` | `/handoff` | Save progress for next session |
+| `/kernel:review` | `/review` | Code review for PRs |
+| `/kernel:tearitapart` | `/tearitapart` | Critical pre-implementation review |
+| `/kernel:init` | `/init` | Setup (run once per project) |
+| `/kernel:help` | `/help` | Show help |
 
 ---
 
@@ -88,7 +90,7 @@ Or just type `/kernel:ingest` and describe what you want on the next line.
 Then restart Claude Code.
 
 **Claude isn't reading memory?**
-Start with `/kernel:ingest`. Plain requests skip the memory system.
+Start with `/ingest` (or `/kernel:ingest` in terminal). Plain requests skip the memory system.
 
 **Claude forgot everything between sessions?**
 Run `/kernel:handoff` before closing. This saves context to AgentDB.
@@ -103,7 +105,7 @@ Run `/kernel:init` first. This creates the `_meta/` folder and database.
 KERNEL routes big tasks (6+ files) to multiple agents. If you want simpler execution, say "Tier 1 only" or "just do it directly."
 
 **Agents not spawning?**
-Make sure you're using `/kernel:ingest`. Direct requests bypass the tiering system.
+Make sure you're using `/ingest` (or `/kernel:ingest` in terminal). Direct requests bypass the tiering system.
 
 ---
 

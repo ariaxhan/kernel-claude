@@ -174,6 +174,20 @@ KERNEL includes specialized helpers that Claude Code can use:
 
 ---
 
+## Command Names by Platform
+
+Commands have different prefixes depending on where you're using Claude:
+
+| Platform | Command Format | Example |
+|----------|----------------|---------|
+| **Claude Code (terminal)** | `/kernel:command` | `/kernel:ingest` |
+| **Claude Desktop** | `/command` | `/ingest` |
+| **Cursor** | `/command` | `/ingest` |
+
+The functionality is identical—only the prefix differs.
+
+---
+
 ## Using KERNEL with Cursor
 
 If you have KERNEL installed in Claude Code and also use Cursor with Claude, KERNEL works automatically—no extra setup needed.
@@ -184,11 +198,11 @@ Cursor uses the same Claude configuration as Claude Code. When you installed KER
 
 ### Verify It's Working
 
-In Cursor's Claude chat, type `/kernel:` and you should see the commands appear. If not:
+In Cursor's Claude chat, type `/` and you should see commands like `/ingest`, `/validate`, `/handoff` appear. If not:
 
 1. Make sure you ran `/plugin install kernel` in Claude Code first
 2. Restart Cursor
-3. The `_meta/` folder from `/kernel:init` must exist in your project
+3. The `_meta/` folder from `/init` must exist in your project
 
 ### Best Practice
 
@@ -196,9 +210,16 @@ In Cursor's Claude chat, type `/kernel:` and you should see the commands appear.
 - **Use Cursor** for quick edits and file navigation
 - Both share the same AgentDB memory in `_meta/`
 
-### If Commands Don't Appear in Cursor
+---
 
-The plugin system is Claude Code-specific. In Cursor, you can still reference KERNEL's memory by telling Claude to read `_meta/agentdb/` or by describing your task—Claude will see the KERNEL instructions in your project's CLAUDE.md.
+## Using KERNEL with Claude Desktop
+
+Same as Cursor—KERNEL commands appear without the `kernel:` prefix. Type `/ingest` to start.
+
+If commands don't appear, make sure:
+1. You installed the plugin in Claude Code first
+2. Restart Claude Desktop
+3. Your project has the `_meta/` folder from running init
 
 ---
 
