@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "6.1.3",
+  "version": "6.1.4",
   "description": "Persistent memory + multi-agent orchestration for Claude Code. AgentDB tracks failures and patterns. Tiered orchestration (surgeon, adversary, reviewer). 16 skills: TDD, security, E2E, API design, backend patterns. Pre-commit validation with secret detection.",
   "author": {
     "name": "Aria Han",
@@ -28,6 +28,5 @@
     "./commands/handoff.md",
     "./commands/init.md",
     "./commands/help.md"
-  ],
-  "hooks": "./hooks/hooks.json"
+  ]
 }
