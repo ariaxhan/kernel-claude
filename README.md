@@ -48,9 +48,35 @@ Specialized helpers for different tasks:
 
 ### Tiered Routing
 KERNEL automatically routes your requests:
-- **Tier 1** (1-2 files): Claude executes directly
-- **Tier 2** (3-5 files): Spawns Surgeon agent
-- **Tier 3** (6+ files): Surgeon + Adversary for verification
+
+| Tier | Files | Approach |
+|------|-------|----------|
+| 1 | 1-2 | Execute directly. No subagents needed. |
+| 2 | 3-5 | Spawn surgeon agents to implement. |
+| 3 | 6+ | Surgeon agents implement; adversary agents verify. |
+
+### Skills
+Skills are methodologies that load on-demand. When you mention "debug" or "security," the relevant skill loads automatically. Skills inform HOW agents work.
+
+| Skill | What It Does |
+|-------|--------------|
+| `debug` | Scientific debugging: reproduce, hypothesize, binary search to root cause |
+| `testing` | Test behavior not implementation; edge cases over happy paths |
+| `tdd` | Test-driven: red-green-refactor cycle, tests before code |
+| `security` | Input validation, auth, secrets management, OWASP top 10 |
+| `api` | REST design: resource naming, status codes, pagination, versioning |
+| `backend` | Repository pattern, caching, queues, N+1 prevention |
+| `e2e` | Playwright: Page Object Model, flaky test strategies |
+| `refactor` | Behavior-preserving transforms; tests green before AND after |
+| `design` | Frontend aesthetics; break generic AI patterns |
+| `architecture` | System design, modules, dependencies, coupling |
+| `git` | Atomic commits, conventional messages, branch strategies |
+| `context` | Token management, compaction strategies, handoffs |
+| `orchestration` | Multi-agent coordination, contracts, fault tolerance |
+| `performance` | Measure before optimizing; identify real bottlenecks |
+| `eval` | Eval-driven development for AI workflows |
+
+Skills live in `skills/{name}/SKILL.md`. Each has a reference doc in `skills/{name}/reference/`.
 
 ---
 
