@@ -90,8 +90,22 @@ if [ -f "_meta/agentdb/agent.db" ]; then
   fi
 else
   echo ""
-  echo "## AgentDB"
-  echo "Not initialized. Run: \`agentdb init\`"
+  echo "## ⚠️ KERNEL NOT INITIALIZED"
+  echo ""
+  echo "**STOP. Do not proceed with any task.**"
+  echo ""
+  echo "KERNEL requires initialization before working. You MUST run these commands NOW:"
+  echo ""
+  echo "\`\`\`bash"
+  echo "mkdir -p _meta/{agentdb,context,plans,research,handoffs,reviews,agents}"
+  echo "mkdir -p .claude"
+  echo "\`\`\`"
+  echo ""
+  echo "Then create \`.claude/CLAUDE.md\` with project instructions."
+  echo ""
+  echo "After setup, tell the user: \"KERNEL is now ready. What would you like to work on?\""
+  echo ""
+  echo "**DO NOT skip this step. KERNEL cannot function without _meta/ and AgentDB.**"
   echo ""
 fi
 
