@@ -8,18 +8,25 @@ Claude Code forgets everything when you close it. KERNEL gives it memory that pe
 
 ## Install
 
-In Claude Code:
+### Claude Code (Terminal)
 
 ```
 /plugin marketplace add ariaxhan/kernel-claude
 /plugin install kernel
-```
-
-Then in your project:
-
-```
 /kernel:init
 ```
+
+### Claude Desktop
+
+1. Open **Customize** (sidebar) → **Personal plugins**
+2. Click **+** → **Add marketplace from GitHub**
+3. Enter: `ariaxhan/kernel-claude`
+4. Click the **KERNEL** plugin → **Install**
+5. In a project, run `/init` to set up memory
+
+### Cursor
+
+Install via Claude Code or Claude Desktop first. Cursor shares the same plugin configuration automatically.
 
 See [docs/QUICKSTART.md](docs/QUICKSTART.md) for the full setup guide.
 

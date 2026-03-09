@@ -16,33 +16,48 @@ Think of it like this: Claude Code is the worker. KERNEL is the training program
 
 ## Installation
 
-### Step 1: Add the KERNEL marketplace
+Choose your platform:
 
-In Claude Code, type this command and press Enter:
+### Option A: Claude Code (Terminal)
 
+**Step 1:** Add the KERNEL marketplace
 ```
 /plugin marketplace add ariaxhan/kernel-claude
 ```
 
-This tells Claude Code where to find KERNEL.
-
-### Step 2: Install the plugin
-
+**Step 2:** Install the plugin
 ```
 /plugin install kernel
 ```
 
-This downloads and activates KERNEL.
-
-### Step 3: Set up your project
-
-Navigate to your project folder, then run:
-
+**Step 3:** Set up your project (in your project folder)
 ```
 /kernel:init
 ```
 
-This creates the memory folders and prepares your project.
+---
+
+### Option B: Claude Desktop
+
+**Step 1:** Open the sidebar and click **Customize**
+
+**Step 2:** Under **Personal plugins**, click the **+** button
+
+**Step 3:** Select **Add marketplace from GitHub**
+
+**Step 4:** Enter `ariaxhan/kernel-claude` and press Enter
+
+**Step 5:** Find **KERNEL** in the list and click **Install**
+
+**Step 6:** Open your project and run `/init` to set up memory
+
+---
+
+### Option C: Cursor
+
+Cursor shares plugin configuration with Claude Code and Claude Desktop. Install via either of those first, then Cursor will have access automatically.
+
+---
 
 **That's it.** You're ready to work.
 
