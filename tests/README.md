@@ -65,7 +65,7 @@ suites:
       - frontmatter in commands, skills, agents
       - hooks.json valid
       - ingest has research, auto has loop
-      - YAML format usage
+      - structured format (XML/YAML)
 ```
 
 ## Adding Tests

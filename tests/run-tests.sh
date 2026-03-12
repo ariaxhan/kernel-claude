@@ -526,18 +526,21 @@ test_auto_command_has_loop() {
   assert_contains "$content" "max_iterations"
 }
 
-test_commands_use_yaml_format() {
-  local yaml_count=0
+test_commands_use_structured_format() {
+  # Commands should use XML structure (like skills) with semantic tags
+  # or YAML code blocks - both are valid formats
+  local structured_count=0
   local total_commands=0
   for cmd in "$PLUGIN_ROOT/commands/"*.md; do
     ((total_commands++))
-    if grep -q '```yaml' "$cmd" 2>/dev/null; then
-      ((yaml_count++))
+    # Check for XML structure (<command id="X">) or YAML blocks
+    if grep -qE '<command id=|```yaml' "$cmd" 2>/dev/null; then
+      ((structured_count++))
     fi
   done
-  # Core commands (ingest, auto) must use YAML - at least 2
-  [ "$yaml_count" -ge 2 ] || {
-    echo "FAIL: core commands should use YAML format ($yaml_count/$total_commands)"
+  # Core commands must use structured format - at least 2
+  [ "$structured_count" -ge 2 ] || {
+    echo "FAIL: core commands should use structured format ($structured_count/$total_commands)"
     return 1
   }
 }
@@ -652,7 +655,7 @@ run_test_suite() {
       run_test "hooks.json valid" test_hooks_json_valid
       run_test "ingest has research step" test_ingest_command_has_research_step
       run_test "auto has loop control" test_auto_command_has_loop
-      run_test "commands use YAML format" test_commands_use_yaml_format
+      run_test "commands use structured format" test_commands_use_structured_format
       ;;
   esac
 }

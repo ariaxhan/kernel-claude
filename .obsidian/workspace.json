@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "CHANGELOG.md",
+                "file": "commands/ingest.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "CHANGELOG"
+              "title": "ingest"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "CHANGELOG.md",
+                "file": "commands/ingest.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for CHANGELOG"
+              "title": "Backlinks for ingest"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "CHANGELOG.md",
+                "file": "commands/ingest.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from CHANGELOG"
+              "title": "Outgoing links from ingest"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "CHANGELOG.md",
+                "file": "commands/ingest.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of CHANGELOG"
+              "title": "Outline of ingest"
             }
           }
         ]
@@ -183,8 +183,17 @@
       "bases:Create new base": false
     }
   },
-  "active": "4f47829cd18bb66a",
+  "active": "73d416e709bbaac9",
   "lastOpenFiles": [
+    "commands/init.md",
+    "commands/review.md",
+    "commands/auto.md",
+    "commands/help.md",
+    "agents/reviewer.md",
+    "CHANGELOG.md",
+    "_meta/research/ai-code-anti-patterns.md",
+    "_meta/agents/main-44090.json",
+    "_meta/agents/main-9673-snapshot.md",
     "tests/README.md",
     "tests/run-tests.sh",
     "tests",
@@ -192,11 +201,7 @@
     "agents/adversary.md",
     "commands/ingest.md",
     "skills/architecture/SKILL.md",
-    "CHANGELOG.md",
     "rules/kernel.md",
-    "commands/auto.md",
-    "commands/help.md",
-    "commands/handoff.md",
-    "agents/reviewer.md"
+    "commands/handoff.md"
   ]
 }
