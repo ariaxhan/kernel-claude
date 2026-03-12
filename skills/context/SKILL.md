@@ -18,6 +18,8 @@ Monitor context usage. Offer handoff proactively at ~70% capacity.
 
 <reference>
 Skill-specific: skills/context/reference/context-research.md
+Architecture: _meta/research/context-graph-architecture.md
+Graph tracking: orchestration/agentdb/migrations/002_graph_tracking.sql
 </reference>
 
 <core_principles>

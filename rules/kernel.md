@@ -97,3 +97,52 @@ Serial execution is the exception. Parallel is the default.
 - User must explicitly approve any invariant override
 
 </rule>
+
+<!-- ============================================ -->
+<!-- FRONTMATTER PROTECTION                       -->
+<!-- Critical: Breaking frontmatter breaks plugin -->
+<!-- ============================================ -->
+
+<rule id="frontmatter_protection" type="invariant" load="always">
+
+## Frontmatter Format (Commands, Skills, Agents)
+
+<invariant id="exact_frontmatter">
+YAML frontmatter MUST be exact. Claude Code plugin fails silently on malformed frontmatter.
+
+**Required format:**
+```yaml
+---
+name: kernel:{name}
+description: "{description with triggers}"
+user-invocable: true|false
+allowed-tools: Tool1, Tool2, ...
+---
+```
+
+**On edit:** Preserve frontmatter EXACTLY as-is. Never:
+- Change field order
+- Add/remove fields
+- Modify quotes or formatting
+- Add blank lines within frontmatter
+</invariant>
+
+<invariant id="frontmatter_validation">
+Before committing any command/skill/agent edit:
+1. Check frontmatter starts at line 1 with `---`
+2. Check frontmatter ends with `---` before content
+3. Verify `name:` field matches filename pattern
+4. Verify `description:` is quoted string
+
+**On violation:** Block commit. Broken frontmatter = broken plugin.
+</invariant>
+
+## Learning (from previous session failure)
+
+Previous session broke agents by editing frontmatter incorrectly.
+Result: Claude Code couldn't load plugins, silent failure.
+
+**Rule:** When trimming files for token budget, preserve frontmatter byte-for-byte.
+Only modify content AFTER the closing `---`.
+
+</rule>

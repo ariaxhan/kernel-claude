@@ -45,50 +45,76 @@ sql_escape() {
 
 cmd_init() {
   mkdir -p "$DB_DIR"
-  if [ -f "$DB" ]; then
-    echo "DB exists: $DB"
-    return
+
+  local created_new=false
+
+  # Apply base schema if DB doesn't exist
+  if [ ! -f "$DB" ]; then
+    created_new=true
+    if [ -f "$SCHEMA_DIR/schema.sql" ]; then
+      sqlite3 "$DB" < "$SCHEMA_DIR/schema.sql"
+    else
+      # Inline minimal schema
+      sqlite3 "$DB" "
+        PRAGMA journal_mode=WAL;
+        CREATE TABLE IF NOT EXISTS learnings (
+          id TEXT PRIMARY KEY,
+          ts TEXT DEFAULT CURRENT_TIMESTAMP,
+          type TEXT CHECK(type IN ('failure','pattern','gotcha','preference')),
+          insight TEXT NOT NULL,
+          evidence TEXT,
+          domain TEXT,
+          hit_count INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS context (
+          id TEXT PRIMARY KEY,
+          ts TEXT DEFAULT CURRENT_TIMESTAMP,
+          type TEXT CHECK(type IN ('contract','checkpoint','handoff','verdict')),
+          contract_id TEXT,
+          agent TEXT,
+          content TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS errors (
+          id INTEGER PRIMARY KEY,
+          ts TEXT DEFAULT CURRENT_TIMESTAMP,
+          tool TEXT,
+          error TEXT,
+          file TEXT
+        );
+        CREATE TABLE IF NOT EXISTS _migrations (
+          name TEXT PRIMARY KEY,
+          applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        INSERT OR IGNORE INTO _migrations (name) VALUES ('001_init');
+        CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
+        CREATE INDEX IF NOT EXISTS idx_learnings_domain ON learnings(domain);
+        CREATE INDEX IF NOT EXISTS idx_context_type ON context(type);
+        CREATE INDEX IF NOT EXISTS idx_context_contract ON context(contract_id);
+        CREATE INDEX IF NOT EXISTS idx_context_ts ON context(ts);
+      "
+    fi
   fi
 
-  # Try local schema first, fall back to inline
-  if [ -f "$SCHEMA_DIR/schema.sql" ]; then
-    sqlite3 "$DB" < "$SCHEMA_DIR/schema.sql"
-  else
-    # Inline minimal schema
-    sqlite3 "$DB" "
-      PRAGMA journal_mode=WAL;
-      CREATE TABLE IF NOT EXISTS learnings (
-        id TEXT PRIMARY KEY,
-        ts TEXT DEFAULT CURRENT_TIMESTAMP,
-        type TEXT CHECK(type IN ('failure','pattern','gotcha','preference')),
-        insight TEXT NOT NULL,
-        evidence TEXT,
-        domain TEXT,
-        hit_count INTEGER DEFAULT 0
-      );
-      CREATE TABLE IF NOT EXISTS context (
-        id TEXT PRIMARY KEY,
-        ts TEXT DEFAULT CURRENT_TIMESTAMP,
-        type TEXT CHECK(type IN ('contract','checkpoint','handoff','verdict')),
-        contract_id TEXT,
-        agent TEXT,
-        content TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS errors (
-        id INTEGER PRIMARY KEY,
-        ts TEXT DEFAULT CURRENT_TIMESTAMP,
-        tool TEXT,
-        error TEXT,
-        file TEXT
-      );
-      CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
-      CREATE INDEX IF NOT EXISTS idx_learnings_domain ON learnings(domain);
-      CREATE INDEX IF NOT EXISTS idx_context_type ON context(type);
-      CREATE INDEX IF NOT EXISTS idx_context_contract ON context(contract_id);
-      CREATE INDEX IF NOT EXISTS idx_context_ts ON context(ts);
-    "
+  # Apply any pending migrations
+  if [ -d "$SCHEMA_DIR/migrations" ]; then
+    for migration in "$SCHEMA_DIR/migrations"/*.sql; do
+      [ -f "$migration" ] || continue
+      local name
+      name=$(basename "$migration" .sql)
+      local applied
+      applied=$(sqlite3 "$DB" "SELECT 1 FROM _migrations WHERE name='$name' LIMIT 1;" 2>/dev/null || echo "")
+      if [ -z "$applied" ]; then
+        sqlite3 "$DB" < "$migration"
+        echo "Applied migration: $name"
+      fi
+    done
   fi
-  echo "Initialized: $DB"
+
+  if [ "$created_new" = true ]; then
+    echo "Initialized: $DB"
+  else
+    echo "DB exists: $DB"
+  fi
 }
 
 cmd_read_start() {
@@ -328,35 +354,144 @@ cmd_recent() {
   done
 }
 
+# === GRAPH TRACKING COMMANDS ===
+
+cmd_session_start() {
+  local task_type="$1"
+  local tier="${2:-1}"
+
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  local id="SES-$(date +%Y%m%d%H%M%S)-$$"
+  local safe_type safe_tier
+  safe_type=$(sql_escape "$task_type")
+  safe_tier=$(sql_escape "$tier")
+
+  # Check if table exists (migration applied)
+  local has_table
+  has_table=$(sqlite3 "$DB" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='context_sessions' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has_table" ]; then
+    echo "Graph tracking not initialized. Run: agentdb init"
+    return 1
+  fi
+
+  sqlite3 "$DB" "INSERT INTO context_sessions (id, task_type, tier) VALUES ('$id', '$safe_type', $safe_tier);"
+  echo "$id"
+}
+
+cmd_session_end() {
+  local session_id="$1"
+  local success="$2"
+  local outcome="$3"
+  local nodes_loaded="${4:-[]}"
+  local tokens_used="${5:-0}"
+
+  [ -z "$session_id" ] && { echo "Usage: agentdb session-end <id> <1|0> <outcome_json> [nodes_json] [tokens]"; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  local safe_id safe_outcome safe_nodes
+  safe_id=$(sql_escape "$session_id")
+  safe_outcome=$(sql_escape "$outcome")
+  safe_nodes=$(sql_escape "$nodes_loaded")
+
+  sqlite3 "$DB" "
+    UPDATE context_sessions SET
+      ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+      success = $success,
+      outcome = '$safe_outcome',
+      nodes_loaded = '$safe_nodes',
+      tokens_used = $tokens_used
+    WHERE id = '$safe_id';
+  "
+  echo "Session closed: $session_id"
+}
+
+cmd_track_node() {
+  local path="$1"
+  local type="$2"
+  local tokens="${3:-0}"
+
+  [ -z "$path" ] || [ -z "$type" ] && { echo "Usage: agentdb track-node <path> <type> [tokens]"; exit 1; }
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  local safe_path safe_type
+  safe_path=$(sql_escape "$path")
+  safe_type=$(sql_escape "$type")
+
+  sqlite3 "$DB" "
+    INSERT INTO nodes (path, type, tokens, last_accessed, access_count)
+    VALUES ('$safe_path', '$safe_type', $tokens, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 1)
+    ON CONFLICT(path) DO UPDATE SET
+      last_accessed = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+      access_count = access_count + 1,
+      tokens = COALESCE(excluded.tokens, tokens);
+  "
+}
+
+cmd_suggest_context() {
+  local task_type="$1"
+  local max_tokens="${2:-4000}"
+
+  [ -z "$task_type" ] && { echo "Usage: agentdb suggest-context <task_type> [max_tokens]"; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  # Find nodes that correlate with success for this task type
+  sqlite3 -header -column "$DB" "
+    SELECT DISTINCT
+      n.path,
+      n.type,
+      n.tokens,
+      n.avg_success_rate,
+      n.access_count
+    FROM nodes n
+    WHERE n.avg_success_rate > 0.5
+      AND n.access_count >= 2
+    ORDER BY n.avg_success_rate DESC, n.access_count DESC
+    LIMIT 10;
+  " 2>/dev/null || echo "No suggestions yet. Need more session data."
+}
+
 # === DISPATCH ===
 case "${1:-help}" in
-  init)        cmd_init ;;
-  read-start)  cmd_read_start ;;
-  write-end)   shift; cmd_write_end "$@" ;;
-  learn)       shift; cmd_learn "$@" ;;
-  contract)    shift; cmd_contract "$@" ;;
-  verdict)     shift; cmd_verdict "$@" ;;
-  error)       shift; cmd_error "$@" ;;
-  query)       shift; cmd_query "$@" ;;
-  stats)       cmd_stats ;;
-  status)      cmd_status ;;
-  prune)       shift; cmd_prune "$@" ;;
+  init)           cmd_init ;;
+  read-start)     cmd_read_start ;;
+  write-end)      shift; cmd_write_end "$@" ;;
+  learn)          shift; cmd_learn "$@" ;;
+  contract)       shift; cmd_contract "$@" ;;
+  verdict)        shift; cmd_verdict "$@" ;;
+  error)          shift; cmd_error "$@" ;;
+  query)          shift; cmd_query "$@" ;;
+  stats)          cmd_stats ;;
+  status)         cmd_status ;;
+  prune)          shift; cmd_prune "$@" ;;
+  session-start)  shift; cmd_session_start "$@" ;;
+  session-end)    shift; cmd_session_end "$@" ;;
+  track-node)     shift; cmd_track_node "$@" ;;
+  suggest-context) shift; cmd_suggest_context "$@" ;;
   export)      cmd_export ;;
   recent)      shift; cmd_recent "$@" ;;
   *)
     echo "KERNEL AgentDB - Every agent reads on start, writes on end"
     echo ""
-    echo "COMMANDS:"
-    echo "  init                    Initialize DB in current project"
-    echo "  read-start              Context for starting work (failures, patterns, checkpoint)"
+    echo "CORE COMMANDS:"
+    echo "  init                    Initialize DB + apply migrations"
+    echo "  read-start              Context for starting work"
     echo "  write-end <json>        Checkpoint before stopping"
     echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"
     echo "  contract <json>         Create new contract"
     echo "  verdict <p|f> <evidence>  QA result"
-    echo "  status                  DB health, counts, last checkpoint time"
-    echo "  prune [N]               Delete old checkpoints, keep last N (default 10)"
-    echo "  export                  Dump learnings to markdown file"
-    echo "  recent [N]              Show last N checkpoints (default 5)"
+    echo ""
+    echo "GRAPH TRACKING (after migration 002):"
+    echo "  session-start <type> [tier]  Start tracking a work session"
+    echo "  session-end <id> <1|0> <json>  Close session with outcome"
+    echo "  track-node <path> <type> [tokens]  Record node access"
+    echo "  suggest-context <type>  Suggest context based on success patterns"
+    echo ""
+    echo "UTILITIES:"
+    echo "  status                  DB health, counts"
+    echo "  prune [N]               Keep last N checkpoints"
+    echo "  export                  Dump learnings to markdown"
+    echo "  recent [N]              Show last N checkpoints"
     echo "  stats                   Show counts"
     echo "  query <sql>             Raw query"
     ;;
