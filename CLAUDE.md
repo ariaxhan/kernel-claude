@@ -124,6 +124,10 @@ Setup: _meta/reference/lsp-setup.md
     Load: orchestration, build skills. Spawn researcher for unfamiliar tech.
     Mandatory: Check _meta/research/ before new work. Write research after learning.
   </command>
+  <command id="/kernel:auto" purpose="Autonomous execution loop. Tests first, iterate until green. Max 5 iterations then report." file="commands/auto.md">
+    Load: quality, testing, build skills. Research → tests → implement → verify → ship.
+    For autonomous mode without human confirmation at each phase.
+  </command>
   <command id="/kernel:validate" purpose="Pre-commit/pre-PR verification loop. Build → types → lint → tests → security → diff. Blocks on failure." file="commands/validate.md">
     Spawns validator agent. Load: testing, security skills.
   </command>

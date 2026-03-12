@@ -185,6 +185,7 @@
   },
   "active": "73d416e709bbaac9",
   "lastOpenFiles": [
+    "_meta/agents/main-54129.json",
     "_meta/agents/main-19138.json",
     "_meta/agents/main-14740.json",
     "_meta/agents/main-12569.json",
@@ -201,7 +202,6 @@
     "_meta/drafts/stanley-reply.md",
     "commands/init.md",
     "_meta/drafts",
-    "orchestration/agentdb/migrations/002_graph_tracking.sql",
     "_meta/research/context-graph-architecture.md",
     "commands/auto.md",
     "_meta/agents/main-65745-snapshot.md",

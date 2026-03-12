@@ -22,6 +22,7 @@
   ],
   "commands": [
     "./commands/ingest.md",
+    "./commands/auto.md",
     "./commands/validate.md",
     "./commands/tearitapart.md",
     "./commands/review.md",
