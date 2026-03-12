@@ -1,10 +1,7 @@
 #!/bin/bash
+set -e  # Fail fast on errors
 # KERNEL: Session start hook
-# 1. Set agent identity
-# 2. Git state
-# 3. Core philosophy + orchestration role
-# 4. AgentDB context (failures, patterns, contracts, errors, checkpoints)
-# 5. Active contract check + tier guidance
+# This is the ONLY always-on context. Make it count.
 
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(dirname "$0")")")}"
 PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
@@ -14,11 +11,8 @@ AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
 AGENT_NAME="main-$$"
 AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
 mkdir -p "$AGENTS_DIR"
-
-# Write current agent name to file (other hooks read this)
 echo "$AGENT_NAME" > "$AGENTS_DIR/.current"
 
-# Register this agent in agent registry
 cat > "$AGENTS_DIR/${AGENT_NAME}.json" << EOF
 {
   "agent_name": "$AGENT_NAME",
@@ -31,60 +25,160 @@ EOF
 echo "# KERNEL"
 echo ""
 
-# Git state (if in a git repo)
+# Git state
 if git rev-parse --git-dir >/dev/null 2>&1; then
   BRANCH=$(git branch --show-current 2>/dev/null)
   echo "**Branch:** $BRANCH"
-
   CHANGES=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-  if [ "$CHANGES" -gt 0 ]; then
-    echo "**Uncommitted:** $CHANGES file(s)"
-  fi
-
+  [ "$CHANGES" -gt 0 ] && echo "**Uncommitted:** $CHANGES file(s)"
   RECENT=$(git log --oneline -1 2>/dev/null)
-  if [ -n "$RECENT" ]; then
-    echo "**Last commit:** $RECENT"
-  fi
+  [ -n "$RECENT" ] && echo "**Last commit:** $RECENT"
   echo ""
 fi
 
-# Philosophy
-cat << 'PHILOSOPHY'
-## Philosophy
+cat << 'KERNEL_CONTEXT'
+## AgentDB (MANDATORY)
 
-**AgentDB-first. Read at start. Write at end.**
+```yaml
+on_start: agentdb read-start  # MUST do first
+on_end: agentdb write-end '{"did":"X","learned":["Y"]}'  # MUST do before stopping
+on_learn:
+  failure: agentdb learn failure "what" "evidence"
+  pattern: agentdb learn pattern "what" "evidence"
+  gotcha: agentdb learn gotcha "what" "context"
+```
 
-| Tier | Files | Your Role |
-|------|-------|-----------|
-| 1 | 1-2 | Execute directly |
-| 2 | 3-5 | Orchestrate → surgeon |
-| 3 | 6+ | Orchestrate → surgeon → adversary |
+**Skip AgentDB = repeat failures. Non-negotiable.**
 
-**Tier 2+:** You are the orchestrator. Create contracts, spawn agents, read their AgentDB output. Don't write code yourself.
+---
 
-PHILOSOPHY
+## Workflow
 
-# AgentDB context
-if [ -f "_meta/agentdb/agent.db" ]; then
+```yaml
+flow: READ → CLASSIFY → RESEARCH → SCOPE → TESTS → EXECUTE → LEARN
+
+steps:
+  1_read:
+    do: agentdb read-start
+    then: ls _meta/research/  # check prior work
+
+  2_classify:
+    task: what user wants
+    type: bug|feature|refactor|question
+    familiar: yes|no
+
+  3_research:
+    order:
+      - anti_patterns: "{tech} not working", "{tech} gotchas"
+      - solutions: official docs → github issues → stack overflow
+    output: _meta/research/{topic}.md
+    rule: search what BREAKS before what works
+
+  4_scope:
+    list: every file that changes
+    count: N
+    tier:
+      1: 1-2 files → execute directly
+      2: 3-5 files → contract + surgeon
+      3: 6+ files → contract + surgeon + adversary
+
+  5_tests:
+    rule: tests BEFORE code, no exceptions
+    cycle: red (fail) → green (pass) → refactor
+    output: failing tests that define success
+
+  6_execute:
+    tier_1: implement using research + tests
+    tier_2+: create contract, spawn surgeon, orchestrate
+
+  7_learn:
+    do: agentdb learn pattern "what worked"
+    then: agentdb write-end
+    update: _meta/research/ if new anti-patterns found
+```
+
+---
+
+## Testing (Non-Negotiable)
+
+```yaml
+rule: tests BEFORE code, always
+cycle:
+  1: write failing test (red)
+  2: write minimal code to pass (green)
+  3: refactor while green
+  4: repeat
+
+principles:
+  tests_first: code-then-tests validates bugs not requirements
+  mock_boundaries_only: external APIs, DBs — NOT internal functions
+  real_deps_preferred: test containers > mocks (mocks lie)
+  edge_cases_first: null, empty, boundary, concurrent, timeout
+  strong_assertions: specific values, not truthy/exists
+  graceful_fallbacks: test degraded mode, not just success/fail
+
+anti_patterns:  # AI generates these — avoid
+  - happy_path_only → test failure modes first
+  - weak_assertions → toBeTruthy catches nothing
+  - mock_everything → mock at boundaries only
+  - test_implementation → test behavior at public API
+```
+
+---
+
+## Mindset
+
+```yaml
+core:
+  - every AI line is liability
+  - most SWE is solved problems
+  - research anti-patterns BEFORE solutions
+  - tests BEFORE code
+  - built-in > library > custom
+  - mock boundaries only, real deps when possible
+  - capture learnings AFTER every task
+
+mantra: find proven solution, test it works, don't reinvent
+```
+
+KERNEL_CONTEXT
+
+# =============================================================================
+# AGENTDB CONTEXT (if initialized)
+# =============================================================================
+if [ -f "$PROJECT_ROOT/_meta/agentdb/agent.db" ]; then
   echo ""
-  "$AGENTDB" read-start
+  "$AGENTDB" read-start 2>/dev/null
   echo ""
 
-  # Check for active contract
+  # Check for recent compaction checkpoint (auto-handoff)
+  LAST_CHECKPOINT=$("$AGENTDB" query "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1" 2>/dev/null)
+  if [ -n "$LAST_CHECKPOINT" ]; then
+    # Check if it was a pre-compact checkpoint
+    if echo "$LAST_CHECKPOINT" | grep -q "pre-compact\|compaction"; then
+      echo "## Resume From Checkpoint"
+      echo ""
+      echo '```yaml'
+      echo "$LAST_CHECKPOINT" | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print('\n'.join(f'{k}: {v}' for k,v in d.items()))" 2>/dev/null || echo "$LAST_CHECKPOINT"
+      echo '```'
+      echo ""
+      echo "**Continue from where you left off. Goal and files above.**"
+      echo ""
+    fi
+  fi
+
   ACTIVE_CONTRACT=$("$AGENTDB" query "SELECT id, content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1" 2>/dev/null)
   if [ -n "$ACTIVE_CONTRACT" ]; then
     echo "## Active Contract"
     echo "$ACTIVE_CONTRACT"
     echo ""
-    echo "**Resume or close this contract before starting new work.**"
+    echo "**Resume or close before starting new work.**"
     echo ""
   fi
 
-  # Check for pending checkpoints (agents finished but not reviewed)
   PENDING=$("$AGENTDB" query "SELECT agent, content FROM context WHERE type='checkpoint' AND ts > (SELECT COALESCE(MAX(ts), '1970-01-01') FROM context WHERE type='verdict') ORDER BY ts DESC LIMIT 1" 2>/dev/null)
-  if [ -n "$PENDING" ]; then
+  if [ -n "$PENDING" ] && ! echo "$PENDING" | grep -q "pre-compact"; then
     echo "## Pending Review"
-    echo "Agent checkpoint awaiting your review:"
     echo "$PENDING"
     echo ""
   fi
@@ -92,47 +186,48 @@ else
   echo ""
   echo "## ⚠️ KERNEL NOT INITIALIZED"
   echo ""
-  echo "**STOP. Do not proceed with any task.**"
-  echo ""
-  echo "KERNEL requires initialization before working. You MUST run these commands NOW:"
-  echo ""
-  echo "\`\`\`bash"
-  echo "mkdir -p _meta/{agentdb,context,plans,research,handoffs,reviews,agents}"
-  echo "mkdir -p .claude"
-  echo "\`\`\`"
-  echo ""
-  echo "Then create \`.claude/CLAUDE.md\` with project instructions."
-  echo ""
-  echo "After setup, tell the user: \"KERNEL is now ready. What would you like to work on?\""
-  echo ""
-  echo "**DO NOT skip this step. KERNEL cannot function without _meta/ and AgentDB.**"
+  echo "**STOP. Run:** \`mkdir -p _meta/{agentdb,research,plans,handoffs,agents} && agentdb init\`"
   echo ""
 fi
 
-# LSP status check (only show if not enabled)
-if [ -z "$ENABLE_LSP_TOOL" ]; then
-  if [ -f ~/.claude/settings.json ]; then
-    LSP_ENABLED=$(grep -o '"ENABLE_LSP_TOOL"' ~/.claude/settings.json 2>/dev/null)
-    if [ -z "$LSP_ENABLED" ]; then
-      echo "## LSP"
-      echo "**Not enabled.** Code nav is 600x slower without it."
-      echo "Setup: \`_meta/reference/lsp-setup.md\`"
-      echo ""
-    fi
-  fi
-fi
-
-# Quick reference
 cat << 'REFERENCE'
-## Quick Reference
+---
 
-```
-/kernel:ingest    → Universal entry (classify, scope, orchestrate)
-/kernel:validate  → Pre-commit checks
-/kernel:ship      → Commit, push, PR
+## Commands
+
+```yaml
+commands:
+  /kernel:ingest: guided flow, human confirms each phase
+  /kernel:auto: autonomous loop, tests first, iterate until green (ralph mode)
+  /kernel:validate: pre-commit quality gates
+  /kernel:tearitapart: critical review before implementation
+  /kernel:handoff: context brief for session continuity
 ```
 
-**Commands:** ingest, validate, review, tearitapart, handoff
-**Agents:** surgeon (implement), adversary (QA), reviewer (PR review)
+## Agents
+
+```yaml
+agents:
+  researcher:
+    purpose: find proven solutions, anti-patterns
+    spawn: unfamiliar tech, new dependencies
+  surgeon:
+    purpose: implement contract scope
+    spawn: tier 2+
+  adversary:
+    purpose: QA, find edge cases
+    spawn: tier 3
+```
+
+## Tiers
+
+```yaml
+tiers:
+  1: {files: 1-2, role: execute directly}
+  2: {files: 3-5, role: orchestrate → surgeon}
+  3: {files: 6+, role: orchestrate → surgeon → adversary}
+
+rule: tier 2+ you orchestrate, agents implement, don't write code yourself
+```
 
 REFERENCE

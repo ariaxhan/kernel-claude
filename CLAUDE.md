@@ -5,10 +5,12 @@
 <!-- ============================================ -->
 
 <philosophy>
+Every AI-written line is a liability. Research proves solutions before coding.
 AgentDB-first. Read at start. Write at end.
 Skip read → repeat failures. Skip write → lose context.
+Skip research → reinvent wheels. Skip learning → repeat mistakes.
 Orchestrate, don't implement (tier 2+).
-Every agent reads AgentDB. Every agent writes AgentDB.
+Most SWE work is solved problems. Find the solution, don't invent it.
 </philosophy>
 
 <!-- ============================================ -->
@@ -60,9 +62,16 @@ Location: _meta/agentdb/agent.db
 <!-- ============================================ -->
 
 <flow>
-  READ (agentdb read-start) → CLASSIFY → TIER (count files) → PLAN → EXECUTE or ORCHESTRATE → WRITE (agentdb write-end)
+  READ → CLASSIFY → RESEARCH → SCOPE → DEFINE SUCCESS → EXECUTE → LEARN
+  <step id="read">agentdb read-start. Check _meta/research/ for prior work.</step>
+  <step id="classify">Task type. Familiar? Search before asking.</step>
+  <step id="research">Anti-patterns FIRST. Then proven solutions. Built-in beats dependency.</step>
+  <step id="scope">Count files → determine tier. Ambiguous = higher tier.</step>
+  <step id="define">Acceptance criteria + evals BEFORE coding.</step>
+  <step id="execute">Tier 1: implement. Tier 2+: contract → surgeon → verify.</step>
+  <step id="learn">agentdb learn. Update research docs. Checkpoint.</step>
   <rule>Never implement first solution. Generate 2-3 approaches, choose simplest.</rule>
-  <rule>Tier 1: implement directly. Tier 2+: contract → surgeon → verify.</rule>
+  <rule>Never code without research. Most problems are already solved.</rule>
 </flow>
 
 <!-- ============================================ -->
@@ -111,8 +120,9 @@ Setup: _meta/reference/lsp-setup.md
 <!-- ============================================ -->
 
 <commands>
-  <command id="/kernel:ingest" purpose="Universal entry point. Classify task → determine scope → create contract → orchestrate agents." file="commands/ingest.md">
-    Load: orchestration, build skills. Reference: orchestration-research, git-research.
+  <command id="/kernel:ingest" purpose="Universal entry. Research → classify → scope → define success → execute → learn." file="commands/ingest.md">
+    Load: orchestration, build skills. Spawn researcher for unfamiliar tech.
+    Mandatory: Check _meta/research/ before new work. Write research after learning.
   </command>
   <command id="/kernel:validate" purpose="Pre-commit/pre-PR verification loop. Build → types → lint → tests → security → diff. Blocks on failure." file="commands/validate.md">
     Spawns validator agent. Load: testing, security skills.
@@ -182,10 +192,15 @@ Setup: _meta/reference/lsp-setup.md
   <!-- Critical only. Extended rules: _meta/reference/heuristics.md, conventions.md -->
   <block action="skip_agentdb_read">Repeat failures.</block>
   <block action="skip_agentdb_write">Lose context.</block>
+  <block action="skip_research">Reinvent solved problems. Check _meta/research/ first.</block>
+  <block action="solution_before_antipattern">Search what breaks BEFORE what works.</block>
+  <block action="code_without_success_criteria">Define done before coding.</block>
+  <block action="skip_learning">Every task teaches. Capture it or lose it.</block>
   <block action="write_code_tier_2+">You orchestrate, not implement.</block>
   <block action="first_solution_bias">Never implement first idea.</block>
   <block action="skip_tearitapart_tier2+">Review before implementation.</block>
   <block action="serial_when_parallel">Independent tasks → concurrent agents.</block>
+  <block action="new_dependency_without_justification">Built-in beats library. Prove you need it.</block>
 </anti_patterns>
 
 </kernel>

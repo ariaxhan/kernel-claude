@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e  # Fail fast on errors
 # SessionEnd hook: Write AgentDB checkpoint, deregister agent, batch commit, push
 # Multi-agent safe: only removes THIS agent's registration
 # Events: SessionEnd (all matchers)

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e  # Fail fast on errors
 # PreCompact hook: Save agent context + commit before compaction
 # Multi-agent safe: each agent writes its OWN snapshot, never overwrites active.md
 # Events: PreCompact (all matchers: manual + auto)
@@ -83,55 +84,68 @@ REPO_NAME=$(basename "$PROJECT_ROOT")
 git commit -m "chore(checkpoint): $REPO_NAME pre-compact [$AGENT] ($TRIGGER, $FILES_CHANGED files) $TIMESTAMP_SHORT" --no-verify 2>/dev/null
 git push 2>/dev/null || true
 
-# === STEP 4: LOG COMPACTION TO AGENTDB ===
-# Record compaction event for pattern tracking
+# === STEP 4: AUTO-CHECKPOINT TO AGENTDB ===
+# This replaces manual handoff - auto-save context before compaction
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(dirname "$0")")")}"
+AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+
 if [ -f "$AGENTDB_PATH" ]; then
     BRANCH=$(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null || echo "unknown")
     UNCOMMITTED=$(cd "$PROJECT_ROOT" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
 
-    # Log compaction event
+    # Get active contract goal if exists
+    ACTIVE_GOAL=$(sqlite3 "$AGENTDB_PATH" "SELECT json_extract(content, '$.goal') FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "")
+
+    # Get recent files changed
+    RECENT_FILES=$(cd "$PROJECT_ROOT" && git diff --name-only HEAD~3 2>/dev/null | head -10 | tr '\n' ',' | sed 's/,$//')
+
+    # Write checkpoint (this is the auto-handoff)
+    "$AGENTDB" write-end "{\"event\":\"pre-compact\",\"agent\":\"$AGENT\",\"trigger\":\"$TRIGGER\",\"branch\":\"$BRANCH\",\"goal\":\"$ACTIVE_GOAL\",\"uncommitted_files\":$UNCOMMITTED,\"files_committed\":${FILES_CHANGED:-0},\"recent_files\":\"$RECENT_FILES\"}" 2>/dev/null || true
+
+    # Also record compaction pattern for analysis
     sqlite3 "$AGENTDB_PATH" <<SQL 2>/dev/null || true
-INSERT INTO context (type, content, ts) VALUES (
-    'compaction',
+INSERT INTO context (id, type, content, agent) VALUES (
+    'CMP-$(date +%Y%m%d%H%M%S)-$$',
+    'checkpoint',
     json_object(
+        'event', 'compaction',
         'agent', '$AGENT',
         'trigger', '$TRIGGER',
         'branch', '$BRANCH',
+        'goal', '$ACTIVE_GOAL',
         'uncommitted_files', $UNCOMMITTED,
         'files_committed', ${FILES_CHANGED:-0},
         'timestamp', '$TIMESTAMP'
     ),
-    datetime('now')
+    '$AGENT'
 );
 SQL
 fi
 
 # === STEP 5: OUTPUT CRITICAL CONTEXT (survives compaction) ===
-# This output appears in conversation after compaction
-echo "=== PRE-COMPACTION SUMMARY ==="
-echo "Agent: $AGENT | Branch: $(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null)"
-echo "Trigger: $TRIGGER | Time: $TIMESTAMP_SHORT"
+# This YAML block survives compaction and provides immediate context
+cat << YAML
+---
+## Auto-Checkpoint (Pre-Compaction)
 
-# Show uncommitted work that was committed
-if [ "${FILES_CHANGED:-0}" -gt 0 ]; then
-    echo ""
-    echo "Committed ${FILES_CHANGED} files before compaction."
-fi
+\`\`\`yaml
+saved:
+  agent: $AGENT
+  branch: $(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null)
+  time: $TIMESTAMP_SHORT
+  trigger: $TRIGGER
+  files_committed: ${FILES_CHANGED:-0}
+  goal: "${ACTIVE_GOAL:-unknown}"
 
-# Show recent commits for context
-echo ""
-echo "Recent commits:"
-cd "$PROJECT_ROOT" && git log --oneline -3 2>/dev/null
+recent_commits:
+$(cd "$PROJECT_ROOT" && git log --oneline -3 2>/dev/null | sed 's/^/  - /')
 
-# Show any remaining uncommitted changes
-REMAINING=$(cd "$PROJECT_ROOT" && git status --porcelain 2>/dev/null | head -5)
-if [ -n "$REMAINING" ]; then
-    echo ""
-    echo "Uncommitted (preserved):"
-    echo "$REMAINING"
-fi
+$(REMAINING=$(cd "$PROJECT_ROOT" && git status --porcelain 2>/dev/null | head -5); [ -n "$REMAINING" ] && echo "uncommitted:" && echo "$REMAINING" | sed 's/^/  - /')
 
-echo ""
-echo "=== POST-COMPACTION: Run 'agentdb read-start' to restore full context ==="
+restore: agentdb read-start
+resume: /kernel:ingest (continue from checkpoint)
+\`\`\`
+---
+YAML
 
 exit 0

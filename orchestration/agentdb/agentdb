@@ -35,6 +35,12 @@ DB_DIR="$PROJECT_ROOT/_meta/agentdb"
 DB="$DB_DIR/agent.db"
 SCHEMA_DIR="$(dirname "$0")"
 
+# === SECURITY: SQL escaping ===
+# Escape single quotes for safe SQL insertion
+sql_escape() {
+  printf '%s' "$1" | sed "s/'/''/g"
+}
+
 # === COMMANDS ===
 
 cmd_init() {
@@ -119,8 +125,12 @@ cmd_write_end() {
   [ -z "$content" ] && { echo "Usage: agentdb write-end <json> [agent]"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
+  local safe_content safe_agent
+  safe_content=$(sql_escape "$content")
+  safe_agent=$(sql_escape "$agent")
+
   local id="CP-$(date +%Y%m%d%H%M%S)-$$"
-  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content) VALUES ('$id', 'checkpoint', '$agent', '$content');"
+  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content) VALUES ('$id', 'checkpoint', '$safe_agent', '$safe_content');"
   echo "Checkpoint: $id"
 }
 
@@ -133,8 +143,15 @@ cmd_learn() {
   [ -z "$type" ] || [ -z "$insight" ] && { echo "Usage: agentdb learn <type> <insight> [evidence] [domain]"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
+  # Escape inputs to prevent SQL injection
+  local safe_type safe_insight safe_evidence safe_domain
+  safe_type=$(sql_escape "$type")
+  safe_insight=$(sql_escape "$insight")
+  safe_evidence=$(sql_escape "$evidence")
+  safe_domain=$(sql_escape "$domain")
+
   local id="LRN-$(date +%Y%m%d%H%M%S)-$$"
-  sqlite3 "$DB" "INSERT INTO learnings (id, type, insight, evidence, domain) VALUES ('$id', '$type', '$insight', '$evidence', '$domain');"
+  sqlite3 "$DB" "INSERT INTO learnings (id, type, insight, evidence, domain) VALUES ('$id', '$safe_type', '$safe_insight', '$safe_evidence', '$safe_domain');"
   echo "Learned: [$type] $insight"
 }
 
@@ -144,8 +161,11 @@ cmd_contract() {
   [ -z "$content" ] && { echo "Usage: agentdb contract <json>"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
+  local safe_content
+  safe_content=$(sql_escape "$content")
+
   local id="CR-$(date +%Y%m%d%H%M%S)-$$"
-  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'contract', 'orchestrator', '$content', '$id');"
+  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'contract', 'orchestrator', '$safe_content', '$id');"
   echo "Contract: $id"
 }
 
@@ -157,9 +177,14 @@ cmd_verdict() {
   [ -z "$result" ] && { echo "Usage: agentdb verdict <pass|fail> <evidence> [contract_id]"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
+  local safe_result safe_evidence safe_contract_id
+  safe_result=$(sql_escape "$result")
+  safe_evidence=$(sql_escape "$evidence")
+  safe_contract_id=$(sql_escape "$contract_id")
+
   local id="VD-$(date +%Y%m%d%H%M%S)-$$"
-  local content="{\"result\":\"$result\",\"evidence\":\"$evidence\"}"
-  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'verdict', 'adversary', '$content', '$contract_id');"
+  local content="{\"result\":\"$safe_result\",\"evidence\":\"$safe_evidence\"}"
+  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'verdict', 'adversary', '$content', '$safe_contract_id');"
   echo "Verdict: $result"
 }
 
@@ -171,7 +196,12 @@ cmd_error() {
   [ -z "$tool" ] || [ -z "$error" ] && { echo "Usage: agentdb error <tool> <error> [file]"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
-  sqlite3 "$DB" "INSERT INTO errors (tool, error, file) VALUES ('$tool', '$error', '$file');"
+  local safe_tool safe_error safe_file
+  safe_tool=$(sql_escape "$tool")
+  safe_error=$(sql_escape "$error")
+  safe_file=$(sql_escape "$file")
+
+  sqlite3 "$DB" "INSERT INTO errors (tool, error, file) VALUES ('$safe_tool', '$safe_error', '$safe_file');"
 }
 
 cmd_query() {
