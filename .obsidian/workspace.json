@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "commands/ingest.md",
+                "file": "commands/auto.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "ingest"
+              "title": "auto"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "commands/ingest.md",
+                "file": "commands/auto.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for ingest"
+              "title": "Backlinks for auto"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "commands/ingest.md",
+                "file": "commands/auto.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from ingest"
+              "title": "Outgoing links from auto"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "commands/ingest.md",
+                "file": "commands/auto.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of ingest"
+              "title": "Outline of auto"
             }
           }
         ]
@@ -185,7 +185,15 @@
   },
   "active": "73d416e709bbaac9",
   "lastOpenFiles": [
+    "skills/quality/reference/quality-research.md",
+    "skills/quality/SKILL.md",
+    "skills/quality/reference",
+    "skills/quality",
+    "commands/handoff.md",
     "commands/init.md",
+    "commands/ingest.md",
+    "_meta/agents/main-65745.json",
+    "_meta/agents/main-44090-snapshot.md",
     "commands/review.md",
     "commands/auto.md",
     "commands/help.md",
@@ -199,9 +207,7 @@
     "tests",
     "agents/surgeon.md",
     "agents/adversary.md",
-    "commands/ingest.md",
     "skills/architecture/SKILL.md",
-    "rules/kernel.md",
-    "commands/handoff.md"
+    "rules/kernel.md"
   ]
 }

@@ -545,6 +545,127 @@ test_commands_use_structured_format() {
   }
 }
 
+# === Token Budget Tests (Attention Optimization) ===
+# Research: Lost-in-the-middle problem, 70-80% max context usage
+# Targets based on Anthropic context engineering recommendations
+
+test_claude_md_token_budget() {
+  # CLAUDE.md is always loaded - must be tight
+  # Target: <200 lines (approx 1200 tokens)
+  local lines
+  lines=$(wc -l < "$PLUGIN_ROOT/CLAUDE.md" | tr -d ' ')
+  [ "$lines" -lt 220 ] || {
+    echo "FAIL: CLAUDE.md too large ($lines lines, max 220). Attention degrades."
+    return 1
+  }
+}
+
+test_commands_token_budget() {
+  # Commands should be focused single workflows
+  # Target: <180 lines each (approx 700 tokens)
+  local failed=0
+  for cmd in "$PLUGIN_ROOT/commands/"*.md; do
+    local lines
+    lines=$(wc -l < "$cmd" | tr -d ' ')
+    if [ "$lines" -gt 180 ]; then
+      echo "  OVER BUDGET: $(basename "$cmd") = $lines lines (max 180)"
+      failed=1
+    fi
+  done
+  [ "$failed" -eq 0 ] || {
+    echo "FAIL: some commands exceed token budget. Trim or use progressive disclosure."
+    return 1
+  }
+}
+
+test_agents_token_budget() {
+  # Agents should have focused roles
+  # Target: <250 lines each (approx 1000 tokens)
+  local failed=0
+  for agent in "$PLUGIN_ROOT/agents/"*.md; do
+    local lines
+    lines=$(wc -l < "$agent" | tr -d ' ')
+    if [ "$lines" -gt 250 ]; then
+      echo "  OVER BUDGET: $(basename "$agent") = $lines lines (max 250)"
+      failed=1
+    fi
+  done
+  [ "$failed" -eq 0 ] || {
+    echo "FAIL: some agents exceed token budget. Use skill_load for progressive disclosure."
+    return 1
+  }
+}
+
+test_critical_content_at_edges() {
+  # Lost-in-the-middle: role/purpose at START, checklist at END
+  # Check that agents have <role> near top and <checklist> near bottom
+  local failed=0
+  for agent in "$PLUGIN_ROOT/agents/"*.md; do
+    # Role should be in first 50 lines
+    local role_line
+    role_line=$(grep -n '<role>' "$agent" 2>/dev/null | head -1 | cut -d: -f1)
+    if [ -n "$role_line" ] && [ "$role_line" -gt 50 ]; then
+      echo "  $(basename "$agent"): <role> at line $role_line (should be < 50)"
+      failed=1
+    fi
+    # Checklist should be in last 40 lines
+    local total_lines
+    total_lines=$(wc -l < "$agent" | tr -d ' ')
+    local checklist_line
+    checklist_line=$(grep -n '<checklist>' "$agent" 2>/dev/null | tail -1 | cut -d: -f1)
+    if [ -n "$checklist_line" ]; then
+      local from_end=$((total_lines - checklist_line))
+      if [ "$from_end" -gt 40 ]; then
+        echo "  $(basename "$agent"): <checklist> $from_end lines from end (should be < 40)"
+        failed=1
+      fi
+    fi
+  done
+  [ "$failed" -eq 0 ] || {
+    echo "FAIL: critical content not at edges. Move <role> to top, <checklist> to bottom."
+    return 1
+  }
+}
+
+test_no_duplicate_big5_definitions() {
+  # Big 5 should be defined once in ai-code-anti-patterns.md, referenced elsewhere
+  # Commands/agents should reference, not redefine the full Big 5
+  local full_definitions=0
+  # Count files with full Big 5 definitions (all 5 checks with descriptions)
+  for f in "$PLUGIN_ROOT/commands/"*.md "$PLUGIN_ROOT/agents/"*.md; do
+    # If file has detailed Big 5 with detection commands, it's a full definition
+    if grep -q 'input_validation' "$f" && \
+       grep -q 'edge_cases' "$f" && \
+       grep -q 'error_handling' "$f" && \
+       grep -q 'duplication' "$f" && \
+       grep -q 'complexity' "$f" && \
+       grep -q 'grep -r' "$f"; then
+      ((full_definitions++))
+    fi
+  done
+  # Should be at most 3 files with full definitions (validator, adversary, tearitapart)
+  [ "$full_definitions" -le 4 ] || {
+    echo "FAIL: $full_definitions files have full Big 5 definitions. Centralize in ai-code-anti-patterns.md"
+    return 1
+  }
+}
+
+test_progressive_disclosure_used() {
+  # Agents should use skill_load for progressive disclosure
+  # This keeps base context tight, loads details on-demand
+  local missing=0
+  for agent in "$PLUGIN_ROOT/agents/"*.md; do
+    if ! grep -q 'skill_load\|SKILL.md' "$agent" 2>/dev/null; then
+      echo "  Missing skill_load in: $(basename "$agent")"
+      missing=1
+    fi
+  done
+  [ "$missing" -eq 0 ] || {
+    echo "FAIL: agents should use progressive disclosure via skill_load"
+    return 1
+  }
+}
+
 # === Verification Tests ===
 
 test_commands_have_frontmatter() {
@@ -657,6 +778,14 @@ run_test_suite() {
       run_test "auto has loop control" test_auto_command_has_loop
       run_test "commands use structured format" test_commands_use_structured_format
       ;;
+    tokens)
+      run_test "CLAUDE.md token budget" test_claude_md_token_budget
+      run_test "commands token budget" test_commands_token_budget
+      run_test "agents token budget" test_agents_token_budget
+      run_test "critical content at edges" test_critical_content_at_edges
+      run_test "no duplicate Big 5 definitions" test_no_duplicate_big5_definitions
+      run_test "progressive disclosure used" test_progressive_disclosure_used
+      ;;
   esac
 }
 
@@ -676,6 +805,7 @@ main() {
     run_test_suite "security"
     run_test_suite "observe"
     run_test_suite "verify"
+    run_test_suite "tokens"
   else
     run_test_suite "$target"
   fi

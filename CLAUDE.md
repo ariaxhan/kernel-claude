@@ -159,6 +159,7 @@ Setup: _meta/reference/lsp-setup.md
   <skill id="eval" triggers="eval, benchmark, pass@k">Eval-Driven Development. pass@k metrics, capability evals, regression evals, grader types.</skill>
 
   <!-- QUALITY -->
+  <skill id="quality" triggers="Big 5, ai code, review, validate, pre-commit">AI code quality. The Big 5: input validation, edge cases, error handling, duplication, complexity. Load before any review/validate.</skill>
   <skill id="debug" triggers="bug, error, broken, not working">Systematic debugging. Reproduce → hypothesize → isolate → fix. Binary search isolation.</skill>
   <skill id="security" triggers="auth, validation, secrets, OWASP">Zod validation, SQL injection prevention, XSS/DOMPurify, CSRF tokens, file upload validation, rate limiting.</skill>
   <skill id="performance" triggers="slow, optimize, latency, profiling">Measure before optimizing. Identify bottlenecks. Avoid premature optimization.</skill>
