@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "commands/auto.md",
+                "file": "_meta/drafts/stanley-reply-v5.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "auto"
+              "title": "stanley-reply-v5"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "commands/auto.md",
+                "file": "_meta/drafts/stanley-reply-v5.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for auto"
+              "title": "Backlinks for stanley-reply-v5"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "commands/auto.md",
+                "file": "_meta/drafts/stanley-reply-v5.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from auto"
+              "title": "Outgoing links from stanley-reply-v5"
             }
           },
           {
@@ -156,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "commands/auto.md",
+                "file": "_meta/drafts/stanley-reply-v5.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of auto"
+              "title": "Outline of stanley-reply-v5"
             }
           }
         ]
@@ -185,17 +185,31 @@
   },
   "active": "73d416e709bbaac9",
   "lastOpenFiles": [
+    "_meta/agents/main-10320.json",
+    "_meta/agents/main-9722.json",
+    "_meta/drafts/stanley-reply-v4.md",
+    "_meta/drafts/stanley-reply-v5.md",
+    "_meta/drafts/stanley-reply-v3.md",
+    "_meta/agents/main-1183.json",
+    "_meta/drafts/stanley-reply-v2.md",
+    "_meta/drafts/stanley-reply.md",
+    "commands/init.md",
+    "_meta/drafts",
+    "orchestration/agentdb/migrations/002_graph_tracking.sql",
+    "orchestration/agentdb/migrations",
+    "_meta/research/context-graph-architecture.md",
+    "commands/auto.md",
+    "_meta/agents/main-79636.json",
+    "_meta/agents/main-65745-snapshot.md",
     "skills/quality/reference/quality-research.md",
     "skills/quality/SKILL.md",
     "skills/quality/reference",
     "skills/quality",
     "commands/handoff.md",
-    "commands/init.md",
     "commands/ingest.md",
     "_meta/agents/main-65745.json",
     "_meta/agents/main-44090-snapshot.md",
     "commands/review.md",
-    "commands/auto.md",
     "commands/help.md",
     "agents/reviewer.md",
     "CHANGELOG.md",
@@ -203,8 +217,6 @@
     "_meta/agents/main-44090.json",
     "_meta/agents/main-9673-snapshot.md",
     "tests/README.md",
-    "tests/run-tests.sh",
-    "tests",
     "agents/surgeon.md",
     "agents/adversary.md",
     "skills/architecture/SKILL.md",
