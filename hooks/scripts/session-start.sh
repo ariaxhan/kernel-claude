@@ -41,6 +41,28 @@ EOF
 echo "# KERNEL"
 echo ""
 
+# === TEAMMATE SYNC: Pull latest from remotes ===
+sync_repo() {
+  local DIR="$1"
+  local NAME="$2"
+  cd "$DIR" 2>/dev/null || return
+  if git rev-parse --git-dir >/dev/null 2>&1; then
+    if git remote get-url origin >/dev/null 2>&1; then
+      if git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null; then
+        PULL_OUTPUT=$(git pull --rebase 2>&1) || true
+        if echo "$PULL_OUTPUT" | grep -q "Fast-forward\|rewinding\|Updating"; then
+          echo "**Synced $NAME:** Pulled latest"
+        fi
+      fi
+    fi
+  fi
+}
+
+# Sync Vaults (shared configs) and current project
+sync_repo "$VAULTS" "Vaults"
+sync_repo "$PROJECT_ROOT" "Project"
+cd "$PROJECT_ROOT" 2>/dev/null || true
+
 # Git state
 if git rev-parse --git-dir >/dev/null 2>&1; then
   BRANCH=$(git branch --show-current 2>/dev/null)
