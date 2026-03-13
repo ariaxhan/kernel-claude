@@ -2,6 +2,22 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.0.1] - 2026-03-13
+
+### Fixed
+- **Hook portability** - Replaced `${CLAUDE_PLUGIN_ROOT}` with `${CLAUDE_PROJECT_DIR}` in all hooks. `CLAUDE_PLUGIN_ROOT` is broken in Claude Code's hook executor ([issue #24529](https://github.com/anthropics/claude-code/issues/24529)). Hooks now work on any machine.
+
+---
+
+## [7.0.0] - 2026-03-12
+
+### Changed
+- **Research-first workflow** - Research phase now mandatory before implementation
+- **Skill references** - Skills link to research docs in `skills/*/reference/`
+- **AgentDB contracts** - Tier 2+ requires contracts before spawning agents
+
+---
+
 ## [6.1.5] - 2026-03-08
 
 ### Fixed
