@@ -120,10 +120,10 @@ If you're developing KERNEL locally, symlink the cache to avoid stale copies:
 
 ```bash
 # Remove cached copy
-rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/7.0.2
+rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/7.1.0
 
 # Symlink to your local dev version
-ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/7.0.2
+ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/7.1.0
 
 # Verify
 ls -la ~/.claude/plugins/cache/kernel-marketplace/kernel/

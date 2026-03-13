@@ -2,6 +2,25 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.1.0] - 2026-03-13
+
+### Added
+- **Cross-machine portability** - Hooks now auto-detect Vaults location via `common.sh`
+- **KERNEL_VAULTS env var** - Explicit override for custom Vaults locations
+- **Portability test suite** - 7 new tests verifying cross-machine behavior
+- **Teammate sync** - Session start auto-pulls latest from remote (if clean working tree)
+
+### Changed
+- **Detection order** - `$KERNEL_VAULTS` → `~/Vaults` → `~/Downloads/Vaults`
+- **No duplication** - All hooks source `hooks/scripts/common.sh` instead of duplicating detection logic
+- **init.md trimmed** - Reduced from 250 to 116 lines (under token budget)
+
+### Fixed
+- **Agent file creation** - Test now properly uses KERNEL_VAULTS override
+- **60 tests passing** - Full test suite green
+
+---
+
 ## [7.0.4] - 2026-03-13
 
 ### Fixed
