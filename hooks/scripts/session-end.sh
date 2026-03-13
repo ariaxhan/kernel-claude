@@ -1,17 +1,22 @@
 #!/bin/bash
-set -e  # Fail fast on errors
+set -e
 # SessionEnd hook: Write AgentDB checkpoint, deregister agent, batch commit, push
-# Multi-agent safe: only removes THIS agent's registration
-# Events: SessionEnd (all matchers)
+# Convention: ~/Vaults/ is required. All teammates use this path.
 
-# Self-locate the plugin (works regardless of how hook is invoked)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+# Fixed paths - no magic
+VAULTS="$HOME/Vaults"
+AGENTDB="$VAULTS/.claude/kernel/orchestration/agentdb/agentdb"
 
-# User's project root (where _meta/ lives)
+# Fallback if symlink not set up
+if [ ! -f "$AGENTDB" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+fi
+
+# Project root for git operations
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
+AGENTS_DIR="$VAULTS/_meta/agents"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M")
 
 # Agent name from file (set by SessionStart)
@@ -23,7 +28,7 @@ else
 fi
 
 # === STEP 0: WRITE AGENTDB CHECKPOINT ===
-if [ -f "$PROJECT_ROOT/_meta/agentdb/agent.db" ]; then
+if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
     BRANCH=$(git branch --show-current 2>/dev/null || echo "none")
     FILES_CHANGED=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
     "$AGENTDB" write-end "{\"agent\":\"$AGENT\",\"event\":\"session-end\",\"branch\":\"$BRANCH\",\"uncommitted_files\":$FILES_CHANGED}" 2>/dev/null || true

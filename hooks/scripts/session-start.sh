@@ -1,19 +1,25 @@
 #!/bin/bash
-set -e  # Fail fast on errors
+set -e
 # KERNEL: Session start hook
-# This is the ONLY always-on context. Make it count.
+# Convention: ~/Vaults/ is required. All teammates use this path.
 
-# Self-locate the plugin (works regardless of how hook is invoked)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+# Fixed paths - no magic, no env var confusion
+VAULTS="$HOME/Vaults"
+AGENTDB="$VAULTS/.claude/kernel/orchestration/agentdb/agentdb"
 
-# User's project root (where _meta/ lives)
+# Fallback: if running from plugin cache, find agentdb there
+if [ ! -f "$AGENTDB" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+fi
+
+# Project root for git operations (current project, not Vaults)
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 
 # Generate agent name and persist for other hooks
 AGENT_NAME="main-$$"
-AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
+AGENTS_DIR="$VAULTS/_meta/agents"
 mkdir -p "$AGENTS_DIR"
 echo "$AGENT_NAME" > "$AGENTS_DIR/.current"
 
@@ -151,7 +157,7 @@ KERNEL_CONTEXT
 # =============================================================================
 # AGENTDB CONTEXT (if initialized)
 # =============================================================================
-if [ -f "$PROJECT_ROOT/_meta/agentdb/agent.db" ]; then
+if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   echo ""
   "$AGENTDB" read-start 2>/dev/null
   echo ""

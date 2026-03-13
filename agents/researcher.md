@@ -1,9 +1,6 @@
 ---
 name: researcher
-description: >
-  Deep research agent. Finds existing solutions, evaluates packages, documents
-  pitfalls before any implementation begins. Spawned by orchestrator when
-  encountering unfamiliar tech, new integrations, or package selection decisions.
+description: Deep research agent. Finds existing solutions, evaluates packages, documents pitfalls before any implementation begins. Spawned by orchestrator when encountering unfamiliar tech, new integrations, or package selection decisions.
 tools: Read, Bash, Grep, Glob, WebSearch, WebFetch
 model: haiku
 ---

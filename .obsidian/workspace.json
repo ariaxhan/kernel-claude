@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "_meta/drafts/stanley-reply-v5.md",
+                "file": "agents/researcher.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "stanley-reply-v5"
+              "title": "researcher"
             }
           }
         ]
@@ -185,23 +185,29 @@
   },
   "active": "73d416e709bbaac9",
   "lastOpenFiles": [
-    "_meta/agents/main-54129.json",
-    "_meta/agents/main-19138.json",
-    "_meta/agents/main-14740.json",
-    "_meta/agents/main-12569.json",
-    "_meta/agents/main-11424.json",
-    "_meta/agents/main-11293.json",
-    "_meta/agents/main-10943.json",
-    "_meta/agents/main-10320.json",
-    "_meta/agents/main-9722.json",
-    "_meta/drafts/stanley-reply-v4.md",
+    "_meta/agents/main-37304.json",
+    "_meta/agents/main-34110.json",
+    "_meta/agents/main-28661.json",
+    "_meta/handoffs/kernel-sync-setup-2026-03-13.md",
+    "_meta/agents/main-28121.json",
+    "_meta/agents/main-27874.json",
+    "skills/context-mgmt/reference/context-research.md",
+    "skills/context-mgmt/reference",
+    "skills/context-mgmt/SKILL.md",
+    "skills/context-mgmt",
+    "agents/reviewer.md",
+    "agents/surgeon.md",
+    "agents/researcher.md",
     "_meta/drafts/stanley-reply-v5.md",
+    "_meta/agents/main-70087.json",
+    "_meta/agents/main-69592.json",
+    "_meta/agents/main-69179.json",
+    "_meta/agents/main-54129.json",
+    "_meta/drafts/stanley-reply-v4.md",
     "_meta/drafts/stanley-reply-v3.md",
-    "_meta/agents/main-1183.json",
     "_meta/drafts/stanley-reply-v2.md",
     "_meta/drafts/stanley-reply.md",
     "commands/init.md",
-    "_meta/drafts",
     "_meta/research/context-graph-architecture.md",
     "commands/auto.md",
     "_meta/agents/main-65745-snapshot.md",
@@ -212,14 +218,8 @@
     "_meta/agents/main-44090-snapshot.md",
     "commands/review.md",
     "commands/help.md",
-    "agents/reviewer.md",
     "CHANGELOG.md",
     "_meta/research/ai-code-anti-patterns.md",
-    "_meta/agents/main-9673-snapshot.md",
-    "tests/README.md",
-    "agents/surgeon.md",
-    "agents/adversary.md",
-    "skills/architecture/SKILL.md",
-    "rules/kernel.md"
+    "_meta/agents/main-9673-snapshot.md"
   ]
 }

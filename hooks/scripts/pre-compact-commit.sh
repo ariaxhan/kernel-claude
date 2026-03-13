@@ -1,23 +1,23 @@
 #!/bin/bash
-set -e  # Fail fast on errors
+set -e
 # PreCompact hook: Save agent context + commit before compaction
-# Multi-agent safe: each agent writes its OWN snapshot, never overwrites active.md
-# Events: PreCompact (all matchers: manual + auto)
-#
-# Key behaviors:
-# 1. Commit any uncommitted work before compaction (preserve work)
-# 2. Log compaction event to AgentDB (track patterns)
-# 3. Save context snapshot for post-compaction restoration
-# 4. Output critical context to conversation (survives compaction)
+# Convention: ~/Vaults/ is required.
 
-# Self-locate the plugin (works regardless of how hook is invoked)
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+# Fixed paths
+VAULTS="$HOME/Vaults"
+AGENTDB="$VAULTS/.claude/kernel/orchestration/agentdb/agentdb"
 
-# User's project root (where _meta/ lives)
+# Fallback
+if [ ! -f "$AGENTDB" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+fi
+
+# Project root for git operations
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
-AGENTDB_PATH="$PROJECT_ROOT/_meta/agentdb/agent.db"
+AGENTS_DIR="$VAULTS/_meta/agents"
+AGENTDB_PATH="$VAULTS/_meta/agentdb/agent.db"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 TIMESTAMP_SHORT=$(date +"%Y-%m-%d %H:%M")
 
