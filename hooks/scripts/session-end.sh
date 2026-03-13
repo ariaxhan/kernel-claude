@@ -4,10 +4,14 @@ set -e  # Fail fast on errors
 # Multi-agent safe: only removes THIS agent's registration
 # Events: SessionEnd (all matchers)
 
-# CLAUDE_PROJECT_DIR is set by Claude Code hook executor
+# Self-locate the plugin (works regardless of how hook is invoked)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+
+# User's project root (where _meta/ lives)
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
-AGENTDB="${PROJECT_ROOT}/orchestration/agentdb/agentdb"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M")
 
 # Agent name from file (set by SessionStart)

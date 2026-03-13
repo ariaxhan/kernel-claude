@@ -3,9 +3,13 @@ set -e  # Fail fast on errors
 # KERNEL: Session start hook
 # This is the ONLY always-on context. Make it count.
 
-# CLAUDE_PROJECT_DIR is set by Claude Code hook executor
+# Self-locate the plugin (works regardless of how hook is invoked)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+
+# User's project root (where _meta/ lives)
 PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-AGENTDB="${PROJECT_ROOT}/orchestration/agentdb/agentdb"
 
 # Generate agent name and persist for other hooks
 AGENT_NAME="main-$$"
@@ -31,8 +35,9 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   echo "**Branch:** $BRANCH"
   CHANGES=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
   [ "$CHANGES" -gt 0 ] && echo "**Uncommitted:** $CHANGES file(s)"
-  RECENT=$(git log --oneline -1 2>/dev/null)
-  [ -n "$RECENT" ] && echo "**Last commit:** $RECENT"
+  echo ""
+  echo "**Recent commits:**"
+  git log --oneline -5 2>/dev/null | sed 's/^/- /'
   echo ""
 fi
 

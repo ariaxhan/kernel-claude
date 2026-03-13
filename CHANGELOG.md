@@ -2,6 +2,16 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.0.3] - 2026-03-13
+
+### Fixed
+- **Hook scripts self-location** - All hooks now use `SCRIPT_DIR` to locate plugin binaries instead of relying on env vars. Fixes "agentdb not found" errors from v7.0.2.
+
+### Enhanced
+- **Session start output** - Now shows 5 recent git commits (not just 1) for better project context
+
+---
+
 ## [7.0.2] - 2026-03-13
 
 ### Fixed
