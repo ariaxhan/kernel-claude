@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/hooks/scripts/session-start.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
             "timeout": 10,
             "statusMessage": "Loading AgentDB context..."
           }
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/hooks/scripts/guard-bash.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-bash.sh",
             "timeout": 5
           }
         ]
@@ -29,12 +29,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/hooks/scripts/guard-config.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-config.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/hooks/scripts/detect-secrets.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/detect-secrets.sh",
             "timeout": 5
           }
         ]
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/hooks/scripts/auto-approve-safe.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/auto-approve-safe.sh",
             "timeout": 5
           }
         ]
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/hooks/scripts/log-write.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-write.sh",
             "timeout": 5,
             "async": true
           }
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/hooks/scripts/capture-error.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/capture-error.sh",
             "timeout": 5,
             "async": true
           }
@@ -84,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/hooks/scripts/pre-compact-commit.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/pre-compact-commit.sh",
             "timeout": 30,
             "statusMessage": "Saving context snapshot..."
           }
@@ -97,7 +97,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PROJECT_DIR}/hooks/scripts/session-end.sh",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-end.sh",
             "timeout": 30,
             "statusMessage": "Cleaning up session..."
           }

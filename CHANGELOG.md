@@ -2,6 +2,17 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.0.4] - 2026-03-13
+
+### Fixed
+- **hooks.json paths** - Reverted to `${CLAUDE_PLUGIN_ROOT}` for hook script paths. v7.0.1's change to `${CLAUDE_PROJECT_DIR}` was wrong — that points to the user's project, not the plugin directory.
+
+**The correct pattern:**
+- `hooks.json`: Use `${CLAUDE_PLUGIN_ROOT}` to find hook scripts in the plugin directory
+- Hook scripts: Use `SCRIPT_DIR` self-location to find agentdb binary, `CLAUDE_PROJECT_DIR` for user's project
+
+---
+
 ## [7.0.3] - 2026-03-13
 
 ### Fixed
