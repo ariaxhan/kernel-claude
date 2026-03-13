@@ -3,8 +3,14 @@ set -e
 # PreCompact hook: Save agent context + commit before compaction
 # Convention: ~/Vaults/ is required.
 
-# Fixed paths
-VAULTS="$HOME/Vaults"
+# Fixed paths - check for initialized agentdb
+if [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ]; then
+  VAULTS="$HOME/Vaults"
+elif [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
+  VAULTS="$HOME/Downloads/Vaults"
+else
+  VAULTS="${KERNEL_VAULTS:-$HOME/Vaults}"
+fi
 AGENTDB="$VAULTS/.claude/kernel/orchestration/agentdb/agentdb"
 
 # Fallback
@@ -90,7 +96,7 @@ git push 2>/dev/null || true
 
 # === STEP 4: AUTO-CHECKPOINT TO AGENTDB ===
 # This replaces manual handoff - auto-save context before compaction
-AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+# AGENTDB already defined at top of script
 
 if [ -f "$AGENTDB_PATH" ]; then
     BRANCH=$(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null || echo "unknown")

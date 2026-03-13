@@ -2,8 +2,14 @@
 # KERNEL: Capture tool errors to AgentDB
 # Convention: ~/Vaults/ is required.
 
-# Fixed paths
-VAULTS="$HOME/Vaults"
+# Fixed paths - check for initialized agentdb
+if [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ]; then
+  VAULTS="$HOME/Vaults"
+elif [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
+  VAULTS="$HOME/Downloads/Vaults"
+else
+  VAULTS="${KERNEL_VAULTS:-$HOME/Vaults}"
+fi
 AGENTDB="$VAULTS/.claude/kernel/orchestration/agentdb/agentdb"
 
 # Fallback

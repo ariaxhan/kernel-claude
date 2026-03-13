@@ -13,7 +13,10 @@ Creates ~/Vaults structure, symlinks ~/.claude, installs agentdb CLI.
 </purpose>
 
 <requirements>
-- ~/Vaults/ folder (required convention for all teammates)
+- Vaults folder at one of:
+  - `$KERNEL_VAULTS` (env var, if set)
+  - `~/Vaults/` (standard location)
+  - `~/Downloads/Vaults/` (fallback)
 - Git installed
 - SQLite3 installed
 </requirements>

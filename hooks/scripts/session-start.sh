@@ -3,8 +3,14 @@ set -e
 # KERNEL: Session start hook
 # Convention: ~/Vaults/ is required. All teammates use this path.
 
-# Fixed paths - no magic, no env var confusion
-VAULTS="$HOME/Vaults"
+# Fixed paths - check for initialized agentdb
+if [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ]; then
+  VAULTS="$HOME/Vaults"
+elif [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
+  VAULTS="$HOME/Downloads/Vaults"
+else
+  VAULTS="${KERNEL_VAULTS:-$HOME/Vaults}"  # env override or default
+fi
 AGENTDB="$VAULTS/.claude/kernel/orchestration/agentdb/agentdb"
 
 # Fallback: if running from plugin cache, find agentdb there

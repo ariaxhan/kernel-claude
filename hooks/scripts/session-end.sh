@@ -3,8 +3,14 @@ set -e
 # SessionEnd hook: Write AgentDB checkpoint, deregister agent, batch commit, push
 # Convention: ~/Vaults/ is required. All teammates use this path.
 
-# Fixed paths - no magic
-VAULTS="$HOME/Vaults"
+# Fixed paths - check for initialized agentdb
+if [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ]; then
+  VAULTS="$HOME/Vaults"
+elif [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
+  VAULTS="$HOME/Downloads/Vaults"
+else
+  VAULTS="${KERNEL_VAULTS:-$HOME/Vaults}"
+fi
 AGENTDB="$VAULTS/.claude/kernel/orchestration/agentdb/agentdb"
 
 # Fallback if symlink not set up
