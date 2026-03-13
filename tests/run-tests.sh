@@ -34,8 +34,7 @@ setup_test_env() {
 
   # Make agentdb available
   export PATH="$PLUGIN_ROOT/orchestration/agentdb:$PATH"
-  export CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT"
-  export CLAUDE_PROJECT_ROOT="$TEST_PROJECT"
+  export CLAUDE_PROJECT_DIR="$TEST_PROJECT"
 }
 
 teardown_test_env() {

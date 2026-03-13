@@ -1,10 +1,10 @@
 ---
-name: context
-description: "Context engineering and token management. Compaction strategies, progressive disclosure, structured note-taking via AgentDB. Triggers: context, tokens, compaction, memory, handoff, summarize, context window."
+name: kernel:context
+description: "Context engineering and token management. Compaction strategies, progressive disclosure, structured note-taking via AgentDB. Triggers: tokens, compaction, memory, handoff, summarize, context window."
 allowed-tools: Read, Bash, Task
 ---
 
-<skill id="context">
+<skill id="context-mgmt">
 
 <purpose>
 Context is finite. Every token competes for attention.
@@ -14,10 +14,11 @@ Progressive disclosure: load what's needed when it's needed.
 
 <prerequisite>
 Monitor context usage. Offer handoff proactively at ~70% capacity.
+Use native /context command to check usage. This skill is for methodology.
 </prerequisite>
 
 <reference>
-Skill-specific: skills/context/reference/context-research.md
+Skill-specific: skills/context-mgmt/reference/context-research.md
 Architecture: _meta/research/context-graph-architecture.md
 Graph tracking: orchestration/agentdb/migrations/002_graph_tracking.sql
 </reference>

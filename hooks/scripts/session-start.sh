@@ -3,9 +3,9 @@ set -e  # Fail fast on errors
 # KERNEL: Session start hook
 # This is the ONLY always-on context. Make it count.
 
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(dirname "$0")")")}"
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+# CLAUDE_PROJECT_DIR is set by Claude Code hook executor
+PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+AGENTDB="${PROJECT_ROOT}/orchestration/agentdb/agentdb"
 
 # Generate agent name and persist for other hooks
 AGENT_NAME="main-$$"

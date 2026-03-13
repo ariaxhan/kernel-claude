@@ -4,11 +4,10 @@ set -e  # Fail fast on errors
 # Multi-agent safe: only removes THIS agent's registration
 # Events: SessionEnd (all matchers)
 
-# Find project root dynamically
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(dirname "$0")")")}"
+# CLAUDE_PROJECT_DIR is set by Claude Code hook executor
+PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
-AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+AGENTDB="${PROJECT_ROOT}/orchestration/agentdb/agentdb"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M")
 
 # Agent name from file (set by SessionStart)

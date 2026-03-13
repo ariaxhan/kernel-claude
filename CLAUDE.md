@@ -1,4 +1,4 @@
-<kernel version="7.0.1">
+<kernel version="7.0.2">
 
 <!-- ============================================ -->
 <!-- PHILOSOPHY                                   -->
@@ -135,7 +135,7 @@ Setup: _meta/reference/lsp-setup.md
     Load: architecture, testing, security skills. Reference: architecture-research, testing-research.
   </command>
   <command id="/kernel:handoff" purpose="Context handoff brief for session continuity. Writes to _meta/handoffs/." file="commands/handoff.md">
-    Load: context skill. Reference: context-research.md.
+    Load: context-mgmt skill. Reference: context-research.md.
   </command>
   <command id="/kernel:review" purpose="Code review for PRs or staged changes. >80% confidence threshold. Verdict: APPROVE/REQUEST CHANGES/COMMENT." file="commands/review.md">
     Spawns reviewer agent. Load: testing, security skills.
@@ -171,7 +171,7 @@ Setup: _meta/reference/lsp-setup.md
   <!-- ARCHITECTURE -->
   <skill id="architecture" triggers="system design, structure, modules">Modular design, interface stability, dependency management, coupling analysis.</skill>
   <skill id="orchestration" triggers="multi-agent, parallel, tier 2+">Multi-agent coordination. AgentDB contracts, 4 fault tolerance layers, context transfer.</skill>
-  <skill id="context" triggers="context, compaction, handoff, memory">Context engineering. Progressive disclosure, AgentDB offloading, compaction strategies.</skill>
+  <skill id="context-mgmt" triggers="compaction, handoff, memory, tokens">Context engineering. Progressive disclosure, AgentDB offloading, compaction strategies. Use native /context for usage check.</skill>
 
   <!-- WORKFLOW -->
   <skill id="git" triggers="commit, branch, merge, PR">Atomic commits, conventional messages, branch strategies, merge protocols.</skill>

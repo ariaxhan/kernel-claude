@@ -71,7 +71,7 @@ Skills are methodologies that load on-demand. When you mention "debug" or "secur
 | `design` | Frontend aesthetics; break generic AI patterns |
 | `architecture` | System design, modules, dependencies, coupling |
 | `git` | Atomic commits, conventional messages, branch strategies |
-| `context` | Token management, compaction strategies, handoffs |
+| `context-mgmt` | Token management, compaction strategies, handoffs |
 | `orchestration` | Multi-agent coordination, contracts, fault tolerance |
 | `performance` | Measure before optimizing; identify real bottlenecks |
 | `eval` | Eval-driven development for AI workflows |
@@ -111,6 +111,27 @@ Or just type `/ingest` and describe what you want on the next line.
 | `/kernel:tearitapart` | `/tearitapart` | Critical pre-implementation review |
 | `/kernel:init` | `/init` | Setup (run once per project) |
 | `/kernel:help` | `/help` | Show help |
+
+---
+
+## Local Development (For Contributors)
+
+If you're developing KERNEL locally, symlink the cache to avoid stale copies:
+
+```bash
+# Remove cached copy
+rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/7.0.2
+
+# Symlink to your local dev version
+ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/7.0.2
+
+# Verify
+ls -la ~/.claude/plugins/cache/kernel-marketplace/kernel/
+```
+
+Now edits to your local copy take effect immediately—no version bumps or reinstalls needed.
+
+**Why this matters:** Claude Code [caches plugins](https://dev.to/wkusnierczyk/claude-code-plugin-cache-1dn) by version. Without the symlink, you'd need to bump version + reinstall after every change.
 
 ---
 

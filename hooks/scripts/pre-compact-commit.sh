@@ -10,8 +10,8 @@ set -e  # Fail fast on errors
 # 3. Save context snapshot for post-compaction restoration
 # 4. Output critical context to conversation (survives compaction)
 
-# Find project root dynamically
-PROJECT_ROOT="${CLAUDE_PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+# CLAUDE_PROJECT_DIR is set by Claude Code hook executor
+PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 AGENTS_DIR="$PROJECT_ROOT/_meta/agents"
 AGENTDB_PATH="$PROJECT_ROOT/_meta/agentdb/agent.db"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -86,8 +86,7 @@ git push 2>/dev/null || true
 
 # === STEP 4: AUTO-CHECKPOINT TO AGENTDB ===
 # This replaces manual handoff - auto-save context before compaction
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(dirname "$(dirname "$(dirname "$0")")")}"
-AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+AGENTDB="${PROJECT_ROOT}/orchestration/agentdb/agentdb"
 
 if [ -f "$AGENTDB_PATH" ]; then
     BRANCH=$(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null || echo "unknown")

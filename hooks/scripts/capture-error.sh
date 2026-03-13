@@ -2,7 +2,9 @@
 # KERNEL: Capture tool errors to AgentDB
 # Called on PostToolUseFailure to log errors automatically
 
-AGENTDB="${CLAUDE_PLUGIN_ROOT}/orchestration/agentdb/agentdb"
+# CLAUDE_PROJECT_DIR is set by Claude Code hook executor
+PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+AGENTDB="${PROJECT_ROOT}/orchestration/agentdb/agentdb"
 
 # Parse input JSON for tool name and error
 TOOL=$(echo "$CLAUDE_TOOL_USE_RESULT" | jq -r '.tool // "unknown"' 2>/dev/null)
