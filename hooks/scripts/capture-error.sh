@@ -1,23 +1,12 @@
 #!/bin/bash
 # KERNEL: Capture tool errors to AgentDB
-# Convention: ~/Vaults/ is required.
 
-# Fixed paths - check for initialized agentdb
-if [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ]; then
-  VAULTS="$HOME/Vaults"
-elif [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
-  VAULTS="$HOME/Downloads/Vaults"
-else
-  VAULTS="${KERNEL_VAULTS:-$HOME/Vaults}"
-fi
-AGENTDB="$VAULTS/.claude/kernel/orchestration/agentdb/agentdb"
+# Load shared functions
+source "$(dirname "$0")/common.sh"
 
-# Fallback
-if [ ! -f "$AGENTDB" ]; then
-  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-  PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-  AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
-fi
+# Detect paths
+VAULTS=$(detect_vaults)
+AGENTDB=$(get_agentdb "$VAULTS")
 
 # Parse input JSON for tool name and error
 TOOL=$(echo "$CLAUDE_TOOL_USE_RESULT" | jq -r '.tool // "unknown"' 2>/dev/null)

@@ -1,27 +1,14 @@
 #!/bin/bash
 set -e
 # KERNEL: Session start hook
-# Convention: ~/Vaults/ is required. All teammates use this path.
 
-# Fixed paths - check for initialized agentdb
-if [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ]; then
-  VAULTS="$HOME/Vaults"
-elif [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
-  VAULTS="$HOME/Downloads/Vaults"
-else
-  VAULTS="${KERNEL_VAULTS:-$HOME/Vaults}"  # env override or default
-fi
-AGENTDB="$VAULTS/.claude/kernel/orchestration/agentdb/agentdb"
+# Load shared functions
+source "$(dirname "$0")/common.sh"
 
-# Fallback: if running from plugin cache, find agentdb there
-if [ ! -f "$AGENTDB" ]; then
-  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-  PLUGIN_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-  AGENTDB="${PLUGIN_ROOT}/orchestration/agentdb/agentdb"
-fi
-
-# Project root for git operations (current project, not Vaults)
-PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+# Detect paths
+VAULTS=$(detect_vaults)
+AGENTDB=$(get_agentdb "$VAULTS")
+PROJECT_ROOT=$(get_project_root)
 
 # Generate agent name and persist for other hooks
 AGENT_NAME="main-$$"

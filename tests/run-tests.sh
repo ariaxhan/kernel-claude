@@ -309,6 +309,11 @@ test_session_start_outputs_kernel() {
 }
 
 test_session_start_creates_agent_file() {
+  # Hook writes to VAULTS/_meta/agents (detected via common.sh)
+  # In test env, we set KERNEL_VAULTS to test project
+  export KERNEL_VAULTS="$TEST_PROJECT"
+  mkdir -p "$TEST_PROJECT/_meta/agentdb"
+  touch "$TEST_PROJECT/_meta/agentdb/agent.db"  # Create marker file
   "$PLUGIN_ROOT/hooks/scripts/session-start.sh" >/dev/null 2>&1
   local agent_files
   agent_files=$(ls "$TEST_PROJECT/_meta/agents/"*.json 2>/dev/null | wc -l)
@@ -505,6 +510,80 @@ test_session_start_shows_checkpoint_after_compact() {
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
   # Should show the checkpoint for resumption
   assert_contains "$output" "Checkpoint" || assert_contains "$output" "checkpoint"
+}
+
+# === Portability Tests ===
+
+test_common_sh_exists() {
+  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/common.sh"
+}
+
+test_detect_vaults_default() {
+  # With no agent.db anywhere, should return default or env override
+  # Skip if real Vaults exists (can't test default in that case)
+  if [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ] || [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
+    echo "  (skipped - real Vaults exists)"
+    return 0
+  fi
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(detect_vaults)
+  assert_equals "$HOME/Vaults" "$result" "default should be ~/Vaults"
+}
+
+test_detect_vaults_env_override() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  export KERNEL_VAULTS="/custom/path"
+  local result
+  result=$(detect_vaults)
+  assert_equals "/custom/path" "$result" "KERNEL_VAULTS should override"
+  unset KERNEL_VAULTS
+}
+
+test_detect_vaults_finds_primary() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  # Create primary location marker
+  mkdir -p "$HOME/Vaults/_meta/agentdb"
+  touch "$HOME/Vaults/_meta/agentdb/agent.db"
+  local result
+  result=$(detect_vaults)
+  assert_equals "$HOME/Vaults" "$result" "should find ~/Vaults"
+  rm -rf "$HOME/Vaults/_meta" 2>/dev/null || true
+  rmdir "$HOME/Vaults" 2>/dev/null || true
+}
+
+test_hooks_source_common() {
+  # All lifecycle hooks should source common.sh
+  local missing=0
+  for script in session-start.sh session-end.sh capture-error.sh pre-compact-commit.sh; do
+    if ! grep -q 'source.*common.sh' "$PLUGIN_ROOT/hooks/scripts/$script" 2>/dev/null; then
+      echo "  Missing common.sh in: $script"
+      missing=1
+    fi
+  done
+  assert_exit_code 0 "$missing" "lifecycle hooks should source common.sh"
+}
+
+test_no_hardcoded_vaults_path() {
+  # Hooks should not have hardcoded ~/Vaults or ~/Downloads/Vaults
+  # Only common.sh should have the detection logic
+  local hardcoded=0
+  for script in session-start.sh session-end.sh capture-error.sh pre-compact-commit.sh; do
+    if grep -E 'HOME/Vaults|HOME/Downloads/Vaults' "$PLUGIN_ROOT/hooks/scripts/$script" 2>/dev/null | grep -v "^#"; then
+      echo "  Hardcoded path in: $script"
+      hardcoded=1
+    fi
+  done
+  assert_exit_code 0 "$hardcoded" "hooks should use common.sh for path detection"
+}
+
+test_get_agentdb_fallback() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  # When symlink doesn't exist, should fall back to plugin root
+  local result
+  result=$(get_agentdb "/nonexistent")
+  # Should contain the plugin path
+  assert_contains "$result" "orchestration/agentdb/agentdb"
 }
 
 # === Command Structure Tests ===
@@ -785,6 +864,15 @@ run_test_suite() {
       run_test "no duplicate Big 5 definitions" test_no_duplicate_big5_definitions
       run_test "progressive disclosure used" test_progressive_disclosure_used
       ;;
+    portable)
+      run_test "common.sh exists" test_common_sh_exists
+      run_test "detect_vaults default" test_detect_vaults_default
+      run_test "detect_vaults env override" test_detect_vaults_env_override
+      run_test "detect_vaults finds primary" test_detect_vaults_finds_primary
+      run_test "hooks source common.sh" test_hooks_source_common
+      run_test "no hardcoded Vaults path" test_no_hardcoded_vaults_path
+      run_test "get_agentdb fallback" test_get_agentdb_fallback
+      ;;
   esac
 }
 
@@ -805,6 +893,7 @@ main() {
     run_test_suite "observe"
     run_test_suite "verify"
     run_test_suite "tokens"
+    run_test_suite "portable"
   else
     run_test_suite "$target"
   fi
