@@ -2,6 +2,35 @@
 # KERNEL: Shared functions for hooks
 # Source this at the top of hook scripts: source "$(dirname "$0")/common.sh"
 
+# Auto-update current symlink to latest version (fixes stale hook issue)
+# Claude Code downloads new versions but doesn't update the symlink
+update_current_symlink() {
+  local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[1]}")" && pwd)"
+  local CACHE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+  # Only run if we're in the plugin cache (not dev mode)
+  [[ "$CACHE_DIR" == *"plugins/cache"* ]] || return 0
+
+  # Find highest semver directory
+  local LATEST
+  LATEST=$(ls -d "$CACHE_DIR"/[0-9]*/ 2>/dev/null \
+    | xargs -n1 basename 2>/dev/null \
+    | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
+    | sort -t. -k1,1n -k2,2n -k3,3n \
+    | tail -1)
+
+  [ -z "$LATEST" ] && return 0
+
+  # Check if current symlink needs updating
+  local CURRENT_TARGET
+  CURRENT_TARGET=$(readlink "$CACHE_DIR/current" 2>/dev/null | xargs basename 2>/dev/null)
+
+  if [ "$CURRENT_TARGET" != "$LATEST" ]; then
+    ln -sfn "$CACHE_DIR/$LATEST" "$CACHE_DIR/current" 2>/dev/null && \
+      echo "**KERNEL auto-updated:** ${CURRENT_TARGET:-none} → $LATEST"
+  fi
+}
+
 # Detect Vaults location - env var takes priority, then checks filesystem
 detect_vaults() {
   # Explicit override always wins (for testing + custom setups)

@@ -2,6 +2,16 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.1.1] - 2026-03-13
+
+### Fixed
+- **Stale hooks after update** - Session start now auto-updates `current` symlink to latest version. Fixes [#10](https://github.com/ariaxhan/kernel-claude/issues/10) where Claude Code downloads new versions but doesn't activate them.
+
+### Added
+- `update_current_symlink()` in common.sh - Self-healing function that detects and fixes stale plugin symlinks
+
+---
+
 ## [7.1.0] - 2026-03-13
 
 ### Added

@@ -586,6 +586,23 @@ test_get_agentdb_fallback() {
   assert_contains "$result" "orchestration/agentdb/agentdb"
 }
 
+test_update_current_symlink_exists() {
+  # Function should exist in common.sh
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  type update_current_symlink >/dev/null 2>&1 || {
+    echo "FAIL: update_current_symlink function not found"
+    return 1
+  }
+}
+
+test_session_start_calls_update_symlink() {
+  # session-start.sh should call update_current_symlink
+  grep -q "update_current_symlink" "$PLUGIN_ROOT/hooks/scripts/session-start.sh" || {
+    echo "FAIL: session-start.sh should call update_current_symlink"
+    return 1
+  }
+}
+
 # === Command Structure Tests ===
 
 test_ingest_command_has_research_step() {
@@ -872,6 +889,8 @@ run_test_suite() {
       run_test "hooks source common.sh" test_hooks_source_common
       run_test "no hardcoded Vaults path" test_no_hardcoded_vaults_path
       run_test "get_agentdb fallback" test_get_agentdb_fallback
+      run_test "update_current_symlink exists" test_update_current_symlink_exists
+      run_test "session-start calls symlink update" test_session_start_calls_update_symlink
       ;;
   esac
 }
