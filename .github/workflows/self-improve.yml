@@ -1,0 +1,82 @@
+name: Self-Improvement Loop
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  schedule:
+    # Every Monday 9am UTC — weekly retrospective
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  learn-from-merge:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            A PR was just merged: #${{ github.event.pull_request.number }}
+            Title: ${{ github.event.pull_request.title }}
+
+            TASK: Extract learnings from this merge and improve KERNEL.
+
+            1. Read the PR diff and understand what changed
+            2. Check if any new patterns emerged that should be captured:
+               - New anti-patterns discovered → update skills/*/SKILL.md
+               - New conventions established → update rules/
+               - Workflow improvements → update commands/
+            3. If improvements found:
+               - Create a branch: learn/pr-${{ github.event.pull_request.number }}
+               - Make the updates (minimal, surgical)
+               - Open a PR with label 'self-improvement'
+            4. If nothing to learn, comment on the merged PR: "No new patterns to extract."
+
+            CONSTRAINTS:
+            - Only update if genuinely new insight (don't churn)
+            - Keep changes under 20 lines total
+            - Never modify CLAUDE.md directly (too high risk)
+            - Focus on skills/ and rules/ files
+
+  weekly-retrospective:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            WEEKLY RETROSPECTIVE — Autonomous improvement cycle.
+
+            1. Review all PRs merged in the last 7 days:
+               - What patterns repeat?
+               - What failed and was retried?
+               - What took multiple iterations?
+
+            2. Review open issues:
+               - Any stale (>14 days)? Comment asking if still relevant.
+               - Any that could be auto-closed? Label 'stale'.
+
+            3. Check KERNEL health:
+               - Read CLAUDE.md, skills/*, agents/*, rules/*
+               - Are there contradictions between files?
+               - Are any skills outdated based on recent merges?
+
+            4. Search for external improvements:
+               - WebSearch: "Claude Code best practices March 2026"
+               - WebSearch: "agent orchestration patterns 2026"
+               - Any new patterns worth adopting?
+
+            5. Create ONE issue titled "Weekly improvement: [date]" with:
+               - Summary of week's activity
+               - Identified improvements (max 3)
+               - Proposed changes with file paths
+               - Label: 'self-improvement', 'claude'
+
+            This issue will auto-trigger implementation via the claude workflow.
+            The system improves itself.

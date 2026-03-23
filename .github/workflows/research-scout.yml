@@ -1,0 +1,59 @@
+name: Research Scout
+on:
+  schedule:
+    # Wednesday and Saturday 2pm UTC — research sweeps
+    - cron: '0 14 * * 3,6'
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'Specific research topic (leave empty for general sweep)'
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  research-sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            RESEARCH SCOUT — Find improvements, patterns, and opportunities.
+
+            You are KERNEL's research agent. Think like a senior AI engineer who is
+            deeply curious about agent orchestration, memory systems, and developer tools.
+
+            ${{ github.event.inputs.topic && format('SPECIFIC TOPIC: {0}', github.event.inputs.topic) || 'GENERAL SWEEP' }}
+
+            1. READ current state:
+               - CLAUDE.md (core philosophy)
+               - skills/build/SKILL.md, skills/testing/SKILL.md
+               - agents/*.md (all agent definitions)
+               - _meta/research/ (prior work, don't repeat)
+
+            2. SEARCH for new developments:
+               - "Claude Code plugin best practices 2026"
+               - "agent memory persistence patterns"
+               - "multi-agent orchestration failures"
+               - "developer tool automation GitHub Actions"
+               - "AI code review accuracy improvements"
+
+            3. ANALYZE gaps:
+               - What do other top Claude Code plugins do that KERNEL doesn't?
+               - What patterns from CrewAI/LangGraph/Composio should we adopt?
+               - Any new Claude Code features we're not using?
+
+            4. CREATE issues for actionable findings (max 3):
+               - Use the Feature or Task template format
+               - Include: what to change, which files, why it matters
+               - Label: 'research', 'claude' (auto-triggers implementation)
+               - Be specific — these become work orders
+
+            5. If nothing actionable found, create no issues. Don't create noise.
+
+            PHILOSOPHY: We're building the best Claude Code plugin.
+            Every improvement should make KERNEL more autonomous and more correct.
