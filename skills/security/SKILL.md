@@ -10,6 +10,11 @@ allowed-tools: Read, Grep, Bash
 Security is not a feature. It's a constraint on all features.
 Never trust user input. Never hardcode secrets. Defense in depth.
 45% of AI-generated code contains known security flaws - verify everything.
+
+<!-- Updated 2026-03-23: brightsec.com/blog/5-best-practices-for-reviewing-and-approving-ai-generated-code -->
+AI-generated PRs contain 1.57x more security issues than human-written code.
+AI-generated code is 2.74x more likely to introduce XSS vulnerabilities.
+Treat AI-generated code as untrusted. Review security boundaries rigorously.
 </purpose>
 
 <prerequisite>
@@ -266,6 +271,14 @@ Before ANY production deployment:
 - Security through obscurity (it's not security)
 - Trusting client-side validation alone
 - Logging sensitive data
+
+<!-- Updated 2026-03-23: brightsec.com, collinwilkins.com -->
+<ai_specific_risks>
+AI vulnerabilities tend to be BEHAVIORAL—emerging from how components interact over time.
+Not single obviously dangerous lines. Mentally execute code as an attacker would.
+AI optimizes for linear flows. Attackers exploit non-linear ones.
+Focus on: authentication, authorization, session handling, state management.
+</ai_specific_risks>
 </anti_patterns>
 
 </skill>

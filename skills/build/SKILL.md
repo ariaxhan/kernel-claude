@@ -83,6 +83,13 @@ Manual: walk through done-when criteria. Document how verified.
 
 Edge cases (at least 3): empty/null, boundary, error/failure path.
 
+<!-- Updated 2026-03-23: code.claude.com/docs/en/best-practices -->
+<verification_loop>
+Provide verification mechanisms (test commands, linter checks, expected outputs).
+Gives Claude a feedback loop to catch its own mistakes before declaring done.
+Never ship without verification. If you can't verify it, don't ship it.
+</verification_loop>
+
 ---
 
 # FAILURE HANDLING

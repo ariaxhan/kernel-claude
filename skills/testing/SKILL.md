@@ -50,6 +50,13 @@ No maintenance burden (tests don't persist). Mutation-based fault injection.
 Consider for high-churn code where traditional test suites rot faster than they help.
 </jit_testing>
 
+<!-- Updated 2026-03-23: platform.claude.com/docs/en/test-and-evaluate/eval-tool -->
+<claude_evaluation_tool>
+Claude Console features an Evaluation tool to test prompts under various scenarios.
+Review results across test cases and compare different prompt versions.
+Spot patterns and make informed adjustments to testing prompts efficiently.
+</claude_evaluation_tool>
+
 <on_complete>
 agentdb write-end '{"skill":"testing","tests_added":<N>,"coverage_delta":"<+X%>","edge_cases":["<list>"],"assertions":"<strong|weak>"}'
 

@@ -109,6 +109,12 @@ Every bug fix MUST include a regression test. No exceptions.
 6. Step away. Bias accumulates under sustained focus.
 </when_stuck>
 
+<!-- Updated 2026-03-23: claudelog.com/faqs/how-to-use-claude-code-for-debugging -->
+<plan_mode_debugging>
+Use Plan Mode for complex or sensitive bugs. Claude analyzes errors without making changes until you approve the approach.
+Prevents accidental "fixes" that mask underlying problems or break working code.
+</plan_mode_debugging>
+
 <escalation>
 - 30+ min on single hypothesis with no evidence → abandon it.
 - 3+ hypotheses rejected → step back, re-examine assumptions.

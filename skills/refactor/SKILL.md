@@ -65,6 +65,12 @@ Copy-paste has overtaken abstraction for first time.
 
 Refactoring is the antidote: systematically improve what AI generates.
 But it requires understanding the code. No understanding = no safe refactor.
+
+<!-- Updated 2026-03-23: brightsec.com/blog/5-best-practices -->
+The verification bottleneck: AI generates faster than humans can review.
+PRs are getting larger (~18% more additions as AI adoption increases).
+Incidents per PR up ~24%. Break work into small, reviewable pieces.
+Perceived speed gains vanish without strong testing practices.
 </vibe_coding_crisis>
 
 <on_complete>
