@@ -1,0 +1,50 @@
+name: Maintenance
+on:
+  schedule:
+    # Daily 6am UTC — health check
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            DAILY MAINTENANCE — KERNEL health check.
+
+            1. VALIDATE structure:
+               - All agents/*.md have required sections (purpose, tools, spawn conditions)
+               - All skills/*/SKILL.md have frontmatter (name, description, triggers)
+               - All commands/*.md have required sections
+               - CLAUDE.md parses as valid XML within <kernel> tags
+
+            2. CHECK consistency:
+               - Every agent referenced in CLAUDE.md exists in agents/
+               - Every skill referenced in CLAUDE.md exists in skills/
+               - Every command referenced in CLAUDE.md exists in commands/
+               - No orphan files (defined but not referenced)
+
+            3. TEST AgentDB:
+               - Verify agent.db schema is current
+               - Check for stale contracts (>7 days old)
+               - Report any error patterns in recent failures
+
+            4. SCAN for issues:
+               - Any TODO/FIXME/HACK comments in non-test files?
+               - Any files modified >90 days ago that reference outdated patterns?
+
+            5. REPORT:
+               - If all healthy: no action needed, exit silently
+               - If issues found: create ONE issue titled "maintenance: [date] health check"
+                 with findings and suggested fixes
+               - Label: 'maintenance', 'claude' (auto-triggers fix)
+
+            Keep KERNEL clean. Don't create noise for passing checks.
