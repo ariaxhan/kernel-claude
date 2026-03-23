@@ -1,0 +1,44 @@
+name: Bug Report
+description: Report a KERNEL bug. Add the 'claude' label to auto-fix.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Add the `claude` label to this issue to trigger automatic investigation and fix.
+        Claude will reproduce, diagnose, fix, and open a PR.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What's broken?
+      description: Describe the bug. What happened vs what should have happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: How can this be triggered?
+      placeholder: |
+        1. Run /kernel:ingest
+        2. Select tier 2
+        3. Surgeon spawns but...
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files likely affected
+      description: Where do you think the bug lives?
+      placeholder: |
+        - skills/build/SKILL.md
+        - hooks/scripts/guard-bash.sh

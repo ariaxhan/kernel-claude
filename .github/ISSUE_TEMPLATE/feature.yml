@@ -1,0 +1,56 @@
+name: Feature Request
+description: Request a new KERNEL feature. Add the 'claude' label to auto-implement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Add the `claude` label to this issue to trigger automatic implementation.
+        Claude will read this issue, create a branch, implement, and open a PR.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What should be built?
+      description: Describe the feature clearly. Include expected behavior.
+      placeholder: "Add a new agent type for..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files likely affected
+      description: Which files or directories should change?
+      placeholder: |
+        - skills/build/SKILL.md
+        - agents/new-agent.md
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - "Small (1-2 files)"
+        - "Medium (3-5 files)"
+        - "Large (6+ files)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+      description: How do we know this is complete?
+      placeholder: |
+        - [ ] New agent file exists
+        - [ ] Tests pass
+        - [ ] CHANGELOG updated
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, examples, prior art, constraints.

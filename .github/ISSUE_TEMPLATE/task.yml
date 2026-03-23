@@ -1,0 +1,43 @@
+name: Task
+description: General work item. Add the 'claude' label to auto-execute.
+labels: ["task"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Add the `claude` label for automatic execution.
+        For manual-only tasks, don't add the label.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Task type
+      options:
+        - "Refactor"
+        - "Documentation"
+        - "Testing"
+        - "Performance"
+        - "Security audit"
+        - "Dependency update"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs to be done?
+      description: Be specific. Claude reads this literally.
+    validations:
+      required: true
+
+  - type: textarea
+    id: done-when
+    attributes:
+      label: Done when
+      description: Success criteria.
+      placeholder: |
+        - [ ] All tests pass
+        - [ ] No lint errors
+    validations:
+      required: true
