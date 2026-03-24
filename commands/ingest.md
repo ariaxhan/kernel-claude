@@ -30,7 +30,16 @@ type: bug|feature|refactor|question|verify|handoff|review
 familiar: yes|no
 
 Search before asking: Glob, Grep, common paths.
+
+After classify: load matching workflow from workflows/{type}.md if it exists.
+Workflow steps guide the phase sequence. Human confirms at each step (ingest mode).
 </step>
+
+<branch after="classify">
+  IF familiar AND tier_likely_1 → skip to step 3 (scope), mark research="skipped (familiar)"
+  IF unfamiliar OR complex → proceed to step 2 (research)
+  ALWAYS: check _meta/research/ cache regardless (cache != full research)
+</branch>
 
 <step id="2_research" mandatory="true">
 <substeps>
@@ -67,6 +76,11 @@ tier: 1|2|3
 ambiguous: assume higher
 </tiers>
 </step>
+
+<branch after="scope">
+  IF scope reveals unknowns not covered by research → loop to step 2 with narrowed query
+  IF scope is clear → proceed to step 4
+</branch>
 
 <step id="4_tests" mandatory="true">
 <rule>Define success before coding. Tests first.</rule>
@@ -108,6 +122,12 @@ rule: you do NOT write code
 7. Report
 </tier_2_plus>
 </step>
+
+<branch after="execute">
+  IF adversary rejects (tier 3) → return to execute with adversary feedback, max 3 retries
+  IF tests fail → diagnose, fix, re-execute
+  IF blocked → checkpoint and STOP, ask human
+</branch>
 
 <step id="6_learn" mandatory="true">
 <rule>Every task teaches. Capture or lose.</rule>

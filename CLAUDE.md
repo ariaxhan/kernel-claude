@@ -62,7 +62,7 @@ Location: _meta/agentdb/agent.db
 <!-- ============================================ -->
 
 <flow>
-  READ → CLASSIFY → RESEARCH → SCOPE → DEFINE SUCCESS → EXECUTE → LEARN
+  READ → CLASSIFY → [branch] → SCOPE → DEFINE SUCCESS → EXECUTE → [branch] → LEARN
   <step id="read">agentdb read-start. Check _meta/research/ for prior work.</step>
   <step id="classify">Task type. Familiar? Search before asking.</step>
   <step id="research">Anti-patterns FIRST. Then proven solutions. Built-in beats dependency.</step>
@@ -70,6 +70,14 @@ Location: _meta/agentdb/agent.db
   <step id="define">Acceptance criteria + evals BEFORE coding.</step>
   <step id="execute">Tier 1: implement. Tier 2+: contract → surgeon → verify.</step>
   <step id="learn">agentdb learn. Update research docs. Checkpoint.</step>
+
+  <branches>
+    classify.familiar AND scope.tier==1 → skip research, go to scope
+    scope.reveals_unknowns → loop back to research
+    execute.fails → branch to debug skill, then retry execute
+    adversary.rejects → loop to surgeon with feedback (max 3 retries)
+  </branches>
+
   <rule>Never implement first solution. Generate 2-3 approaches, choose simplest.</rule>
   <rule>Never code without research. Most problems are already solved.</rule>
 </flow>
@@ -141,6 +149,13 @@ Setup: _meta/reference/lsp-setup.md
     Spawns reviewer agent. Load: testing, security skills.
   </command>
   <rule>Commands must load relevant skills and reference research before executing.</rule>
+
+  <workflows>
+    Declarative workflow definitions in workflows/ directory.
+    Load workflow matching task type. Steps define agent sequence.
+    Each step has: agent, output, skip_if, retry, on_failure.
+    See: workflows/feature.md, workflows/bugfix.md, workflows/refactor.md
+  </workflows>
 </commands>
 
 <!-- ============================================ -->

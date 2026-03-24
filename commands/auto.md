@@ -31,6 +31,10 @@ Check: _meta/research/ for prior work.
 Search anti-patterns FIRST: "{tech} not working", "{tech} gotchas"
 THEN: "{tech} best practices", official docs
 Output: _meta/research/{topic}.md
+
+<branch after="research">
+  IF agentdb shows pattern for this task type → skip research, use cached pattern
+</branch>
 </phase>
 
 <phase id="2_tests_first">
@@ -46,10 +50,11 @@ Edge cases: null, empty, boundary, timeout.
 3c: evaluate:
   - all_pass → phase 4
   - failing → fix implementation (NOT tests)
+  - adversary_rejects → feed rejection evidence back to surgeon, retry
   - coverage_low → add edge case tests
 3d: repeat until green + coverage >= 80%
 
-max_iterations: 5
+max_iterations: 5 (includes adversary retries)
 on_max_exceeded: STOP, report blockers
 ```
 </phase>
@@ -57,6 +62,11 @@ on_max_exceeded: STOP, report blockers
 <phase id="4_verify">
 Build, lint, test, security scan. Load skills/quality/SKILL.md for Big 5.
 Any fail: back to phase 3.
+
+<branch after="verify">
+  IF verify.failure_type == "approach" → loop to phase 1, try different approach (max 1 approach change)
+  IF verify.failure_type == "bug" → back to phase 3 (default behavior)
+</branch>
 </phase>
 
 <phase id="5_ship">
