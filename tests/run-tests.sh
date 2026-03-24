@@ -904,6 +904,36 @@ test_agentdb_numeric_injection_prune() {
   [ -n "$count" ] || { echo "FAIL: learnings table was dropped by injection"; return 1; }
 }
 
+# === Dreamer Tests ===
+
+test_dream_command_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/commands/dream.md" ]
+  head -1 "$PLUGIN_ROOT/commands/dream.md" | grep -q "^---"
+}
+
+test_dream_command_registered_in_plugin_json() {
+  grep -q "dream.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+}
+
+test_dreamer_agent_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/dreamer.md" ]
+  head -1 "$PLUGIN_ROOT/agents/dreamer.md" | grep -q "^---"
+}
+
+test_dreamer_agent_has_voice_definitions() {
+  grep -q "minimalist" "$PLUGIN_ROOT/agents/dreamer.md"
+  grep -q "maximalist" "$PLUGIN_ROOT/agents/dreamer.md"
+  grep -q "pragmatist" "$PLUGIN_ROOT/agents/dreamer.md"
+}
+
+test_dream_command_has_output_format() {
+  grep -q "output_format" "$PLUGIN_ROOT/commands/dream.md"
+}
+
+test_dream_command_has_github_integration() {
+  grep -q "github_integration" "$PLUGIN_ROOT/commands/dream.md"
+}
+
 # === Command Structure Tests ===
 
 test_ingest_command_has_research_step() {
@@ -1311,13 +1341,21 @@ run_test_suite() {
       run_test "SQL injection via tokens" test_agentdb_numeric_injection_tokens
       run_test "SQL injection via prune" test_agentdb_numeric_injection_prune
       ;;
+    dreamer)
+      run_test "dream command exists and has frontmatter" test_dream_command_exists_with_frontmatter
+      run_test "dream command registered in plugin.json" test_dream_command_registered_in_plugin_json
+      run_test "dreamer agent exists and has frontmatter" test_dreamer_agent_exists_with_frontmatter
+      run_test "dreamer agent has voice definitions" test_dreamer_agent_has_voice_definitions
+      run_test "dream command has output format" test_dream_command_has_output_format
+      run_test "dream command has github integration" test_dream_command_has_github_integration
+      ;;
   esac
 }
 
 main() {
-  echo "========================================"
+  echo "================================="
   echo "KERNEL Plugin Test Suite"
-  echo "========================================"
+  echo "================================="
   echo "Plugin: $PLUGIN_ROOT"
   echo "sqlite3: $(which sqlite3)"
 
@@ -1336,17 +1374,20 @@ main() {
     run_test_suite "graph_tracking"
     run_test_suite "schema_validation"
     run_test_suite "input_validation"
+
     run_test_suite "telemetry"
     run_test_suite "learning_dedup"
     run_test_suite "migration_003"
+
+    run_test_suite "dreamer"
   else
     run_test_suite "$target"
   fi
 
   echo ""
-  echo "========================================"
+  echo "================================="
   echo -e "Results: ${GREEN}$PASS_COUNT passed${NC}, ${RED}$FAIL_COUNT failed${NC}"
-  echo "========================================"
+  echo "================================="
 
   [ "$FAIL_COUNT" -eq 0 ]
 }

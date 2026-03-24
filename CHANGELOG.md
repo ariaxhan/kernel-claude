@@ -2,6 +2,28 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.3.0] - 2026-03-24
+
+### Added
+- **`/kernel:dream` command** — Multi-perspective debate before implementation. Generates three competing approaches grounded in actual codebase context:
+  - **Minimalist** 🔻 — Radical simplification. Questions whether the feature is needed. Finds the 20-line version. Provocative and terse.
+  - **Maximalist** 🔺 — Full vision. The architecture you'd be proud of in 6 months. Extensible, thorough, ambitious.
+  - **Pragmatist** ⚖️ — The 80/20 point. Ships this week with explicit tradeoffs and documented upgrade path.
+  
+  Each perspective uses a distinct voice reflecting its value system. The dreamer prevents Claude's convergence bias from collapsing the solution space before you see alternatives. (#42)
+
+- **Dreamer agent** — For tier 2+ dreams, spawns a dedicated agent that reads the actual codebase to ground each perspective in real files and patterns. Writes to `_meta/dreams/` and optionally posts to GitHub Discussions (Decisions category) when `gh` is authenticated.
+
+- **Agent personality system (dreamer voices)** — First implementation of distinct agent voices. Minimalist is terse/provocative, Maximalist is expansive/visionary, Pragmatist is balanced/deadline-aware. Foundation for full personality system across all agents. (#53)
+
+### Philosophy
+
+The dreamer enforces the existing "never implement first solution" rule structurally instead of as a prohibition. Three value systems compete because they're structurally opposed — minimalist and maximalist can't converge. This guarantees solution space expansion before narrowing.
+
+**Pipeline:** Dream → Select → Plan → TearItApart → Execute
+
+---
+
 ## [7.2.0] - 2026-03-24
 
 ### Added
@@ -17,9 +39,6 @@ All notable changes to KERNEL are documented in this file.
 ### Changed
 - **Directive calibration** -- Softened aggressive MUST/NEVER language that caused Claude 4.6 over-triggering. Security-critical directives (secrets, data loss) remain strong. (#34)
 - **CLAUDE.md context note** -- Added developer note that CLAUDE.md is NOT loaded for plugin users; session-start.sh is the only ambient context delivery mechanism.
-
----
-
 ## [7.1.2] - 2026-03-24
 
 ### Fixed
