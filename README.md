@@ -105,6 +105,7 @@ Or just type `/ingest` and describe what you want on the next line.
 | Terminal | Desktop/Cursor | What It Does |
 |----------|----------------|--------------|
 | `/kernel:ingest` | `/ingest` | Classify task, determine tier, route to agent |
+| `/kernel:dream` | `/dream` | Multi-perspective debate before implementation |
 | `/kernel:validate` | `/validate` | Build, lint, test, security scan |
 | `/kernel:handoff` | `/handoff` | Save progress for next session |
 | `/kernel:review` | `/review` | Code review for PRs |
@@ -171,6 +172,29 @@ See [docs/QUICKSTART.md](docs/QUICKSTART.md) for:
 - All commands explained
 - Common situations and fixes
 - What's inside KERNEL
+
+---
+
+## Built on aDNA
+
+KERNEL's architecture is directly parallel to [**aDNA (Agentic DNA)**](https://github.com/LatticeProtocol/adna) — a universal, open-source knowledge architecture template for AI-native projects. Full credit and deep thanks to the aDNA project for pioneering many of the patterns KERNEL builds on:
+
+| aDNA Concept | KERNEL Parallel |
+|-------------|-----------------|
+| **Triad** (WHO/WHAT/HOW) | **Agents/Skills/Commands** — actors, methodology, entry points |
+| **Execution Hierarchy** (Campaign → Mission → Objective) | **Tiered Routing** (Orchestrator → Surgeon → Adversary) — convergent decomposition |
+| **Context Library** with progressive loading | **Skills** with on-demand disclosure — agents load only what they need |
+| **Session tracking** with state persistence | **AgentDB** — cross-session memory with telemetry |
+| **Skills** (11 agent recipes) | **Skills** (16 methodologies) — both are HOW-knowledge for agents |
+| **OODA Cascade** (Observe → Orient → Decide → Act) | **Workflow** (Read → Classify → Research → Scope → Execute → Learn) |
+| **Templates** for every entity type | **Agent/command definitions** with structured frontmatter |
+| **Coordination** (cross-agent handoffs) | **GitHub Discussions** (agent communication layer) |
+| **After-Action Review** (reflection at mission close) | **Dreamer** (multi-perspective debate) + **Coroner** (post-mortem analysis) |
+| **Dual-audience design** (humans browse, agents parse) | **Session-start hook** (ambient context) + **GitHub** (human interface) |
+
+Both projects solve the same core problems: agent orientation, cross-session memory, knowledge fragmentation, and human-agent coordination. KERNEL focuses specifically on Claude Code plugin integration; aDNA provides the universal template.
+
+**If you want the full knowledge architecture** — the triad, lattice composition, campaign/mission hierarchy, OODA cascades, the 58K-token context library, and a framework that works with any AI agent and any editor — **go to [aDNA](https://github.com/LatticeProtocol/adna)**. It's the deeper system that KERNEL draws from.
 
 ---
 
