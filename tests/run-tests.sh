@@ -607,6 +607,85 @@ test_session_start_calls_update_symlink() {
   }
 }
 
+# === Profile Detection Tests (pure functions — no API calls) ===
+
+test_parse_github_remote_https() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(parse_github_remote "https://github.com/owner/repo.git")
+  assert_equals "owner/repo" "$result" "HTTPS with .git suffix"
+}
+
+test_parse_github_remote_ssh() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(parse_github_remote "git@github.com:owner/repo.git")
+  assert_equals "owner/repo" "$result" "SSH with .git suffix"
+}
+
+test_parse_github_remote_ssh_protocol() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(parse_github_remote "ssh://git@github.com/owner/repo.git")
+  assert_equals "owner/repo" "$result" "SSH protocol with .git suffix"
+}
+
+test_parse_github_remote_no_git_suffix() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(parse_github_remote "https://github.com/owner/repo")
+  assert_equals "owner/repo" "$result" "HTTPS without .git suffix"
+}
+
+test_parse_github_remote_not_github() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(parse_github_remote "https://gitlab.com/owner/repo.git")
+  assert_equals "" "$result" "non-GitHub remote should return empty"
+}
+
+test_classify_profile_local() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "false" "unknown" 0 0 "false")
+  assert_equals "local" "$result" "non-GitHub should be local"
+}
+
+test_classify_profile_github_private() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "private" 1 0 "false")
+  assert_equals "github" "$result" "private GitHub with 1 collab"
+}
+
+test_classify_profile_github_oss() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "public" 1 0 "false")
+  assert_equals "github-oss" "$result" "public GitHub should be oss"
+}
+
+test_classify_profile_production_by_collabs() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "private" 5 0 "false")
+  assert_equals "github-production" "$result" ">2 collabs = production"
+}
+
+test_classify_profile_production_by_envs() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "public" 1 2 "false")
+  assert_equals "github-production" "$result" "envs > 0 = production"
+}
+
+test_classify_profile_production_by_projects() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "public" 1 0 "true")
+  assert_equals "github-production" "$result" "has_projects = production"
+}
+
 # === Security Hook Tests ===
 # Note: Secret values are built dynamically to avoid triggering detect-secrets on THIS file
 
@@ -1292,6 +1371,19 @@ run_test_suite() {
       run_test "update_current_symlink exists" test_update_current_symlink_exists
       run_test "session-start calls symlink update" test_session_start_calls_update_symlink
       ;;
+    profile)
+      run_test "parse_github_remote HTTPS" test_parse_github_remote_https
+      run_test "parse_github_remote SSH" test_parse_github_remote_ssh
+      run_test "parse_github_remote SSH protocol" test_parse_github_remote_ssh_protocol
+      run_test "parse_github_remote no .git suffix" test_parse_github_remote_no_git_suffix
+      run_test "parse_github_remote non-GitHub" test_parse_github_remote_not_github
+      run_test "classify_profile local" test_classify_profile_local
+      run_test "classify_profile github private" test_classify_profile_github_private
+      run_test "classify_profile github oss" test_classify_profile_github_oss
+      run_test "classify_profile production by collabs" test_classify_profile_production_by_collabs
+      run_test "classify_profile production by envs" test_classify_profile_production_by_envs
+      run_test "classify_profile production by projects" test_classify_profile_production_by_projects
+      ;;
     security_hooks)
       run_test "detect-secrets blocks AWS key" test_detect_secrets_blocks_aws_key
       run_test "detect-secrets blocks GitHub PAT" test_detect_secrets_blocks_github_pat
@@ -1380,6 +1472,8 @@ main() {
     run_test_suite "migration_003"
 
     run_test_suite "dreamer"
+
+    run_test_suite "profile"
   else
     run_test_suite "$target"
   fi

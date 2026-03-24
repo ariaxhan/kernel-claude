@@ -66,3 +66,115 @@ get_agentdb() {
 get_project_root() {
   echo "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 }
+
+# === Project Profile Detection ===
+
+# Parse owner/repo from any GitHub remote URL format
+# Handles: HTTPS, SSH (git@), SSH (ssh://), with/without .git suffix
+parse_github_remote() {
+  local url="$1"
+  # Return empty if not github.com
+  echo "$url" | grep -qi "github\.com" || return 0
+  # Strip protocol, host, .git suffix — extract owner/repo
+  echo "$url" | sed -E 's#^(https?://|git@|ssh://git@)github\.com[:/]##; s/\.git$//'
+}
+
+# Pure classification function — no side effects, fully testable
+classify_profile() {
+  local is_github="${1:-false}"
+  local visibility="${2:-unknown}"
+  local collab_count="${3:-0}"
+  local env_count="${4:-0}"
+  local has_projects="${5:-false}"
+
+  [[ "$is_github" != "true" ]] && echo "local" && return
+
+  # Production signals: team collaboration indicators
+  if [[ "$collab_count" -gt 2 ]] || [[ "$env_count" -gt 0 ]] || [[ "$has_projects" == "true" ]]; then
+    echo "github-production"
+    return
+  fi
+
+  [[ "$visibility" == "public" ]] && echo "github-oss" && return
+  echo "github"
+}
+
+# Full detection with API calls, caching, timeout protection
+detect_profile() {
+  local project_root="${1:-$(get_project_root)}"
+
+  # Check cache first
+  local cache_dir="$HOME/.cache/kernel"
+  mkdir -p "$cache_dir" 2>/dev/null || cache_dir="/tmp"
+  local remote_url
+  remote_url=$(cd "$project_root" && git remote get-url origin 2>/dev/null) || true
+
+  if [[ -z "${remote_url:-}" ]]; then
+    echo "local"
+    return
+  fi
+
+  local repo_hash
+  repo_hash=$(echo "$remote_url" | md5 2>/dev/null || echo "$remote_url" | md5sum 2>/dev/null | cut -d' ' -f1)
+  local cache_file="$cache_dir/profile-${repo_hash}"
+
+  # Check cache (1hr TTL)
+  if [[ -f "$cache_file" ]]; then
+    local cache_age
+    cache_age=$(( $(date +%s) - $(stat -f %m "$cache_file" 2>/dev/null || stat -c %Y "$cache_file" 2>/dev/null || echo 0) ))
+    if [[ "$cache_age" -lt 3600 ]]; then
+      cat "$cache_file"
+      return
+    fi
+  fi
+
+  # Parse owner/repo
+  local owner_repo
+  owner_repo=$(parse_github_remote "$remote_url")
+  if [[ -z "${owner_repo:-}" ]]; then
+    echo "local"  # non-GitHub remote
+    return
+  fi
+
+  local is_github="true"
+  local visibility="unknown"
+  local collab_count=0
+  local env_count=0
+  local has_projects="false"
+
+  # API calls — all failure-safe, all with timeout
+  if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+    # Single API call to get repo metadata
+    local repo_json
+    repo_json=$(GH_HTTP_TIMEOUT=5 gh api "repos/${owner_repo}" --cache 3600s 2>/dev/null) || true
+
+    if [[ -n "${repo_json:-}" ]]; then
+      visibility=$(echo "$repo_json" | jq -r '.visibility // "unknown"' 2>/dev/null) || true
+      visibility="${visibility:-unknown}"
+
+      # Only check production signals if we got basic metadata
+      collab_count=$(GH_HTTP_TIMEOUT=5 gh api "repos/${owner_repo}/collaborators" --jq 'length' --cache 3600s 2>/dev/null) || true
+      collab_count="${collab_count:-0}"
+
+      env_count=$(GH_HTTP_TIMEOUT=5 gh api "repos/${owner_repo}/environments" --jq '.total_count // 0' --cache 3600s 2>/dev/null) || true
+      env_count="${env_count:-0}"
+
+      # Check for projects (lightweight)
+      local project_count
+      project_count=$(GH_HTTP_TIMEOUT=5 gh api graphql -f query='query($owner:String!,$repo:String!){repository(owner:$owner,name:$repo){projectsV2(first:1){totalCount}}}' -f owner="${owner_repo%%/*}" -f repo="${owner_repo##*/}" --jq '.data.repository.projectsV2.totalCount // 0' 2>/dev/null) || true
+      [[ "${project_count:-0}" -gt 0 ]] && has_projects="true"
+    fi
+  fi
+
+  local profile
+  profile=$(classify_profile "$is_github" "$visibility" "$collab_count" "$env_count" "$has_projects")
+
+  # Atomic cache write
+  local tmp_cache
+  tmp_cache=$(mktemp "${cache_dir}/profile-tmp-XXXXXX" 2>/dev/null) || tmp_cache="${cache_dir}/profile-tmp-$$"
+  echo "$profile" > "$tmp_cache"
+  chmod 600 "$tmp_cache" 2>/dev/null || true
+  mv "$tmp_cache" "$cache_file" 2>/dev/null || true
+
+  echo "$profile"
+}
