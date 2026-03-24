@@ -1107,6 +1107,75 @@ test_hooks_json_valid() {
   fi
 }
 
+# === Telemetry Tests ===
+
+test_agentdb_emit_records_event() {
+  agentdb init >/dev/null
+  agentdb emit session "test-start" "" '{"branch":"main"}' >/dev/null
+  RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM events WHERE category='session';")
+  assert_equals "1" "$RESULT" "event count"
+}
+
+test_agentdb_emit_validates_category() {
+  agentdb init >/dev/null
+  OUTPUT=$(agentdb emit invalid "test" 2>&1 || true)
+  assert_contains "$OUTPUT" "category must be"
+}
+
+test_agentdb_emit_validates_duration() {
+  agentdb init >/dev/null
+  OUTPUT=$(agentdb emit session "test" "notanumber" 2>&1 || true)
+  assert_contains "$OUTPUT" "must be integer"
+}
+
+test_agentdb_emit_with_duration() {
+  agentdb init >/dev/null
+  agentdb emit hook "guard-bash" "42" '{"exit_code":0}' >/dev/null
+  RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT duration_ms FROM events WHERE event='guard-bash';")
+  assert_equals "42" "$RESULT" "duration"
+}
+
+test_agentdb_health_runs() {
+  agentdb init >/dev/null
+  OUTPUT=$(agentdb health 2>&1 || true)
+  assert_contains "$OUTPUT" "agentdb:"
+  assert_contains "$OUTPUT" "Health:"
+}
+
+# === Learning Dedup Tests ===
+
+test_learning_dedup_reinforces() {
+  agentdb init >/dev/null
+  agentdb learn pattern "sqlite busy_timeout prevents failures" "evidence1" >/dev/null
+  agentdb learn pattern "sqlite busy_timeout prevents failures" "evidence2" >/dev/null
+  COUNT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM learnings;")
+  assert_equals "1" "$COUNT" "should have 1 learning not 2"
+  HIT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT hit_count FROM learnings LIMIT 1;")
+  assert_equals "1" "$HIT" "hit_count should be 1 after reinforcement"
+}
+
+test_learning_dedup_requires_same_type() {
+  agentdb init >/dev/null
+  agentdb learn pattern "sqlite timeout issue" "evidence1" >/dev/null
+  agentdb learn failure "sqlite timeout issue" "evidence2" >/dev/null
+  COUNT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM learnings;")
+  assert_equals "2" "$COUNT" "different types should not dedup"
+}
+
+# === Migration 003 Tests ===
+
+test_migration_003_creates_events() {
+  agentdb init >/dev/null
+  RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT name FROM sqlite_master WHERE type='table' AND name='events';")
+  assert_equals "events" "$RESULT" "events table should exist"
+}
+
+test_inline_schema_includes_events() {
+  SCHEMA_DIR="" agentdb init >/dev/null
+  RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT name FROM sqlite_master WHERE type='table' AND name='events';")
+  assert_equals "events" "$RESULT" "events table should exist from inline schema"
+}
+
 # === Run Tests ===
 
 run_test_suite() {
@@ -1222,6 +1291,21 @@ run_test_suite() {
       run_test "migration 002 applies cleanly" test_migration_applies_cleanly
       run_test "hooks.json events are valid" test_hooks_json_schema_valid
       ;;
+    telemetry)
+      run_test "agentdb emit records event" test_agentdb_emit_records_event
+      run_test "agentdb emit validates category" test_agentdb_emit_validates_category
+      run_test "agentdb emit validates duration" test_agentdb_emit_validates_duration
+      run_test "agentdb emit with duration" test_agentdb_emit_with_duration
+      run_test "agentdb health runs" test_agentdb_health_runs
+      ;;
+    learning_dedup)
+      run_test "learning dedup reinforces existing" test_learning_dedup_reinforces
+      run_test "learning dedup requires same type" test_learning_dedup_requires_same_type
+      ;;
+    migration_003)
+      run_test "migration 003 creates events table" test_migration_003_creates_events
+      run_test "inline schema includes events table" test_inline_schema_includes_events
+      ;;
     input_validation)
       run_test "SQL injection via tier" test_agentdb_numeric_injection_tier
       run_test "SQL injection via tokens" test_agentdb_numeric_injection_tokens
@@ -1252,6 +1336,9 @@ main() {
     run_test_suite "graph_tracking"
     run_test_suite "schema_validation"
     run_test_suite "input_validation"
+    run_test_suite "telemetry"
+    run_test_suite "learning_dedup"
+    run_test_suite "migration_003"
   else
     run_test_suite "$target"
   fi

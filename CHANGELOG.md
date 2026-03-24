@@ -2,6 +2,24 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.2.0] - 2026-03-24
+
+### Added
+- **Telemetry events table** -- Migration 003 adds `events` table for tracking session lifecycle, agent spawns, hook executions, and command usage. Auto-applies on next session start. (#43)
+- **`agentdb emit`** -- New subcommand for recording telemetry events with category, duration, and metadata.
+- **`agentdb health`** -- New subcommand showing schema status, dependency checks, learning stats, and disk usage.
+- **Learning deduplication** -- Similar learnings reinforce existing records (bumps hit_count) instead of creating duplicates. (#20)
+- **Learning highlights** -- Session start surfaces top 3 most-reinforced learnings so patterns propagate across sessions.
+- **Stale learning pruning** -- Learnings with 0 hits older than 30 days auto-pruned at session start.
+- **System health warnings** -- Session start checks for missing dependencies (jq, gh) and auth status. Warnings only shown when something needs attention.
+- **Auto-migration** -- Session start runs `agentdb init` automatically, applying any pending schema migrations. Plugin updates are seamless.
+
+### Changed
+- **Directive calibration** -- Softened aggressive MUST/NEVER language that caused Claude 4.6 over-triggering. Security-critical directives (secrets, data loss) remain strong. (#34)
+- **CLAUDE.md context note** -- Added developer note that CLAUDE.md is NOT loaded for plugin users; session-start.sh is the only ambient context delivery mechanism.
+
+---
+
 ## [7.1.2] - 2026-03-24
 
 ### Fixed

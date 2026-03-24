@@ -14,6 +14,7 @@
 #   agentdb prune                   # Delete old checkpoints (keep last 10)
 #   agentdb export                  # Dump learnings to markdown
 #   agentdb recent                  # Show last 5 checkpoints
+#   agentdb health                  # Check system health
 
 set -euo pipefail
 
@@ -124,6 +125,19 @@ cmd_init() {
           applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
         );
         INSERT OR IGNORE INTO _migrations (name) VALUES ('001_init');
+        CREATE TABLE IF NOT EXISTS events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+          category TEXT NOT NULL CHECK(category IN ('session','agent','hook','command','error','learning')),
+          event TEXT NOT NULL,
+          duration_ms INTEGER,
+          metadata TEXT,
+          agent TEXT,
+          session_id TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);
+        CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
+        CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
         CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
         CREATE INDEX IF NOT EXISTS idx_learnings_domain ON learnings(domain);
         CREATE INDEX IF NOT EXISTS idx_context_type ON context(type);
@@ -213,6 +227,16 @@ cmd_learn() {
   safe_insight=$(sql_escape "$insight")
   safe_evidence=$(sql_escape "$evidence")
   safe_domain=$(sql_escape "$domain")
+
+  # Dedup: if similar learning exists, reinforce instead of duplicating
+  local safe_substr=$(sql_escape "${insight:0:40}")
+  local existing
+  existing=$(db_exec "SELECT id FROM learnings WHERE insight LIKE '%${safe_substr}%' AND type='$safe_type' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -n "$existing" ]; then
+    db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='$existing';"
+    echo "Reinforced: [$type] (existing: $existing)"
+    return
+  fi
 
   local id="LRN-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
   db_exec "INSERT INTO learnings (id, type, insight, evidence, domain) VALUES ('$id', '$safe_type', '$safe_insight', '$safe_evidence', '$safe_domain');"
@@ -507,6 +531,98 @@ cmd_suggest_context() {
   " 2>/dev/null || echo "No suggestions yet. Need more session data."
 }
 
+cmd_emit() {
+  local category="${1:?Usage: agentdb emit <category> <event> [duration_ms] [metadata_json] [agent] [session_id]}"
+  local event="${2:?Usage: agentdb emit <category> <event>}"
+  local duration="${3:-}"
+  local metadata="${4:-'{}'}"
+  local agent="${5:-}"
+  local session_id="${6:-}"
+
+  # Validate category
+  case "$category" in
+    session|agent|hook|command|error|learning) ;;
+    *) echo "Error: category must be one of: session, agent, hook, command, error, learning" >&2; exit 1 ;;
+  esac
+
+  local safe_event=$(sql_escape "$event")
+  local safe_meta=$(sql_escape "$metadata")
+  local safe_agent=$(sql_escape "$agent")
+  local safe_session=$(sql_escape "$session_id")
+
+  local duration_sql="NULL"
+  if [ -n "$duration" ]; then
+    validate_int "$duration" "duration_ms"
+    duration_sql="$duration"
+  fi
+
+  db_exec "INSERT INTO events (category, event, duration_ms, metadata, agent, session_id)
+    VALUES ('$category', '$safe_event', $duration_sql, '$safe_meta', '$safe_agent', '$safe_session');"
+  echo "Recorded: [$category] $event"
+}
+
+cmd_health() {
+  local warnings=0
+  local errors=0
+
+  # Schema check
+  local migration_count
+  migration_count=$(db_exec "SELECT COUNT(*) FROM _migrations;" 2>/dev/null || echo "0")
+  if [ "$migration_count" -ge 3 ]; then
+    echo "✓ agentdb: OK ($migration_count migrations applied)"
+  else
+    echo "⚠ agentdb: $migration_count migrations applied (expected 3+)"
+    warnings=$((warnings + 1))
+  fi
+
+  # Learnings
+  local learning_count
+  learning_count=$(db_exec "SELECT COUNT(*) FROM learnings;" 2>/dev/null || echo "0")
+  local active_learnings
+  active_learnings=$(db_exec "SELECT COUNT(*) FROM learnings WHERE hit_count > 0;" 2>/dev/null || echo "0")
+  echo "✓ learnings: $learning_count total, $active_learnings reinforced"
+
+  # Events
+  local event_count
+  event_count=$(db_exec "SELECT COUNT(*) FROM events;" 2>/dev/null || echo "0")
+  echo "✓ events: $event_count recorded"
+
+  # Dependencies
+  local deps_ok=true
+  printf "✓ dependencies:"
+  command -v sqlite3 >/dev/null 2>&1 && printf " sqlite3" || { printf " ✗sqlite3"; deps_ok=false; errors=$((errors + 1)); }
+  command -v jq >/dev/null 2>&1 && printf " jq" || { printf " ✗jq"; warnings=$((warnings + 1)); }
+  command -v gh >/dev/null 2>&1 && printf " gh" || { printf " ✗gh"; warnings=$((warnings + 1)); }
+  echo ""
+
+  # gh auth
+  if command -v gh >/dev/null 2>&1; then
+    if gh auth status >/dev/null 2>&1; then
+      echo "✓ gh: authenticated"
+    else
+      echo "⚠ gh: not authenticated — run 'gh auth login' for GitHub features"
+      warnings=$((warnings + 1))
+    fi
+  fi
+
+  # DB size
+  local db_size
+  db_size=$(ls -lh "$DB" 2>/dev/null | awk '{print $5}')
+  echo "✓ disk: agent.db $db_size"
+
+  # Summary
+  if [ "$errors" -gt 0 ]; then
+    echo ""; echo "Health: ERRORS ($errors errors, $warnings warnings)"
+    return 2
+  elif [ "$warnings" -gt 0 ]; then
+    echo ""; echo "Health: WARNINGS ($warnings warnings)"
+    return 1
+  else
+    echo ""; echo "Health: OK"
+    return 0
+  fi
+}
+
 # === DISPATCH ===
 case "${1:-help}" in
   init)           cmd_init ;;
@@ -524,6 +640,8 @@ case "${1:-help}" in
   session-end)    shift; cmd_session_end "$@" ;;
   track-node)     shift; cmd_track_node "$@" ;;
   suggest-context) shift; cmd_suggest_context "$@" ;;
+  emit)        shift; cmd_emit "$@" ;;
+  health)      cmd_health ;;
   export)      cmd_export ;;
   recent)      shift; cmd_recent "$@" ;;
   *)
@@ -542,6 +660,10 @@ case "${1:-help}" in
     echo "  session-end <id> <1|0> <json>  Close session with outcome"
     echo "  track-node <path> <type> [tokens]  Record node access"
     echo "  suggest-context <type>  Suggest context based on success patterns"
+    echo ""
+    echo "TELEMETRY (after migration 003):"
+    echo "  emit <cat> <event> [ms] [json]  Record telemetry event"
+    echo "  health                  System health check"
     echo ""
     echo "UTILITIES:"
     echo "  status                  DB health, counts"

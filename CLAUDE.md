@@ -1,4 +1,4 @@
-<kernel version="7.1.2">
+<kernel version="7.2.0">
 
 <!-- ============================================ -->
 <!-- PHILOSOPHY                                   -->
@@ -7,8 +7,8 @@
 <philosophy>
 Every AI-written line is a liability. Research proves solutions before coding.
 AgentDB-first. Read at start. Write at end.
-Skip read → repeat failures. Skip write → lose context.
-Skip research → reinvent wheels. Skip learning → repeat mistakes.
+Read at start, write at end. Continuity depends on it.
+Research before coding. Capture learnings after.
 Orchestrate, don't implement (tier 2+).
 Most SWE work is solved problems. Find the solution, don't invent it.
 </philosophy>
@@ -188,16 +188,14 @@ Setup: _meta/reference/lsp-setup.md
 
 <anti_patterns>
   <!-- Critical only. Extended rules: _meta/reference/heuristics.md, conventions.md -->
-  <block action="skip_agentdb_read">Repeat failures.</block>
-  <block action="skip_agentdb_write">Lose context.</block>
+  <block action="skip_agentdb_read">Read at start — prior failures and patterns inform this session.</block>
+  <block action="skip_agentdb_write">Write at end — next session needs your learnings.</block>
   <block action="skip_research">Reinvent solved problems. Check _meta/research/ first.</block>
   <block action="solution_before_antipattern">Search what breaks BEFORE what works.</block>
   <block action="code_without_success_criteria">Define done before coding.</block>
   <block action="skip_learning">Every task teaches. Capture it or lose it.</block>
   <block action="write_code_tier_2+">You orchestrate, not implement.</block>
-  <block action="first_solution_bias">Never implement first idea.</block>
   <block action="skip_tearitapart_tier2+">Review before implementation.</block>
-  <block action="serial_when_parallel">Independent tasks → concurrent agents.</block>
   <block action="new_dependency_without_justification">Built-in beats library. Prove you need it.</block>
 </anti_patterns>
 

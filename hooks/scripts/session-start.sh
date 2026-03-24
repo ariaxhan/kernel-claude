@@ -65,6 +65,21 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   echo ""
 fi
 
+# === SYSTEM HEALTH ===
+HEALTH_WARNINGS=""
+# Check dependencies
+command -v jq >/dev/null 2>&1 || HEALTH_WARNINGS="${HEALTH_WARNINGS}\n⚠ jq not installed — some hooks will not function"
+command -v gh >/dev/null 2>&1 || HEALTH_WARNINGS="${HEALTH_WARNINGS}\n⚠ gh CLI not installed — GitHub features unavailable (install: https://cli.github.com)"
+if command -v gh >/dev/null 2>&1 && ! gh auth status >/dev/null 2>&1; then
+  HEALTH_WARNINGS="${HEALTH_WARNINGS}\n⚠ gh not authenticated — run: gh auth login"
+fi
+
+if [ -n "$HEALTH_WARNINGS" ]; then
+  echo "## System Health"
+  printf "%b\n" "$HEALTH_WARNINGS"
+  echo ""
+fi
+
 cat << 'KERNEL_CONTEXT'
 ## AgentDB (MANDATORY)
 
@@ -77,7 +92,7 @@ on_learn:
   gotcha: agentdb learn gotcha "what" "context"
 ```
 
-**Skip AgentDB = repeat failures. Non-negotiable.**
+**AgentDB: read at start, write at end. Every session.**
 
 ---
 
@@ -112,7 +127,7 @@ steps:
       3: 6+ files → contract + surgeon + adversary
 
   5_tests:
-    rule: tests BEFORE code, no exceptions
+    rule: tests BEFORE code
     cycle: red (fail) → green (pass) → refactor
     output: failing tests that define success
 
@@ -131,7 +146,7 @@ steps:
 ## Testing (Non-Negotiable)
 
 ```yaml
-rule: tests BEFORE code, always
+rule: tests before code
 cycle:
   1: write failing test (red)
   2: write minimal code to pass (green)
@@ -175,10 +190,24 @@ KERNEL_CONTEXT
 # =============================================================================
 # AGENTDB CONTEXT (if initialized)
 # =============================================================================
+# Auto-migrate: ensure schema is current (handles plugin updates seamlessly)
+"$AGENTDB" init 2>/dev/null || true
+
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   echo ""
   "$AGENTDB" read-start 2>/dev/null
   echo ""
+
+  # Prune stale learnings (0 hits, >30 days old)
+  "$AGENTDB" query "DELETE FROM learnings WHERE hit_count = 0 AND ts < datetime('now', '-30 days');" 2>/dev/null || true
+
+  # Surface high-hit learnings
+  TOP_LEARNINGS=$("$AGENTDB" query "SELECT '- ' || insight FROM learnings WHERE hit_count >= 3 ORDER BY hit_count DESC LIMIT 3;" 2>/dev/null)
+  if [ -n "$TOP_LEARNINGS" ]; then
+    echo "## Top Learnings"
+    echo "$TOP_LEARNINGS"
+    echo ""
+  fi
 
   # Check for recent compaction checkpoint (auto-handoff)
   LAST_CHECKPOINT=$("$AGENTDB" query "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1" 2>/dev/null)
