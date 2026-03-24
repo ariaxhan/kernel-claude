@@ -36,6 +36,28 @@ Skill-specific: skills/orchestration/reference/orchestration-research.md
 4. CHECKPOINTING: Write state to AgentDB at every boundary
 </fault_tolerance>
 
+<worktree_isolation>
+Use git worktree isolation for tier 2+ when multiple surgeons run in parallel.
+
+**When**: Tier 2+ with 2+ concurrent surgeons touching different files.
+**How**: Claude Code natively supports `isolation: "worktree"` on the Agent tool.
+  - Each surgeon gets an isolated repo copy
+  - If changes are made, worktree path and branch are returned
+  - If no changes, worktree auto-cleans
+
+**Pattern**:
+```
+Agent tool call:
+  subagent_type: kernel:surgeon
+  isolation: "worktree"
+  prompt: "Contract CR-xxx: implement..."
+```
+
+**Merge protocol**: After surgeon completes, orchestrator reviews branch diff, then merges to main working tree.
+**Failure mode**: Surgeon fails → worktree abandoned (no main pollution). Read AgentDB checkpoint for details.
+**Tier 1**: Don't use worktrees. Unnecessary overhead for 1-2 file changes.
+</worktree_isolation>
+
 <context_transfer>
 Every agent boundary is lossy compression.
 - Pre-transfer: Write structured briefing to AgentDB

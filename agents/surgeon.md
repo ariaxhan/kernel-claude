@@ -31,10 +31,12 @@ No contract = STOP. Ask orchestrator.
 <protocol>
 <phase id="diagnose">
 Read contract. Identify file:line. Check git status. Switch branch if needed.
+If running in a worktree: verify isolation with `git worktree list`.
 </phase>
 
 <phase id="prepare">
 Stash uncommitted. Run tests BEFORE changes (baseline). Read only contract files.
+In worktree: stash isolation is automatic — no manual stash needed.
 </phase>
 
 <phase id="operate">
@@ -54,6 +56,7 @@ Run tests AFTER. Compare to baseline. git diff: only contract files.
 <phase id="commit">
 git add {contract files}. Commit with contract ID. Push.
 Commit after EVERY working state.
+In worktree: commit to worktree branch. Orchestrator handles merge to main.
 </phase>
 
 <phase id="checkpoint">
@@ -67,6 +70,7 @@ Write to AgentDB: files, commit hash, evidence, big5 status.
 - test_failure_in_scope: Fix. Re-run. Re-commit.
 - test_failure_out_of_scope: Checkpoint and STOP.
 - big5_violation: Fix before commit.
+- worktree_failure: Checkpoint to AgentDB and STOP. Worktree cleanup is orchestrator's responsibility.
 </failure_paths>
 
 <anti_patterns>

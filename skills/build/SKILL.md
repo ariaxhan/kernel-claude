@@ -50,6 +50,38 @@ Evaluation criteria (ordered):
 
 ---
 
+# RESEARCH CACHE
+
+Before web search, check for cached research in `_meta/research/`.
+
+**Cache format** — research files use frontmatter:
+```yaml
+---
+query: "{original search query}"
+date: "YYYY-MM-DD"
+ttl: 7  # days
+domain: "{tech domain}"
+---
+```
+
+**TTL rules:**
+- Anti-patterns/gotchas: 7 days (change slowly)
+- Framework docs/APIs: 30 days (stable references)
+- Package versions/compatibility: 3 days (changes fast)
+- Architecture patterns: 30 days (stable)
+
+**Cache check protocol:**
+1. `ls _meta/research/` for topic matches
+2. Read frontmatter date + ttl
+3. If `today - date < ttl`: use cached result, skip web search
+4. If stale or missing: search, then write result with frontmatter
+
+**Cold start**: No behavior change when cache empty — search normally, create cache entry.
+
+**Note**: Cache hits still check agentdb for learnings. Learnings are never cached — always fresh.
+
+---
+
 # ASSUMPTION VERIFICATION
 
 Confirm (not guess) max 6 per category:
