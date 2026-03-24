@@ -1,6 +1,24 @@
 <kernel version="7.3.0">
 
 <!-- ============================================ -->
+<!-- CONTEXT DELIVERY: READ THIS FIRST            -->
+<!-- ============================================ -->
+<!--
+  THIS FILE IS NOT LOADED FOR PLUGIN USERS.
+
+  When kernel-claude is installed as a Claude Code plugin, this CLAUDE.md
+  is NOT injected into conversation context. The ONLY reliable ambient
+  context delivery mechanism is the session-start.sh hook output.
+
+  Therefore:
+  - session-start.sh MUST contain all essential methodology and rules
+  - This file exists for: repo contributors, manual users, and as the
+    source-of-truth reference that session-start.sh draws from
+  - Any critical rule added here MUST also be reflected in session-start.sh
+  - Never assume this file is in context during a plugin user's session
+-->
+
+<!-- ============================================ -->
 <!-- PHILOSOPHY                                   -->
 <!-- ============================================ -->
 
