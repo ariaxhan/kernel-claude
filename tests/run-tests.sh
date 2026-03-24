@@ -843,7 +843,7 @@ test_hooks_json_schema_valid() {
   [ -f "$hooks_file" ] || { echo "FAIL: hooks.json not found"; return 1; }
 
   # Valid Claude Code hook event names
-  local valid_events="SessionStart PreToolUse PostToolUse PermissionRequest PreCompact SessionEnd PostToolUseFailure Notification"
+  local valid_events="SessionStart PreToolUse PostToolUse PermissionRequest PreCompact SessionEnd PostToolUseFailure Notification UserPromptSubmit"
 
   # Extract all event names from hooks.json
   local events
@@ -1204,6 +1204,41 @@ test_inline_schema_includes_events() {
   SCHEMA_DIR="" agentdb init >/dev/null
   RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT name FROM sqlite_master WHERE type='table' AND name='events';")
   assert_equals "events" "$RESULT" "events table should exist from inline schema"
+}
+
+# === Compaction Restore Tests ===
+
+test_compact_restore_fast_exit() {
+  cd "$TEST_PROJECT"
+  mkdir -p _meta
+  OUTPUT=$(KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" 2>&1)
+  assert_equals "" "$OUTPUT" "should produce no output without marker"
+}
+
+test_compact_restore_outputs_marker() {
+  cd "$TEST_PROJECT"
+  mkdir -p _meta
+  cat > _meta/.compact-marker << 'EOF'
+**Branch:** main
+**Compacted at:** 2026-03-24T12:00:00Z
+
+**Resume from where you left off.**
+EOF
+  OUTPUT=$(KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" 2>&1)
+  assert_contains "$OUTPUT" "Context Restored After Compaction"
+  assert_contains "$OUTPUT" "Branch:** main"
+}
+
+test_compact_restore_deletes_marker() {
+  cd "$TEST_PROJECT"
+  mkdir -p _meta
+  echo "test marker" > _meta/.compact-marker
+  KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" >/dev/null 2>&1
+  [ ! -f _meta/.compact-marker ]
+}
+
+test_hooks_json_has_user_prompt_submit() {
+  grep -q "UserPromptSubmit" "$PLUGIN_ROOT/hooks/hooks.json"
 }
 
 # === Run Tests ===
