@@ -20,6 +20,13 @@ PATTERNS=(
   'sk_live_[a-zA-Z0-9]{24,}'               # Stripe live keys
   'sk_test_[a-zA-Z0-9]{24,}'               # Stripe test keys
   '-----BEGIN (RSA |EC )?PRIVATE KEY-----' # Private keys
+  '-----BEGIN CERTIFICATE-----'            # TLS certificates (often bundled with keys)
+  'sk-ant-[a-zA-Z0-9]{20,}'               # Anthropic API keys
+  'AIza[a-zA-Z0-9_-]{35}'                 # Google/GCP API keys
+  'ya29\.[a-zA-Z0-9_-]+'                  # Google OAuth access tokens
+  '[a-zA-Z0-9_-]*\.apps\.googleusercontent\.com' # Google OAuth client IDs
+  'az[a-zA-Z0-9]{10,}\.[a-zA-Z0-9]{10,}' # Azure connection strings (partial)
+  'AccountKey=[a-zA-Z0-9+/=]{40,}'        # Azure storage account keys
 )
 
 for pattern in "${PATTERNS[@]}"; do

@@ -60,6 +60,9 @@ FILES_CHANGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
 REPO_NAME=$(basename "$PROJECT_ROOT")
 # --no-verify: intentional. Avoids infinite hook loops during session-end cleanup.
 git commit -m "chore(session-end): $REPO_NAME [$AGENT] ($FILES_CHANGED files) $TIMESTAMP" --no-verify 2>/dev/null
-git push 2>/dev/null || true
+if ! git push 2>/dev/null; then
+    echo "WARNING: git push failed. Changes committed locally but not pushed." >&2
+    echo "Run 'git push' manually or check for rebase conflicts." >&2
+fi
 
 exit 0

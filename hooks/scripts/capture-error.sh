@@ -8,10 +8,11 @@ source "$(dirname "$0")/common.sh"
 VAULTS=$(detect_vaults)
 AGENTDB=$(get_agentdb "$VAULTS")
 
-# Parse input JSON for tool name and error
-TOOL=$(echo "$CLAUDE_TOOL_USE_RESULT" | jq -r '.tool // "unknown"' 2>/dev/null)
-ERROR=$(echo "$CLAUDE_TOOL_USE_RESULT" | jq -r '.error // .message // "unknown error"' 2>/dev/null)
-FILE=$(echo "$CLAUDE_TOOL_USE_RESULT" | jq -r '.file_path // .path // ""' 2>/dev/null)
+# Read from stdin (same as all other hooks)
+INPUT=$(cat)
+TOOL=$(echo "$INPUT" | jq -r '.tool // "unknown"' 2>/dev/null)
+ERROR=$(echo "$INPUT" | jq -r '.error // .message // "unknown error"' 2>/dev/null)
+FILE=$(echo "$INPUT" | jq -r '.file_path // .path // ""' 2>/dev/null)
 
 # Only log if agentdb is initialized
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
