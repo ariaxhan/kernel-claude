@@ -57,10 +57,6 @@ Location: _meta/agentdb/agent.db
   <rule>Every agent must load relevant skills/*/SKILL.md and reference skills/*/reference/*-research.md when applicable.</rule>
 </agents>
 
-<!-- ============================================ -->
-<!-- FLOW                                         -->
-<!-- ============================================ -->
-
 <flow>
   READ → CLASSIFY → [branch] → SCOPE → DEFINE SUCCESS → EXECUTE → [branch] → LEARN
   <step id="read">agentdb read-start. Check _meta/research/ for prior work.</step>
@@ -82,18 +78,10 @@ Location: _meta/agentdb/agent.db
   <rule>Never code without research. Most problems are already solved.</rule>
 </flow>
 
-<!-- ============================================ -->
-<!-- CONTRACT FORMAT                              -->
-<!-- ============================================ -->
-
 <contract>
 CONTRACT: {id} | GOAL: {observable} | CONSTRAINTS: {files} | FAILURE: {conditions} | TIER: {2|3} | BRANCH: {name}
   <rule>Observable, bounded, rejectable. Close on: done|confirmed|approved|ship.</rule>
 </contract>
-
-<!-- ============================================ -->
-<!-- LSP (Language Server Protocol)              -->
-<!-- ============================================ -->
 
 <lsp>
 Prefer LSP tools over Grep/Glob when available:
@@ -195,18 +183,8 @@ Setup: _meta/reference/lsp-setup.md
   <rule>Load relevant skill before acting. Match triggers to task. Reference research docs when methodology applies.</rule>
 </skills>
 
-<!-- ============================================ -->
-<!-- DESIGN PRINCIPLES (always active)            -->
-<!-- ============================================ -->
-
-<!-- Full design principles: skills/design/SKILL.md, skills/design/reference/design-research.md -->
-<design_note>Design principles (typography, color, surfaces, motion, anti-convergence) are in skills/design/SKILL.md. Load that file for frontend work.</design_note>
-
-<!-- Output validation: rules/kernel.md invariants -->
-
-<!-- ============================================ -->
-<!-- ANTI-PATTERNS                                -->
-<!-- ============================================ -->
+<!-- Design: skills/design/SKILL.md. Load for frontend work. -->
+<!-- Output validation: rules/kernel.md -->
 
 <anti_patterns>
   <!-- Critical only. Extended rules: _meta/reference/heuristics.md, conventions.md -->
