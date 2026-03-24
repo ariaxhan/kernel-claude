@@ -13,6 +13,9 @@ VAULTS=$(detect_vaults)
 AGENTDB=$(get_agentdb "$VAULTS")
 PROJECT_ROOT=$(get_project_root)
 
+# Detect project profile (local, github, github-oss, github-production)
+PROFILE=$(detect_profile "$PROJECT_ROOT")
+
 # Generate agent name and persist for other hooks
 AGENT_NAME="main-$$"
 AGENTS_DIR="$VAULTS/_meta/agents"
@@ -29,6 +32,8 @@ cat > "$AGENTS_DIR/${AGENT_NAME}.json" << EOF
 EOF
 
 echo "# KERNEL"
+echo ""
+echo "**Profile:** $PROFILE"
 echo ""
 
 # === TEAMMATE SYNC: Pull latest from remotes ===
@@ -80,7 +85,10 @@ if [ -n "$HEALTH_WARNINGS" ]; then
   echo ""
 fi
 
-cat << 'KERNEL_CONTEXT'
+# === CONTEXT OUTPUT (profile-gated) ===
+
+# AgentDB section — always shown (all profiles)
+cat << 'AGENTDB_SECTION'
 ## AgentDB (MANDATORY)
 
 ```yaml
@@ -96,6 +104,26 @@ on_learn:
 
 ---
 
+AGENTDB_SECTION
+
+# Workflow section — compact for local, full for others
+if [[ "$PROFILE" == "local" ]]; then
+  cat << 'WORKFLOW_COMPACT'
+## Workflow
+
+```yaml
+flow: READ → CLASSIFY → RESEARCH → SCOPE → TESTS → EXECUTE → LEARN
+agentdb: read-start (first) → write-end (last)
+tests: before code, red → green → refactor, mock boundaries only
+tiers: {1: 1-2 files, 2: 3-5 + surgeon, 3: 6+ + adversary}
+mantra: find proven solution, test it works, don't reinvent
+```
+
+---
+
+WORKFLOW_COMPACT
+else
+  cat << 'WORKFLOW_FULL'
 ## Workflow
 
 ```yaml
@@ -185,7 +213,34 @@ core:
 mantra: find proven solution, test it works, don't reinvent
 ```
 
-KERNEL_CONTEXT
+WORKFLOW_FULL
+fi
+
+# GitHub-specific sections — only for github-oss and github-production
+if [[ "$PROFILE" == "github-oss" ]] || [[ "$PROFILE" == "github-production" ]]; then
+  REMOTE_URL=$(cd "$PROJECT_ROOT" && git remote get-url origin 2>/dev/null) || true
+  OWNER_REPO=$(parse_github_remote "${REMOTE_URL:-}") || true
+  if [[ -n "${OWNER_REPO:-}" ]]; then
+    echo "## GitHub"
+    echo ""
+    echo "**Repository:** [${OWNER_REPO}](https://github.com/${OWNER_REPO})"
+    echo "**Dashboard:** https://github.com/${OWNER_REPO}/pulse"
+    echo ""
+  fi
+fi
+
+# Production sections — only for github-production
+if [[ "$PROFILE" == "github-production" ]]; then
+  echo "## Production Signals"
+  echo ""
+  echo "This repository has team collaboration indicators (multiple collaborators, environments, or projects)."
+  echo "Consider: required reviewers, CI/CD checks, deployment guards."
+  if [[ -n "${OWNER_REPO:-}" ]]; then
+    echo "**Projects:** https://github.com/${OWNER_REPO}/projects"
+    echo "**Settings:** https://github.com/${OWNER_REPO}/settings"
+  fi
+  echo ""
+fi
 
 # =============================================================================
 # AGENTDB CONTEXT (if initialized)
