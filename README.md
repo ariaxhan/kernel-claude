@@ -175,26 +175,23 @@ See [docs/QUICKSTART.md](docs/QUICKSTART.md) for:
 
 ---
 
-## Built on aDNA
+## Graph Architecture — Built on aDNA
 
-KERNEL's architecture is directly parallel to [**aDNA (Agentic DNA)**](https://github.com/LatticeProtocol/adna) — a universal, open-source knowledge architecture template for AI-native projects. Full credit and deep thanks to the aDNA project for pioneering many of the patterns KERNEL builds on:
+KERNEL's context graph system is directly inspired by [**aDNA (Agentic DNA)**](https://github.com/LatticeProtocol/adna) from Lattice Protocol. Full credit and thanks.
 
-| aDNA Concept | KERNEL Parallel |
-|-------------|-----------------|
-| **Triad** (WHO/WHAT/HOW) | **Agents/Skills/Commands** — actors, methodology, entry points |
-| **Execution Hierarchy** (Campaign → Mission → Objective) | **Tiered Routing** (Orchestrator → Surgeon → Adversary) — convergent decomposition |
-| **Context Library** with progressive loading | **Skills** with on-demand disclosure — agents load only what they need |
-| **Session tracking** with state persistence | **AgentDB** — cross-session memory with telemetry |
-| **Skills** (11 agent recipes) | **Skills** (16 methodologies) — both are HOW-knowledge for agents |
-| **OODA Cascade** (Observe → Orient → Decide → Act) | **Workflow** (Read → Classify → Research → Scope → Execute → Learn) |
-| **Templates** for every entity type | **Agent/command definitions** with structured frontmatter |
-| **Coordination** (cross-agent handoffs) | **GitHub Discussions** (agent communication layer) |
-| **After-Action Review** (reflection at mission close) | **Dreamer** (multi-perspective debate) + **Coroner** (post-mortem analysis) |
-| **Dual-audience design** (humans browse, agents parse) | **Session-start hook** (ambient context) + **GitHub** (human interface) |
+AgentDB's graph tracking (migration 002, added in v7.0.0) models context as **nodes, edges, and sessions** — the same directed-graph-of-connected-components pattern that aDNA uses for lattice composition. Specifically:
 
-Both projects solve the same core problems: agent orientation, cross-session memory, knowledge fragmentation, and human-agent coordination. KERNEL focuses specifically on Claude Code plugin integration; aDNA provides the universal template.
+| aDNA | KERNEL (AgentDB graph) |
+|------|----------------------|
+| **Lattices** — directed graphs of modules + datasets | **Nodes + Edges** — directed graph of skills, commands, agents, research |
+| **`context_graph`** lattice type — knowledge retrieval + reasoning | **`context_sessions`** — tracks which nodes loaded together and whether they succeeded |
+| **Edge relations** (input/output between modules) | **Edge relations** (`loads`, `references`, `depends_on`, `conflicts_with`, `succeeds_with`) |
+| **Success correlation** across lattice executions | **`v_successful_combos`** view — which node combinations correlate with success |
+| **Node performance** tracking | **`v_node_performance`** view — access count × success rate = confidence score |
 
-**If you want the full knowledge architecture** — the triad, lattice composition, campaign/mission hierarchy, OODA cascades, the 58K-token context library, and a framework that works with any AI agent and any editor — **go to [aDNA](https://github.com/LatticeProtocol/adna)**. It's the deeper system that KERNEL draws from.
+The graph learns over time: which skills load well together for bug fixes? Which agent+skill combinations succeed? Which nodes conflict? This is aDNA's lattice composition concept applied to Claude Code's context window.
+
+**If you want the full graph architecture** — lattice YAML schemas, directed-graph composition, context libraries with progressive loading, multi-project federation, and a framework that works with any AI agent — **go to [aDNA](https://github.com/LatticeProtocol/adna)**. It's the deeper, more general system.
 
 ---
 
