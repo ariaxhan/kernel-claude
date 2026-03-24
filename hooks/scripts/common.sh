@@ -37,7 +37,7 @@ update_current_symlink() {
 # Detect Vaults location - env var takes priority, then checks filesystem
 detect_vaults() {
   # Explicit override always wins (for testing + custom setups)
-  if [ -n "$KERNEL_VAULTS" ] && [ -d "$KERNEL_VAULTS" ]; then
+  if [ -n "${KERNEL_VAULTS:-}" ] && [ -d "${KERNEL_VAULTS:-}" ]; then
     echo "$KERNEL_VAULTS"
   elif [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ]; then
     echo "$HOME/Vaults"
