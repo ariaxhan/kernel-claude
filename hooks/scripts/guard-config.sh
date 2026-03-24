@@ -3,6 +3,8 @@
 # Allows config edits, blocks generated content
 # Events: PreToolUse (matcher: Write|Edit)
 
+source "$(dirname "$0")/circuit-breaker.sh"
+
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 

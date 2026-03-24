@@ -3,6 +3,8 @@
 # Blocks writes containing API keys, tokens, or credentials
 # Events: PreToolUse (matcher: Write|Edit)
 
+source "$(dirname "$0")/circuit-breaker.sh"
+
 INPUT=$(cat)
 CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // .tool_input.new_string // empty')
 
@@ -37,4 +39,5 @@ for pattern in "${PATTERNS[@]}"; do
   fi
 done
 
+_cb_record_success
 exit 0

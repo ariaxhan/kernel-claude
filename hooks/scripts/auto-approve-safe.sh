@@ -4,6 +4,8 @@
 # Auto-approves read-only git, test runners, and diagnostics.
 # Events: PermissionRequest (matcher: Bash)
 
+source "$(dirname "$0")/circuit-breaker.sh"
+
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
@@ -34,4 +36,5 @@ if echo "$COMMAND" | grep -qE '^(pwd|whoami|uname|df|du|free|uptime|id|hostname)
 fi
 
 # Don't interfere with other commands - let normal permission flow handle them
+_cb_record_success
 exit 0

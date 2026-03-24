@@ -2,6 +2,15 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.4.0] - 2026-03-24
+
+### Added
+- **Post-compaction context restoration** — New `UserPromptSubmit` hook restores methodology context after compaction. PreCompact writes a marker with active contract, recent learnings, and branch info. First user message after compaction gets full context injection. Marker auto-deletes after use. (#33)
+- **Circuit breaker for hooks** — Guard hooks (guard-bash, guard-config, detect-secrets, auto-approve-safe) now degrade gracefully. After 3 consecutive failures, the hook disables itself for 10 minutes instead of blocking all operations. Project-scoped state in `_meta/.breakers/`. Lifecycle hooks (session-start, session-end, pre-compact) are exempt — they always run. (#21)
+- **`/kernel:diagnose` command** — Systematic debugging and refactor analysis before fixing. Bug mode: reproduce → trace → isolate → hypothesize → diagnose. Refactor mode: map → trace deps → measure coupling → risks → diagnose. Produces structured diagnosis with blast radius, affected files, and recommended approach. Hands off to `/kernel:ingest` or `/kernel:auto`. (#35)
+
+---
+
 ## [7.3.0] - 2026-03-24
 
 ### Added

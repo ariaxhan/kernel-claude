@@ -130,7 +130,32 @@ INSERT INTO context (id, type, content, agent) VALUES (
 SQL
 fi
 
-# === STEP 5: OUTPUT CRITICAL CONTEXT (survives compaction) ===
+# === STEP 5: WRITE COMPACTION MARKER FOR CONTEXT RESTORATION ===
+# post-compact-restore.sh (UserPromptSubmit) reads this on next user message
+MARKER="$PROJECT_ROOT/_meta/.compact-marker"
+BRANCH=$(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null || echo "none")
+
+{
+  echo "**Branch:** $BRANCH"
+  echo "**Compacted at:** $TIMESTAMP"
+  echo ""
+  if [ -n "$ACTIVE_GOAL" ]; then
+    echo "### Active Contract"
+    echo '```'
+    echo "$ACTIVE_GOAL"
+    echo '```'
+    echo ""
+  fi
+  RECENT_LEARNINGS=$("$AGENTDB" query "SELECT type || ': ' || insight FROM learnings ORDER BY ts DESC LIMIT 5" 2>/dev/null || echo "")
+  if [ -n "$RECENT_LEARNINGS" ]; then
+    echo "### Recent Learnings"
+    echo "$RECENT_LEARNINGS"
+    echo ""
+  fi
+  echo "**Resume from where you left off. Run \`agentdb read-start\` for full context.**"
+} > "$MARKER" 2>/dev/null || true
+
+# === STEP 6: OUTPUT CRITICAL CONTEXT (survives compaction) ===
 # This YAML block survives compaction and provides immediate context
 cat << YAML
 ---

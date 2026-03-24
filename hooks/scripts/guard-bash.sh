@@ -3,6 +3,8 @@
 # Safety net for irreversible operations. Blocks force-push, hard reset, etc.
 # Events: PreToolUse (matcher: Bash)
 
+source "$(dirname "$0")/circuit-breaker.sh"
+
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
@@ -44,4 +46,5 @@ if echo "$COMMAND" | grep -qE 'rm\s+-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*\s+(/\s|/\s*$|
     exit 2
 fi
 
+_cb_record_success
 exit 0

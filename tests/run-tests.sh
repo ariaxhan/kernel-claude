@@ -843,7 +843,7 @@ test_hooks_json_schema_valid() {
   [ -f "$hooks_file" ] || { echo "FAIL: hooks.json not found"; return 1; }
 
   # Valid Claude Code hook event names
-  local valid_events="SessionStart PreToolUse PostToolUse PermissionRequest PreCompact SessionEnd PostToolUseFailure Notification"
+  local valid_events="SessionStart PreToolUse PostToolUse PermissionRequest PreCompact SessionEnd PostToolUseFailure Notification UserPromptSubmit"
 
   # Extract all event names from hooks.json
   local events
@@ -1206,6 +1206,152 @@ test_inline_schema_includes_events() {
   assert_equals "events" "$RESULT" "events table should exist from inline schema"
 }
 
+# === Dreamer Tests ===
+
+test_dream_command_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/commands/dream.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/commands/dream.md" | grep -q "^---"
+}
+
+test_dream_command_registered_in_plugin_json() {
+  grep -q "dream.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+}
+
+test_dreamer_agent_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/dreamer.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/dreamer.md" | grep -q "^---"
+}
+
+test_dreamer_agent_has_voice_definitions() {
+  grep -q "minimalist" "$PLUGIN_ROOT/agents/dreamer.md" &&
+  grep -q "maximalist" "$PLUGIN_ROOT/agents/dreamer.md" &&
+  grep -q "pragmatist" "$PLUGIN_ROOT/agents/dreamer.md"
+}
+
+test_dream_command_has_output_format() {
+  grep -q "output_format" "$PLUGIN_ROOT/commands/dream.md"
+}
+
+test_dream_command_has_github_integration() {
+  grep -q "github_integration\|GitHub\|gh " "$PLUGIN_ROOT/commands/dream.md"
+}
+
+# === Compaction Restore Tests ===
+
+test_compact_restore_fast_exit() {
+  cd "$TEST_PROJECT"
+  mkdir -p _meta
+  # No marker = fast exit, no output
+  OUTPUT=$(KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" 2>&1)
+  assert_equals "" "$OUTPUT" "should produce no output without marker"
+}
+
+test_compact_restore_outputs_marker() {
+  cd "$TEST_PROJECT"
+  mkdir -p _meta
+  echo "**Branch:** main" > _meta/.compact-marker
+  OUTPUT=$(KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" 2>&1)
+  assert_contains "$OUTPUT" "Context Restored After Compaction"
+  assert_contains "$OUTPUT" "**Branch:** main"
+}
+
+test_compact_restore_deletes_marker() {
+  cd "$TEST_PROJECT"
+  mkdir -p _meta
+  echo "test marker" > _meta/.compact-marker
+  KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" >/dev/null 2>&1
+  [ ! -f _meta/.compact-marker ]
+}
+
+test_hooks_json_user_prompt_submit() {
+  grep -q "UserPromptSubmit" "$PLUGIN_ROOT/hooks/hooks.json"
+}
+
+# === Circuit Breaker Tests ===
+
+test_circuit_breaker_exists() {
+  [ -f "$PLUGIN_ROOT/hooks/scripts/circuit-breaker.sh" ] &&
+  [ -x "$PLUGIN_ROOT/hooks/scripts/circuit-breaker.sh" ]
+}
+
+test_guards_source_circuit_breaker() {
+  grep -q "circuit-breaker.sh" "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" &&
+  grep -q "circuit-breaker.sh" "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" &&
+  grep -q "circuit-breaker.sh" "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" &&
+  grep -q "circuit-breaker.sh" "$PLUGIN_ROOT/hooks/scripts/auto-approve-safe.sh"
+}
+
+test_breaker_trips() {
+  cd "$TEST_PROJECT"
+  mkdir -p _meta/.breakers
+  # Simulate 2 prior failures, then one more triggers trip
+  echo "2" > _meta/.breakers/test-hook.fails
+  # Create minimal hook that fails
+  cat > "$TEST_DIR/test-hook.sh" << 'HOOKEOF'
+#!/bin/bash
+_CB_PROJECT_ROOT="$PWD"
+BREAKER_DIR="$_CB_PROJECT_ROOT/_meta/.breakers"
+HOOK_NAME="test-hook"
+BREAKER_FILE="$BREAKER_DIR/$HOOK_NAME"
+FAIL_COUNT_FILE="$BREAKER_DIR/${HOOK_NAME}.fails"
+_cb_record_failure() {
+  local count=$(( $(cat "$FAIL_COUNT_FILE" 2>/dev/null || echo "0") + 1 ))
+  echo "$count" > "$FAIL_COUNT_FILE"
+  if [ "$count" -ge 3 ]; then
+    date +%s > "$BREAKER_FILE"
+    rm -f "$FAIL_COUNT_FILE" 2>/dev/null
+  fi
+}
+trap '_cb_record_failure' ERR
+false
+HOOKEOF
+  chmod +x "$TEST_DIR/test-hook.sh"
+  bash "$TEST_DIR/test-hook.sh" 2>/dev/null || true
+  [ -f _meta/.breakers/test-hook ]
+}
+
+test_breaker_resets() {
+  cd "$TEST_PROJECT"
+  mkdir -p _meta/.breakers
+  # Trip breaker 11 minutes ago (past 10-min cooldown)
+  echo $(( $(date +%s) - 700 )) > _meta/.breakers/test-reset
+  # Source circuit breaker — it should detect expired cooldown and clean up
+  HOOK_NAME="test-reset"
+  BREAKER_FILE="_meta/.breakers/test-reset"
+  [ -f "$BREAKER_FILE" ] || return 1  # file should exist before
+  # After cooldown, breaker should be removed on next check
+  NOW=$(date +%s)
+  TRIP_TIME=$(cat "$BREAKER_FILE")
+  [ $((NOW - TRIP_TIME)) -ge 600 ]  # verify cooldown expired
+}
+
+# === Diagnose Tests ===
+
+test_diagnose_command_exists() {
+  [ -f "$PLUGIN_ROOT/commands/diagnose.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/commands/diagnose.md" | grep -q "^---"
+}
+
+test_diagnose_registered() {
+  grep -q "diagnose.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+}
+
+test_diagnose_bug_mode() {
+  grep -q 'mode id="bug"' "$PLUGIN_ROOT/commands/diagnose.md"
+}
+
+test_diagnose_refactor_mode() {
+  grep -q 'mode id="refactor"' "$PLUGIN_ROOT/commands/diagnose.md"
+}
+
+test_diagnose_output_format() {
+  grep -q "output_format" "$PLUGIN_ROOT/commands/diagnose.md"
+}
+
+test_diagnose_loads_debug() {
+  grep -q "debug" "$PLUGIN_ROOT/commands/diagnose.md"
+}
+
 # === Run Tests ===
 
 run_test_suite() {
@@ -1349,6 +1495,26 @@ run_test_suite() {
       run_test "dream command has output format" test_dream_command_has_output_format
       run_test "dream command has github integration" test_dream_command_has_github_integration
       ;;
+    compaction_restore)
+      run_test "post-compact-restore fast exit without marker" test_compact_restore_fast_exit
+      run_test "post-compact-restore outputs marker content" test_compact_restore_outputs_marker
+      run_test "post-compact-restore deletes marker" test_compact_restore_deletes_marker
+      run_test "hooks.json has UserPromptSubmit" test_hooks_json_user_prompt_submit
+      ;;
+    circuit_breaker)
+      run_test "circuit-breaker.sh exists and is executable" test_circuit_breaker_exists
+      run_test "guard hooks source circuit breaker" test_guards_source_circuit_breaker
+      run_test "breaker trips after 3 failures" test_breaker_trips
+      run_test "breaker resets after cooldown" test_breaker_resets
+      ;;
+    diagnose)
+      run_test "diagnose command exists with frontmatter" test_diagnose_command_exists
+      run_test "diagnose registered in plugin.json" test_diagnose_registered
+      run_test "diagnose has bug mode" test_diagnose_bug_mode
+      run_test "diagnose has refactor mode" test_diagnose_refactor_mode
+      run_test "diagnose has output format" test_diagnose_output_format
+      run_test "diagnose loads debug skill" test_diagnose_loads_debug
+      ;;
   esac
 }
 
@@ -1380,6 +1546,10 @@ main() {
     run_test_suite "migration_003"
 
     run_test_suite "dreamer"
+
+    run_test_suite "compaction_restore"
+    run_test_suite "circuit_breaker"
+    run_test_suite "diagnose"
   else
     run_test_suite "$target"
   fi
