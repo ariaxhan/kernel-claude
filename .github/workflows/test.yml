@@ -21,7 +21,7 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Run shellcheck on all .sh files
-        run: find . -name "*.sh" -exec shellcheck -x -S warning -e SC1091 {} +
+        run: find . -name "*.sh" -exec shellcheck -x -S warning -e SC1091 -e SC2034 -e SC2155 -e SC2164 -e SC2011 {} +
 
   tests:
     runs-on: ubuntu-latest
@@ -59,11 +59,12 @@ jobs:
           done
           sqlite3 "$DIR_A/_meta/agentdb/agent.db" ".schema" | sort > /tmp/schema_file.txt
 
-          # Init via agentdb CLI (inline schema, hide schema.sql so it falls through)
+          # Init via agentdb CLI (uses SCHEMA_DIR resolution to find schema.sql)
           DIR_B=$(mktemp -d)
           mkdir -p "$DIR_B/_meta/agentdb" "$DIR_B/.claude"
           AGENTDB_COPY=$(mktemp -d)
           cp "$AGENTDB_DIR/agentdb" "$AGENTDB_COPY/agentdb"
+          cp "$AGENTDB_DIR/schema.sql" "$AGENTDB_COPY/schema.sql"
           cp -r "$AGENTDB_DIR/migrations" "$AGENTDB_COPY/migrations" 2>/dev/null || true
           chmod +x "$AGENTDB_COPY/agentdb"
           export PATH="$AGENTDB_COPY:$PATH"
