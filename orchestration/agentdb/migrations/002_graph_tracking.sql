@@ -2,6 +2,8 @@
 -- Purpose: Add graph structure tracking for context optimization
 -- Based on: aDNA (Lattice Protocol) + kernel-claude hybrid architecture
 
+BEGIN TRANSACTION;
+
 -- Track context loading sessions for pattern learning
 CREATE TABLE IF NOT EXISTS context_sessions (
   id TEXT PRIMARY KEY,
@@ -44,12 +46,16 @@ CREATE TABLE IF NOT EXISTS edges (
   )),
   weight REAL DEFAULT 1.0,  -- strength/frequency
   last_observed TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  PRIMARY KEY (source_path, target_path, relation)
+  PRIMARY KEY (source_path, target_path, relation),
+  FOREIGN KEY (source_path) REFERENCES nodes(path),
+  FOREIGN KEY (target_path) REFERENCES nodes(path)
 );
 
 CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_path);
 CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target_path);
 CREATE INDEX IF NOT EXISTS idx_edges_relation ON edges(relation);
+
+COMMIT;
 
 -- Migration tracking
 INSERT OR IGNORE INTO _migrations (name) VALUES ('002_graph_tracking');

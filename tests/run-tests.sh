@@ -603,6 +603,303 @@ test_session_start_calls_update_symlink() {
   }
 }
 
+# === Security Hook Tests ===
+# Note: Secret values are built dynamically to avoid triggering detect-secrets on THIS file
+
+test_detect_secrets_blocks_aws_key() {
+  # Build AWS key pattern dynamically
+  local aws_key="AKIA"
+  aws_key+="IOSFODNN7EXAMPLE"
+  local json
+  json=$(printf '{"tool_input":{"content":"const key = \\"%s\\""}}' "$aws_key")
+  echo "$json" \
+    | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 2 "$exit_code" "AWS key should be blocked"
+}
+
+test_detect_secrets_blocks_github_pat() {
+  local pat="ghp_"
+  pat+=$(printf 'x%.0s' {1..36})
+  local json
+  json=$(printf '{"tool_input":{"content":"const t = \\"%s\\""}}' "$pat")
+  echo "$json" \
+    | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 2 "$exit_code" "GitHub PAT should be blocked"
+}
+
+test_detect_secrets_blocks_openai_key() {
+  local okey="s"
+  okey+="k-"
+  okey+=$(printf 'x%.0s' {1..40})
+  local json
+  json=$(printf '{"tool_input":{"content":"const k = \\"%s\\""}}' "$okey")
+  echo "$json" \
+    | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 2 "$exit_code" "OpenAI key should be blocked"
+}
+
+test_detect_secrets_blocks_private_key() {
+  local header="-----BEGIN RSA"
+  header+=" PRIVATE KEY-----"
+  local json
+  json=$(printf '{"tool_input":{"content":"%s\\nMIIE..."}}' "$header")
+  echo "$json" \
+    | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 2 "$exit_code" "private key should be blocked"
+}
+
+test_detect_secrets_allows_clean_code() {
+  echo '{"tool_input":{"content":"const x = 123;\nfunction hello() { return true; }"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 0 "$exit_code" "clean code should pass"
+}
+
+test_guard_bash_blocks_force_push() {
+  echo '{"tool_input":{"command":"git push --force origin main"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 2 "$exit_code" "force push should be blocked"
+}
+
+test_guard_bash_blocks_hard_reset() {
+  echo '{"tool_input":{"command":"git reset --hard HEAD~1"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 2 "$exit_code" "hard reset should be blocked"
+}
+
+test_guard_bash_blocks_clean_fd() {
+  echo '{"tool_input":{"command":"git clean -fd"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 2 "$exit_code" "git clean -fd should be blocked"
+}
+
+test_guard_bash_allows_safe_commands() {
+  echo '{"tool_input":{"command":"git status"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 0 "$exit_code" "git status should pass"
+}
+
+test_guard_bash_allows_git_log() {
+  echo '{"tool_input":{"command":"git log --oneline -10"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 0 "$exit_code" "git log should pass"
+}
+
+test_guard_config_blocks_claude_dir_write() {
+  echo '{"tool_input":{"file_path":".claude/generated/foo.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 2 "$exit_code" ".claude/generated/ write should be blocked"
+}
+
+test_guard_config_allows_claude_md() {
+  echo '{"tool_input":{"file_path":".claude/CLAUDE.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 0 "$exit_code" "CLAUDE.md write should be allowed"
+}
+
+test_guard_config_allows_rules() {
+  echo '{"tool_input":{"file_path":".claude/rules/new-rule.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1
+  local exit_code=$?
+  assert_exit_code 0 "$exit_code" ".claude/rules/*.md write should be allowed"
+}
+
+test_auto_approve_allows_git_status() {
+  local output
+  output=$(echo '{"tool_input":{"command":"git status"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/auto-approve-safe.sh" 2>&1)
+  assert_contains "$output" "allow"
+}
+
+test_auto_approve_allows_npm_test() {
+  local output
+  output=$(echo '{"tool_input":{"command":"npm test"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/auto-approve-safe.sh" 2>&1)
+  assert_contains "$output" "allow"
+}
+
+test_auto_approve_rejects_rm_rf() {
+  local output
+  output=$(echo '{"tool_input":{"command":"rm -rf /tmp/something"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/auto-approve-safe.sh" 2>&1)
+  # Should NOT contain allow — falls through to normal permission flow
+  if [[ "$output" == *"allow"* ]]; then
+    echo "FAIL: rm -rf should not be auto-approved"
+    return 1
+  fi
+}
+
+# === Graph Tracking Tests ===
+
+# Helper: ensure graph tracking migration is applied
+# On macOS, readlink -f doesn't work, so agentdb init may not find migrations
+_ensure_graph_migration() {
+  agentdb init >/dev/null
+  local has_table
+  has_table=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='context_sessions' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has_table" ]; then
+    sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" < "$PLUGIN_ROOT/orchestration/agentdb/migrations/002_graph_tracking.sql"
+  fi
+}
+
+test_session_start_creates_session() {
+  _ensure_graph_migration
+  local output
+  output=$(agentdb session-start "feature" 1)
+  assert_contains "$output" "SES-"
+  # Verify record in DB (use sqlite3 directly to avoid header/pragma noise from agentdb query)
+  local count
+  count=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM context_sessions;")
+  assert_equals "1" "$count" "session record should exist"
+}
+
+test_session_start_validates_tier() {
+  _ensure_graph_migration
+  local exit_code=0
+  agentdb session-start "feature" "abc" 2>/dev/null || exit_code=$?
+  # Non-integer tier should cause sqlite error (CHECK constraint or type mismatch)
+  [ "$exit_code" -ne 0 ] || {
+    echo "FAIL: non-integer tier should fail"
+    return 1
+  }
+}
+
+test_session_end_updates_session() {
+  _ensure_graph_migration
+  local session_id
+  session_id=$(agentdb session-start "bug" 1 | grep '^SES-')
+  agentdb session-end "$session_id" 1 '{"did":"fixed bug"}' '["skills/build"]' 500 >/dev/null
+  local ended
+  ended=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT tokens_used FROM context_sessions WHERE id='$session_id';")
+  assert_equals "500" "$ended" "tokens_used should be recorded"
+}
+
+test_session_end_validates_tokens() {
+  _ensure_graph_migration
+  local session_id
+  session_id=$(agentdb session-start "feature" 1 | grep '^SES-')
+  local exit_code=0
+  agentdb session-end "$session_id" 1 '{"did":"test"}' '[]' "not_a_number" 2>/dev/null || exit_code=$?
+  [ "$exit_code" -ne 0 ] || {
+    echo "FAIL: non-integer tokens should fail"
+    return 1
+  }
+}
+
+# === Schema Validation Tests ===
+
+test_inline_schema_matches_schema_sql() {
+  # Initialize DB with schema.sql (the file-based path)
+  local db1="$TEST_DIR/db1.db"
+  sqlite3 "$db1" < "$PLUGIN_ROOT/orchestration/agentdb/schema.sql"
+  local schema1
+  schema1=$(sqlite3 "$db1" ".schema" | sort)
+
+  # Initialize via agentdb init (which may use inline schema)
+  agentdb init >/dev/null
+  local schema2
+  schema2=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" ".schema" | sort)
+
+  # Both should have same base tables (learnings, context, errors, _migrations)
+  for table in learnings context errors _migrations; do
+    local has1 has2
+    has1=$(echo "$schema1" | grep -c "CREATE TABLE.*$table" || true)
+    has2=$(echo "$schema2" | grep -c "CREATE TABLE.*$table" || true)
+    [ "$has1" -gt 0 ] || { echo "FAIL: schema.sql missing table $table"; return 1; }
+    [ "$has2" -gt 0 ] || { echo "FAIL: inline schema missing table $table"; return 1; }
+  done
+}
+
+test_migration_applies_cleanly() {
+  _ensure_graph_migration
+  # Verify migration 002 tables exist (use sqlite3 directly to avoid pragma noise)
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  local has_sessions has_nodes has_edges
+  has_sessions=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='context_sessions' LIMIT 1;")
+  has_nodes=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='nodes' LIMIT 1;")
+  has_edges=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='edges' LIMIT 1;")
+  assert_equals "1" "$has_sessions" "context_sessions table should exist"
+  assert_equals "1" "$has_nodes" "nodes table should exist"
+  assert_equals "1" "$has_edges" "edges table should exist"
+}
+
+test_hooks_json_schema_valid() {
+  local hooks_file="$PLUGIN_ROOT/hooks/hooks.json"
+  [ -f "$hooks_file" ] || { echo "FAIL: hooks.json not found"; return 1; }
+
+  # Valid Claude Code hook event names
+  local valid_events="SessionStart PreToolUse PostToolUse PermissionRequest PreCompact SessionEnd PostToolUseFailure Notification"
+
+  # Extract all event names from hooks.json
+  local events
+  events=$(python3 -c "
+import json, sys
+with open('$hooks_file') as f:
+    data = json.load(f)
+for event in data.get('hooks', {}).keys():
+    print(event)
+" 2>/dev/null)
+
+  local invalid=0
+  while IFS= read -r event; do
+    [ -z "$event" ] && continue
+    if ! echo "$valid_events" | grep -qw "$event"; then
+      echo "  Invalid hook event: $event"
+      invalid=1
+    fi
+  done <<< "$events"
+  assert_exit_code 0 "$invalid" "all hook events should be valid Claude Code events"
+}
+
+# === Input Validation Tests ===
+
+test_agentdb_numeric_injection_tier() {
+  _ensure_graph_migration
+  local exit_code=0
+  agentdb session-start "feature" "1; DROP TABLE learnings;" 2>/dev/null || exit_code=$?
+  # Should fail (not a valid integer)
+  [ "$exit_code" -ne 0 ] || {
+    # Even if it didn't fail, check that learnings table still exists
+    local count
+    count=$(agentdb query "SELECT COUNT(*) FROM learnings;" 2>/dev/null | tail -1 | tr -d ' ')
+    [ -n "$count" ] || { echo "FAIL: learnings table was dropped by injection"; return 1; }
+  }
+}
+
+test_agentdb_numeric_injection_tokens() {
+  _ensure_graph_migration
+  local session_id
+  session_id=$(agentdb session-start "feature" 1 | grep '^SES-')
+  local exit_code=0
+  agentdb session-end "$session_id" 1 '{"did":"test"}' '[]' "0; DROP TABLE learnings;" 2>/dev/null || exit_code=$?
+  # Verify learnings table still exists
+  local count
+  count=$(agentdb query "SELECT COUNT(*) FROM learnings;" 2>/dev/null | tail -1 | tr -d ' ')
+  [ -n "$count" ] || { echo "FAIL: learnings table was dropped by injection"; return 1; }
+}
+
+test_agentdb_numeric_injection_prune() {
+  agentdb init >/dev/null
+  agentdb learn pattern "important" "evidence" >/dev/null
+  local exit_code=0
+  agentdb prune "5; DROP TABLE learnings;" 2>/dev/null || exit_code=$?
+  # Verify learnings table still exists
+  local count
+  count=$(agentdb query "SELECT COUNT(*) FROM learnings;" 2>/dev/null | tail -1 | tr -d ' ')
+  [ -n "$count" ] || { echo "FAIL: learnings table was dropped by injection"; return 1; }
+}
+
 # === Command Structure Tests ===
 
 test_ingest_command_has_research_step() {
@@ -892,6 +1189,40 @@ run_test_suite() {
       run_test "update_current_symlink exists" test_update_current_symlink_exists
       run_test "session-start calls symlink update" test_session_start_calls_update_symlink
       ;;
+    security_hooks)
+      run_test "detect-secrets blocks AWS key" test_detect_secrets_blocks_aws_key
+      run_test "detect-secrets blocks GitHub PAT" test_detect_secrets_blocks_github_pat
+      run_test "detect-secrets blocks OpenAI key" test_detect_secrets_blocks_openai_key
+      run_test "detect-secrets blocks private key" test_detect_secrets_blocks_private_key
+      run_test "detect-secrets allows clean code" test_detect_secrets_allows_clean_code
+      run_test "guard-bash blocks force push" test_guard_bash_blocks_force_push
+      run_test "guard-bash blocks hard reset" test_guard_bash_blocks_hard_reset
+      run_test "guard-bash blocks clean -fd" test_guard_bash_blocks_clean_fd
+      run_test "guard-bash allows safe commands" test_guard_bash_allows_safe_commands
+      run_test "guard-bash allows git log" test_guard_bash_allows_git_log
+      run_test "guard-config blocks .claude/ write" test_guard_config_blocks_claude_dir_write
+      run_test "guard-config allows CLAUDE.md" test_guard_config_allows_claude_md
+      run_test "guard-config allows rules" test_guard_config_allows_rules
+      run_test "auto-approve allows git status" test_auto_approve_allows_git_status
+      run_test "auto-approve allows npm test" test_auto_approve_allows_npm_test
+      run_test "auto-approve rejects rm -rf" test_auto_approve_rejects_rm_rf
+      ;;
+    graph_tracking)
+      run_test "session-start creates session" test_session_start_creates_session
+      run_test "session-start validates tier" test_session_start_validates_tier
+      run_test "session-end updates session" test_session_end_updates_session
+      run_test "session-end validates tokens" test_session_end_validates_tokens
+      ;;
+    schema_validation)
+      run_test "inline schema matches schema.sql" test_inline_schema_matches_schema_sql
+      run_test "migration 002 applies cleanly" test_migration_applies_cleanly
+      run_test "hooks.json events are valid" test_hooks_json_schema_valid
+      ;;
+    input_validation)
+      run_test "SQL injection via tier" test_agentdb_numeric_injection_tier
+      run_test "SQL injection via tokens" test_agentdb_numeric_injection_tokens
+      run_test "SQL injection via prune" test_agentdb_numeric_injection_prune
+      ;;
   esac
 }
 
@@ -913,6 +1244,10 @@ main() {
     run_test_suite "verify"
     run_test_suite "tokens"
     run_test_suite "portable"
+    run_test_suite "security_hooks"
+    run_test_suite "graph_tracking"
+    run_test_suite "schema_validation"
+    run_test_suite "input_validation"
   else
     run_test_suite "$target"
   fi

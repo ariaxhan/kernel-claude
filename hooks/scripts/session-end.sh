@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 # SessionEnd hook: Write AgentDB checkpoint, deregister agent, batch commit, push
 
 # Load shared functions
@@ -48,7 +48,9 @@ if ! git status --porcelain 2>/dev/null | grep -q .; then
 fi
 
 git add -A 2>/dev/null
-git reset HEAD -- '*.zip' '*.tar.gz' '*.tar.bz2' '**/.DS_Store' 2>/dev/null
+git reset HEAD -- '*.zip' '*.tar.gz' '*.tar.bz2' '**/.DS_Store' \
+    '.env*' '*.pem' '*.key' '*.p12' 'credentials*' 'secrets*' '*.secret' \
+    'node_modules/' 2>/dev/null
 
 if git diff --cached --quiet 2>/dev/null; then
     exit 0
@@ -56,6 +58,7 @@ fi
 
 FILES_CHANGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
 REPO_NAME=$(basename "$PROJECT_ROOT")
+# --no-verify: intentional. Avoids infinite hook loops during session-end cleanup.
 git commit -m "chore(session-end): $REPO_NAME [$AGENT] ($FILES_CHANGED files) $TIMESTAMP" --no-verify 2>/dev/null
 git push 2>/dev/null || true
 

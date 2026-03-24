@@ -2,6 +2,9 @@
 # KERNEL: Shared functions for hooks
 # Source this at the top of hook scripts: source "$(dirname "$0")/common.sh"
 
+# Dependency check: jq is required by most hooks for JSON parsing
+command -v jq >/dev/null 2>&1 || { echo "Warning: jq not found, some hooks may not work" >&2; }
+
 # Auto-update current symlink to latest version (fixes stale hook issue)
 # Claude Code downloads new versions but doesn't update the symlink
 update_current_symlink() {

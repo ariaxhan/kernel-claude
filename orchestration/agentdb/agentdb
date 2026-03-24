@@ -15,7 +15,10 @@
 #   agentdb export                  # Dump learnings to markdown
 #   agentdb recent                  # Show last 5 checkpoints
 
-set -e
+set -euo pipefail
+
+# Dependency check
+command -v sqlite3 >/dev/null 2>&1 || { echo "Error: sqlite3 required but not found" >&2; exit 1; }
 
 # Find project root (where .claude/ or _meta/ exists)
 find_project_root() {
@@ -33,12 +36,43 @@ find_project_root() {
 PROJECT_ROOT=$(find_project_root)
 DB_DIR="$PROJECT_ROOT/_meta/agentdb"
 DB="$DB_DIR/agent.db"
-SCHEMA_DIR="$(dirname "$0")"
+SCHEMA_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || echo "$0")")" && pwd)"
 
 # === SECURITY: SQL escaping ===
 # Escape single quotes for safe SQL insertion
 sql_escape() {
   printf '%s' "$1" | sed "s/'/''/g"
+}
+
+# JSON-safe escaping (backslashes then double quotes)
+json_escape() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+}
+
+# Integer validation for numeric SQL parameters
+validate_int() {
+  local val="$1"
+  local name="${2:-value}"
+  [[ "$val" =~ ^[0-9]+$ ]] || { echo "Error: $name must be integer" >&2; exit 1; }
+}
+
+# Execute sqlite3 with busy_timeout
+db_exec() {
+  sqlite3 "$DB" <<EOF
+.timeout 5000
+$1
+EOF
+}
+
+# Execute sqlite3 with options and busy_timeout
+db_exec_opts() {
+  local opts="$1"
+  shift
+  # shellcheck disable=SC2086
+  sqlite3 $opts "$DB" <<EOF
+.timeout 5000
+$1
+EOF
 }
 
 # === COMMANDS ===
@@ -52,38 +86,42 @@ cmd_init() {
   if [ ! -f "$DB" ]; then
     created_new=true
     if [ -f "$SCHEMA_DIR/schema.sql" ]; then
-      sqlite3 "$DB" < "$SCHEMA_DIR/schema.sql"
+      sqlite3 "$DB" "PRAGMA busy_timeout=5000;" ".read $SCHEMA_DIR/schema.sql"
     else
-      # Inline minimal schema
+      # Inline schema — must match schema.sql exactly
       sqlite3 "$DB" "
         PRAGMA journal_mode=WAL;
+        PRAGMA foreign_keys=ON;
+        PRAGMA busy_timeout=5000;
         CREATE TABLE IF NOT EXISTS learnings (
           id TEXT PRIMARY KEY,
-          ts TEXT DEFAULT CURRENT_TIMESTAMP,
-          type TEXT CHECK(type IN ('failure','pattern','gotcha','preference')),
+          ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+          type TEXT NOT NULL CHECK(type IN ('failure','pattern','gotcha','preference')),
           insight TEXT NOT NULL,
           evidence TEXT,
           domain TEXT,
-          hit_count INTEGER DEFAULT 0
+          hit_count INTEGER DEFAULT 0,
+          last_hit TEXT
         );
         CREATE TABLE IF NOT EXISTS context (
           id TEXT PRIMARY KEY,
-          ts TEXT DEFAULT CURRENT_TIMESTAMP,
-          type TEXT CHECK(type IN ('contract','checkpoint','handoff','verdict')),
+          ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+          type TEXT NOT NULL CHECK(type IN ('contract','checkpoint','handoff','verdict')),
           contract_id TEXT,
           agent TEXT,
           content TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS errors (
-          id INTEGER PRIMARY KEY,
-          ts TEXT DEFAULT CURRENT_TIMESTAMP,
-          tool TEXT,
-          error TEXT,
-          file TEXT
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+          tool TEXT NOT NULL,
+          error TEXT NOT NULL,
+          file TEXT,
+          context TEXT
         );
         CREATE TABLE IF NOT EXISTS _migrations (
           name TEXT PRIMARY KEY,
-          applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+          applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
         );
         INSERT OR IGNORE INTO _migrations (name) VALUES ('001_init');
         CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
@@ -102,9 +140,9 @@ cmd_init() {
       local name
       name=$(basename "$migration" .sql)
       local applied
-      applied=$(sqlite3 "$DB" "SELECT 1 FROM _migrations WHERE name='$name' LIMIT 1;" 2>/dev/null || echo "")
+      applied=$(db_exec "SELECT 1 FROM _migrations WHERE name='$name' LIMIT 1;" 2>/dev/null || echo "")
       if [ -z "$applied" ]; then
-        sqlite3 "$DB" < "$migration"
+        sqlite3 "$DB" ".timeout 5000" ".read $migration"
         echo "Applied migration: $name"
       fi
     done
@@ -125,27 +163,27 @@ cmd_read_start() {
   echo ""
 
   echo "## Recent Failures (AVOID THESE)"
-  sqlite3 "$DB" "SELECT '- ' || insight FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  db_exec "SELECT '- ' || insight FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
   echo ""
 
   echo "## Active Patterns"
-  sqlite3 "$DB" "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || echo "None"
   echo ""
 
   echo "## Recent Errors"
-  sqlite3 "$DB" "SELECT '- [' || tool || '] ' || error || COALESCE(' (' || file || ')', '') FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  db_exec "SELECT '- [' || tool || '] ' || error || COALESCE(' (' || file || ')', '') FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
   echo ""
 
   echo "## Active Contract"
-  sqlite3 "$DB" "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
+  db_exec "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
   echo ""
 
   echo "## Last Checkpoint"
-  sqlite3 "$DB" "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
+  db_exec "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
 }
 
 cmd_write_end() {
-  local content="$1"
+  local content="${1:-}"
   local agent="${2:-orchestrator}"
 
   [ -z "$content" ] && { echo "Usage: agentdb write-end <json> [agent]"; exit 1; }
@@ -155,14 +193,14 @@ cmd_write_end() {
   safe_content=$(sql_escape "$content")
   safe_agent=$(sql_escape "$agent")
 
-  local id="CP-$(date +%Y%m%d%H%M%S)-$$"
-  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content) VALUES ('$id', 'checkpoint', '$safe_agent', '$safe_content');"
+  local id="CP-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
+  db_exec "INSERT INTO context (id, type, agent, content) VALUES ('$id', 'checkpoint', '$safe_agent', '$safe_content');"
   echo "Checkpoint: $id"
 }
 
 cmd_learn() {
-  local type="$1"
-  local insight="$2"
+  local type="${1:-}"
+  local insight="${2:-}"
   local evidence="${3:-}"
   local domain="${4:-}"
 
@@ -176,13 +214,13 @@ cmd_learn() {
   safe_evidence=$(sql_escape "$evidence")
   safe_domain=$(sql_escape "$domain")
 
-  local id="LRN-$(date +%Y%m%d%H%M%S)-$$"
-  sqlite3 "$DB" "INSERT INTO learnings (id, type, insight, evidence, domain) VALUES ('$id', '$safe_type', '$safe_insight', '$safe_evidence', '$safe_domain');"
+  local id="LRN-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
+  db_exec "INSERT INTO learnings (id, type, insight, evidence, domain) VALUES ('$id', '$safe_type', '$safe_insight', '$safe_evidence', '$safe_domain');"
   echo "Learned: [$type] $insight"
 }
 
 cmd_contract() {
-  local content="$1"
+  local content="${1:-}"
 
   [ -z "$content" ] && { echo "Usage: agentdb contract <json>"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
@@ -190,14 +228,14 @@ cmd_contract() {
   local safe_content
   safe_content=$(sql_escape "$content")
 
-  local id="CR-$(date +%Y%m%d%H%M%S)-$$"
-  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'contract', 'orchestrator', '$safe_content', '$id');"
+  local id="CR-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
+  db_exec "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'contract', 'orchestrator', '$safe_content', '$id');"
   echo "Contract: $id"
 }
 
 cmd_verdict() {
-  local result="$1"
-  local evidence="$2"
+  local result="${1:-}"
+  local evidence="${2:-}"
   local contract_id="${3:-}"
 
   [ -z "$result" ] && { echo "Usage: agentdb verdict <pass|fail> <evidence> [contract_id]"; exit 1; }
@@ -208,15 +246,25 @@ cmd_verdict() {
   safe_evidence=$(sql_escape "$evidence")
   safe_contract_id=$(sql_escape "$contract_id")
 
-  local id="VD-$(date +%Y%m%d%H%M%S)-$$"
-  local content="{\"result\":\"$safe_result\",\"evidence\":\"$safe_evidence\"}"
-  sqlite3 "$DB" "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'verdict', 'adversary', '$content', '$safe_contract_id');"
+  local id="VD-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
+  local content
+  if command -v jq >/dev/null 2>&1; then
+    content=$(jq -n --arg r "$result" --arg e "$evidence" '{result:$r,evidence:$e}')
+  else
+    local json_result json_evidence
+    json_result=$(json_escape "$result")
+    json_evidence=$(json_escape "$evidence")
+    content="{\"result\":\"$json_result\",\"evidence\":\"$json_evidence\"}"
+  fi
+  local safe_content
+  safe_content=$(sql_escape "$content")
+  db_exec "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'verdict', 'adversary', '$safe_content', '$safe_contract_id');"
   echo "Verdict: $result"
 }
 
 cmd_error() {
-  local tool="$1"
-  local error="$2"
+  local tool="${1:-}"
+  local error="${2:-}"
   local file="${3:-}"
 
   [ -z "$tool" ] || [ -z "$error" ] && { echo "Usage: agentdb error <tool> <error> [file]"; exit 1; }
@@ -227,24 +275,24 @@ cmd_error() {
   safe_error=$(sql_escape "$error")
   safe_file=$(sql_escape "$file")
 
-  sqlite3 "$DB" "INSERT INTO errors (tool, error, file) VALUES ('$safe_tool', '$safe_error', '$safe_file');"
+  db_exec "INSERT INTO errors (tool, error, file) VALUES ('$safe_tool', '$safe_error', '$safe_file');"
 }
 
 cmd_query() {
-  local sql="$1"
+  local sql="${1:-}"
   [ -z "$sql" ] && { echo "Usage: agentdb query <sql>"; exit 1; }
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
 
-  sqlite3 -header -column "$DB" "$sql"
+  db_exec_opts "-header -column" "$sql"
 }
 
 cmd_stats() {
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
 
-  echo "Learnings: $(sqlite3 "$DB" "SELECT COUNT(*) FROM learnings;")"
-  echo "Checkpoints: $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='checkpoint';")"
-  echo "Contracts: $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='contract';")"
-  echo "Errors: $(sqlite3 "$DB" "SELECT COUNT(*) FROM errors;")"
+  echo "Learnings: $(db_exec "SELECT COUNT(*) FROM learnings;")"
+  echo "Checkpoints: $(db_exec "SELECT COUNT(*) FROM context WHERE type='checkpoint';")"
+  echo "Contracts: $(db_exec "SELECT COUNT(*) FROM context WHERE type='contract';")"
+  echo "Errors: $(db_exec "SELECT COUNT(*) FROM errors;")"
 }
 
 cmd_status() {
@@ -254,7 +302,7 @@ cmd_status() {
   db_size=$(du -sh "$DB" 2>/dev/null | cut -f1)
 
   local last_cp_ts
-  last_cp_ts=$(sqlite3 "$DB" "SELECT ts FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1;" 2>/dev/null)
+  last_cp_ts=$(db_exec "SELECT ts FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1;" 2>/dev/null)
 
   echo "# AgentDB Status"
   echo ""
@@ -262,27 +310,28 @@ cmd_status() {
   echo "Size:        $db_size"
   echo ""
   echo "Counts:"
-  echo "  learnings:   $(sqlite3 "$DB" "SELECT COUNT(*) FROM learnings;")"
-  echo "  checkpoints: $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='checkpoint';")"
-  echo "  contracts:   $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='contract';")"
-  echo "  verdicts:    $(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='verdict';")"
-  echo "  errors:      $(sqlite3 "$DB" "SELECT COUNT(*) FROM errors;")"
+  echo "  learnings:   $(db_exec "SELECT COUNT(*) FROM learnings;")"
+  echo "  checkpoints: $(db_exec "SELECT COUNT(*) FROM context WHERE type='checkpoint';")"
+  echo "  contracts:   $(db_exec "SELECT COUNT(*) FROM context WHERE type='contract';")"
+  echo "  verdicts:    $(db_exec "SELECT COUNT(*) FROM context WHERE type='verdict';")"
+  echo "  errors:      $(db_exec "SELECT COUNT(*) FROM errors;")"
   echo ""
   echo "Last checkpoint: ${last_cp_ts:-none}"
   echo ""
   echo "Learnings by type:"
-  sqlite3 "$DB" "SELECT '  ' || type || ': ' || COUNT(*) FROM learnings GROUP BY type ORDER BY type;" 2>/dev/null
+  db_exec "SELECT '  ' || type || ': ' || COUNT(*) FROM learnings GROUP BY type ORDER BY type;" 2>/dev/null
 }
 
 cmd_prune() {
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
 
   local keep="${1:-10}"
+  validate_int "$keep" "keep"
 
   local before_count
-  before_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
+  before_count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
 
-  sqlite3 "$DB" "
+  db_exec "
     DELETE FROM context
     WHERE type='checkpoint'
       AND id NOT IN (
@@ -294,7 +343,7 @@ cmd_prune() {
   "
 
   local after_count
-  after_count=$(sqlite3 "$DB" "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
+  after_count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
   local removed=$(( before_count - after_count ))
 
   echo "Pruned $removed checkpoint(s). Kept $after_count (of last $keep)."
@@ -313,22 +362,22 @@ cmd_export() {
 
     echo "## Failures"
     echo ""
-    sqlite3 "$DB" "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || CASE WHEN evidence != '' THEN '- evidence: ' || evidence || char(10) ELSE '' END || '- ts: ' || ts FROM learnings WHERE type='failure' ORDER BY ts DESC;" 2>/dev/null || echo "None"
+    db_exec "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || CASE WHEN evidence != '' THEN '- evidence: ' || evidence || char(10) ELSE '' END || '- ts: ' || ts FROM learnings WHERE type='failure' ORDER BY ts DESC;" 2>/dev/null || echo "None"
     echo ""
 
     echo "## Patterns"
     echo ""
-    sqlite3 "$DB" "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || CASE WHEN evidence != '' THEN '- evidence: ' || evidence || char(10) ELSE '' END || '- hits: ' || hit_count || char(10) || '- ts: ' || ts FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+    db_exec "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || CASE WHEN evidence != '' THEN '- evidence: ' || evidence || char(10) ELSE '' END || '- hits: ' || hit_count || char(10) || '- ts: ' || ts FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
     echo ""
 
     echo "## Gotchas"
     echo ""
-    sqlite3 "$DB" "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || CASE WHEN evidence != '' THEN '- evidence: ' || evidence || char(10) ELSE '' END || '- ts: ' || ts FROM learnings WHERE type='gotcha' ORDER BY ts DESC;" 2>/dev/null || echo "None"
+    db_exec "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || CASE WHEN evidence != '' THEN '- evidence: ' || evidence || char(10) ELSE '' END || '- ts: ' || ts FROM learnings WHERE type='gotcha' ORDER BY ts DESC;" 2>/dev/null || echo "None"
     echo ""
 
     echo "## Preferences"
     echo ""
-    sqlite3 "$DB" "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || '- ts: ' || ts FROM learnings WHERE type='preference' ORDER BY ts DESC;" 2>/dev/null || echo "None"
+    db_exec "SELECT '### ' || id || char(10) || '- insight: ' || insight || char(10) || '- ts: ' || ts FROM learnings WHERE type='preference' ORDER BY ts DESC;" 2>/dev/null || echo "None"
   } > "$out_file"
 
   echo "Exported to: $out_file"
@@ -338,10 +387,11 @@ cmd_recent() {
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
 
   local n="${1:-5}"
+  validate_int "$n" "n"
 
   echo "# Last $n Checkpoints"
   echo ""
-  sqlite3 -separator $'\t' "$DB" "
+  db_exec_opts "-separator $'\t'" "
     SELECT ts, agent, content
     FROM context
     WHERE type='checkpoint'
@@ -357,44 +407,47 @@ cmd_recent() {
 # === GRAPH TRACKING COMMANDS ===
 
 cmd_session_start() {
-  local task_type="$1"
+  local task_type="${1:-}"
   local tier="${2:-1}"
 
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
-  local id="SES-$(date +%Y%m%d%H%M%S)-$$"
-  local safe_type safe_tier
+  local id="SES-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
+  local safe_type
   safe_type=$(sql_escape "$task_type")
-  safe_tier=$(sql_escape "$tier")
+  validate_int "$tier" "tier"
 
   # Check if table exists (migration applied)
   local has_table
-  has_table=$(sqlite3 "$DB" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='context_sessions' LIMIT 1;" 2>/dev/null || echo "")
+  has_table=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='context_sessions' LIMIT 1;" 2>/dev/null || echo "")
   if [ -z "$has_table" ]; then
     echo "Graph tracking not initialized. Run: agentdb init"
     return 1
   fi
 
-  sqlite3 "$DB" "INSERT INTO context_sessions (id, task_type, tier) VALUES ('$id', '$safe_type', $safe_tier);"
+  db_exec "INSERT INTO context_sessions (id, task_type, tier) VALUES ('$id', '$safe_type', $tier);"
   echo "$id"
 }
 
 cmd_session_end() {
-  local session_id="$1"
-  local success="$2"
-  local outcome="$3"
+  local session_id="${1:-}"
+  local success="${2:-}"
+  local outcome="${3:-}"
   local nodes_loaded="${4:-[]}"
   local tokens_used="${5:-0}"
 
   [ -z "$session_id" ] && { echo "Usage: agentdb session-end <id> <1|0> <outcome_json> [nodes_json] [tokens]"; exit 1; }
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
 
+  validate_int "$success" "success"
+  validate_int "$tokens_used" "tokens_used"
+
   local safe_id safe_outcome safe_nodes
   safe_id=$(sql_escape "$session_id")
   safe_outcome=$(sql_escape "$outcome")
   safe_nodes=$(sql_escape "$nodes_loaded")
 
-  sqlite3 "$DB" "
+  db_exec "
     UPDATE context_sessions SET
       ended_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
       success = $success,
@@ -407,18 +460,20 @@ cmd_session_end() {
 }
 
 cmd_track_node() {
-  local path="$1"
-  local type="$2"
+  local path="${1:-}"
+  local type="${2:-}"
   local tokens="${3:-0}"
 
   [ -z "$path" ] || [ -z "$type" ] && { echo "Usage: agentdb track-node <path> <type> [tokens]"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
+  validate_int "$tokens" "tokens"
+
   local safe_path safe_type
   safe_path=$(sql_escape "$path")
   safe_type=$(sql_escape "$type")
 
-  sqlite3 "$DB" "
+  db_exec "
     INSERT INTO nodes (path, type, tokens, last_accessed, access_count)
     VALUES ('$safe_path', '$safe_type', $tokens, strftime('%Y-%m-%dT%H:%M:%fZ','now'), 1)
     ON CONFLICT(path) DO UPDATE SET
@@ -429,14 +484,15 @@ cmd_track_node() {
 }
 
 cmd_suggest_context() {
-  local task_type="$1"
+  local task_type="${1:-}"
   local max_tokens="${2:-4000}"
 
   [ -z "$task_type" ] && { echo "Usage: agentdb suggest-context <task_type> [max_tokens]"; exit 1; }
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  validate_int "$max_tokens" "max_tokens"
 
   # Find nodes that correlate with success for this task type
-  sqlite3 -header -column "$DB" "
+  db_exec_opts "-header -column" "
     SELECT DISTINCT
       n.path,
       n.type,

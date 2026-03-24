@@ -4,6 +4,7 @@
 
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;
+PRAGMA busy_timeout=5000;
 
 -- LEARNINGS: Cross-session memory (survives forever)
 -- Read these at session start to avoid repeating mistakes
@@ -53,3 +54,6 @@ CREATE TABLE IF NOT EXISTS _migrations (
 );
 
 INSERT OR IGNORE INTO _migrations (name) VALUES ('001_init');
+
+-- Schema version tracking
+PRAGMA user_version = 2;  -- Increment with each migration

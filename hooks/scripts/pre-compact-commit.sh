@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 # PreCompact hook: Save agent context + commit before compaction
 
 # Load shared functions
@@ -70,7 +70,9 @@ if ! git status --porcelain 2>/dev/null | grep -q .; then
 fi
 
 git add -A 2>/dev/null
-git reset HEAD -- '*.zip' '*.tar.gz' '*.tar.bz2' '**/.DS_Store' 2>/dev/null
+git reset HEAD -- '*.zip' '*.tar.gz' '*.tar.bz2' '**/.DS_Store' \
+    '.env*' '*.pem' '*.key' '*.p12' 'credentials*' 'secrets*' '*.secret' \
+    'node_modules/' 2>/dev/null
 
 if git diff --cached --quiet 2>/dev/null; then
     exit 0
@@ -78,6 +80,7 @@ fi
 
 FILES_CHANGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
 REPO_NAME=$(basename "$PROJECT_ROOT")
+# --no-verify: intentional. Avoids infinite hook loops during pre-compact cleanup.
 git commit -m "chore(checkpoint): $REPO_NAME pre-compact [$AGENT] ($TRIGGER, $FILES_CHANGED files) $TIMESTAMP_SHORT" --no-verify 2>/dev/null
 git push 2>/dev/null || true
 
@@ -99,21 +102,30 @@ if [ -f "$AGENTDB_PATH" ]; then
     "$AGENTDB" write-end "{\"event\":\"pre-compact\",\"agent\":\"$AGENT\",\"trigger\":\"$TRIGGER\",\"branch\":\"$BRANCH\",\"goal\":\"$ACTIVE_GOAL\",\"uncommitted_files\":$UNCOMMITTED,\"files_committed\":${FILES_CHANGED:-0},\"recent_files\":\"$RECENT_FILES\"}" 2>/dev/null || true
 
     # Also record compaction pattern for analysis
+    # Escape single quotes in all variables to prevent SQL injection
+    # (ACTIVE_GOAL comes from a previous query and may contain quotes)
+    _AGENT="${AGENT//\'/\'\'}"
+    _TRIGGER="${TRIGGER//\'/\'\'}"
+    _BRANCH="${BRANCH//\'/\'\'}"
+    _ACTIVE_GOAL="${ACTIVE_GOAL//\'/\'\'}"
+    _TIMESTAMP="${TIMESTAMP//\'/\'\'}"
+    _RECENT_FILES="${RECENT_FILES//\'/\'\'}"
+
     sqlite3 "$AGENTDB_PATH" <<SQL 2>/dev/null || true
 INSERT INTO context (id, type, content, agent) VALUES (
     'CMP-$(date +%Y%m%d%H%M%S)-$$',
     'checkpoint',
     json_object(
         'event', 'compaction',
-        'agent', '$AGENT',
-        'trigger', '$TRIGGER',
-        'branch', '$BRANCH',
-        'goal', '$ACTIVE_GOAL',
+        'agent', '$_AGENT',
+        'trigger', '$_TRIGGER',
+        'branch', '$_BRANCH',
+        'goal', '$_ACTIVE_GOAL',
         'uncommitted_files', $UNCOMMITTED,
         'files_committed', ${FILES_CHANGED:-0},
-        'timestamp', '$TIMESTAMP'
+        'timestamp', '$_TIMESTAMP'
     ),
-    '$AGENT'
+    '$_AGENT'
 );
 SQL
 fi

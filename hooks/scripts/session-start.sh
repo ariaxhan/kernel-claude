@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 # KERNEL: Session start hook
 
 # Load shared functions
