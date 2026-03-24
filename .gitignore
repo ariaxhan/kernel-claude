@@ -10,5 +10,8 @@ _meta/agentdb/*.db-shm
 _meta/agentdb/*.db-wal
 _meta/agentdb/errors.log
 
+# Compaction markers (ephemeral, per-machine)
+_meta/.compact-marker
+
 # Logs
 _meta/logs/

@@ -29,12 +29,21 @@ Skill-specific: skills/git/reference/git-research.md
 </core_principles>
 
 <branch_strategy>
-- main: Always deployable. Never commit directly for tier 2+.
-- feature/{name}: New functionality
-- fix/{name}: Bug fixes
-- refactor/{name}: Code restructuring
+Git workflow is determined by project profile (detected at session start):
 
-Merge via PR when possible. Fast-forward for clean history.
+| Step | local | github | github-oss | github-production |
+|------|-------|--------|------------|-------------------|
+| Branch | optional | feature/{name} tier 2+ | feature/{name} ALWAYS | feature/{name} ALWAYS |
+| PR | no | no | REQUIRED | REQUIRED |
+| Review | no | self (/kernel:review) | /kernel:review | /kernel:review + human |
+| Merge target | main | main | main (protected) | main (protected) |
+| Rulesets | none | none | required checks | required checks + approvals |
+
+Rules:
+- Profile is shown in session-start output. Follow the rules for your profile.
+- github-oss and github-production: NEVER merge directly to main. Always PR.
+- If gh CLI is unavailable: push branch, output manual PR URL for user.
+- Feature branches: {type}/{name} (feature/, fix/, refactor/)
 </branch_strategy>
 
 <commit_messages>
@@ -51,6 +60,7 @@ Bad:
 
 <anti_patterns>
 - Committing to main directly for multi-file changes
+- Merging directly to main for github-oss or github-production profiles
 - "WIP" commits that never get squashed
 - Mixing unrelated changes in one commit
 - Force pushing to shared branches

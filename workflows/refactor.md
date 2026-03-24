@@ -39,9 +39,16 @@ tier: auto  # determined at classify step
    - check: test results identical to step 2 (same pass/fail, same count)
    - on_reject: return to step 4 with diff of what changed
 
-6. **Ship** -- Commit, push, PR
+6. **Ship** -- Commit, push, and follow profile git workflow
    - agent: orchestrator
-   - output: pushed branch, optional PR
+   - actions:
+     - Push commits to feature branch
+     - If profile is github-oss or github-production: create PR via `gh pr create`
+     - If profile is github: push branch (no PR needed)
+     - If profile is local: merge to main directly
+     - If gh CLI unavailable: push branch, output manual PR URL
+   - output: pushed branch + PR link (if applicable)
+   - rule: NEVER merge to main directly for github-oss or github-production
 
 ## On Failure
 

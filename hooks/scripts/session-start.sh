@@ -242,6 +242,30 @@ if [[ "$PROFILE" == "github-production" ]]; then
   echo ""
 fi
 
+# Git workflow section — profile-gated (not shown for local)
+if [[ "$PROFILE" == "github" ]]; then
+  echo "## Git Workflow"
+  echo "- Feature branches for tier 2+ work"
+  echo "- Self-review with /kernel:review before merging"
+  echo ""
+elif [[ "$PROFILE" == "github-oss" ]] || [[ "$PROFILE" == "github-production" ]]; then
+  echo "## Git Workflow (ENFORCED)"
+  echo "- Feature branches ALWAYS: {type}/{name}"
+  echo "- PR REQUIRED before merge to main"
+  echo "- /kernel:review before PR creation"
+  echo "- NEVER merge directly to main"
+  if command -v gh >/dev/null 2>&1; then
+    echo "- Create PR: \`gh pr create\`"
+  else
+    echo "- If gh unavailable: push branch, create PR manually at: https://github.com/${OWNER_REPO:-OWNER/REPO}/compare/{branch}"
+  fi
+  if [[ "$PROFILE" == "github-production" ]]; then
+    echo "- Human approval required on PR"
+    echo "- Consider: CODEOWNERS file, required status checks"
+  fi
+  echo ""
+fi
+
 # =============================================================================
 # AGENTDB CONTEXT (if initialized)
 # =============================================================================

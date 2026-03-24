@@ -90,6 +90,19 @@ Serial execution is the exception. Parallel is the default.
 
 ---
 
+## Git Workflow
+
+<invariant id="pr_before_merge">
+For github-oss and github-production profiles: all changes merge via Pull Request.
+Direct commits to main are blocked. Feature branches required.
+Profile is detected at session start and displayed in header.
+
+**On violation:** Block merge. Push to feature branch and create PR.
+**Exception:** Only with explicit user override ("merge directly").
+</invariant>
+
+---
+
 ## Enforcement
 
 - Pre-commit hooks validate: no secrets, commit message format, test status
