@@ -900,7 +900,7 @@ test_ingest_command_has_research_step() {
   assert_contains "$content" "anti_patterns"
 }
 
-test_auto_command_has_loop() {
+test_forge_command_has_loop() {
   local cmd_file="$PLUGIN_ROOT/commands/forge.md"
   local content
   content=$(cat "$cmd_file")
@@ -1506,7 +1506,7 @@ run_test_suite() {
       run_test "agents have frontmatter" test_agents_have_frontmatter
       run_test "hooks.json valid" test_hooks_json_valid
       run_test "ingest has research step" test_ingest_command_has_research_step
-      run_test "auto has loop control" test_auto_command_has_loop
+      run_test "forge has loop control" test_forge_command_has_loop
       run_test "commands use structured format" test_commands_use_structured_format
       ;;
     tokens)
