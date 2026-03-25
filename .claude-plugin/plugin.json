@@ -31,5 +31,6 @@
     "./commands/help.md",
     "./commands/dream.md",
     "./commands/diagnose.md"
-  ]
+  ],
+  "hooks": "./hooks/hooks.json"
 }
