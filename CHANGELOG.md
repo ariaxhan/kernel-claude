@@ -2,6 +2,39 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.6.1] - 2026-03-25
+
+### Added
+- **`/kernel:retrospective` command** — Cross-session learning synthesis. Queries AgentDB learnings, clusters by theme, merges duplicates, resolves contradictions, archives stale entries, promotes high-confidence patterns into rules. 5 dedicated tests.
+- **Command routing in ingest** — Execute phase now routes to the right command before implementing: `/kernel:dream` for design, `/kernel:diagnose` for bugs, `/kernel:forge` for autonomous runs, `/kernel:tearitapart` for pre-implementation critique.
+- **Context-aware help** — `/kernel:help` now checks actual plugin state (profile, active contracts, AgentDB status) before showing help, so the output reflects reality rather than just reciting docs.
+
+### Fixed
+- **Renamed `auto.md` → `forge.md`** — Filename now matches the `kernel:forge` frontmatter name. Was causing `/kernel:forge` to not load correctly.
+- **Stale `/kernel:auto` references** — Updated diagnose.md and CHANGELOG.md to reference `/kernel:forge`.
+
+### Removed
+- **`code-review.yml` CI workflow** — Removed failing GitHub Actions workflow that required `CLAUDE_CODE_OAUTH_TOKEN`. Local `/kernel:review` is more thorough. Re-add when token is configured.
+
+### Changed
+- **Updated `/kernel:help`** — Full rewrite with all 12 commands, workflow chains, agent roster, and usage tips.
+- **Ingest learn phase** — Now suggests `/kernel:retrospective` when 5+ learnings accumulated.
+- **Ingest execute phase** — Tier 2+ now includes `/kernel:tearitapart`, `/kernel:validate`, and `/kernel:review` steps.
+- **Forge/handoff learn phases** — Reference `/kernel:retrospective` for cross-session synthesis.
+
+---
+
+## [7.6.0] - 2026-03-25
+
+### Added
+- **`/kernel:forge` command** — Autonomous development engine. Heat/hammer/quench/anneal cycle. Generates competing approaches, implements against failing tests, adversarial review, iterates until antifragile. Stops after 3 structural failures or 10 iterations. Full AgentDB audit trail.
+- **`/kernel:dream` upgrade** — Now includes 4-persona stress test council (Devil's Advocate, Pragmatic Engineer, Security Auditor, End User) that probes each perspective for flaws. Integrity scoring 0.0-1.0.
+- **`/kernel:diagnose` command** — Bug mode and refactor mode with structured diagnosis output.
+- **`/kernel:metrics` command** — Observability dashboard wrapping `agentdb metrics` + `agentdb health`.
+- **Aggressive skill loading** — Ingest and forge commands now load skills by classify/domain/tier triggers.
+
+---
+
 ## [7.5.1] - 2026-03-24
 
 ### Changed
@@ -30,7 +63,7 @@ All notable changes to KERNEL are documented in this file.
 ### Added
 - **Post-compaction context restoration** — New `UserPromptSubmit` hook restores methodology context after compaction. PreCompact writes a marker with active contract, recent learnings, and branch info. First user message after compaction gets full context injection. Marker auto-deletes after use. (#33)
 - **Circuit breaker for hooks** — Guard hooks (guard-bash, guard-config, detect-secrets, auto-approve-safe) now degrade gracefully. After 3 consecutive failures, the hook disables itself for 10 minutes instead of blocking all operations. Project-scoped state in `_meta/.breakers/`. Lifecycle hooks (session-start, session-end, pre-compact) are exempt — they always run. (#21)
-- **`/kernel:diagnose` command** — Systematic debugging and refactor analysis before fixing. Bug mode: reproduce → trace → isolate → hypothesize → diagnose. Refactor mode: map → trace deps → measure coupling → risks → diagnose. Produces structured diagnosis with blast radius, affected files, and recommended approach. Hands off to `/kernel:ingest` or `/kernel:auto`. (#35)
+- **`/kernel:diagnose` command** — Systematic debugging and refactor analysis before fixing. Bug mode: reproduce → trace → isolate → hypothesize → diagnose. Refactor mode: map → trace deps → measure coupling → risks → diagnose. Produces structured diagnosis with blast radius, affected files, and recommended approach. Hands off to `/kernel:ingest` or `/kernel:forge`. (#35)
 
 ---
 

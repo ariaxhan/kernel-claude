@@ -119,30 +119,41 @@ strong_assertions: specific values
 </step>
 
 <step id="5_execute">
+<route_to_command>
+Before implementing, check if another command is the right tool:
+- Complex/ambiguous design? → /kernel:dream (3 perspectives, stress-tested)
+- Bug or regression? → /kernel:diagnose (reproduce → isolate → root cause)
+- Autonomous overnight run? → /kernel:forge (heat/hammer/quench/anneal cycle)
+- Pre-implementation critique needed? → /kernel:tearitapart (PROCEED/REVISE/RETHINK)
+- Stale learnings accumulating? → /kernel:retrospective (synthesis + promotion)
+If none match, execute below.
+</route_to_command>
+
 <tier_1>
 1. Reference research doc
 2. Write failing tests (edge cases!)
 3. Implement proven pattern
 4. Check Big 5: skills/quality/SKILL.md
-5. Run evals
+5. Run evals → /kernel:validate before commit
 6. Commit when done_when satisfied
 </tier_1>
 
 <tier_2_plus>
 rule: you do NOT write code
-1. agentdb contract '{"goal":"X","files":["Y"],"tier":N}'
-2. git checkout -b {type}/{name}
-3. Spawn surgeon
-4. Wait for checkpoint
-5. (tier 3) spawn adversary
-6. Verify evals
-7. Report
+1. /kernel:tearitapart — review plan before implementation
+2. agentdb contract '{"goal":"X","files":["Y"],"tier":N}'
+3. git checkout -b {type}/{name}
+4. Spawn surgeon
+5. Wait for checkpoint
+6. (tier 3) spawn adversary
+7. /kernel:validate → verify evals
+8. /kernel:review — self-review before PR
 </tier_2_plus>
 </step>
 
 <branch after="execute">
   IF adversary rejects (tier 3) → return to execute with adversary feedback, max 3 retries
-  IF tests fail → diagnose, fix, re-execute
+  IF tests fail → /kernel:diagnose, fix, re-execute
   IF blocked → checkpoint and STOP, ask human
 </branch>
 
@@ -179,13 +190,7 @@ status: researching|scoping|testing|executing|complete
 </hard_stops>
 
 <protocol_fallback>
-If session-start hook did not fire (no "# KERNEL" in context), this is the ambient protocol:
-- AgentDB: read at start, write at end, learn on discovery
-- Skills ARE the methodology — load them aggressively before acting
-- Research anti-patterns BEFORE solutions. Tests BEFORE code.
-- Tier 1: execute directly. Tier 2+: orchestrate via agents.
-- Profile-gated git: local=direct, github-oss=PRs required
-- Built-in beats library. Library beats custom.
+If no "# KERNEL" in context: agentdb read/write, research before code, tests before implementation.
 </protocol_fallback>
 
 </command>

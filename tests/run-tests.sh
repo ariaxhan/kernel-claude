@@ -901,7 +901,7 @@ test_ingest_command_has_research_step() {
 }
 
 test_auto_command_has_loop() {
-  local cmd_file="$PLUGIN_ROOT/commands/auto.md"
+  local cmd_file="$PLUGIN_ROOT/commands/forge.md"
   local content
   content=$(cat "$cmd_file")
   assert_contains "$content" "loop"

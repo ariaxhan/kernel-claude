@@ -47,7 +47,7 @@ Load: skills/debug/SKILL.md, skills/testing/SKILL.md, skills/architecture/SKILL.
       </step>
       <step id="handoff">
         Output structured diagnosis.
-        Hand off to /kernel:ingest or /kernel:auto for implementation.
+        Hand off to /kernel:ingest or /kernel:forge for implementation.
         If the user wants to fix immediately, transition to execute mode.
       </step>
     </steps>
@@ -113,14 +113,14 @@ Load: skills/debug/SKILL.md, skills/testing/SKILL.md, skills/architecture/SKILL.
 {what depends on what}
 
 ### Recommended Approach
-{what to do, not how — that's for ingest/auto}
+{what to do, not how — that's for ingest/forge}
 
 ### Tests Required
 - {test that must pass before the fix}
 - {test that validates the fix}
 
 ---
-**Next:** /kernel:ingest or /kernel:auto to implement.
+**Next:** /kernel:ingest or /kernel:forge to implement.
 </output_format>
 
 <telemetry>
