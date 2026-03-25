@@ -152,6 +152,7 @@ rule: you do NOT write code
 agentdb learn pattern "{what worked}" "{evidence}"
 agentdb learn failure "{what broke}" "{evidence}"
 Update _meta/research/ if new findings.
+Suggest /kernel:retrospective if 5+ learnings accumulated since last synthesis.
 
 <checkpoint>
 agentdb write-end '{"task":"X","tier":N,"learned":["Z"]}'
