@@ -13,8 +13,20 @@ Human confirms each phase. For autonomous loop: /kernel:auto
 </purpose>
 
 <skill_load>
-Load: skills/quality/SKILL.md, skills/testing/SKILL.md
-Reference: skills/quality/reference/quality-research.md
+always: skills/quality/SKILL.md, skills/testing/SKILL.md, skills/git/SKILL.md
+on_classify:
+  bug:      skills/debug/SKILL.md, skills/testing/SKILL.md
+  feature:  skills/build/SKILL.md, skills/architecture/SKILL.md
+  refactor: skills/refactor/SKILL.md, skills/architecture/SKILL.md
+  review:   skills/testing/SKILL.md, skills/security/SKILL.md
+on_domain:
+  api:      skills/api/SKILL.md, skills/backend/SKILL.md
+  auth:     skills/security/SKILL.md
+  frontend: skills/design/SKILL.md, skills/e2e/SKILL.md
+  backend:  skills/backend/SKILL.md
+on_tier:
+  2+:       skills/orchestration/SKILL.md
+reference: skills/quality/reference/quality-research.md
 </skill_load>
 
 <on_start>
@@ -22,6 +34,11 @@ Reference: skills/quality/reference/quality-research.md
 agentdb read-start
 ls _meta/research/  # check prior work
 ```
+
+Load /kernel:quality, /kernel:testing, /kernel:git immediately.
+After classify: load task-specific skills above. Do NOT proceed without loading them.
+After scope: if tier 2+, load /kernel:orchestration.
+If any domain detected (API, auth, frontend, backend): load domain skills.
 </on_start>
 
 <step id="1_classify">
@@ -157,6 +174,17 @@ status: researching|scoping|testing|executing|complete
 - code_without_tests → step 4
 - code_for_tier_2+ → spawn surgeon
 - skip_agentdb → go back
+- skip_skill_load → load the skill before proceeding
 </hard_stops>
+
+<protocol_fallback>
+If session-start hook did not fire (no "# KERNEL" in context), this is the ambient protocol:
+- AgentDB: read at start, write at end, learn on discovery
+- Skills ARE the methodology — load them aggressively before acting
+- Research anti-patterns BEFORE solutions. Tests BEFORE code.
+- Tier 1: execute directly. Tier 2+: orchestrate via agents.
+- Profile-gated git: local=direct, github-oss=PRs required
+- Built-in beats library. Library beats custom.
+</protocol_fallback>
 
 </command>
