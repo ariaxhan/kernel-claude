@@ -36,9 +36,11 @@ tier: auto  # determined at classify step
    - output: verdict to AgentDB
    - on_reject: return to step 4 with feedback
 
-6. **Ship** -- Commit, push, PR
+6. **Ship** -- Commit, push, PR (profile-gated)
    - agent: orchestrator
-   - output: pushed branch, optional PR
+   - local/github: push to main or feature branch
+   - github-oss: push feature branch, create PR (required)
+   - github-production: push feature branch, create PR, request review (required)
 
 ## On Failure
 

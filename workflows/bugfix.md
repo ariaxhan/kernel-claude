@@ -39,9 +39,11 @@ tier: auto  # determined at classify step
    - checks: failing test now passes, all existing tests still green
    - on_reject: return to step 4 with feedback
 
-6. **Ship** -- Commit, push, PR
+6. **Ship** -- Commit, push, PR (profile-gated)
    - agent: orchestrator
-   - output: pushed branch, optional PR
+   - local/github: push to main or fix branch
+   - github-oss: push fix branch, create PR (required)
+   - github-production: push fix branch, create PR, request review (required)
 
 ## On Failure
 
