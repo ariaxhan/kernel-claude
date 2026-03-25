@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "7.6.2",
+  "version": "7.6.3",
   "description": "Persistent memory, multi-agent orchestration, and project-aware context for Claude Code. AgentDB tracks failures, patterns, and telemetry across sessions. Profile detection auto-adapts to local, private, OSS, and production projects. 17 skills (TDD, security, debugging, API design, backend patterns). Tiered routing: surgeon, adversary, reviewer, dreamer agents. Circuit breakers, compaction recovery, secret detection.",
   "author": {
     "name": "Aria Han",

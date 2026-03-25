@@ -139,12 +139,14 @@ cmd_preflight() {
     exists=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='$table' LIMIT 1;" 2>/dev/null || echo "")
     if [ -z "$exists" ]; then
       echo "preflight:missing_table — $table not found, applying schema"
-      # cmd_init skips if DB exists, so apply schema directly for missing tables
+      # Re-apply schema (all CREATE TABLE IF NOT EXISTS, safe to re-run)
       if [ -f "$SCHEMA_DIR/schema.sql" ]; then
         sqlite3 "$DB" ".timeout 5000" ".read $SCHEMA_DIR/schema.sql" >/dev/null 2>&1 || true
       fi
-      # Re-run migrations
-      if [ -d "$SCHEMA_DIR/migrations" ]; then
+      # Re-run migrations only if _migrations table exists (avoid circular dep)
+      local has_migrations
+      has_migrations=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='_migrations' LIMIT 1;" 2>/dev/null || echo "")
+      if [ -n "$has_migrations" ] && [ -d "$SCHEMA_DIR/migrations" ]; then
         for m in "$SCHEMA_DIR/migrations"/*.sql; do
           [ -f "$m" ] || continue
           [[ "$m" == *.down.sql ]] && continue
@@ -206,6 +208,44 @@ cmd_preflight() {
   if [ ! -f "$SCHEMA_DIR/schema.sql" ]; then
     echo "preflight:missing_schema — schema.sql not found at $SCHEMA_DIR"
     warnings=$((warnings + 1))
+  fi
+
+  # Check 7: DB bloat (>5MB is suspicious for a metadata store)
+  local db_bytes
+  db_bytes=$(stat -f%z "$DB" 2>/dev/null || stat -c%s "$DB" 2>/dev/null || echo "0")
+  if [ "$db_bytes" -gt 5242880 ]; then
+    local db_mb=$(( db_bytes / 1048576 ))
+    echo "preflight:bloat — agent.db is ${db_mb}MB (consider: agentdb prune all)"
+    warnings=$((warnings + 1))
+  fi
+
+  # Check 8: Orphan contracts (>48h with no verdict)
+  local orphan_count
+  orphan_count=$(db_exec "
+    SELECT COUNT(*) FROM context
+    WHERE type='contract'
+      AND ts < datetime('now', '-2 days')
+      AND contract_id NOT IN (
+        SELECT COALESCE(contract_id, '') FROM context WHERE type='verdict'
+      );
+  " 2>/dev/null || echo "0")
+  if [ "$orphan_count" -gt 0 ]; then
+    echo "preflight:orphan_contracts — $orphan_count contract(s) >48h with no verdict (close with: agentdb contract close --stale)"
+    warnings=$((warnings + 1))
+  fi
+
+  # Check 9: Stale learnings ratio (>50% with 0 hits and >14 days old)
+  local total_learnings stale_learnings
+  total_learnings=$(db_exec "SELECT COUNT(*) FROM learnings;" 2>/dev/null || echo "0")
+  if [ "$total_learnings" -gt 5 ]; then
+    stale_learnings=$(db_exec "
+      SELECT COUNT(*) FROM learnings
+      WHERE hit_count = 0 AND ts < datetime('now', '-14 days');
+    " 2>/dev/null || echo "0")
+    if [ $(( stale_learnings * 100 / total_learnings )) -gt 50 ]; then
+      echo "preflight:stale_learnings — $stale_learnings/$total_learnings learnings never reinforced (consider pruning)"
+      warnings=$((warnings + 1))
+    fi
   fi
 
   # Summary
@@ -315,17 +355,58 @@ cmd_learn() {
 }
 
 cmd_contract() {
-  local content="${1:-}"
+  local subcmd="${1:-}"
 
-  [ -z "$content" ] && { echo "Usage: agentdb contract <json>"; exit 1; }
-  [ ! -f "$DB" ] && cmd_init >/dev/null
+  case "$subcmd" in
+    close)
+      shift
+      cmd_contract_close "$@"
+      ;;
+    list)
+      [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+      db_exec_opts "-header -column" "SELECT id, ts, substr(content, 1, 80) || '...' AS summary FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 10;"
+      ;;
+    *)
+      # Original behavior: create contract from JSON
+      local content="$subcmd"
+      [ -z "$content" ] && { echo "Usage: agentdb contract <json> | close [id|--stale] | list"; exit 1; }
+      [ ! -f "$DB" ] && cmd_init >/dev/null
 
-  local safe_content
-  safe_content=$(sql_escape "$content")
+      local safe_content
+      safe_content=$(sql_escape "$content")
 
-  local id="CR-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
-  db_exec "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'contract', 'orchestrator', '$safe_content', '$id');"
-  echo "Contract: $id"
+      local id="CR-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
+      db_exec "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'contract', 'orchestrator', '$safe_content', '$id');"
+      echo "Contract: $id"
+      ;;
+  esac
+}
+
+cmd_contract_close() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  local target="${1:-}"
+
+  if [ "$target" = "--stale" ]; then
+    # Close contracts older than 24 hours
+    local count
+    count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='contract' AND ts < datetime('now', '-1 day');")
+    db_exec "DELETE FROM context WHERE type='contract' AND ts < datetime('now', '-1 day');"
+    echo "Closed $count stale contract(s)."
+  elif [ -n "$target" ]; then
+    # Close specific contract by ID (or partial match)
+    local safe_target
+    safe_target=$(sql_escape "$target")
+    local count
+    count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='contract' AND id LIKE '%${safe_target}%';")
+    db_exec "DELETE FROM context WHERE type='contract' AND id LIKE '%${safe_target}%';"
+    echo "Closed $count contract(s) matching '$target'."
+  else
+    # Close all contracts
+    local count
+    count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='contract';")
+    db_exec "DELETE FROM context WHERE type='contract';"
+    echo "Closed all $count contract(s)."
+  fi
 }
 
 cmd_verdict() {
@@ -420,28 +501,183 @@ cmd_status() {
 cmd_prune() {
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
 
-  local keep="${1:-10}"
-  validate_int "$keep" "keep"
+  local target="${1:-checkpoints}"
+  local keep="${2:-10}"
 
-  local before_count
-  before_count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
+  # Backward compat: if first arg is a number, treat as "prune checkpoints N"
+  if [[ "$target" =~ ^[0-9]+$ ]]; then
+    keep="$target"
+    target="checkpoints"
+  fi
+
+  case "$target" in
+    checkpoints)
+      validate_int "$keep" "keep"
+      local before_count
+      before_count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
+      db_exec "
+        DELETE FROM context
+        WHERE type='checkpoint'
+          AND id NOT IN (
+            SELECT id FROM context
+            WHERE type='checkpoint'
+            ORDER BY ts DESC
+            LIMIT $keep
+          );
+      "
+      local after_count
+      after_count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
+      echo "Pruned $(( before_count - after_count )) checkpoint(s). Kept $after_count."
+      ;;
+    errors)
+      validate_int "$keep" "keep"
+      local before_err
+      before_err=$(db_exec "SELECT COUNT(*) FROM errors;")
+      db_exec "
+        DELETE FROM errors
+        WHERE id NOT IN (
+          SELECT id FROM errors ORDER BY ts DESC LIMIT $keep
+        );
+      "
+      local after_err
+      after_err=$(db_exec "SELECT COUNT(*) FROM errors;")
+      echo "Pruned $(( before_err - after_err )) error(s). Kept $after_err."
+      ;;
+    contracts)
+      local before_con
+      before_con=$(db_exec "SELECT COUNT(*) FROM context WHERE type='contract';")
+      # Keep only the most recent contract, delete rest
+      db_exec "
+        DELETE FROM context
+        WHERE type='contract'
+          AND id NOT IN (
+            SELECT id FROM context
+            WHERE type='contract'
+            ORDER BY ts DESC
+            LIMIT ${keep}
+          );
+      "
+      local after_con
+      after_con=$(db_exec "SELECT COUNT(*) FROM context WHERE type='contract';")
+      echo "Pruned $(( before_con - after_con )) contract(s). Kept $after_con."
+      ;;
+    all)
+      cmd_prune checkpoints "$keep"
+      cmd_prune errors "$keep"
+      cmd_prune contracts 1
+      ;;
+    *)
+      echo "Usage: agentdb prune <checkpoints|errors|contracts|all> [keep_count]" >&2
+      exit 1
+      ;;
+  esac
+}
+
+cmd_wtf() {
+  # The "what just happened?" command. For confused agents and humans.
+  [ ! -f "$DB" ] && { echo "No DB — run: agentdb init"; exit 1; }
+
+  echo "# AgentDB: What's Going On"
+  echo ""
+
+  # Last error
+  local last_err
+  last_err=$(db_exec "SELECT '[' || tool || '] ' || error FROM errors ORDER BY ts DESC LIMIT 1;" 2>/dev/null)
+  echo "Last error: ${last_err:-none}"
+
+  # Last failed verdict
+  local last_fail
+  last_fail=$(db_exec "SELECT content FROM context WHERE type='verdict' AND content LIKE '%fail%' ORDER BY ts DESC LIMIT 1;" 2>/dev/null)
+  echo "Last failed verdict: ${last_fail:-none}"
+
+  # Active contract
+  local contract
+  contract=$(db_exec "SELECT id || ' — ' || substr(content, 1, 80) FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null)
+  echo "Active contract: ${contract:-none}"
+
+  # Last checkpoint
+  local checkpoint
+  checkpoint=$(db_exec "SELECT substr(content, 1, 100) FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1;" 2>/dev/null)
+  echo "Last checkpoint: ${checkpoint:-none}"
+  echo ""
+
+  # Recent failures (learnings)
+  local failures
+  failures=$(db_exec "SELECT COUNT(*) FROM learnings WHERE type='failure';" 2>/dev/null || echo "0")
+  if [ "$failures" -gt 0 ]; then
+    echo "Recent failure learnings:"
+    db_exec "SELECT '  - ' || insight FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 3;" 2>/dev/null
+    echo ""
+  fi
+
+  echo "---"
+  echo "Fix: agentdb contract close | agentdb prune errors | agentdb learn failure \"what\" \"evidence\""
+}
+
+cmd_timeline() {
+  # Unified chronological view across all tables. The git-log of agentdb.
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  local n="${1:-20}"
+  validate_int "$n" "n"
 
   db_exec "
-    DELETE FROM context
-    WHERE type='checkpoint'
-      AND id NOT IN (
-        SELECT id FROM context
-        WHERE type='checkpoint'
-        ORDER BY ts DESC
-        LIMIT $keep
-      );
-  "
+    SELECT ts, category, event FROM (
+      SELECT ts, 'learning' AS category, type || ': ' || insight AS event FROM learnings
+      UNION ALL
+      SELECT ts, type AS category, substr(content, 1, 100) AS event FROM context
+      UNION ALL
+      SELECT ts, 'error' AS category, '[' || tool || '] ' || substr(error, 1, 80) AS event FROM errors
+      UNION ALL
+      SELECT ts, category, event || CASE WHEN duration_ms IS NOT NULL THEN ' (' || duration_ms || 'ms)' ELSE '' END AS event FROM events
+    )
+    ORDER BY ts DESC
+    LIMIT $n;
+  " 2>/dev/null | while IFS='|' read -r ts category event; do
+    printf "%-20s  %-12s  %s\n" "$ts" "[$category]" "$event"
+  done
+}
 
-  local after_count
-  after_count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
-  local removed=$(( before_count - after_count ))
+cmd_guide() {
+  cat <<'GUIDE'
+# AgentDB Quick Reference
 
-  echo "Pruned $removed checkpoint(s). Kept $after_count (of last $keep)."
+Starting work?      agentdb read-start
+Something broke?    agentdb wtf
+Learned something?  agentdb learn failure "description" "evidence"
+                    agentdb learn pattern "description" "evidence"
+Done for now?       agentdb write-end '{"did":"X","next":"Y"}'
+What happened?      agentdb timeline 10
+Close old work?     agentdb contract close --stale
+Clean up?           agentdb prune all
+DB healthy?         agentdb preflight
+Full reference?     agentdb help
+GUIDE
+}
+
+cmd_schema() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  local target="${1:-}"
+
+  if [ -n "$target" ]; then
+    # Show specific table
+    echo "## $target"
+    db_exec_opts "-header -column" "SELECT * FROM pragma_table_info('$target');"
+  else
+    # Show all tables with row counts
+    echo "# AgentDB Schema"
+    echo ""
+    local tables
+    tables=$(db_exec "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;")
+    for t in $tables; do
+      local count
+      count=$(db_exec "SELECT COUNT(*) FROM \"$t\";" 2>/dev/null || echo "?")
+      printf "  %-20s %s rows\n" "$t" "$count"
+    done
+    echo ""
+    echo "Views:"
+    db_exec "SELECT '  ' || name FROM sqlite_master WHERE type='view' ORDER BY name;" 2>/dev/null
+  fi
 }
 
 cmd_export() {
@@ -809,6 +1045,10 @@ case "${1:-help}" in
   emit)        shift; cmd_emit "$@" ;;
   health)      cmd_health ;;
   metrics)     shift; cmd_metrics "$@" ;;
+  wtf)         cmd_wtf ;;
+  timeline)    shift; cmd_timeline "$@" ;;
+  guide)       cmd_guide ;;
+  schema)      shift; cmd_schema "$@" ;;
   export)      cmd_export ;;
   recent)      shift; cmd_recent "$@" ;;
   *)
@@ -821,6 +1061,8 @@ case "${1:-help}" in
     echo "  write-end <json>        Checkpoint before stopping"
     echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"
     echo "  contract <json>         Create new contract"
+    echo "  contract close [id|--stale]  Close contract(s)"
+    echo "  contract list           List recent contracts"
     echo "  verdict <p|f> <evidence>  QA result"
     echo ""
     echo "GRAPH TRACKING (after migration 002):"
@@ -834,12 +1076,17 @@ case "${1:-help}" in
     echo "  health                  System health check"
     echo "  metrics [days]              Observability dashboard (default: 7 days)"
     echo ""
+    echo "SITUATIONAL AWARENESS:"
+    echo "  wtf                     What just happened? (errors, failures, contract)"
+    echo "  timeline [N]            Last N events across all tables (default: 20)"
+    echo "  guide                   Quick reference cheat sheet"
+    echo ""
     echo "UTILITIES:"
     echo "  status                  DB health, counts"
-    echo "  prune [N]               Keep last N checkpoints"
+    echo "  schema [table]          Show tables + row counts, or table columns"
+    echo "  prune <target> [N]      Prune: checkpoints|errors|contracts|all"
     echo "  export                  Dump learnings to markdown"
     echo "  recent [N]              Show last N checkpoints"
-    echo "  stats                   Show counts"
     echo "  query <sql>             Raw query"
     ;;
 esac

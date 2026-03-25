@@ -91,6 +91,10 @@ cat << 'KERNEL_CONTEXT'
     on_start: agentdb read-start
     on_end:   agentdb write-end '{"did":"X","learned":["Y"]}'
     on_learn: agentdb learn failure|pattern|gotcha "what" "evidence"
+    confused: agentdb wtf
+    history:  agentdb timeline 10
+    cleanup:  agentdb prune all | agentdb contract close --stale
+    reference: agentdb guide
   </agentdb>
 
   <decision_tree>
