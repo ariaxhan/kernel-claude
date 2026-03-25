@@ -927,53 +927,54 @@ test_commands_use_structured_format() {
   }
 }
 
-# === Token Budget Tests (Attention Optimization) ===
-# Research: Lost-in-the-middle problem, 70-80% max context usage
-# Targets based on Anthropic context engineering recommendations
+# === Token Budget Tests (Composition Discipline) ===
+# With 1M context, full bundle is ~33K tokens (3.3%). Scarcity isn't the constraint.
+# Context rot is a gradient (not a cliff): structured loading mitigates degradation.
+# These guardrails enforce discipline, not survival. See: _meta/research/token-budget-research.md
 
 test_claude_md_token_budget() {
-  # CLAUDE.md is always loaded - must be tight
-  # Target: <200 lines (approx 1200 tokens)
+  # CLAUDE.md is always loaded — keep it focused
+  # Guardrail: <300 lines (~1.95K tokens)
   local lines
   lines=$(wc -l < "$PLUGIN_ROOT/CLAUDE.md" | tr -d ' ')
-  [ "$lines" -lt 220 ] || {
-    echo "FAIL: CLAUDE.md too large ($lines lines, max 220). Attention degrades."
+  [ "$lines" -lt 300 ] || {
+    echo "FAIL: CLAUDE.md too large ($lines lines, max 300). Always-loaded context should stay tight."
     return 1
   }
 }
 
 test_commands_token_budget() {
-  # Commands should be focused single workflows
-  # Target: <200 lines each (approx 800 tokens)
+  # Commands load one at a time on invocation
+  # Guardrail: <250 lines each (~1.6K tokens)
   local failed=0
   for cmd in "$PLUGIN_ROOT/commands/"*.md; do
     local lines
     lines=$(wc -l < "$cmd" | tr -d ' ')
-    if [ "$lines" -gt 200 ]; then
-      echo "  OVER BUDGET: $(basename "$cmd") = $lines lines (max 200)"
+    if [ "$lines" -gt 250 ]; then
+      echo "  OVER BUDGET: $(basename "$cmd") = $lines lines (max 250)"
       failed=1
     fi
   done
   [ "$failed" -eq 0 ] || {
-    echo "FAIL: some commands exceed token budget. Trim or use progressive disclosure."
+    echo "FAIL: some commands exceed budget. Use progressive disclosure via skill_load."
     return 1
   }
 }
 
 test_agents_token_budget() {
-  # Agents should have focused roles
-  # Target: <250 lines each (approx 1000 tokens)
+  # Agents load when spawned — focused roles, details via skills
+  # Guardrail: <300 lines each (~1.95K tokens)
   local failed=0
   for agent in "$PLUGIN_ROOT/agents/"*.md; do
     local lines
     lines=$(wc -l < "$agent" | tr -d ' ')
-    if [ "$lines" -gt 250 ]; then
-      echo "  OVER BUDGET: $(basename "$agent") = $lines lines (max 250)"
+    if [ "$lines" -gt 300 ]; then
+      echo "  OVER BUDGET: $(basename "$agent") = $lines lines (max 300)"
       failed=1
     fi
   done
   [ "$failed" -eq 0 ] || {
-    echo "FAIL: some agents exceed token budget. Use skill_load for progressive disclosure."
+    echo "FAIL: some agents exceed budget. Use skill_load for progressive disclosure."
     return 1
   }
 }
