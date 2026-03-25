@@ -151,6 +151,8 @@ cmd_init() {
   if [ -d "$SCHEMA_DIR/migrations" ]; then
     for migration in "$SCHEMA_DIR/migrations"/*.sql; do
       [ -f "$migration" ] || continue
+      # Skip rollback files
+      [[ "$migration" == *.down.sql ]] && continue
       local name
       name=$(basename "$migration" .sql)
       local applied

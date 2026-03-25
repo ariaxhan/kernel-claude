@@ -59,6 +59,12 @@ suites:
       - status healthy, export, timestamps
       - DB size reasonable
 
+  metrics:
+    count: 5
+    tests:
+      - metrics runs, custom days, shows learnings
+      - metrics command registered, has frontmatter
+
   verify:
     count: 7
     tests:
