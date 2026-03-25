@@ -13,13 +13,26 @@ Tests first. Iterate until green. Max 5 iterations then report.
 </purpose>
 
 <skill_load>
-Load: skills/quality/SKILL.md, skills/testing/SKILL.md, skills/build/SKILL.md
+always: skills/quality/SKILL.md, skills/testing/SKILL.md, skills/git/SKILL.md, skills/build/SKILL.md
+on_classify:
+  bug:      skills/debug/SKILL.md
+  refactor: skills/refactor/SKILL.md
+on_domain:
+  api:      skills/api/SKILL.md, skills/backend/SKILL.md
+  auth:     skills/security/SKILL.md
+  frontend: skills/design/SKILL.md
+  backend:  skills/backend/SKILL.md
+on_tier:
+  2+:       skills/orchestration/SKILL.md
 </skill_load>
 
 <on_start>
 ```bash
 agentdb read-start
 ```
+
+Load /kernel:quality, /kernel:testing, /kernel:git, /kernel:build immediately.
+After classify: load task-specific and domain skills. Do NOT skip skill loading.
 </on_start>
 
 <phase id="0_setup">
