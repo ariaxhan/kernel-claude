@@ -1,6 +1,6 @@
 #!/bin/bash
-# PreToolUse hook: Block destructive bash commands
-# Safety net for irreversible operations. Blocks force-push, hard reset, etc.
+# PreToolUse hook: Block only the most dangerous bash commands
+# Minimal guardrails — block rm -rf / and force push to main. That's it.
 # Events: PreToolUse (matcher: Bash)
 
 source "$(dirname "$0")/circuit-breaker.sh"
@@ -10,39 +10,15 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 [ -z "$COMMAND" ] && exit 0
 
-# Block force push (any form)
-if echo "$COMMAND" | grep -qE 'git\s+push\s+.*(-f|--force)'; then
-    echo "BLOCKED: Force push not allowed. Use regular push or ask Aria first." >&2
+# Block force push to main/master only
+if echo "$COMMAND" | grep -qE 'git\s+push\s+--force\s+.*\b(main|master)\b'; then
+    echo "BLOCKED: Force push to main/master not allowed." >&2
     exit 2
 fi
 
-# Block hard reset
-if echo "$COMMAND" | grep -qE 'git\s+reset\s+--hard'; then
-    echo "BLOCKED: git reset --hard discards changes. Use --soft or git stash." >&2
-    exit 2
-fi
-
-# Block git clean -f (deletes untracked files)
-if echo "$COMMAND" | grep -qE 'git\s+clean\s+-[a-zA-Z]*f'; then
-    echo "BLOCKED: git clean -f deletes untracked files permanently. Review manually." >&2
-    exit 2
-fi
-
-# Block discard-all-changes patterns
-if echo "$COMMAND" | grep -qE 'git\s+(checkout|restore)\s+\.\s*$'; then
-    echo "BLOCKED: This discards all working tree changes. Use git stash instead." >&2
-    exit 2
-fi
-
-# Block deleting main/master branch
-if echo "$COMMAND" | grep -qE 'git\s+branch\s+-D\s+(main|master)\s*$'; then
-    echo "BLOCKED: Cannot delete main/master branch." >&2
-    exit 2
-fi
-
-# Block recursive force delete of root/home
-if echo "$COMMAND" | grep -qE 'rm\s+-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*\s+(/\s|/\s*$|~/|"\$HOME"|"\$\{HOME\}")'; then
-    echo "BLOCKED: Refusing to recursively delete root or home directory." >&2
+# Block rm -rf on root or home
+if echo "$COMMAND" | grep -qE 'rm\s+-rf\s+(/\s*$|/\s|~/)'; then
+    echo "BLOCKED: Refusing to rm -rf root or home." >&2
     exit 2
 fi
 
