@@ -89,61 +89,9 @@ cmd_init() {
     if [ -f "$SCHEMA_DIR/schema.sql" ]; then
       sqlite3 "$DB" "PRAGMA busy_timeout=5000;" ".read $SCHEMA_DIR/schema.sql"
     else
-      # Inline schema — must match schema.sql exactly
-      sqlite3 "$DB" "
-        PRAGMA journal_mode=WAL;
-        PRAGMA foreign_keys=ON;
-        PRAGMA busy_timeout=5000;
-        CREATE TABLE IF NOT EXISTS learnings (
-          id TEXT PRIMARY KEY,
-          ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-          type TEXT NOT NULL CHECK(type IN ('failure','pattern','gotcha','preference')),
-          insight TEXT NOT NULL,
-          evidence TEXT,
-          domain TEXT,
-          hit_count INTEGER DEFAULT 0,
-          last_hit TEXT
-        );
-        CREATE TABLE IF NOT EXISTS context (
-          id TEXT PRIMARY KEY,
-          ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-          type TEXT NOT NULL CHECK(type IN ('contract','checkpoint','handoff','verdict')),
-          contract_id TEXT,
-          agent TEXT,
-          content TEXT NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS errors (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-          tool TEXT NOT NULL,
-          error TEXT NOT NULL,
-          file TEXT,
-          context TEXT
-        );
-        CREATE TABLE IF NOT EXISTS _migrations (
-          name TEXT PRIMARY KEY,
-          applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-        );
-        INSERT OR IGNORE INTO _migrations (name) VALUES ('001_init');
-        CREATE TABLE IF NOT EXISTS events (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          ts TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-          category TEXT NOT NULL CHECK(category IN ('session','agent','hook','command','error','learning')),
-          event TEXT NOT NULL,
-          duration_ms INTEGER,
-          metadata TEXT,
-          agent TEXT,
-          session_id TEXT
-        );
-        CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);
-        CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts);
-        CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id);
-        CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
-        CREATE INDEX IF NOT EXISTS idx_learnings_domain ON learnings(domain);
-        CREATE INDEX IF NOT EXISTS idx_context_type ON context(type);
-        CREATE INDEX IF NOT EXISTS idx_context_contract ON context(contract_id);
-        CREATE INDEX IF NOT EXISTS idx_context_ts ON context(ts);
-      "
+      echo "Error: schema.sql not found at $SCHEMA_DIR/schema.sql" >&2
+      echo "Cannot initialize database without schema definition." >&2
+      exit 1
     fi
   fi
 
@@ -171,6 +119,104 @@ cmd_init() {
   fi
 }
 
+cmd_preflight() {
+  # Validate local environment and DB schema integrity
+  # Called by session-start hook to catch drift before it causes errors
+  local warnings=0
+  local repairs=0
+
+  # Check 1: DB exists
+  if [ ! -f "$DB" ]; then
+    echo "preflight:init — no database found, initializing"
+    cmd_init >/dev/null
+    repairs=$((repairs + 1))
+  fi
+
+  # Check 2: Required tables exist
+  local required_tables="learnings context errors _migrations events"
+  for table in $required_tables; do
+    local exists
+    exists=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='$table' LIMIT 1;" 2>/dev/null || echo "")
+    if [ -z "$exists" ]; then
+      echo "preflight:missing_table — $table not found, applying schema"
+      # cmd_init skips if DB exists, so apply schema directly for missing tables
+      if [ -f "$SCHEMA_DIR/schema.sql" ]; then
+        sqlite3 "$DB" ".timeout 5000" ".read $SCHEMA_DIR/schema.sql" >/dev/null 2>&1 || true
+      fi
+      # Re-run migrations
+      if [ -d "$SCHEMA_DIR/migrations" ]; then
+        for m in "$SCHEMA_DIR/migrations"/*.sql; do
+          [ -f "$m" ] || continue
+          [[ "$m" == *.down.sql ]] && continue
+          local mname
+          mname=$(basename "$m" .sql)
+          local mapplied
+          mapplied=$(db_exec "SELECT 1 FROM _migrations WHERE name='$mname' LIMIT 1;" 2>/dev/null || echo "")
+          [ -z "$mapplied" ] && sqlite3 "$DB" ".timeout 5000" ".read $m" 2>/dev/null || true
+        done
+      fi
+      repairs=$((repairs + 1))
+      break
+    fi
+  done
+
+  # Check 3: learnings schema has all expected columns
+  local expected_cols="id ts type insight evidence domain hit_count last_hit"
+  for col in $expected_cols; do
+    local has_col
+    has_col=$(db_exec "SELECT 1 FROM pragma_table_info('learnings') WHERE name='$col' LIMIT 1;" 2>/dev/null || echo "")
+    if [ -z "$has_col" ]; then
+      echo "preflight:missing_column — learnings.$col not found, adding"
+      # Determine type for the missing column
+      case "$col" in
+        hit_count) db_exec "ALTER TABLE learnings ADD COLUMN hit_count INTEGER DEFAULT 0;" 2>/dev/null || true ;;
+        last_hit)  db_exec "ALTER TABLE learnings ADD COLUMN last_hit TEXT;" 2>/dev/null || true ;;
+        domain)    db_exec "ALTER TABLE learnings ADD COLUMN domain TEXT;" 2>/dev/null || true ;;
+        *)         echo "preflight:error — unknown column $col, manual fix required"; warnings=$((warnings + 1)); continue ;;
+      esac
+      repairs=$((repairs + 1))
+    fi
+  done
+
+  # Check 4: All migrations applied
+  if [ -d "$SCHEMA_DIR/migrations" ]; then
+    for migration in "$SCHEMA_DIR/migrations"/*.sql; do
+      [ -f "$migration" ] || continue
+      [[ "$migration" == *.down.sql ]] && continue
+      local name
+      name=$(basename "$migration" .sql)
+      local applied
+      applied=$(db_exec "SELECT 1 FROM _migrations WHERE name='$name' LIMIT 1;" 2>/dev/null || echo "")
+      if [ -z "$applied" ]; then
+        echo "preflight:pending_migration — $name not applied"
+        warnings=$((warnings + 1))
+      fi
+    done
+  fi
+
+  # Check 5: DB is writable (not corrupted or locked)
+  local write_test
+  write_test=$(db_exec "PRAGMA integrity_check;" 2>/dev/null | head -1 || echo "fail")
+  if [ "$write_test" != "ok" ]; then
+    echo "preflight:corruption — integrity check failed: $write_test"
+    warnings=$((warnings + 1))
+  fi
+
+  # Check 6: schema.sql exists (needed for future init/migrations)
+  if [ ! -f "$SCHEMA_DIR/schema.sql" ]; then
+    echo "preflight:missing_schema — schema.sql not found at $SCHEMA_DIR"
+    warnings=$((warnings + 1))
+  fi
+
+  # Summary
+  if [ $warnings -eq 0 ] && [ $repairs -eq 0 ]; then
+    echo "preflight:ok"
+  else
+    echo "preflight:done — $repairs repairs, $warnings warnings"
+  fi
+  return 0
+}
+
 cmd_read_start() {
   # Ensure DB exists
   [ ! -f "$DB" ] && cmd_init >/dev/null
@@ -189,6 +235,29 @@ cmd_read_start() {
   echo "## Recent Errors"
   db_exec "SELECT '- [' || tool || '] ' || error || COALESCE(' (' || file || ')', '') FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
   echo ""
+
+  # Error replay detection: warn if recent errors match known failure patterns
+  local replay_warnings
+  replay_warnings=$(db_exec "
+    SELECT DISTINCT '⚠ REPLAY RISK: error \"' || substr(e.error, 1, 60) || '\" matches known failure: ' || l.insight
+    FROM errors e
+    JOIN learnings l ON l.type = 'failure'
+    WHERE e.ts > datetime('now', '-24 hours')
+    AND (
+      -- Match if error text contains key words from the failure insight
+      e.error LIKE '%' || substr(l.insight, 1, 30) || '%'
+      OR l.insight LIKE '%' || REPLACE(REPLACE(e.error, CHAR(10), ' '), CHAR(13), ' ') || '%'
+      -- Match on tool/domain overlap
+      OR (e.tool != 'unknown' AND l.domain IS NOT NULL AND e.tool = l.domain)
+    )
+    LIMIT 3;
+  " 2>/dev/null || echo "")
+  if [ -n "$replay_warnings" ]; then
+    echo "## ⚠ Error Replay Detection"
+    echo "These recent errors match known failure patterns. Review before proceeding:"
+    echo "$replay_warnings" | sed 's/^/- /'
+    echo ""
+  fi
 
   echo "## Active Contract"
   db_exec "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
@@ -235,7 +304,7 @@ cmd_learn() {
   local existing
   existing=$(db_exec "SELECT id FROM learnings WHERE insight LIKE '%${safe_substr}%' AND type='$safe_type' LIMIT 1;" 2>/dev/null || echo "")
   if [ -n "$existing" ]; then
-    db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='$existing';"
+    db_exec "UPDATE learnings SET hit_count = hit_count + 1 WHERE id='$existing';"
     echo "Reinforced: [$type] (existing: $existing)"
     return
   fi
@@ -722,6 +791,7 @@ cmd_metrics() {
 # === DISPATCH ===
 case "${1:-help}" in
   init)           cmd_init ;;
+  preflight)      cmd_preflight ;;
   read-start)     cmd_read_start ;;
   write-end)      shift; cmd_write_end "$@" ;;
   learn)          shift; cmd_learn "$@" ;;
@@ -746,6 +816,7 @@ case "${1:-help}" in
     echo ""
     echo "CORE COMMANDS:"
     echo "  init                    Initialize DB + apply migrations"
+    echo "  preflight               Validate schema + environment health"
     echo "  read-start              Context for starting work"
     echo "  write-end <json>        Checkpoint before stopping"
     echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"
