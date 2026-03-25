@@ -28,7 +28,11 @@ cat > "$AGENTS_DIR/${AGENT_NAME}.json" << EOF
 }
 EOF
 
+# Detect project profile (cached 1hr)
+PROFILE=$(detect_profile "$PROJECT_ROOT")
+
 echo "# KERNEL"
+echo "**Profile:** $PROFILE"
 echo ""
 
 # === TEAMMATE SYNC: Pull latest from remotes ===
@@ -248,6 +252,9 @@ else
   echo ""
 fi
 
+# === PROFILE-GATED REFERENCE ===
+# local: compact reference. github+: full reference with GitHub features.
+
 cat << 'REFERENCE'
 ---
 
@@ -256,25 +263,12 @@ cat << 'REFERENCE'
 ```yaml
 commands:
   /kernel:ingest: guided flow, human confirms each phase
-  /kernel:auto: autonomous loop, tests first, iterate until green (ralph mode)
+  /kernel:auto: autonomous loop, tests first, iterate until green
+  /kernel:dream: multi-perspective debate before implementation
+  /kernel:diagnose: systematic debugging + refactor analysis
   /kernel:validate: pre-commit quality gates
   /kernel:tearitapart: critical review before implementation
   /kernel:handoff: context brief for session continuity
-```
-
-## Agents
-
-```yaml
-agents:
-  researcher:
-    purpose: find proven solutions, anti-patterns
-    spawn: unfamiliar tech, new dependencies
-  surgeon:
-    purpose: implement contract scope
-    spawn: tier 2+
-  adversary:
-    purpose: QA, find edge cases
-    spawn: tier 3
 ```
 
 ## Tiers
@@ -289,3 +283,43 @@ rule: tier 2+ you orchestrate, agents implement, don't write code yourself
 ```
 
 REFERENCE
+
+# Profile-gated sections — only show what's relevant
+if [ "$PROFILE" != "local" ]; then
+cat << 'GITHUB_REF'
+
+## Agents
+
+```yaml
+agents:
+  researcher: find proven solutions, anti-patterns (spawn: unfamiliar tech)
+  surgeon: implement contract scope (spawn: tier 2+)
+  adversary: QA, find edge cases (spawn: tier 3)
+  dreamer: multi-perspective debate (spawn: /kernel:dream tier 2+)
+```
+
+GITHUB_REF
+fi
+
+if [ "$PROFILE" = "github-oss" ] || [ "$PROFILE" = "github-production" ]; then
+cat << 'OSS_REF'
+
+## Git Workflow (OSS/Production)
+
+```yaml
+workflow:
+  branch: feature/{type}/{name} for all changes
+  pr: required before merge to main
+  review: /kernel:review + CI checks
+  merge: squash merge to main
+```
+
+OSS_REF
+fi
+
+if [ "$PROFILE" = "github-production" ]; then
+  echo "## Team Signals"
+  echo "Production profile detected: >2 collaborators or environments configured."
+  echo "Use GitHub Issues for work tracking. Enforce branch protection."
+  echo ""
+fi

@@ -1352,6 +1352,78 @@ test_diagnose_loads_debug() {
   grep -q "debug" "$PLUGIN_ROOT/commands/diagnose.md"
 }
 
+# === Profile Detection Tests ===
+
+test_parse_github_remote_https() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(parse_github_remote "https://github.com/ariaxhan/kernel-claude.git")
+  assert_equals "ariaxhan/kernel-claude" "$result" "HTTPS URL"
+}
+
+test_parse_github_remote_ssh() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(parse_github_remote "git@github.com:ariaxhan/kernel-claude.git")
+  assert_equals "ariaxhan/kernel-claude" "$result" "SSH URL"
+}
+
+test_parse_github_remote_no_git_suffix() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(parse_github_remote "https://github.com/ariaxhan/kernel-claude")
+  assert_equals "ariaxhan/kernel-claude" "$result" "no .git suffix"
+}
+
+test_parse_github_remote_not_github() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(parse_github_remote "https://gitlab.com/foo/bar.git")
+  assert_equals "" "$result" "non-GitHub should return empty"
+}
+
+test_classify_profile_local() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "false" "unknown" "0" "0" "false")
+  assert_equals "local" "$result"
+}
+
+test_classify_profile_github_private() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "private" "1" "0" "false")
+  assert_equals "github" "$result"
+}
+
+test_classify_profile_github_oss() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "public" "1" "0" "false")
+  assert_equals "github-oss" "$result"
+}
+
+test_classify_profile_production_by_collabs() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "private" "5" "0" "false")
+  assert_equals "github-production" "$result"
+}
+
+test_classify_profile_production_by_envs() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "public" "1" "2" "false")
+  assert_equals "github-production" "$result"
+}
+
+test_classify_profile_production_by_projects() {
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local result
+  result=$(classify_profile "true" "public" "1" "0" "true")
+  assert_equals "github-production" "$result"
+}
+
 # === Run Tests ===
 
 run_test_suite() {
@@ -1515,6 +1587,18 @@ run_test_suite() {
       run_test "diagnose has output format" test_diagnose_output_format
       run_test "diagnose loads debug skill" test_diagnose_loads_debug
       ;;
+    profile)
+      run_test "parse_github_remote HTTPS" test_parse_github_remote_https
+      run_test "parse_github_remote SSH" test_parse_github_remote_ssh
+      run_test "parse_github_remote no .git suffix" test_parse_github_remote_no_git_suffix
+      run_test "parse_github_remote non-GitHub" test_parse_github_remote_not_github
+      run_test "classify_profile local" test_classify_profile_local
+      run_test "classify_profile github private" test_classify_profile_github_private
+      run_test "classify_profile github-oss" test_classify_profile_github_oss
+      run_test "classify_profile production by collabs" test_classify_profile_production_by_collabs
+      run_test "classify_profile production by envs" test_classify_profile_production_by_envs
+      run_test "classify_profile production by projects" test_classify_profile_production_by_projects
+      ;;
   esac
 }
 
@@ -1550,6 +1634,7 @@ main() {
     run_test_suite "compaction_restore"
     run_test_suite "circuit_breaker"
     run_test_suite "diagnose"
+    run_test_suite "profile"
   else
     run_test_suite "$target"
   fi

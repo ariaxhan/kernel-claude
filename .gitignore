@@ -16,3 +16,4 @@ _meta/logs/
 # Ephemeral state (circuit breaker, compaction markers)
 _meta/.breakers/
 _meta/.compact-marker
+_meta/.cache/

@@ -2,6 +2,19 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.5.0] - 2026-03-24
+
+### Added
+- **Project profile detection** — Auto-detects project complexity as `local`, `github`, `github-oss`, or `github-production`. Gates context output and feature availability accordingly. (#54)
+  - `local`: No GitHub remote. Minimal context, no GitHub features referenced.
+  - `github`: Private GitHub repo. Standard context.
+  - `github-oss`: Public GitHub repo. Full context with branch protection, PR workflow, and agent details.
+  - `github-production`: >2 collaborators, environments, or projects board. Full context plus team signals.
+- **`detect_profile()`** in common.sh — Pure functions (`parse_github_remote`, `classify_profile`) + cached detection with 1hr TTL, 5s API timeout, graceful offline degradation.
+- **Profile-gated session output** — Session start now shows `**Profile:** {tier}` in header and adjusts reference sections by profile. Local projects get compact output. OSS/production projects get full GitHub workflow guidance.
+
+---
+
 ## [7.4.0] - 2026-03-24
 
 ### Added
@@ -47,7 +60,11 @@ The dreamer enforces the existing "never implement first solution" rule structur
 
 ### Changed
 - **Directive calibration** -- Softened aggressive MUST/NEVER language that caused Claude 4.6 over-triggering. Security-critical directives (secrets, data loss) remain strong. (#34)
-- **CLAUDE.md context note** -- Added developer note that CLAUDE.md is NOT loaded for plugin users; session-start.sh is the only ambient context delivery mechanism.
+- **CLAUDE.md context note** — Added developer note that CLAUDE.md is NOT loaded for plugin users; session-start.sh is the only ambient context delivery mechanism.
+- **aDNA graph attribution** — README now credits [aDNA (Lattice Protocol)](https://github.com/LatticeProtocol/adna) for the graph architecture that inspired AgentDB's nodes/edges/context_sessions system.
+
+---
+
 ## [7.1.2] - 2026-03-24
 
 ### Fixed
