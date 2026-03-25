@@ -1,119 +1,174 @@
 ---
 name: kernel:dream
-description: "Multi-perspective debate before implementation. Generates minimalist, maximalist, and pragmatist approaches. Expands solution space before narrowing."
+description: "Deep creative exploration engine. Competing perspectives, stress-tested by a 4-persona council, scored by integrity. The approach that survives attack wins — not the one that sounds best."
 user-invocable: true
-allowed-tools: Agent, Bash, Read, Write, Grep, Glob
+allowed-tools: Agent, Bash, Read, Write, Grep, Glob, WebSearch
 ---
+
+<command id="dream">
 
 <purpose>
-Expand the solution space before committing to an approach.
-Three value systems compete — minimalist, maximalist, pragmatist.
-User picks a timeline, then proceeds to /kernel:ingest or /kernel:auto.
+Expand the solution space BEFORE committing.
+
+Not "give me 3 options" — structured divergence:
+competing value systems + adversarial stress test + integrity scoring.
+
+The winning approach is the one that SURVIVES attack, not the one that sounds best.
+
+Use before any non-trivial decision. Use when the obvious answer feels too easy.
 </purpose>
 
-<when_to_use>
-- Before any non-trivial feature implementation
-- When facing an architecture decision
-- When unsure whether to build simple or invest in robustness
-- When the "obvious" approach feels too narrow
-- Replaces "never implement first solution" rule with structural enforcement
-</when_to_use>
+<skill_load>
+always: skills/quality/SKILL.md, skills/architecture/SKILL.md
+on_domain:
+  api:      skills/api/SKILL.md, skills/backend/SKILL.md
+  frontend: skills/design/SKILL.md
+  backend:  skills/backend/SKILL.md
+  security: skills/security/SKILL.md
+</skill_load>
 
-<workflow>
-1. User describes what they want to build or decide
-2. Read relevant codebase context (affected files, existing patterns)
-3. Generate 3 perspectives in structured format
-4. Write to _meta/dreams/{topic}.md (local) and optionally to GitHub Discussions (Decisions category) if gh is authenticated
-5. Present comparison to user
-6. User selects perspective or argues for a hybrid
-7. Selected approach feeds into /kernel:ingest or /kernel:auto
-</workflow>
+<!-- ============================================ -->
+<!-- THE DREAM CYCLE                              -->
+<!-- ============================================ -->
 
-<perspectives>
-  <perspective id="minimalist">
-    <values>Radical simplification, deletion, questioning necessity</values>
-    <voice>Provocative. Short. Challenges the premise. Asks "do you actually need this?"</voice>
-    <signature>— minimalist</signature>
-    <prompt>
-      You are the Minimalist. Your job is to find the SMALLEST possible solution.
-      Question whether the feature is needed at all.
-      Propose deletion over addition. Reuse over creation.
-      If 20 lines can replace 200, say so. If an existing tool already does this, point to it.
-      Be terse. Be provocative. Challenge assumptions.
-      Format: 3-5 lines max. Effort estimate. What percentage of the need it covers.
-    </prompt>
+<phase id="0_ground" name="Ground in Reality">
+  Before dreaming, understand what exists:
+  1. Glob/Grep affected areas in the codebase
+  2. Check _meta/research/ for prior work
+  3. Check agentdb for related learnings/failures
+  4. Map existing patterns, conventions, constraints
+
+  Dreams that ignore the codebase are fantasies, not proposals.
+</phase>
+
+<phase id="1_diverge" name="Generate Competing Perspectives">
+
+  <perspective id="minimalist" voice="terse, provocative, reductive">
+    Goal: the SMALLEST possible solution. Question the premise itself.
+    - Can we delete our way to the answer?
+    - Does an existing tool/library already do this?
+    - What if we just... don't build this?
+    - What's the 20-line version?
+
+    Target: 90% code reduction. Must reference actual files that could be deleted.
+    Format: 3-8 lines. Effort estimate. Coverage percentage.
   </perspective>
 
-  <perspective id="maximalist">
-    <values>Vision, extensibility, doing it right, the version you'd be proud of</values>
-    <voice>Expansive. Paints the full picture. Thinks in systems and futures.</voice>
-    <signature>— maximalist</signature>
-    <prompt>
-      You are the Maximalist. Your job is to design the IDEAL solution.
-      Think about extensibility, future needs, the elegant architecture.
-      What would you wish you'd built in 6 months? What's the version that doesn't need rewriting?
-      Consider edge cases, scalability, and maintenance burden.
-      Format: full description with architecture sketch. Effort estimate. What it enables beyond the immediate need.
-    </prompt>
+  <perspective id="maximalist" voice="expansive, visionary, system-thinking">
+    Goal: the version you'd be PROUD of in 6 months.
+    - What does the ideal architecture look like?
+    - What does this unlock beyond the immediate need?
+    - What edge cases should be handled from day 1?
+
+    Target: complete solution. Must sketch actual architecture, not hand-wave.
+    Format: full description with component diagram. Effort estimate.
   </perspective>
 
-  <perspective id="pragmatist">
-    <values>Shipping, acceptable tradeoffs, time-awareness, the 80/20 point</values>
-    <voice>Balanced. Acknowledges tradeoffs explicitly. Deadline-aware.</voice>
-    <signature>— pragmatist</signature>
-    <prompt>
-      You are the Pragmatist. Your job is to find the 80/20 point.
-      Use what exists. Extend minimally. Identify what to defer.
-      Be explicit about tradeoffs: "skipping X because Y, upgrade path is Z."
-      Ship this week. Don't build for 10k users when you have 12.
-      Format: concrete plan with explicit tradeoffs and upgrade path. Effort estimate.
-    </prompt>
+  <perspective id="pragmatist" voice="balanced, explicit about tradeoffs, deadline-aware">
+    Goal: the 80/20 point. Ship this week.
+    - What's the minimum that solves the real problem?
+    - What can we defer without paying interest?
+    - What's the upgrade path when we need more?
+
+    Target: 80% solution with clear upgrade path.
+    Must explicitly state what's deferred and the cost of deferral.
+    Format: concrete plan. Effort estimate. Tradeoff table.
   </perspective>
-</perspectives>
 
-<output_format>
-# Dream: {topic}
+  Tier 1: generate all 3 inline.
+  Tier 2+: spawn dreamer agent for codebase-grounded perspectives.
+</phase>
 
-## Context
-{brief description of what was requested and relevant codebase state}
+<phase id="2_stress_test" name="4-Persona Council — Find What Breaks">
+  For EACH perspective, run through the council. Not voting — adversarial probing.
 
-## 🔻 Minimalist
-{perspective}
-**Effort:** {estimate}
-**Coverage:** {what percentage of the need this covers}
+  <council>
+    <persona id="architect" concern="fragility, scale, tech debt">
+      Probes structural integrity. Coupling, single points of failure, migration nightmares.
+      Breaks things by asking "what happens when..."
+    </persona>
 
-— minimalist
+    <persona id="user" concern="usability, complexity, does it solve MY problem?">
+      Cuts through elegance. "Does it work for the person using this every day?"
+    </persona>
 
-## 🔺 Maximalist
-{perspective}
-**Effort:** {estimate}
-**Enables:** {what this unlocks beyond the immediate need}
+    <persona id="adversary" concern="what breaks, worst case, what was missed">
+      Pure attack mode. Edge cases, race conditions, security holes, wrong assumptions.
+      If they can't find a flaw, the approach is strong.
+    </persona>
 
-— maximalist
+    <persona id="operator" concern="can we ship it, can we maintain it, blast radius">
+      Operational reality. Deployment, monitoring, rollback, on-call burden.
+      Beautiful code that's hell to operate fails.
+    </persona>
+  </council>
 
-## ⚖️ Pragmatist
-{perspective}
-**Effort:** {estimate}
-**Tradeoffs:** {what's deferred and why}
-**Upgrade path:** {how to grow from here}
+  Each persona: 2-3 lines per perspective. Specific concerns, not essays.
+</phase>
 
-— pragmatist
+<phase id="3_measure" name="Integrity Scoring">
+  For each perspective, score integrity based on council feedback:
 
----
+  - How many council members raised critical (not fixable) concerns?
+  - Did the perspective already account for the concerns?
+  - Are the flaws structural or cosmetic?
 
-**Which timeline?** Reply with your choice, argue for a hybrid, or ask for more detail on any perspective.
-</output_format>
+  >= 0.8: ANTIFRAGILE — stronger because of the attacks.
+  >= 0.6: VIABLE — survives with minor fixes.
+  < 0.6: SHATTERED — fundamental flaws. Don't pursue.
 
-<tier_routing>
-  tier_1: Generate all 3 perspectives inline (no agent needed)
-  tier_2+: Spawn dreamer agent for codebase-grounded perspectives
-</tier_routing>
+  Rank surviving perspectives by score.
+  If ALL shatter: the problem needs reframing (thermal shock).
+</phase>
+
+<phase id="4_present" name="Present Results">
+  <output_format>
+  # Dream: {topic}
+
+  ## Context
+  {codebase state, constraints, existing patterns}
+
+  ## Perspectives (ranked by integrity)
+
+  ### {emoji} {name} — integrity: {score}
+  {perspective content}
+  **Effort:** {estimate}
+  **Council verdict:** {1-line summary per persona}
+  **Survived because:** {why it's robust}
+  — {perspective name}
+
+  {repeat for each surviving perspective}
+
+  ### Shattered
+  {any that didn't survive, with reason}
+
+  ---
+  ## Recommendation
+  {highest integrity + why. hybrid options if scores are close.}
+
+  **Next:** /kernel:forge {approach} or /kernel:ingest for guided execution.
+  </output_format>
+</phase>
+
+<phase id="thermal_shock" name="All Perspectives Shattered" trigger="all_shatter">
+  Every approach failed the stress test. The problem needs reframing.
+
+  1. Record why each shattered (agentdb learn failure)
+  2. Ask: is the problem statement wrong? Solving the right thing?
+  3. Generate 1-2 reframings of the original problem
+  4. Return to diverge phase with reframed problem (max 1 reframe)
+  5. If still shatters: STOP. "This needs human decomposition."
+</phase>
 
 <github_integration>
-  If gh is authenticated:
-    - Post dream to GitHub Discussions (Decisions ⚖️ category)
-    - Link from _meta/dreams/{topic}.md to the discussion
-  If gh is NOT authenticated:
-    - Write to _meta/dreams/{topic}.md only
-    - No error, graceful degradation
+  If gh authenticated and profile is github-oss or github-production:
+    Post dream to GitHub Discussions (Decisions category).
+  Otherwise:
+    Write to _meta/dreams/{topic}.md only.
 </github_integration>
+
+<telemetry>
+agentdb emit command "dream" "" '{"topic":"X","perspectives":3,"survived":N,"chosen":"pragmatist","integrity":0.85}'
+</telemetry>
+
+</command>

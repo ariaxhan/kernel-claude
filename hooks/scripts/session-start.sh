@@ -224,11 +224,14 @@ cat << 'REFERENCE'
 ```yaml
 commands:
   /kernel:ingest: guided flow, human confirms each phase
-  /kernel:auto: autonomous loop, tests first, iterate until green
-  /kernel:dream: multi-perspective debate before implementation
-  /kernel:diagnose: systematic debugging + refactor analysis
+  /kernel:forge: autonomous engine — heat/hammer/quench/anneal until antifragile
+  /kernel:dream: creative exploration — 3 perspectives + 4-persona stress test
+  /kernel:diagnose: systematic debugging + refactor analysis before fixing
+  /kernel:retrospective: cross-session learning synthesis + pattern promotion
+  /kernel:metrics: observability dashboard — sessions, agents, hooks, learnings
   /kernel:validate: pre-commit quality gates
   /kernel:tearitapart: critical review before implementation
+  /kernel:review: code review for PRs
   /kernel:handoff: context brief for session continuity
 ```
 

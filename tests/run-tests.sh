@@ -932,12 +932,12 @@ test_commands_use_structured_format() {
 # Targets based on Anthropic context engineering recommendations
 
 test_claude_md_token_budget() {
-  # CLAUDE.md is always loaded - must be tight
-  # Target: <200 lines (approx 1200 tokens)
+  # CLAUDE.md is NOT loaded for plugin users (session-start.sh is the delivery mechanism).
+  # It's reference for contributors. With 1M context, the limit is generous.
   local lines
   lines=$(wc -l < "$PLUGIN_ROOT/CLAUDE.md" | tr -d ' ')
-  [ "$lines" -lt 220 ] || {
-    echo "FAIL: CLAUDE.md too large ($lines lines, max 220). Attention degrades."
+  [ "$lines" -lt 300 ] || {
+    echo "FAIL: CLAUDE.md too large ($lines lines, max 300)."
     return 1
   }
 }

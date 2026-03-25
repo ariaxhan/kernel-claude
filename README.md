@@ -104,12 +104,16 @@ Or just type `/ingest` and describe what you want on the next line.
 
 | Terminal | Desktop/Cursor | What It Does |
 |----------|----------------|--------------|
-| `/kernel:ingest` | `/ingest` | Classify task, determine tier, route to agent |
-| `/kernel:dream` | `/dream` | Multi-perspective debate before implementation |
-| `/kernel:validate` | `/validate` | Build, lint, test, security scan |
-| `/kernel:handoff` | `/handoff` | Save progress for next session |
-| `/kernel:review` | `/review` | Code review for PRs |
+| `/kernel:ingest` | `/ingest` | Guided flow — classify, scope, execute with human confirmation |
+| `/kernel:forge` | `/forge` | Autonomous engine — heat/hammer/quench/anneal until antifragile |
+| `/kernel:dream` | `/dream` | Creative exploration — 3 perspectives, 4-persona stress test |
+| `/kernel:diagnose` | `/diagnose` | Systematic debugging + refactor analysis before fixing |
+| `/kernel:retrospective` | `/retrospective` | Cross-session learning synthesis + pattern promotion |
+| `/kernel:metrics` | `/metrics` | Observability dashboard — sessions, agents, hooks, learnings |
+| `/kernel:validate` | `/validate` | Pre-commit quality gates |
 | `/kernel:tearitapart` | `/tearitapart` | Critical pre-implementation review |
+| `/kernel:review` | `/review` | Code review for PRs |
+| `/kernel:handoff` | `/handoff` | Save progress for next session |
 | `/kernel:init` | `/init` | Setup (run once per project) |
 | `/kernel:help` | `/help` | Show help |
 

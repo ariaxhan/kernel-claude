@@ -9,7 +9,7 @@ allowed-tools: Read, Bash, Grep, Glob, Task, WebSearch, WebFetch
 
 <purpose>
 Guided entry: READ → CLASSIFY → RESEARCH → SCOPE → TESTS → EXECUTE → LEARN
-Human confirms each phase. For autonomous loop: /kernel:auto
+Human confirms each phase. For autonomous loop: /kernel:forge
 </purpose>
 
 <skill_load>

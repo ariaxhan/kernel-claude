@@ -138,9 +138,9 @@ Setup: _meta/reference/lsp-setup.md
     Load: orchestration, build skills. Spawn researcher for unfamiliar tech.
     Mandatory: Check _meta/research/ before new work. Write research after learning.
   </command>
-  <command id="/kernel:auto" purpose="Autonomous execution loop. Tests first, iterate until green. Max 5 iterations then report." file="commands/auto.md">
-    Load: quality, testing, build skills. Research → tests → implement → verify → ship.
-    For autonomous mode without human confirmation at each phase.
+  <command id="/kernel:forge" purpose="Autonomous engine. Heat/hammer/quench/anneal until antifragile. Run overnight." file="commands/auto.md">
+    Entropy-tested development: generate approaches, implement, adversarial attack, iterate.
+    Stops after 3 structural failures or 10 iterations. Full audit trail.
   </command>
   <command id="/kernel:validate" purpose="Pre-commit/pre-PR verification loop. Build → types → lint → tests → security → diff. Blocks on failure." file="commands/validate.md">
     Spawns validator agent. Load: testing, security skills.
@@ -153,6 +153,19 @@ Setup: _meta/reference/lsp-setup.md
   </command>
   <command id="/kernel:review" purpose="Code review for PRs or staged changes. >80% confidence threshold. Verdict: APPROVE/REQUEST CHANGES/COMMENT." file="commands/review.md">
     Spawns reviewer agent. Load: testing, security skills.
+  </command>
+  <command id="/kernel:dream" purpose="Creative exploration. 3 perspectives + 4-persona stress test. Integrity-scored." file="commands/dream.md">
+    Minimalist/maximalist/pragmatist perspectives. Council probes each for flaws.
+  </command>
+  <command id="/kernel:diagnose" purpose="Systematic debugging + refactor analysis. Diagnosis before prescription." file="commands/diagnose.md">
+    Bug mode: reproduce → trace → isolate → hypothesize → diagnose.
+    Refactor mode: map → trace deps → coupling → risks → diagnose.
+  </command>
+  <command id="/kernel:retrospective" purpose="Cross-session learning synthesis. Finds patterns, resolves contradictions, promotes insights." file="commands/retrospective.md">
+    Groups learnings, merges duplicates, archives stale, promotes high-confidence patterns.
+  </command>
+  <command id="/kernel:metrics" purpose="Observability dashboard. Sessions, agents, hooks, learnings." file="commands/metrics.md">
+    Wraps agentdb metrics + health with actionable insights.
   </command>
   <rule>Commands must load relevant skills and reference research before executing.</rule>
 
