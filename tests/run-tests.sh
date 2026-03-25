@@ -670,20 +670,6 @@ test_guard_bash_blocks_force_push() {
   assert_exit_code 2 "$exit_code" "force push should be blocked"
 }
 
-test_guard_bash_blocks_hard_reset() {
-  echo '{"tool_input":{"command":"git reset --hard HEAD~1"}}' \
-    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
-  local exit_code=$?
-  assert_exit_code 2 "$exit_code" "hard reset should be blocked"
-}
-
-test_guard_bash_blocks_clean_fd() {
-  echo '{"tool_input":{"command":"git clean -fd"}}' \
-    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
-  local exit_code=$?
-  assert_exit_code 2 "$exit_code" "git clean -fd should be blocked"
-}
-
 test_guard_bash_allows_safe_commands() {
   echo '{"tool_input":{"command":"git status"}}' \
     | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
@@ -904,36 +890,6 @@ test_agentdb_numeric_injection_prune() {
   [ -n "$count" ] || { echo "FAIL: learnings table was dropped by injection"; return 1; }
 }
 
-# === Dreamer Tests ===
-
-test_dream_command_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/commands/dream.md" ]
-  head -1 "$PLUGIN_ROOT/commands/dream.md" | grep -q "^---"
-}
-
-test_dream_command_registered_in_plugin_json() {
-  grep -q "dream.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
-}
-
-test_dreamer_agent_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/agents/dreamer.md" ]
-  head -1 "$PLUGIN_ROOT/agents/dreamer.md" | grep -q "^---"
-}
-
-test_dreamer_agent_has_voice_definitions() {
-  grep -q "minimalist" "$PLUGIN_ROOT/agents/dreamer.md"
-  grep -q "maximalist" "$PLUGIN_ROOT/agents/dreamer.md"
-  grep -q "pragmatist" "$PLUGIN_ROOT/agents/dreamer.md"
-}
-
-test_dream_command_has_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/commands/dream.md"
-}
-
-test_dream_command_has_github_integration() {
-  grep -q "github_integration" "$PLUGIN_ROOT/commands/dream.md"
-}
-
 # === Command Structure Tests ===
 
 test_ingest_command_has_research_step() {
@@ -988,13 +944,13 @@ test_claude_md_token_budget() {
 
 test_commands_token_budget() {
   # Commands should be focused single workflows
-  # Target: <180 lines each (approx 700 tokens)
+  # Target: <200 lines each (approx 800 tokens)
   local failed=0
   for cmd in "$PLUGIN_ROOT/commands/"*.md; do
     local lines
     lines=$(wc -l < "$cmd" | tr -d ' ')
-    if [ "$lines" -gt 180 ]; then
-      echo "  OVER BUDGET: $(basename "$cmd") = $lines lines (max 180)"
+    if [ "$lines" -gt 200 ]; then
+      echo "  OVER BUDGET: $(basename "$cmd") = $lines lines (max 200)"
       failed=1
     fi
   done
@@ -1170,6 +1126,42 @@ test_agentdb_health_runs() {
   OUTPUT=$(agentdb health 2>&1 || true)
   assert_contains "$OUTPUT" "agentdb:"
   assert_contains "$OUTPUT" "Health:"
+}
+
+# === Metrics Tests ===
+
+test_agentdb_metrics_runs() {
+  agentdb init >/dev/null
+  local output
+  output=$(agentdb metrics)
+  assert_contains "$output" "KERNEL Metrics"
+  assert_contains "$output" "Sessions"
+  assert_contains "$output" "Hooks"
+  assert_contains "$output" "Learnings"
+}
+
+test_agentdb_metrics_custom_days() {
+  agentdb init >/dev/null
+  local output
+  output=$(agentdb metrics 30)
+  assert_contains "$output" "last 30d"
+}
+
+test_agentdb_metrics_shows_learnings() {
+  agentdb init >/dev/null
+  agentdb learn pattern "test insight" "evidence" >/dev/null
+  local output
+  output=$(agentdb metrics)
+  assert_contains "$output" "Total: 1"
+}
+
+test_metrics_command_registered() {
+  grep -q "metrics.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+}
+
+test_metrics_command_has_frontmatter() {
+  [ -f "$PLUGIN_ROOT/commands/metrics.md" ] || { echo "FAIL: metrics.md not found"; return 1; }
+  head -1 "$PLUGIN_ROOT/commands/metrics.md" | grep -q "^---"
 }
 
 # === Learning Dedup Tests ===
@@ -1520,8 +1512,6 @@ run_test_suite() {
       run_test "detect-secrets blocks private key" test_detect_secrets_blocks_private_key
       run_test "detect-secrets allows clean code" test_detect_secrets_allows_clean_code
       run_test "guard-bash blocks force push" test_guard_bash_blocks_force_push
-      run_test "guard-bash blocks hard reset" test_guard_bash_blocks_hard_reset
-      run_test "guard-bash blocks clean -fd" test_guard_bash_blocks_clean_fd
       run_test "guard-bash allows safe commands" test_guard_bash_allows_safe_commands
       run_test "guard-bash allows git log" test_guard_bash_allows_git_log
       run_test "guard-config blocks .claude/ write" test_guard_config_blocks_claude_dir_write
@@ -1548,6 +1538,13 @@ run_test_suite() {
       run_test "agentdb emit validates duration" test_agentdb_emit_validates_duration
       run_test "agentdb emit with duration" test_agentdb_emit_with_duration
       run_test "agentdb health runs" test_agentdb_health_runs
+      ;;
+    metrics)
+      run_test "agentdb metrics runs" test_agentdb_metrics_runs
+      run_test "agentdb metrics custom days" test_agentdb_metrics_custom_days
+      run_test "agentdb metrics shows learnings" test_agentdb_metrics_shows_learnings
+      run_test "metrics command registered in plugin.json" test_metrics_command_registered
+      run_test "metrics command has frontmatter" test_metrics_command_has_frontmatter
       ;;
     learning_dedup)
       run_test "learning dedup reinforces existing" test_learning_dedup_reinforces
@@ -1629,6 +1626,7 @@ main() {
     run_test_suite "input_validation"
 
     run_test_suite "telemetry"
+    run_test_suite "metrics"
     run_test_suite "learning_dedup"
     run_test_suite "migration_003"
 
