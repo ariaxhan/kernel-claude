@@ -1240,7 +1240,8 @@ test_dream_command_has_github_integration() {
 
 test_compact_restore_fast_exit() {
   cd "$TEST_PROJECT"
-  mkdir -p _meta
+  mkdir -p "$TEST_DIR/_meta/agents"
+  echo "test-agent" > "$TEST_DIR/_meta/agents/.current"  # VAULTS-level, not project-level
   # No marker = fast exit, no output
   OUTPUT=$(KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" 2>&1)
   assert_equals "" "$OUTPUT" "should produce no output without marker"
@@ -1248,7 +1249,8 @@ test_compact_restore_fast_exit() {
 
 test_compact_restore_outputs_marker() {
   cd "$TEST_PROJECT"
-  mkdir -p _meta
+  mkdir -p "$TEST_DIR/_meta/agents"
+  echo "test-agent" > "$TEST_DIR/_meta/agents/.current"
   echo "**Branch:** main" > _meta/.compact-marker
   OUTPUT=$(KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" 2>&1)
   assert_contains "$OUTPUT" "Context Restored After Compaction"
@@ -1257,7 +1259,8 @@ test_compact_restore_outputs_marker() {
 
 test_compact_restore_deletes_marker() {
   cd "$TEST_PROJECT"
-  mkdir -p _meta
+  mkdir -p "$TEST_DIR/_meta/agents"
+  echo "test-agent" > "$TEST_DIR/_meta/agents/.current"
   echo "test marker" > _meta/.compact-marker
   KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" >/dev/null 2>&1
   [ ! -f _meta/.compact-marker ]
