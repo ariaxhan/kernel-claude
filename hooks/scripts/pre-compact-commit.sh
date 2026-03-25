@@ -4,6 +4,7 @@ set -eo pipefail
 
 # Load shared functions
 source "$(dirname "$0")/common.sh"
+_kernel_hook_start
 
 # Detect paths
 VAULTS=$(detect_vaults)
@@ -180,5 +181,7 @@ resume: /kernel:ingest (continue from checkpoint)
 \`\`\`
 ---
 YAML
+
+_kernel_hook_end "pre-compact-commit" 0
 
 exit 0

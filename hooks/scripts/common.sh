@@ -71,6 +71,32 @@ get_project_root() {
   echo "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 }
 
+# === Hook Telemetry ===
+# Lightweight timing for hook execution. Fire-and-forget.
+# Usage: _kernel_hook_start at top, _kernel_hook_end at bottom.
+
+_KERNEL_HOOK_START_MS=""
+
+_kernel_hook_start() {
+  # macOS date doesn't support %N, use python for ms precision
+  _KERNEL_HOOK_START_MS=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo "")
+}
+
+_kernel_hook_end() {
+  local hook_name="${1:-unknown}"
+  local exit_code="${2:-0}"
+  [ -z "$_KERNEL_HOOK_START_MS" ] && return
+  local end_ms
+  end_ms=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || return)
+  local duration_ms=$(( end_ms - _KERNEL_HOOK_START_MS ))
+  local vaults
+  vaults=$(detect_vaults)
+  local agentdb
+  agentdb=$(get_agentdb "$vaults")
+  # Fire-and-forget: never block hook on telemetry
+  "$agentdb" emit hook "$hook_name" "$duration_ms" "{\"exit_code\":$exit_code}" "" "" 2>/dev/null &
+}
+
 # === Project Profile Detection ===
 # Gates feature complexity: local projects get minimal overhead,
 # OSS/production projects get full GitHub integration.
