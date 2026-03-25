@@ -152,14 +152,15 @@ detect_profile() {
       visibility="${visibility:-unknown}"
 
       collab_count=$(GH_HTTP_TIMEOUT=5 gh api "repos/${owner_repo}/collaborators" --jq 'length' --cache 3600s 2>/dev/null) || true
-      collab_count="${collab_count:-0}"
+      [[ "${collab_count:-}" =~ ^[0-9]+$ ]] || collab_count=0
 
       env_count=$(GH_HTTP_TIMEOUT=5 gh api "repos/${owner_repo}/environments" --jq '.total_count // 0' --cache 3600s 2>/dev/null) || true
-      env_count="${env_count:-0}"
+      [[ "${env_count:-}" =~ ^[0-9]+$ ]] || env_count=0
 
       local project_count
       project_count=$(GH_HTTP_TIMEOUT=5 gh api graphql -f query='query($owner:String!,$repo:String!){repository(owner:$owner,name:$repo){projectsV2(first:1){totalCount}}}' -f owner="${owner_repo%%/*}" -f repo="${owner_repo##*/}" --jq '.data.repository.projectsV2.totalCount // 0' 2>/dev/null) || true
-      [[ "${project_count:-0}" -gt 0 ]] && has_projects="true"
+      # Validate numeric — graphql errors return JSON strings that break arithmetic
+      [[ "${project_count:-0}" =~ ^[0-9]+$ ]] && [[ "$project_count" -gt 0 ]] && has_projects="true"
     fi
   fi
 
