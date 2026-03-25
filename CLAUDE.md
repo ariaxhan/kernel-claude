@@ -138,7 +138,7 @@ Setup: _meta/reference/lsp-setup.md
     Load: orchestration, build skills. Spawn researcher for unfamiliar tech.
     Mandatory: Check _meta/research/ before new work. Write research after learning.
   </command>
-  <command id="/kernel:forge" purpose="Autonomous engine. Heat/hammer/quench/anneal until antifragile. Run overnight." file="commands/auto.md">
+  <command id="/kernel:forge" purpose="Autonomous engine. Heat/hammer/quench/anneal until antifragile. Run overnight." file="commands/forge.md">
     Entropy-tested development: generate approaches, implement, adversarial attack, iterate.
     Stops after 3 structural failures or 10 iterations. Full audit trail.
   </command>

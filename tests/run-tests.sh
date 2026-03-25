@@ -900,8 +900,8 @@ test_ingest_command_has_research_step() {
   assert_contains "$content" "anti_patterns"
 }
 
-test_auto_command_has_loop() {
-  local cmd_file="$PLUGIN_ROOT/commands/auto.md"
+test_forge_command_has_loop() {
+  local cmd_file="$PLUGIN_ROOT/commands/forge.md"
   local content
   content=$(cat "$cmd_file")
   assert_contains "$content" "loop"
@@ -1347,6 +1347,29 @@ test_diagnose_loads_debug() {
   grep -q "debug" "$PLUGIN_ROOT/commands/diagnose.md"
 }
 
+# === Retrospective Tests ===
+
+test_retrospective_command_exists() {
+  [ -f "$PLUGIN_ROOT/commands/retrospective.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/commands/retrospective.md" | grep -q "^---"
+}
+
+test_retrospective_registered() {
+  grep -q "retrospective.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+}
+
+test_retrospective_has_agentdb() {
+  grep -q "agentdb" "$PLUGIN_ROOT/commands/retrospective.md"
+}
+
+test_retrospective_has_output_format() {
+  grep -q "output_format" "$PLUGIN_ROOT/commands/retrospective.md"
+}
+
+test_retrospective_has_clusters() {
+  grep -q "Clusters\|cluster" "$PLUGIN_ROOT/commands/retrospective.md"
+}
+
 # === Profile Detection Tests ===
 
 test_parse_github_remote_https() {
@@ -1483,7 +1506,7 @@ run_test_suite() {
       run_test "agents have frontmatter" test_agents_have_frontmatter
       run_test "hooks.json valid" test_hooks_json_valid
       run_test "ingest has research step" test_ingest_command_has_research_step
-      run_test "auto has loop control" test_auto_command_has_loop
+      run_test "forge has loop control" test_forge_command_has_loop
       run_test "commands use structured format" test_commands_use_structured_format
       ;;
     tokens)
@@ -1587,6 +1610,13 @@ run_test_suite() {
       run_test "diagnose has output format" test_diagnose_output_format
       run_test "diagnose loads debug skill" test_diagnose_loads_debug
       ;;
+    retrospective)
+      run_test "retrospective command exists with frontmatter" test_retrospective_command_exists
+      run_test "retrospective registered in plugin.json" test_retrospective_registered
+      run_test "retrospective has agentdb integration" test_retrospective_has_agentdb
+      run_test "retrospective has output format" test_retrospective_has_output_format
+      run_test "retrospective has cluster analysis" test_retrospective_has_clusters
+      ;;
     profile)
       run_test "parse_github_remote HTTPS" test_parse_github_remote_https
       run_test "parse_github_remote SSH" test_parse_github_remote_ssh
@@ -1635,6 +1665,7 @@ main() {
     run_test_suite "compaction_restore"
     run_test_suite "circuit_breaker"
     run_test_suite "diagnose"
+    run_test_suite "retrospective"
     run_test_suite "profile"
   else
     run_test_suite "$target"

@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "7.6.0",
+  "version": "7.6.1",
   "description": "Persistent memory, multi-agent orchestration, and project-aware context for Claude Code. AgentDB tracks failures, patterns, and telemetry across sessions. Profile detection auto-adapts to local, private, OSS, and production projects. 17 skills (TDD, security, debugging, API design, backend patterns). Tiered routing: surgeon, adversary, reviewer, dreamer agents. Circuit breakers, compaction recovery, secret detection.",
   "author": {
     "name": "Aria Han",
@@ -22,7 +22,7 @@
   ],
   "commands": [
     "./commands/ingest.md",
-    "./commands/auto.md",
+    "./commands/forge.md",
     "./commands/validate.md",
     "./commands/tearitapart.md",
     "./commands/review.md",
@@ -31,6 +31,7 @@
     "./commands/help.md",
     "./commands/dream.md",
     "./commands/diagnose.md",
-    "./commands/metrics.md"
+    "./commands/metrics.md",
+    "./commands/retrospective.md"
   ]
 }
