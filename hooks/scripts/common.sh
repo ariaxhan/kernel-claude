@@ -15,18 +15,22 @@ update_current_symlink() {
   [[ "$CACHE_DIR" == *"plugins/cache"* ]] || return 0
 
   # Find highest semver directory
+  # CACHE_DIR is 2 levels up from hooks/scripts/ — lands at the VERSION dir (e.g. 7.5.2/)
+  # We need the PARENT (e.g. kernel/) to find other versions
+  CACHE_DIR="$(dirname "$CACHE_DIR")"
+
   local LATEST
   LATEST=$(ls -d "$CACHE_DIR"/[0-9]*/ 2>/dev/null \
     | xargs -n1 basename 2>/dev/null \
     | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
     | sort -t. -k1,1n -k2,2n -k3,3n \
-    | tail -1)
+    | tail -1 || true)
 
   [ -z "$LATEST" ] && return 0
 
   # Check if current symlink needs updating
   local CURRENT_TARGET
-  CURRENT_TARGET=$(readlink "$CACHE_DIR/current" 2>/dev/null | xargs basename 2>/dev/null)
+  CURRENT_TARGET=$(readlink "$CACHE_DIR/current" 2>/dev/null | xargs basename 2>/dev/null || true)
 
   if [ "$CURRENT_TARGET" != "$LATEST" ]; then
     ln -sfn "$CACHE_DIR/$LATEST" "$CACHE_DIR/current" 2>/dev/null && \
