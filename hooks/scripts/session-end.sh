@@ -4,6 +4,7 @@ set -eo pipefail
 
 # Load shared functions
 source "$(dirname "$0")/common.sh"
+_kernel_hook_start
 
 # Detect paths
 VAULTS=$(detect_vaults)
@@ -26,6 +27,22 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
     FILES_CHANGED=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
     "$AGENTDB" write-end "{\"agent\":\"$AGENT\",\"event\":\"session-end\",\"branch\":\"$BRANCH\",\"uncommitted_files\":$FILES_CHANGED}" 2>/dev/null || true
 fi
+
+# Emit session end event with duration
+SESSION_DURATION_S=""
+AGENT_JSON="$AGENTS_DIR/${AGENT}.json"
+if [ -f "$AGENT_JSON" ]; then
+  STARTED=$(jq -r '.started // empty' "$AGENT_JSON" 2>/dev/null)
+  if [ -n "$STARTED" ]; then
+    START_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$STARTED" +%s 2>/dev/null || python3 -c "from datetime import datetime; print(int(datetime.fromisoformat('$STARTED'.replace('Z','+00:00')).timestamp()))" 2>/dev/null || echo "")
+    if [ -n "$START_EPOCH" ]; then
+      NOW_EPOCH=$(date +%s)
+      SESSION_DURATION_S=$(( NOW_EPOCH - START_EPOCH ))
+    fi
+  fi
+fi
+"$AGENTDB" emit session "session:end" "${SESSION_DURATION_S:+$(( SESSION_DURATION_S * 1000 ))}" "{\"branch\":\"$BRANCH\",\"files_changed\":$FILES_CHANGED,\"agent\":\"$AGENT\"}" "" "" 2>/dev/null &
+_kernel_hook_end "session-end" 0
 
 # === STEP 1: DEREGISTER THIS AGENT ===
 rm -f "$AGENTS_DIR/${AGENT}.json" "$AGENTS_DIR/${AGENT}-snapshot.md" "$AGENTS_DIR/.current" 2>/dev/null

@@ -48,11 +48,47 @@ _cb_record_failure() {
     echo "CIRCUIT BREAKER: $HOOK_NAME disabled for 10min after $count consecutive failures" >&2
     rm -f "$FAIL_COUNT_FILE" 2>/dev/null
   fi
+  # Emit hook failure timing (fire-and-forget)
+  if [ -n "${_CB_START_MS:-}" ]; then
+    local _cb_end_ms
+    _cb_end_ms=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || true)
+    if [ -n "$_cb_end_ms" ]; then
+      local _cb_duration=$(( _cb_end_ms - _CB_START_MS ))
+      local _cb_vaults_dir="$_CB_PROJECT_ROOT"
+      while [ "$_cb_vaults_dir" != "/" ]; do
+        [ -f "$_cb_vaults_dir/_meta/agentdb/agent.db" ] && break
+        _cb_vaults_dir=$(dirname "$_cb_vaults_dir")
+      done
+      local _cb_agentdb="$_cb_vaults_dir/.claude/kernel/orchestration/agentdb/agentdb"
+      [ ! -f "$_cb_agentdb" ] && _cb_agentdb="${_CB_PROJECT_ROOT}/orchestration/agentdb/agentdb"
+      "$_cb_agentdb" emit hook "$HOOK_NAME" "$_cb_duration" "{\"exit_code\":1,\"failures\":$count}" "" "" 2>/dev/null &
+    fi
+  fi
 }
 
 # Reset failure count on success
 _cb_record_success() {
   rm -f "$FAIL_COUNT_FILE" 2>/dev/null || true
+  # Emit hook timing (fire-and-forget)
+  if [ -n "${_CB_START_MS:-}" ]; then
+    local _cb_end_ms
+    _cb_end_ms=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || true)
+    if [ -n "$_cb_end_ms" ]; then
+      local _cb_duration=$(( _cb_end_ms - _CB_START_MS ))
+      # Find agentdb
+      local _cb_vaults_dir="$_CB_PROJECT_ROOT"
+      while [ "$_cb_vaults_dir" != "/" ]; do
+        [ -f "$_cb_vaults_dir/_meta/agentdb/agent.db" ] && break
+        _cb_vaults_dir=$(dirname "$_cb_vaults_dir")
+      done
+      local _cb_agentdb="$_cb_vaults_dir/.claude/kernel/orchestration/agentdb/agentdb"
+      [ ! -f "$_cb_agentdb" ] && _cb_agentdb="${_CB_PROJECT_ROOT}/orchestration/agentdb/agentdb"
+      "$_cb_agentdb" emit hook "$HOOK_NAME" "$_cb_duration" "{\"exit_code\":0}" "" "" 2>/dev/null &
+    fi
+  fi
 }
+
+# Timing capture (lightweight, no dependencies)
+_CB_START_MS=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo "")
 
 trap '_cb_record_failure' ERR

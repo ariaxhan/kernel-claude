@@ -3,6 +3,7 @@
 
 # Load shared functions
 source "$(dirname "$0")/common.sh"
+_kernel_hook_start
 
 # Detect paths
 VAULTS=$(detect_vaults)
@@ -18,3 +19,5 @@ FILE=$(echo "$INPUT" | jq -r '.file_path // .path // ""' 2>/dev/null)
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   "$AGENTDB" error "$TOOL" "$ERROR" "$FILE" 2>/dev/null
 fi
+
+_kernel_hook_end "capture-error" 0

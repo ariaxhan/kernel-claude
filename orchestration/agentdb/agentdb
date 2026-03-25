@@ -623,6 +623,100 @@ cmd_health() {
   fi
 }
 
+cmd_metrics() {
+  [ ! -f "$DB" ] && { echo "No DB at $DB"; exit 1; }
+
+  local days="${1:-7}"
+  validate_int "$days" "days"
+
+  echo "# KERNEL Metrics (last ${days}d)"
+  echo ""
+
+  # === Sessions ===
+  local session_count avg_duration_s
+  session_count=$(db_exec "SELECT COUNT(*) FROM events WHERE category='session' AND event='session:start' AND ts > datetime('now', '-${days} days');" 2>/dev/null || echo "0")
+  avg_duration_s=$(db_exec "SELECT COALESCE(ROUND(AVG(duration_ms) / 1000.0, 0), 0) FROM events WHERE category='session' AND event='session:end' AND duration_ms IS NOT NULL AND ts > datetime('now', '-${days} days');" 2>/dev/null || echo "0")
+
+  echo "## Sessions"
+  echo "  Count: $session_count | Avg duration: ${avg_duration_s}s"
+
+  # Tier breakdown from context_sessions if available
+  local has_sessions
+  has_sessions=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='context_sessions' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -n "$has_sessions" ]; then
+    echo "  By tier:"
+    db_exec "SELECT '    Tier ' || tier || ': ' || COUNT(*) || ' (' || ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM context_sessions WHERE started_at > datetime('now', '-${days} days')), 0) || '%)' FROM context_sessions WHERE started_at > datetime('now', '-${days} days') GROUP BY tier ORDER BY tier;" 2>/dev/null || echo "    No data"
+  fi
+  echo ""
+
+  # === Agents ===
+  echo "## Agents"
+  local agent_events
+  agent_events=$(db_exec "SELECT COUNT(*) FROM events WHERE category='agent' AND ts > datetime('now', '-${days} days');" 2>/dev/null || echo "0")
+  if [ "$agent_events" -gt 0 ] 2>/dev/null; then
+    db_exec "SELECT '  ' || COALESCE(agent, json_extract(metadata, '$.agent_type'), 'unknown') || ': ' || COUNT(*) || ' spawned' FROM events WHERE category='agent' AND ts > datetime('now', '-${days} days') GROUP BY COALESCE(agent, json_extract(metadata, '$.agent_type'), 'unknown');" 2>/dev/null || echo "  No data"
+  else
+    echo "  No agent events recorded"
+  fi
+  echo ""
+
+  # === Hooks ===
+  echo "## Hooks"
+  local hook_events
+  hook_events=$(db_exec "SELECT COUNT(*) FROM events WHERE category='hook' AND ts > datetime('now', '-${days} days');" 2>/dev/null || echo "0")
+  if [ "$hook_events" -gt 0 ] 2>/dev/null; then
+    db_exec "SELECT '  ' || event || ': ' || COUNT(*) || ' runs, avg ' || ROUND(AVG(duration_ms), 0) || 'ms' || CASE WHEN SUM(CASE WHEN json_extract(metadata, '$.exit_code') != 0 THEN 1 ELSE 0 END) > 0 THEN ', ' || SUM(CASE WHEN json_extract(metadata, '$.exit_code') != 0 THEN 1 ELSE 0 END) || ' failures' ELSE '' END FROM events WHERE category='hook' AND ts > datetime('now', '-${days} days') GROUP BY event ORDER BY COUNT(*) DESC;" 2>/dev/null || echo "  No data"
+  else
+    echo "  No hook events recorded"
+  fi
+  echo ""
+
+  # === Commands ===
+  echo "## Commands"
+  local cmd_events
+  cmd_events=$(db_exec "SELECT COUNT(*) FROM events WHERE category='command' AND ts > datetime('now', '-${days} days');" 2>/dev/null || echo "0")
+  if [ "$cmd_events" -gt 0 ] 2>/dev/null; then
+    db_exec "SELECT '  ' || event || ': ' || COUNT(*) FROM events WHERE category='command' AND ts > datetime('now', '-${days} days') GROUP BY event ORDER BY COUNT(*) DESC;" 2>/dev/null || echo "  No data"
+  else
+    echo "  No command events recorded"
+  fi
+  echo ""
+
+  # === Learnings ===
+  echo "## Learnings"
+  local total_learnings active_learnings
+  total_learnings=$(db_exec "SELECT COUNT(*) FROM learnings;" 2>/dev/null || echo "0")
+  active_learnings=$(db_exec "SELECT COUNT(*) FROM learnings WHERE hit_count > 0;" 2>/dev/null || echo "0")
+  echo "  Total: $total_learnings | Reinforced: $active_learnings"
+
+  local top_learning
+  top_learning=$(db_exec "SELECT '  Top: \"' || SUBSTR(insight, 1, 60) || '\" (' || hit_count || ' hits)' FROM learnings WHERE hit_count > 0 ORDER BY hit_count DESC LIMIT 1;" 2>/dev/null || echo "")
+  [ -n "$top_learning" ] && echo "$top_learning"
+  echo ""
+
+  # === Adversary Verdicts ===
+  echo "## Adversary Verdicts"
+  local verdict_count pass_count fail_count
+  verdict_count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='verdict';" 2>/dev/null || echo "0")
+  pass_count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='verdict' AND json_extract(content, '$.result')='pass';" 2>/dev/null || echo "0")
+  fail_count=$(db_exec "SELECT COUNT(*) FROM context WHERE type='verdict' AND json_extract(content, '$.result')='fail';" 2>/dev/null || echo "0")
+  echo "  Total: $verdict_count | Pass: $pass_count | Fail: $fail_count"
+  if [ "$verdict_count" -lt 5 ] 2>/dev/null; then
+    echo "  ⚠ Sample size too small to calibrate"
+  fi
+  echo ""
+
+  # === Errors ===
+  echo "## Errors (last ${days}d)"
+  local error_count
+  error_count=$(db_exec "SELECT COUNT(*) FROM errors WHERE ts > datetime('now', '-${days} days');" 2>/dev/null || echo "0")
+  if [ "$error_count" -gt 0 ] 2>/dev/null; then
+    db_exec "SELECT '  ' || tool || ': ' || COUNT(*) FROM errors WHERE ts > datetime('now', '-${days} days') GROUP BY tool ORDER BY COUNT(*) DESC LIMIT 5;" 2>/dev/null || echo "  No data"
+  else
+    echo "  None"
+  fi
+}
+
 # === DISPATCH ===
 case "${1:-help}" in
   init)           cmd_init ;;
@@ -642,6 +736,7 @@ case "${1:-help}" in
   suggest-context) shift; cmd_suggest_context "$@" ;;
   emit)        shift; cmd_emit "$@" ;;
   health)      cmd_health ;;
+  metrics)     shift; cmd_metrics "$@" ;;
   export)      cmd_export ;;
   recent)      shift; cmd_recent "$@" ;;
   *)
@@ -664,6 +759,7 @@ case "${1:-help}" in
     echo "TELEMETRY (after migration 003):"
     echo "  emit <cat> <event> [ms] [json]  Record telemetry event"
     echo "  health                  System health check"
+    echo "  metrics [days]              Observability dashboard (default: 7 days)"
     echo ""
     echo "UTILITIES:"
     echo "  status                  DB health, counts"

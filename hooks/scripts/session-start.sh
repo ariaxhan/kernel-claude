@@ -4,6 +4,7 @@ set -eo pipefail
 
 # Load shared functions
 source "$(dirname "$0")/common.sh"
+_kernel_hook_start
 
 # Self-heal: update current symlink if newer version available
 update_current_symlink
@@ -283,3 +284,7 @@ if [ "$PROFILE" = "github-production" ]; then
   echo "Use GitHub Issues for work tracking. Enforce branch protection."
   echo ""
 fi
+
+# Emit session start event
+"$AGENTDB" emit session "session:start" "" "{\"branch\":\"$(git branch --show-current 2>/dev/null || echo none)\",\"profile\":\"$PROFILE\",\"project\":\"$PROJECT_ROOT\"}" "" "" 2>/dev/null &
+_kernel_hook_end "session-start" 0

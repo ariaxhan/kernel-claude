@@ -11,6 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Load shared functions
 source "$SCRIPT_DIR/common.sh"
+_kernel_hook_start
 
 # Detect paths
 VAULTS=$(detect_vaults)
@@ -26,6 +27,7 @@ if [ ! -f "$AGENTS_DIR/.current" ] 2>/dev/null; then
   if [ -x "$SCRIPT_DIR/session-start.sh" ]; then
     bash "$SCRIPT_DIR/session-start.sh" < /dev/null 2>/dev/null
   fi
+  _kernel_hook_end "post-compact-restore" 0
   exit 0
 fi
 
@@ -33,7 +35,7 @@ fi
 MARKER="$PROJECT_ROOT/_meta/.compact-marker"
 
 # Fast exit if no compaction happened
-[ ! -f "$MARKER" ] && exit 0
+[ ! -f "$MARKER" ] && _kernel_hook_end "post-compact-restore" 0 && exit 0
 
 # Restore context
 echo "## Context Restored After Compaction"
@@ -44,4 +46,5 @@ echo ""
 # Clean up marker (one-shot restoration)
 rm -f "$MARKER"
 
+_kernel_hook_end "post-compact-restore" 0
 exit 0
