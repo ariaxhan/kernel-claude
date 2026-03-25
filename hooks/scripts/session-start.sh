@@ -155,8 +155,19 @@ KERNEL_CONTEXT
 # =============================================================================
 # AGENTDB CONTEXT (if initialized)
 # =============================================================================
-# Auto-migrate: ensure schema is current (handles plugin updates seamlessly)
-"$AGENTDB" init 2>/dev/null || true
+# Preflight: validate schema integrity, apply pending migrations, auto-repair drift
+PREFLIGHT_OUTPUT=$("$AGENTDB" preflight 2>/dev/null || true)
+if echo "$PREFLIGHT_OUTPUT" | grep -q "preflight:ok"; then
+  : # all good, no output needed
+elif [ -n "$PREFLIGHT_OUTPUT" ]; then
+  # Filter to only warnings/repairs (skip the "ok" line)
+  PREFLIGHT_ISSUES=$(echo "$PREFLIGHT_OUTPUT" | grep -v "preflight:ok" | grep -v "preflight:done")
+  if [ -n "$PREFLIGHT_ISSUES" ]; then
+    echo "## AgentDB Preflight"
+    echo "$PREFLIGHT_ISSUES" | sed 's/^preflight:/- ⚠ /'
+    echo ""
+  fi
+fi
 
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   echo ""
