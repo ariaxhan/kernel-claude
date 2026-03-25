@@ -305,7 +305,7 @@ test_session_start_outputs_kernel() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
   assert_contains "$output" "# KERNEL"
-  assert_contains "$output" "AgentDB"
+  assert_contains "$output" "agentdb"
 }
 
 test_session_start_creates_agent_file() {
