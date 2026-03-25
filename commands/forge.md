@@ -61,6 +61,7 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
 
     ```bash
     agentdb emit command "forge-heat" "" '{"approaches":N,"tier":N}'
+    # If non-local profile: create tracking issue via _gh_create_issue
     ```
   </phase>
 
@@ -144,6 +145,7 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
     agentdb learn pattern "what worked" "approach X, integrity Y"
     agentdb emit command "forge-ship" "" '{"iterations":N,"integrity":0.X,"approach":"X"}'
     agentdb write-end '{"command":"forge","iterations":N,"tests":N,"integrity":0.X,"shipped":true}'
+    # If non-local profile: close tracking issue with completion summary
     # Suggest /kernel:retrospective if learnings accumulated across forge cycles
     ```
   </phase>

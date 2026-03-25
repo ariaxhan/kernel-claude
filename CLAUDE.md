@@ -114,7 +114,15 @@ Use Grep only when: LSP unavailable, searching string literals, or pattern match
 Setup: _meta/reference/lsp-setup.md
 </lsp>
 
-<!-- ERROR RECOVERY: See rules/kernel.md -->
+<github_layer>
+GitHub is a supplementary visibility layer. AgentDB is ALWAYS the source of truth for ALL profiles.
+Non-local profiles (github, github-oss, github-production) get additive GitHub features:
+- Issues: tier 2+ contracts surface as GitHub Issues with agent/tier labels
+- Discussions: session summaries → Agent Logs, learnings → Learnings, decisions → Decisions
+- Agents post checkpoints and verdicts as issue comments
+Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-and-forget.
+<rule>AgentDB first. GitHub after. Never block on GitHub API failures.</rule>
+</github_layer>
 
 <!-- ============================================ -->
 <!-- GIT                                          -->

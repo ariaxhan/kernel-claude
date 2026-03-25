@@ -61,6 +61,7 @@ In worktree: commit to worktree branch. Orchestrator handles merge to main.
 
 <phase id="checkpoint">
 Write to AgentDB: files, commit hash, evidence, big5 status.
+Surface to GitHub: if github-oss/production profile, post checkpoint as issue comment via _gh_comment_issue.
 </phase>
 </protocol>
 
@@ -82,6 +83,7 @@ Write to AgentDB: files, commit hash, evidence, big5 status.
 
 <on_end>
 agentdb write-end '{"agent":"surgeon","contract":"ID","files":[...],"commits":[...],"big5":"pass"}'
+Surface to GitHub: if github-oss/production profile and issue exists, post completion summary as issue comment and close issue.
 </on_end>
 
 <checklist>

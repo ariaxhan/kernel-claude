@@ -4,6 +4,7 @@ set -eo pipefail
 
 # Load shared functions
 source "$(dirname "$0")/common.sh"
+source "$(dirname "$0")/github-integration.sh" 2>/dev/null || true
 _kernel_hook_start
 
 # Detect paths
@@ -42,6 +43,15 @@ if [ -f "$AGENT_JSON" ]; then
   fi
 fi
 "$AGENTDB" emit session "session:end" "${SESSION_DURATION_S:+$(( SESSION_DURATION_S * 1000 ))}" "{\"branch\":\"$BRANCH\",\"files_changed\":$FILES_CHANGED,\"agent\":\"$AGENT\"}" "" "" 2>/dev/null &
+
+# === GITHUB LAYER: Post session summary for non-local profiles ===
+if type _gh_available &>/dev/null && _gh_available; then
+    DURATION_DISPLAY=""
+    [ -n "$SESSION_DURATION_S" ] && DURATION_DISPLAY=" (${SESSION_DURATION_S}s)"
+    _gh_post_session_summary "$AGENT" "$BRANCH" \
+        "${FILES_CHANGED} files changed${DURATION_DISPLAY}" "" "" &
+fi
+
 _kernel_hook_end "session-end" 0
 
 # === STEP 1: DEREGISTER THIS AGENT ===

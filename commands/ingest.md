@@ -142,6 +142,7 @@ If none match, execute below.
 rule: you do NOT write code
 1. /kernel:tearitapart — review plan before implementation
 2. agentdb contract '{"goal":"X","files":["Y"],"tier":N}'
+2b. If non-local profile: _gh_create_issue with contract goal + tier label
 3. git checkout -b {type}/{name}
 4. Spawn surgeon
 5. Wait for checkpoint
