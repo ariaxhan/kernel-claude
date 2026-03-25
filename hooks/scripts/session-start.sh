@@ -85,110 +85,70 @@ if [ -n "$HEALTH_WARNINGS" ]; then
 fi
 
 cat << 'KERNEL_CONTEXT'
-## AgentDB (MANDATORY)
+<protocol>
+  <agentdb>
+    on_start: agentdb read-start
+    on_end:   agentdb write-end '{"did":"X","learned":["Y"]}'
+    on_learn: agentdb learn failure|pattern|gotcha "what" "evidence"
+  </agentdb>
 
-```yaml
-on_start: agentdb read-start  # MUST do first
-on_end: agentdb write-end '{"did":"X","learned":["Y"]}'  # MUST do before stopping
-on_learn:
-  failure: agentdb learn failure "what" "evidence"
-  pattern: agentdb learn pattern "what" "evidence"
-  gotcha: agentdb learn gotcha "what" "context"
-```
+  <decision_tree>
+    1. READ context
+       → agentdb read-start
+       → ls _meta/research/ (check prior work)
 
-**AgentDB: read at start, write at end. Every session.**
+    2. CLASSIFY request
+       → bug?      load: /kernel:debug → /kernel:diagnose
+       → feature?  load: /kernel:build
+       → refactor? load: /kernel:refactor
+       → review?   load: /kernel:review
+       → unsure?   load: /kernel:build (default)
 
----
+    3. RESEARCH (before coding)
+       → check _meta/research/ for cached results
+       → anti-patterns FIRST: "{tech} gotchas", "{tech} not working"
+       → then solutions: official docs → github issues
+       → load: /kernel:security if auth/validation/secrets involved
 
-## Workflow
+    4. SCOPE
+       → count files that change
+       → tier 1 (1-2 files): execute directly
+       → tier 2 (3-5 files): contract + surgeon agent
+       → tier 3 (6+ files):  contract + surgeon + adversary
 
-```yaml
-flow: READ → CLASSIFY → RESEARCH → SCOPE → TESTS → EXECUTE → LEARN
+    5. DEFINE SUCCESS (before coding)
+       → load: /kernel:testing — tests BEFORE code
+       → load: /kernel:tdd if red-green-refactor appropriate
+       → edge cases first: null, empty, boundary, concurrent, timeout
 
-steps:
-  1_read:
-    do: agentdb read-start
-    then: ls _meta/research/  # check prior work
+    6. EXECUTE
+       → load: /kernel:quality — Big 5 checks on all code
+       → tier 1: implement directly
+       → tier 2+: spawn surgeon, orchestrate via /kernel:orchestration
 
-  2_classify:
-    task: what user wants
-    type: bug|feature|refactor|question
-    familiar: yes|no
+    7. SHIP
+       → load: /kernel:git — atomic commits, profile-gated workflow
+       → local: commit to main
+       → github-oss/production: feature branch → PR → review
 
-  3_research:
-    order:
-      - anti_patterns: "{tech} not working", "{tech} gotchas"
-      - solutions: official docs → github issues → stack overflow
-    output: _meta/research/{topic}.md
-    rule: search what BREAKS before what works
+    8. LEARN
+       → agentdb learn pattern|failure "what" "evidence"
+       → agentdb write-end
+       → update _meta/research/ if new findings
+  </decision_tree>
 
-  4_scope:
-    list: every file that changes
-    count: N
-    tier:
-      1: 1-2 files → execute directly
-      2: 3-5 files → contract + surgeon
-      3: 6+ files → contract + surgeon + adversary
+  <skills index="true">
+    always: /kernel:quality, /kernel:testing, /kernel:git
+    by_task: /kernel:build, /kernel:debug, /kernel:refactor, /kernel:security
+    by_domain: /kernel:api, /kernel:backend, /kernel:e2e, /kernel:tdd
+    commands: /kernel:dream, /kernel:diagnose, /kernel:tearitapart, /kernel:review
+    advanced: /kernel:orchestration, /kernel:architecture, /kernel:performance
+  </skills>
 
-  5_tests:
-    rule: tests BEFORE code
-    cycle: red (fail) → green (pass) → refactor
-    output: failing tests that define success
-
-  6_execute:
-    tier_1: implement using research + tests
-    tier_2+: create contract, spawn surgeon, orchestrate
-
-  7_learn:
-    do: agentdb learn pattern "what worked"
-    then: agentdb write-end
-    update: _meta/research/ if new anti-patterns found
-```
-
----
-
-## Testing (Non-Negotiable)
-
-```yaml
-rule: tests before code
-cycle:
-  1: write failing test (red)
-  2: write minimal code to pass (green)
-  3: refactor while green
-  4: repeat
-
-principles:
-  tests_first: code-then-tests validates bugs not requirements
-  mock_boundaries_only: external APIs, DBs — NOT internal functions
-  real_deps_preferred: test containers > mocks (mocks lie)
-  edge_cases_first: null, empty, boundary, concurrent, timeout
-  strong_assertions: specific values, not truthy/exists
-  graceful_fallbacks: test degraded mode, not just success/fail
-
-anti_patterns:  # AI generates these — avoid
-  - happy_path_only → test failure modes first
-  - weak_assertions → toBeTruthy catches nothing
-  - mock_everything → mock at boundaries only
-  - test_implementation → test behavior at public API
-```
-
----
-
-## Mindset
-
-```yaml
-core:
-  - every AI line is liability
-  - most SWE is solved problems
-  - research anti-patterns BEFORE solutions
-  - tests BEFORE code
-  - built-in > library > custom
-  - mock boundaries only, real deps when possible
-  - capture learnings AFTER every task
-
-mantra: find proven solution, test it works, don't reinvent
-```
-
+  <rule>Load the relevant skill BEFORE acting. Skills ARE the methodology.</rule>
+  <rule>Research anti-patterns BEFORE solutions. Tests BEFORE code.</rule>
+  <rule>Built-in beats library. Library beats custom. Prove you need complexity.</rule>
+</protocol>
 KERNEL_CONTEXT
 
 # =============================================================================

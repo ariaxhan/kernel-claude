@@ -39,9 +39,11 @@ tier: auto  # determined at classify step
    - check: test results identical to step 2 (same pass/fail, same count)
    - on_reject: return to step 4 with diff of what changed
 
-6. **Ship** -- Commit, push, PR
+6. **Ship** -- Commit, push, PR (profile-gated)
    - agent: orchestrator
-   - output: pushed branch, optional PR
+   - local/github: push to main or refactor branch
+   - github-oss: push refactor branch, create PR (required)
+   - github-production: push refactor branch, create PR, request review (required)
 
 ## On Failure
 

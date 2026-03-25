@@ -34,7 +34,11 @@ Skill-specific: skills/git/reference/git-research.md
 - fix/{name}: Bug fixes
 - refactor/{name}: Code restructuring
 
-Merge via PR when possible. Fast-forward for clean history.
+Profile-gated workflow:
+  local:            direct to main OK, branches optional
+  github:           feature branches for tier 2+, PRs optional
+  github-oss:       feature branches always, PRs REQUIRED before merge
+  github-production: feature branches always, PRs REQUIRED, review REQUIRED
 </branch_strategy>
 
 <commit_messages>

@@ -2,6 +2,16 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.5.1] - 2026-03-24
+
+### Changed
+- **Session-start rewrite** — Replaced 105-line static methodology block with skill-referencing decision tree. Session hook now points to skills instead of duplicating their content. Skills ARE the methodology; the hook is the routing protocol. (#59)
+- **Profile-gated git workflow** — Git skill and all 3 workflow files (feature, bugfix, refactor) now enforce PR requirements by profile: local (direct OK), github (PRs optional), github-oss (PRs required), github-production (PRs + review required). (#55)
+- **XML decision tree protocol** — Session-start outputs a structured `<decision_tree>` with 8 steps (READ → CLASSIFY → RESEARCH → SCOPE → DEFINE SUCCESS → EXECUTE → SHIP → LEARN), each referencing the specific skill to load.
+- **Skills index in session output** — Categorized as always/by_task/by_domain/commands/advanced so Claude aggressively loads relevant skills.
+
+---
+
 ## [7.5.0] - 2026-03-24
 
 ### Added

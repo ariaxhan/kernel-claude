@@ -488,9 +488,9 @@ test_session_start_workflow_present() {
 test_session_start_testing_philosophy() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
-  # Should contain testing philosophy
-  assert_contains "$output" "tests"
-  assert_contains "$output" "mock"
+  # Should reference testing skill in decision tree
+  assert_contains "$output" "/kernel:testing"
+  assert_contains "$output" "decision_tree"
 }
 
 test_pre_compact_writes_checkpoint() {
