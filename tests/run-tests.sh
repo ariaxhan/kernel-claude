@@ -1370,6 +1370,66 @@ test_retrospective_has_clusters() {
   grep -q "Clusters\|cluster" "$PLUGIN_ROOT/commands/retrospective.md"
 }
 
+# === GitHub Integration Tests ===
+
+test_github_integration_exists() {
+  [ -f "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" ] || return 1
+  head -1 "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" | grep -q "^#!/bin/bash"
+}
+
+test_github_integration_has_availability_check() {
+  grep -q "_gh_available" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+}
+
+test_github_integration_has_profile_gate() {
+  # Must check profile — local profiles get no GitHub operations
+  grep -q "local\|profile" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+}
+
+test_github_integration_has_issue_functions() {
+  grep -q "_gh_create_issue" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" &&
+  grep -q "_gh_comment_issue" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" &&
+  grep -q "_gh_close_issue" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+}
+
+test_github_integration_has_discussion_functions() {
+  grep -q "_gh_post_discussion" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" &&
+  grep -q "_gh_post_session_summary" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" &&
+  grep -q "_gh_post_learning" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+}
+
+test_github_integration_fire_and_forget() {
+  # All gh calls should have error suppression — never block hooks
+  # Check that functions return 0 on failure paths
+  grep -q '2>/dev/null' "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+}
+
+test_session_end_sources_github() {
+  grep -q "github-integration.sh" "$PLUGIN_ROOT/hooks/scripts/session-end.sh"
+}
+
+test_session_end_posts_summary() {
+  grep -q "_gh_post_session_summary" "$PLUGIN_ROOT/hooks/scripts/session-end.sh"
+}
+
+test_github_integration_not_hardcoded_repo() {
+  # Repo should be derived from git remote, not hardcoded
+  ! grep -q '"ariaxhan/kernel-claude"' "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" || \
+  grep -q 'git remote' "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+}
+
+test_agents_have_github_layer() {
+  grep -q "github\|_gh_\|issue" "$PLUGIN_ROOT/agents/surgeon.md" &&
+  grep -q "github\|_gh_\|issue" "$PLUGIN_ROOT/agents/adversary.md"
+}
+
+test_commands_have_github_layer() {
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/ingest.md" &&
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/forge.md" &&
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/handoff.md" &&
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/retrospective.md"
+}
+
 # === Profile Detection Tests ===
 
 test_parse_github_remote_https() {
@@ -1617,6 +1677,19 @@ run_test_suite() {
       run_test "retrospective has output format" test_retrospective_has_output_format
       run_test "retrospective has cluster analysis" test_retrospective_has_clusters
       ;;
+    github_integration)
+      run_test "github-integration.sh exists" test_github_integration_exists
+      run_test "has availability check" test_github_integration_has_availability_check
+      run_test "has profile gate" test_github_integration_has_profile_gate
+      run_test "has issue functions" test_github_integration_has_issue_functions
+      run_test "has discussion functions" test_github_integration_has_discussion_functions
+      run_test "fire-and-forget safety" test_github_integration_fire_and_forget
+      run_test "session-end sources github" test_session_end_sources_github
+      run_test "session-end posts summary" test_session_end_posts_summary
+      run_test "repo not hardcoded" test_github_integration_not_hardcoded_repo
+      run_test "agents have github layer" test_agents_have_github_layer
+      run_test "commands have github layer" test_commands_have_github_layer
+      ;;
     profile)
       run_test "parse_github_remote HTTPS" test_parse_github_remote_https
       run_test "parse_github_remote SSH" test_parse_github_remote_ssh
@@ -1666,6 +1739,7 @@ main() {
     run_test_suite "circuit_breaker"
     run_test_suite "diagnose"
     run_test_suite "retrospective"
+    run_test_suite "github_integration"
     run_test_suite "profile"
   else
     run_test_suite "$target"

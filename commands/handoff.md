@@ -118,6 +118,7 @@ Generated: {timestamp}
 <on_complete>
 ```bash
 agentdb write-end '{"command":"handoff","saved_to":"path","branch":"X","tier":N}'
+# If non-local profile: post handoff to GitHub Discussions (Agent Logs category)
 # Suggest /kernel:retrospective if learnings accumulated across sessions
 ```
 </on_complete>

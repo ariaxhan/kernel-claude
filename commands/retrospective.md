@@ -34,6 +34,7 @@ resolves contradictions, merges duplicates, archives stale entries, promotes hig
    - Merge duplicates: `agentdb learn {type} "{merged}" "{combined evidence}"`
    - Archive stale: `agentdb query "DELETE FROM learnings WHERE id = {id}"`
    - Promote patterns: Recommend additions to CLAUDE.md or skill reference docs
+   - If non-local profile: surface promoted patterns to GitHub Discussions (Learnings category)
 
 5. Write synthesis to AgentDB:
    ```bash

@@ -73,6 +73,7 @@ Partial = FAIL.
 
 <verdict>
 agentdb verdict pass|fail '{"tested":[...],"evidence":"<actual_output>","big5":"pass|fail"}'
+Surface to GitHub: if github-oss/production profile and issue exists, post verdict as issue comment with PASS/FAIL badge.
 </verdict>
 
 <anti_patterns>
