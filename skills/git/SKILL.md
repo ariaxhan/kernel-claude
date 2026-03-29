@@ -61,4 +61,27 @@ Bad:
 - Skipping commit messages
 </anti_patterns>
 
+<pr_structure>
+<!-- Updated 2026-03-28: https://addyo.substack.com/p/code-review-in-the-age-of-ai -->
+As of 2026, 41% of commits are AI-assisted. PRs must include human accountability:
+
+```
+## Intent
+1-2 sentences: what this changes and why.
+
+## Proof it works
+- [ ] Tests added/updated
+- [ ] Manual test steps: [describe]
+
+## Risk tier
+low | medium | high — and which parts were AI-generated.
+
+## Review focus
+1-2 specific areas where human judgment is needed.
+```
+
+AI reviewers break down on large diffs (>500 lines). Keep PRs small and focused.
+Non-breaking additions (new fields, optional params, new endpoints) don't need a version bump.
+</pr_structure>
+
 </skill>

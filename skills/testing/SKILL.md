@@ -44,6 +44,13 @@ Invert the pyramid at your peril. More E2E = slower feedback = less testing.
 <block id="flaky_tolerance">Flaky test = broken test. Fix or delete. Never ignore.</block>
 </anti_patterns>
 
+<verification_gate>
+<!-- Updated 2026-03-28: https://code.claude.com/docs/en/best-practices -->
+Always provide verification. If you can't verify it, don't ship it.
+AI writes tests prolifically — but tends to test where the code IS, not where it matters most.
+Review AI-generated tests for: do they test the actual risk area, or just the happy path it already handles?
+</verification_gate>
+
 <jit_testing>
 From Meta (Feb 2026): tests generated on-the-fly before code lands.
 No maintenance burden (tests don't persist). Mutation-based fault injection.

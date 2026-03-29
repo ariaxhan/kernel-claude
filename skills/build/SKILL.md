@@ -47,6 +47,8 @@ Evaluation criteria (ordered):
 **Rules:**
 - Write chosen solution + rejected alternatives to `_meta/plans/{feature}.md`
 - Plans under 50 lines. Longer = overthinking.
+- **Planning heuristic**: If you can describe the complete diff in one sentence, skip the plan and implement directly. Planning overhead is only justified for multi-file changes or uncertain approaches.
+<!-- Updated 2026-03-28: https://code.claude.com/docs/en/best-practices -->
 
 ---
 
