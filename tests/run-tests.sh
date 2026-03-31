@@ -1505,14 +1505,12 @@ test_classify_profile_production_by_projects() {
 # === Phase 0 Bug Fix Tests ===
 
 test_capture_error_reads_tool_name() {
-  # capture-error.sh should read tool_name from stdin JSON (not tool)
   grep -q 'tool_name' "$PLUGIN_ROOT/hooks/scripts/capture-error.sh"
 }
 
 test_capture_error_logs_tool_correctly() {
   setup_test_env
   agentdb init >/dev/null 2>&1
-  # Simulate what capture-error.sh does with correct field
   local INPUT='{"tool_name":"Edit","error":"file not found","tool_input":{}}'
   local TOOL=$(echo "$INPUT" | jq -r '.tool_name // .tool // "unknown"' 2>/dev/null)
   assert_equals "Edit" "$TOOL" "tool_name should be extracted correctly"
@@ -1520,8 +1518,39 @@ test_capture_error_logs_tool_correctly() {
 }
 
 test_session_start_creates_memory_dir() {
-  # session-start.sh should contain MEMORY.md creation logic
   grep -q 'MEMORY.md' "$PLUGIN_ROOT/hooks/scripts/session-start.sh"
+}
+
+# --- Worktree Safety Tests ---
+
+test_surgeon_has_worktree_safety() {
+  local file="$PLUGIN_ROOT/agents/surgeon.md"
+  assert_file_exists "$file"
+  local content
+  content=$(cat "$file")
+  assert_contains "$content" "worktree_safety" "surgeon.md should contain worktree_safety section"
+  assert_contains "$content" "constraints.files" "surgeon.md should reference constraints.files"
+  assert_contains "$content" "git diff --name-only" "surgeon.md should have diff validation"
+}
+
+test_orchestration_has_constraint_validation() {
+  local file="$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+  assert_file_exists "$file"
+  local content
+  content=$(cat "$file")
+  assert_contains "$content" "worktree_safety" "orchestration SKILL.md should contain worktree_safety"
+  assert_contains "$content" "constraints.files" "orchestration SKILL.md should reference constraints.files"
+  assert_contains "$content" "Post-agent validation" "orchestration SKILL.md should have post-agent validation"
+}
+
+test_agentdb_contract_accepts_constraints() {
+  local output
+  output=$(agentdb contract '{"goal":"test","constraints":{"files":["a.sh","b.md"]},"tier":2}' 2>&1)
+  assert_contains "$output" "Contract: CR-"
+  local stored
+  stored=$(agentdb query "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1" 2>&1)
+  assert_contains "$stored" "constraints"
+  assert_contains "$stored" "a.sh"
 }
 
 # === Run Tests ===
@@ -1729,6 +1758,11 @@ run_test_suite() {
       run_test "classify_profile production by envs" test_classify_profile_production_by_envs
       run_test "classify_profile production by projects" test_classify_profile_production_by_projects
       ;;
+    worktree_safety)
+      run_test "surgeon has worktree_safety section" test_surgeon_has_worktree_safety
+      run_test "orchestration has constraint validation" test_orchestration_has_constraint_validation
+      run_test "agentdb contract accepts constraints" test_agentdb_contract_accepts_constraints
+      ;;
   esac
 }
 
@@ -1769,6 +1803,7 @@ main() {
     run_test_suite "github_integration"
     run_test_suite "profile"
     run_test_suite "phase0_fixes"
+    run_test_suite "worktree_safety"
   else
     run_test_suite "$target"
   fi

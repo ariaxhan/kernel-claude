@@ -70,7 +70,10 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   BRANCH=$(git branch --show-current 2>/dev/null)
   echo "**Branch:** $BRANCH"
   CHANGES=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
-  [ "$CHANGES" -gt 0 ] && echo "**Uncommitted:** $CHANGES file(s)"
+  if [ "$CHANGES" -gt 0 ]; then
+    echo "**Uncommitted:** $CHANGES file(s)"
+    echo "**ASK USER:** $CHANGES uncommitted file(s). Stash, commit, or continue?"
+  fi
   echo ""
   echo "**Recent commits:**"
   git log --oneline -5 2>/dev/null | sed 's/^/- /'
@@ -218,6 +221,8 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
     echo "$ACTIVE_CONTRACT"
     echo ""
     echo "**Resume or close before starting new work.**"
+    echo ""
+    echo "**ASK USER:** Stale contract detected. Resume, close, or start fresh?"
     echo ""
   fi
 

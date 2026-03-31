@@ -48,6 +48,12 @@ familiar: yes|no
 
 Search before asking: Glob, Grep, common paths.
 
+<ask_user>
+  Use AskUserQuestion when: classification is ambiguous (could be bug or feature, refactor or rewrite)
+  Ask: "This looks like {type_A} but could be {type_B}. Which framing fits your intent?"
+  Options: type_A, type_B, or clarify
+</ask_user>
+
 After classify: load matching workflow from workflows/{type}.md if it exists.
 Workflow steps guide the phase sequence. Human confirms at each step (ingest mode).
 </step>
@@ -78,6 +84,12 @@ Workflow steps guide the phase sequence. Human confirms at each step (ingest mod
 </format>
 
 tier 2+: spawn kernel:researcher
+
+<ask_user>
+  Use AskUserQuestion when: research reveals multiple viable approaches or unknown risks
+  Ask: "Research found {N} approaches. Proceed with {recommended}, or explore alternatives?"
+  Options: proceed, explore alternatives, skip research
+</ask_user>
 </step>
 
 <step id="3_scope">
@@ -92,6 +104,12 @@ tier: 1|2|3
 3: 6+ files → contract + surgeon + adversary
 ambiguous: assume higher
 </tiers>
+
+<ask_user>
+  Use AskUserQuestion when: tier classification is borderline (e.g., 2-3 files but complex coupling)
+  Ask: "Scoped to {N} files — tier {X}. Confirm tier, or should I treat as tier {X+1}?"
+  Options: confirm tier {X}, bump to tier {X+1}
+</ask_user>
 </step>
 
 <branch after="scope">
@@ -119,16 +137,6 @@ strong_assertions: specific values
 </step>
 
 <step id="5_execute">
-<route_to_command>
-Before implementing, check if another command is the right tool:
-- Complex/ambiguous design? → /kernel:dream (3 perspectives, stress-tested)
-- Bug or regression? → /kernel:diagnose (reproduce → isolate → root cause)
-- Autonomous overnight run? → /kernel:forge (heat/hammer/quench/anneal cycle)
-- Pre-implementation critique needed? → /kernel:tearitapart (PROCEED/REVISE/RETHINK)
-- Stale learnings accumulating? → /kernel:retrospective (synthesis + promotion)
-If none match, execute below.
-</route_to_command>
-
 <tier_1>
 1. Reference research doc
 2. Write failing tests (edge cases!)
@@ -173,25 +181,11 @@ MUST run before session ends.
 </step>
 
 <output_format>
-task: one sentence
-type: bug|feature|refactor
-tier: 1|2|3
-research: none|existing|new
-tests: defined|pending|written
-status: researching|scoping|testing|executing|complete
+task: one sentence | type: bug|feature|refactor | tier: 1|2|3 | status: researching|scoping|testing|executing|complete
 </output_format>
 
 <hard_stops>
-- ask_file_location → search first
-- code_without_research → step 2
-- code_without_tests → step 4
-- code_for_tier_2+ → spawn surgeon
-- skip_agentdb → go back
-- skip_skill_load → load the skill before proceeding
+ask_file_location→search | code_without_research→step2 | code_without_tests→step4 | code_tier2+→surgeon | skip_agentdb→go_back
 </hard_stops>
-
-<protocol_fallback>
-If no "# KERNEL" in context: agentdb read/write, research before code, tests before implementation.
-</protocol_fallback>
 
 </command>

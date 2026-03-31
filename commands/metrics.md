@@ -32,6 +32,12 @@ Example recommendations:
 agentdb metrics
 agentdb health
 ```
+
+<ask_user>
+  Use AskUserQuestion when: dashboard displayed and anomalies found
+  Ask: "Anomaly in {metric}: {detail}. Want to investigate, or just note it?"
+  Options: investigate, note and move on
+</ask_user>
 </on_start>
 
 </command>

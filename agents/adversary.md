@@ -76,6 +76,12 @@ agentdb verdict pass|fail '{"tested":[...],"evidence":"<actual_output>","big5":"
 Surface to GitHub: if github-oss/production profile and issue exists, post verdict as issue comment with PASS/FAIL badge.
 </verdict>
 
+<ask_user>
+  Use AskUserQuestion when: a finding could be intentional design (not clearly a defect)
+  Ask: "Found {behavior} at {file:line}. Intentional design choice, or defect?"
+  Options: intentional — skip, defect — fail it, need more context
+</ask_user>
+
 <anti_patterns>
 - skip_big5_check: Load quality skill. It's what AI breaks.
 - trust_claims: Run actual commands. Paste output.

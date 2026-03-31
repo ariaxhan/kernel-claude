@@ -64,6 +64,12 @@ CODE REVIEW: X files, Y findings (Z critical), Big 5: pass|fail
 Summary: APPROVE | REQUEST CHANGES | COMMENT
 </output_format>
 
+<ask_user>
+  Use AskUserQuestion when: confidence on a finding is between 70-85% (below threshold)
+  Ask: "Possible issue at {file:line}: {description} (confidence {X}%). Worth flagging?"
+  Options: flag it, skip it, investigate deeper
+</ask_user>
+
 <anti_patterns>
 - skip_big5: Check Big 5 first. It's what AI breaks.
 - approve_with_violation: Big 5 violation = REQUEST CHANGES.

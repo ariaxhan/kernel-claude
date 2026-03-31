@@ -73,6 +73,12 @@ export PATH="$VAULTS/.local/bin:$PATH"
 agentdb init
 ```
 
+<ask_user>
+  Use AskUserQuestion when: detection complete, before creating/modifying directories
+  Ask: "Detected Vaults at {path}. Proceed with setup, or use a different location?"
+  Options: proceed, use different path, abort
+</ask_user>
+
 ## Step 5: Verify
 
 ```bash

@@ -103,6 +103,12 @@ Output: "REVISE: [changes with file:line]"
 3+ Big 5 violations. Fundamental security gaps. No tests.
 Output: "RETHINK: [why flawed] → [alternative]"
 </RETHINK>
+
+<ask_user>
+  Use AskUserQuestion when: verdict is REVISE or RETHINK
+  Ask: "Verdict: {REVISE|RETHINK}. Want details on specific findings, or proceed with fixes?"
+  Options: show details, proceed with fixes, override and proceed anyway
+</ask_user>
 </verdict>
 
 <output_format>

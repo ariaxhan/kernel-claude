@@ -95,6 +95,12 @@ grep -r "req\.body" --include="*.ts" --include="*.js" | grep -v "parse\|validate
 
 If any Big 5 violations found: NOT READY
 </check>
+
+<ask_user>
+  Use AskUserQuestion when: a gate fails (build, types, lint, tests, security, big5)
+  Ask: "Gate {gate_name} failed: {summary}. Fix and retry, or skip this gate?"
+  Options: fix and retry, skip gate (document reason), abort validation
+</ask_user>
 </verification_workflow>
 
 <report_format>

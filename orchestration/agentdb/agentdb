@@ -368,6 +368,9 @@ cmd_contract() {
       ;;
     *)
       # Original behavior: create contract from JSON
+      # Expected format: {"goal":"X","files":["a.sh"],"constraints":{"files":["a.sh","b.md"]},"tier":2}
+      # constraints.files: exhaustive list of files the agent is allowed to touch.
+      # Surgeons MUST verify git diff --name-only is a subset of constraints.files before commit.
       local content="$subcmd"
       [ -z "$content" ] && { echo "Usage: agentdb contract <json> | close [id|--stale] | list"; exit 1; }
       [ ! -f "$DB" ] && cmd_init >/dev/null

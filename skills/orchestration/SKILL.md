@@ -58,6 +58,29 @@ Agent tool call:
 **Tier 1**: Don't use worktrees. Unnecessary overhead for 1-2 file changes.
 </worktree_isolation>
 
+<worktree_safety>
+Constraint enforcement for parallel agents. Prevents scope creep and file conflicts.
+
+**Contract constraints (mandatory for tier 2+)**:
+- Every contract MUST include `constraints.files`: an exhaustive list of files the agent may touch.
+- Format: `{"goal":"X","files":["a.sh"],"constraints":{"files":["a.sh","b.md"]},"tier":2}`
+- No two concurrent contracts may have overlapping `constraints.files`.
+
+**Pre-spawn validation**:
+- `git status --porcelain` must be empty or all changes stashed before spawning agents.
+- Each surgeon's constraint list must be disjoint from all other active surgeons.
+
+**Post-agent validation**:
+- Read surgeon's checkpoint from AgentDB.
+- Run `git diff --name-only {base}..{surgeon_branch}` on the surgeon's branch.
+- Every file in the diff MUST appear in that contract's `constraints.files`.
+- If any file is out of scope: REJECT the agent's output. Do not merge. Re-contract.
+
+**Merge protocol**:
+- Validate constraints before merging surgeon branch to main.
+- If constraints violated: abandon branch, log failure, re-contract with corrected scope.
+</worktree_safety>
+
 <context_transfer>
 Every agent boundary is lossy compression.
 - Pre-transfer: Write structured briefing to AgentDB

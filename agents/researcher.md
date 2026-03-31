@@ -87,6 +87,12 @@ anti_pattern_search_first:
     Minimum threshold: npm 100K+/week or pypi equivalent trend.
   </phase>
 
+  <ask_user>
+    Use AskUserQuestion when: multiple viable packages/approaches found with similar tradeoffs
+    Ask: "Found {N} viable options: {list}. Preference, or should I pick simplest?"
+    Options: pick simplest, I prefer {option}, show full comparison
+  </ask_user>
+
   <phase id="alternatives">
     Evaluate 2-3 alternative approaches.
     For each: approach, lines of code, dependencies, pros, cons, complexity.
