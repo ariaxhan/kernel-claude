@@ -1442,6 +1442,103 @@ test_classify_profile_production_by_projects() {
   assert_equals "github-production" "$result"
 }
 
+# === Analyzer Agent Tests (Phase 4) ===
+
+test_analyzer_agent_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/analyzer.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/analyzer.md" | grep -q "^---"
+}
+
+test_analyzer_agent_has_dependency_detection() {
+  grep -q "dependency_detection" "$PLUGIN_ROOT/agents/analyzer.md"
+}
+
+test_analyzer_agent_has_model_opus() {
+  grep -q "model: opus" "$PLUGIN_ROOT/agents/analyzer.md"
+}
+
+test_orchestration_has_progressive_autonomy() {
+  grep -q "progressive_autonomy" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+}
+
+test_orchestration_has_budget_awareness() {
+  grep -q "budget_awareness" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+}
+
+test_claude_md_references_analyzer() {
+  grep -q 'id="analyzer"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
+# === Extension Tests (Phase 4) ===
+
+test_quality_has_adsr() {
+  grep -q "adsr" "$PLUGIN_ROOT/skills/quality/SKILL.md"
+}
+
+test_orchestration_has_checkpoint_recovery() {
+  grep -q "checkpoint_recovery" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+}
+
+test_agentdb_co_change_exists() {
+  grep -q "cmd_co_change" "$PLUGIN_ROOT/orchestration/agentdb/agentdb"
+}
+
+test_agentdb_co_change_runs() {
+  # Run co-change on CLAUDE.md (exists in repo, will have git history)
+  local output
+  output=$(agentdb co-change "CLAUDE.md" 5 2>&1) || true
+  assert_contains "$output" "Co-Change Graph"
+}
+
+# === Framework Tests (Phase 4) ===
+
+test_template_exists() {
+  assert_file_exists "$PLUGIN_ROOT/skills/TEMPLATE.md" "TEMPLATE.md should exist"
+}
+
+test_template_has_sources() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  assert_contains "$content" "sources:" "TEMPLATE.md should have sources section"
+}
+
+test_template_has_triggers() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  assert_contains "$content" "triggers:" "TEMPLATE.md should have triggers section"
+}
+
+test_template_has_gates() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  assert_contains "$content" "gates:" "TEMPLATE.md should have gates section"
+}
+
+test_template_has_output() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  assert_contains "$content" "output:" "TEMPLATE.md should have output section"
+}
+
+test_validate_structure_exists() {
+  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" "validate-structure.sh should exist"
+  local perms
+  perms=$(ls -l "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" | cut -c4)
+  assert_equals "x" "$perms" "validate-structure.sh should be executable"
+}
+
+test_hooks_json_has_validate_structure() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/hooks/hooks.json")
+  assert_contains "$content" "validate-structure.sh" "hooks.json should reference validate-structure.sh"
+}
+
+test_validate_structure_sources_common() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh")
+  assert_contains "$content" "common.sh" "validate-structure.sh should source common.sh"
+}
+
 # === Run Tests ===
 
 run_test_suite() {
@@ -1629,6 +1726,30 @@ run_test_suite() {
       run_test "classify_profile production by envs" test_classify_profile_production_by_envs
       run_test "classify_profile production by projects" test_classify_profile_production_by_projects
       ;;
+    phase4_agents)
+      run_test "analyzer agent exists with frontmatter" test_analyzer_agent_exists_with_frontmatter
+      run_test "analyzer agent has dependency detection" test_analyzer_agent_has_dependency_detection
+      run_test "analyzer agent has model opus" test_analyzer_agent_has_model_opus
+      run_test "orchestration has progressive_autonomy" test_orchestration_has_progressive_autonomy
+      run_test "orchestration has budget_awareness" test_orchestration_has_budget_awareness
+      run_test "CLAUDE.md references analyzer" test_claude_md_references_analyzer
+      ;;
+    phase4_extensions)
+      run_test "quality SKILL.md has adsr section" test_quality_has_adsr
+      run_test "orchestration SKILL.md has checkpoint_recovery" test_orchestration_has_checkpoint_recovery
+      run_test "agentdb co-change command exists" test_agentdb_co_change_exists
+      run_test "co-change runs without error" test_agentdb_co_change_runs
+      ;;
+    phase4_framework)
+      run_test "TEMPLATE.md exists" test_template_exists
+      run_test "TEMPLATE.md has sources section" test_template_has_sources
+      run_test "TEMPLATE.md has triggers section" test_template_has_triggers
+      run_test "TEMPLATE.md has gates section" test_template_has_gates
+      run_test "TEMPLATE.md has output section" test_template_has_output
+      run_test "validate-structure.sh exists and is executable" test_validate_structure_exists
+      run_test "hooks.json references validate-structure.sh" test_hooks_json_has_validate_structure
+      run_test "validate-structure.sh sources common.sh" test_validate_structure_sources_common
+      ;;
   esac
 }
 
@@ -1667,6 +1788,8 @@ main() {
     run_test_suite "diagnose"
     run_test_suite "retrospective"
     run_test_suite "profile"
+    run_test_suite "phase4_agents"
+    run_test_suite "phase4_framework"
   else
     run_test_suite "$target"
   fi
