@@ -51,6 +51,8 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
     Raise the temperature. Don't commit to the first idea.
 
     1. Read agentdb context + _meta/research/ for prior work.
+    1b. Measure entropy: check agentdb learning count in domain, test coverage, recent failures.
+        Low entropy → generate 1 approach (streamlined). High entropy → generate 3 approaches (full exploration).
     2. Classify task: type, tier, domain.
     3. Generate 2-3 candidate approaches (not variations — genuinely different strategies).
     4. For each: files affected, tests needed, effort estimate, known risks.

@@ -2,6 +2,21 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.9.0] - 2026-03-31
+
+### Added
+- **Cartographer agent** — Opus whole-codebase mapper with 1M context. (#38)
+- **Coroner agent** — Sonnet post-mortem analyst for failed contracts. (#47)
+- **Pre-ship agent** — Composite release gate, 4 parallel validators, SHIP/NO-SHIP verdict. (#98)
+- **App development skill** — Mobile/web build, EAS, store submission patterns. (#102)
+- **PostToolUse JSON schema validation** — validates JSON/SQL after writes. (#99)
+- **Session-start blocker surfacing** — stale contracts + error loop detection. (#100)
+- **Hardcoded value warning** — hex colors and px values in components. (#101)
+- **Entropy-adaptive coordination** — dynamic agent orchestration by task entropy. (#71)
+- **27 new tests** — 227 total passing.
+
+---
+
 ## [7.6.4] - 2026-03-30
 
 ### Fixed
