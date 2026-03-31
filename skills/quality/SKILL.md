@@ -55,4 +55,40 @@ Any Big 5 violation = NOT READY
 Fix before commit. No exceptions.
 </verdict>
 
+<r_factor>
+  Composite quality score replacing binary pass/fail.
+
+  R = (0.20 * test_pass_rate) +
+      (0.20 * acceptance_rate) +
+      (0.15 * scope_accuracy) +
+      (0.15 * security_clean_rate) +
+      (0.15 * budget_compliance) +
+      (0.15 * first_try_rate)
+
+  Range: 0.0 to 1.0
+
+  thresholds:
+    >= 0.85: production-ready
+    >= 0.70: good (ship with monitoring)
+    >= 0.50: acceptable (ship with caveats)
+    < 0.50: not ready (fix before shipping)
+
+  measurement:
+    test_pass_rate: passing tests / total tests
+    acceptance_rate: acceptance criteria met / total criteria
+    scope_accuracy: files in contract / files actually changed (1.0 = perfect scope)
+    security_clean_rate: 1.0 if no security findings, 0.0 otherwise
+    budget_compliance: 1.0 if within budget, decreases proportionally over budget
+    first_try_rate: 1.0 if merged without revision, decreases per revision round
+
+  usage:
+    - Validator reports R-factor in verdict
+    - /kernel:forge uses R-factor in quench phase (>= 0.8 = survived)
+    - /kernel:metrics displays R-factor trend
+    - agentdb verdict stores R-factor in evidence JSON
+
+  rule: R-factor is informational, not a hard gate. Use thresholds as guidelines.
+  rule: Track R-factor over time to measure improvement, not as a one-time score.
+</r_factor>
+
 </skill>

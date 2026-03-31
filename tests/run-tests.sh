@@ -1658,6 +1658,120 @@ test_validator_has_9_gates() {
   assert_contains "$content" "Gate 9:"
 }
 
+# === Approval Learner + R-Factor Tests ===
+
+test_approval_learner_exists_with_frontmatter() {
+  local agent_file="$PLUGIN_ROOT/agents/approval-learner.md"
+  assert_file_exists "$agent_file"
+  head -1 "$agent_file" | grep -q "^---" || {
+    echo "FAIL: approval-learner.md missing frontmatter"
+    return 1
+  }
+}
+
+test_approval_learner_model_sonnet() {
+  grep -q "model: sonnet" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should have model: sonnet"
+    return 1
+  }
+}
+
+test_approval_learner_has_confidence_scoring() {
+  grep -q "confidence_scoring" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should have confidence scoring"
+    return 1
+  }
+  grep -q "times_validated / times_applied" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should define confidence formula"
+    return 1
+  }
+}
+
+test_approval_learner_has_progressive_trust() {
+  grep -qi "progressive trust" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should have progressive trust"
+    return 1
+  }
+  grep -q "observe.*suggest.*enforce" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should define trust levels: observe, suggest, enforce"
+    return 1
+  }
+}
+
+test_quality_skill_has_r_factor() {
+  grep -q "r_factor" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
+    echo "FAIL: quality SKILL.md should have r_factor section"
+    return 1
+  }
+}
+
+test_r_factor_has_weighted_formula() {
+  grep -q "0.20 \* test_pass_rate" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
+    echo "FAIL: r_factor should have weighted formula with test_pass_rate"
+    return 1
+  }
+  grep -q "0.15 \* scope_accuracy" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
+    echo "FAIL: r_factor should have scope_accuracy weight"
+    return 1
+  }
+}
+
+test_claude_md_references_approval_learner() {
+  grep -q "approval-learner" "$PLUGIN_ROOT/CLAUDE.md" || {
+    echo "FAIL: CLAUDE.md should reference approval-learner agent"
+    return 1
+  }
+}
+
+# === Learning System Tests ===
+
+test_migration_005_file_exists() {
+  assert_file_exists "$PLUGIN_ROOT/orchestration/agentdb/migrations/005_learning_system.sql"
+}
+
+test_migration_005_creates_execution_traces() {
+  agentdb init >/dev/null
+  RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT name FROM sqlite_master WHERE type='table' AND name='execution_traces';")
+  assert_equals "execution_traces" "$RESULT" "execution_traces table should exist"
+}
+
+test_execution_traces_has_correct_columns() {
+  agentdb init >/dev/null
+  local cols
+  cols=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT name FROM pragma_table_info('execution_traces') ORDER BY cid;" | tr '\n' ',')
+  assert_contains "$cols" "id,"
+  assert_contains "$cols" "goal,"
+  assert_contains "$cols" "exploration,"
+  assert_contains "$cols" "plan,"
+  assert_contains "$cols" "action,"
+  assert_contains "$cols" "outcome,"
+  assert_contains "$cols" "success,"
+  assert_contains "$cols" "tokens_used,"
+  assert_contains "$cols" "domain,"
+}
+
+test_agentdb_trace_records() {
+  agentdb init >/dev/null
+  OUTPUT=$(agentdb trace '{"goal":"test goal","outcome":"success","success":1}' 2>&1)
+  assert_contains "$OUTPUT" "Trace: TR-"
+  RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT goal FROM execution_traces LIMIT 1;")
+  assert_equals "test goal" "$RESULT" "trace goal"
+}
+
+test_agentdb_decay_runs() {
+  agentdb init >/dev/null
+  OUTPUT=$(agentdb decay 2>&1)
+  assert_contains "$OUTPUT" "stale learnings"
+}
+
+test_agentdb_antibody_searches() {
+  agentdb init >/dev/null
+  agentdb learn pattern "always validate inputs" "test evidence" >/dev/null
+  OUTPUT=$(agentdb antibody "validate" 2>&1)
+  assert_contains "$OUTPUT" "Pattern Antibodies"
+  assert_contains "$OUTPUT" "validate inputs"
+}
+
 # === Run Tests ===
 
 run_test_suite() {
@@ -1891,6 +2005,23 @@ run_test_suite() {
       run_test "CLAUDE.md references triage agent" test_claude_md_references_triage
       run_test "CLAUDE.md references understudier agent" test_claude_md_references_understudier
       ;;
+    approval_rfactor)
+      run_test "approval-learner exists with frontmatter" test_approval_learner_exists_with_frontmatter
+      run_test "approval-learner model is sonnet" test_approval_learner_model_sonnet
+      run_test "approval-learner has confidence scoring" test_approval_learner_has_confidence_scoring
+      run_test "approval-learner has progressive trust" test_approval_learner_has_progressive_trust
+      run_test "quality SKILL.md has r_factor" test_quality_skill_has_r_factor
+      run_test "r_factor has weighted formula" test_r_factor_has_weighted_formula
+      run_test "CLAUDE.md references approval-learner" test_claude_md_references_approval_learner
+      ;;
+    learning_system)
+      run_test "migration 005 file exists" test_migration_005_file_exists
+      run_test "migration 005 creates execution_traces" test_migration_005_creates_execution_traces
+      run_test "execution_traces has correct columns" test_execution_traces_has_correct_columns
+      run_test "agentdb trace records trace" test_agentdb_trace_records
+      run_test "agentdb decay runs" test_agentdb_decay_runs
+      run_test "agentdb antibody searches learnings" test_agentdb_antibody_searches
+      ;;
   esac
 }
 
@@ -1935,6 +2066,8 @@ main() {
     run_test_suite "phase2_agents"
     run_test_suite "triage_understudier"
     run_test_suite "inject_context"
+    run_test_suite "approval_rfactor"
+    run_test_suite "learning_system"
   else
     run_test_suite "$target"
   fi

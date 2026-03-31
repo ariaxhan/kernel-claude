@@ -16,6 +16,9 @@
 #   agentdb recent                  # Show last 5 checkpoints
 #   agentdb inject-context <type>   # Build agent-specific context slice
 #   agentdb health                  # Check system health
+#   agentdb trace <json>            # Record GEPA execution trace
+#   agentdb decay                   # Archive stale learnings
+#   agentdb antibody <text>         # Search IMMUNE pattern antibodies
 
 set -euo pipefail
 
@@ -1077,6 +1080,82 @@ cmd_inject_context() {
   esac
 }
 
+# === LEARNING SYSTEM COMMANDS ===
+
+cmd_trace() {
+  local json="${1:-}"
+  [ -z "$json" ] && { echo "Usage: agentdb trace '{\"goal\":\"X\",\"outcome\":\"Y\",\"success\":1}'"; exit 1; }
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  local id="TR-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
+  local goal exploration plan action outcome success tokens domain contract_id
+  goal=$(echo "$json" | jq -r '.goal // ""' 2>/dev/null)
+  exploration=$(echo "$json" | jq -r '.exploration // ""' 2>/dev/null)
+  plan=$(echo "$json" | jq -r '.plan // ""' 2>/dev/null)
+  action=$(echo "$json" | jq -r '.action // ""' 2>/dev/null)
+  outcome=$(echo "$json" | jq -r '.outcome // ""' 2>/dev/null)
+  success=$(echo "$json" | jq -r '.success // 0' 2>/dev/null)
+  tokens=$(echo "$json" | jq -r '.tokens_used // 0' 2>/dev/null)
+  domain=$(echo "$json" | jq -r '.domain // ""' 2>/dev/null)
+  contract_id=$(echo "$json" | jq -r '.contract_id // ""' 2>/dev/null)
+
+  validate_int "$success" "success"
+  validate_int "$tokens" "tokens_used"
+
+  local sg se sp sa so sd sc
+  sg=$(sql_escape "$goal"); se=$(sql_escape "$exploration"); sp=$(sql_escape "$plan")
+  sa=$(sql_escape "$action"); so=$(sql_escape "$outcome"); sd=$(sql_escape "$domain")
+  sc=$(sql_escape "$contract_id")
+
+  db_exec "INSERT INTO execution_traces (id, contract_id, goal, exploration, plan, action, outcome, success, tokens_used, domain) VALUES ('$id', '$sc', '$sg', '$se', '$sp', '$sa', '$so', $success, $tokens, '$sd');"
+  echo "Trace: $id"
+}
+
+cmd_decay() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  # Archive learnings with 0 hits and >46 days old (freshness < 0.1)
+  local archived
+  archived=$(db_exec "SELECT COUNT(*) FROM learnings WHERE hit_count = 0 AND ts < datetime('now', '-46 days');")
+
+  if [ "$archived" -gt 0 ]; then
+    db_exec "DELETE FROM learnings WHERE hit_count = 0 AND ts < datetime('now', '-46 days');"
+    echo "Archived $archived stale learnings (0 hits, >46 days)"
+  else
+    echo "No stale learnings to archive"
+  fi
+
+  # Report freshness distribution
+  echo ""
+  echo "Freshness distribution:"
+  db_exec "SELECT
+    CASE
+      WHEN hit_count >= 3 THEN 'high-confidence (' || COUNT(*) || ')'
+      WHEN hit_count >= 1 THEN 'reinforced (' || COUNT(*) || ')'
+      ELSE 'unvalidated (' || COUNT(*) || ')'
+    END as status
+  FROM learnings GROUP BY
+    CASE WHEN hit_count >= 3 THEN 1 WHEN hit_count >= 1 THEN 2 ELSE 3 END;"
+}
+
+cmd_antibody() {
+  local pattern="${1:-}"
+  [ -z "$pattern" ] && { echo "Usage: agentdb antibody <search_text>"; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  local safe_pattern
+  safe_pattern=$(sql_escape "$pattern")
+
+  echo "## Pattern Antibodies"
+  echo "Matching learnings for: $pattern"
+  echo ""
+  db_exec "SELECT '- [' || type || '] ' || insight || ' (hits: ' || hit_count || ')'
+    FROM learnings
+    WHERE insight LIKE '%$safe_pattern%' OR domain LIKE '%$safe_pattern%'
+    ORDER BY hit_count DESC, ts DESC
+    LIMIT 10;"
+}
+
 # === DISPATCH ===
 case "${1:-help}" in
   init)           cmd_init ;;
@@ -1103,6 +1182,9 @@ case "${1:-help}" in
   timeline)    shift; cmd_timeline "$@" ;;
   guide)       cmd_guide ;;
   schema)      shift; cmd_schema "$@" ;;
+  trace)       shift; cmd_trace "$@" ;;
+  decay)       cmd_decay ;;
+  antibody)    shift; cmd_antibody "$@" ;;
   export)      cmd_export ;;
   recent)      shift; cmd_recent "$@" ;;
   *)
@@ -1137,6 +1219,10 @@ case "${1:-help}" in
     echo ""
     echo "KNOWLEDGE INJECTION:"
     echo "  inject-context <type>   Build agent-specific context slice"
+    echo "LEARNING SYSTEM (after migration 005):"
+    echo "  trace <json>            Record GEPA execution trace"
+    echo "  decay                   Archive stale learnings, show freshness"
+    echo "  antibody <text>         Search learnings for pattern matches"
     echo ""
     echo "UTILITIES:"
     echo "  status                  DB health, counts"
