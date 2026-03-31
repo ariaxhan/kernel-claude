@@ -14,6 +14,7 @@
 #   agentdb prune                   # Delete old checkpoints (keep last 10)
 #   agentdb export                  # Dump learnings to markdown
 #   agentdb recent                  # Show last 5 checkpoints
+#   agentdb inject-context <type>   # Build agent-specific context slice
 #   agentdb health                  # Check system health
 
 set -euo pipefail
@@ -1024,6 +1025,55 @@ cmd_metrics() {
   fi
 }
 
+cmd_inject_context() {
+  local agent_type="${1:-surgeon}"
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  echo "# Context Injection: $agent_type"
+  echo ""
+
+  case "$agent_type" in
+    surgeon|implementer)
+      echo "## Known Gotchas (AVOID THESE)"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type='failure' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || true
+      echo ""
+      echo "## Proven Patterns (USE THESE)"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || true
+      echo ""
+      echo "## Active Contract"
+      db_exec "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || true
+      ;;
+    adversary|reviewer)
+      echo "## Past Failures (TEST FOR THESE)"
+      db_exec "SELECT '- ' || insight || COALESCE(' [' || domain || ']', '') FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 10;" 2>/dev/null || true
+      echo ""
+      echo "## Known Gotchas"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type='gotcha' ORDER BY hit_count DESC LIMIT 5;" 2>/dev/null || true
+      echo ""
+      echo "## Recent Errors (REGRESSION RISK)"
+      db_exec "SELECT '- [' || tool || '] ' || substr(error, 1, 80) FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || true
+      ;;
+    researcher|scout)
+      echo "## All Learnings by Domain"
+      db_exec "SELECT '- [' || COALESCE(domain, 'general') || '] ' || insight FROM learnings ORDER BY domain, ts DESC LIMIT 15;" 2>/dev/null || true
+      echo ""
+      echo "## Recent Verdicts"
+      db_exec "SELECT '- ' || content FROM context WHERE type='verdict' ORDER BY ts DESC LIMIT 3;" 2>/dev/null || true
+      ;;
+    triage|understudier)
+      echo "## Complexity Signals"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type IN ('failure', 'gotcha') ORDER BY ts DESC LIMIT 5;" 2>/dev/null || true
+      echo ""
+      echo "## Recent Contracts (scope reference)"
+      db_exec "SELECT '- ' || content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 3;" 2>/dev/null || true
+      ;;
+    *)
+      # Default: everything
+      cmd_read_start
+      ;;
+  esac
+}
+
 # === DISPATCH ===
 case "${1:-help}" in
   init)           cmd_init ;;
@@ -1042,6 +1092,7 @@ case "${1:-help}" in
   session-end)    shift; cmd_session_end "$@" ;;
   track-node)     shift; cmd_track_node "$@" ;;
   suggest-context) shift; cmd_suggest_context "$@" ;;
+  inject-context) shift; cmd_inject_context "$@" ;;
   emit)        shift; cmd_emit "$@" ;;
   health)      cmd_health ;;
   metrics)     shift; cmd_metrics "$@" ;;
@@ -1080,6 +1131,9 @@ case "${1:-help}" in
     echo "  wtf                     What just happened? (errors, failures, contract)"
     echo "  timeline [N]            Last N events across all tables (default: 20)"
     echo "  guide                   Quick reference cheat sheet"
+    echo ""
+    echo "KNOWLEDGE INJECTION:"
+    echo "  inject-context <type>   Build agent-specific context slice"
     echo ""
     echo "UTILITIES:"
     echo "  status                  DB health, counts"

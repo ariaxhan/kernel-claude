@@ -2,6 +2,21 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.7.1] - 2026-03-30
+
+### Added
+- **11-phase adversarial review protocol** — Reviewer agent upgraded with structured review: checkpoint → Big5 → scope → smoke → edge cases → error paths → regression → security → contract → mutation → quality. Confidence scoring formula with 0.8 threshold. (#89)
+- **9-gate safety chain** — Validator agent upgraded with progressive gates: branch isolation → atomic commits → lint → types → tests → security → adversarial review → human checkpoint → post-merge monitoring. Fail-fast model. (#91)
+- **Triage agent** — Haiku-powered complexity classifier. Single fast call classifies low/medium/high/epic before expensive agents spawn. (#92)
+- **Understudier agent** — Haiku pre-flight validates approach viability before surgeon commit. Checks: existence, compatibility, conflicts, dependencies, test infrastructure. (#40)
+- **Knowledge injection system** — `agentdb inject-context <agent_type>` builds agent-specific context slices. Orchestrator injects before spawn. Surgeon gets gotchas+patterns, adversary gets failures+errors, researcher gets all learnings by domain. (#110)
+- **17 new tests** — Phase 2 agent tests (4), triage/understudier tests (8), knowledge injection tests (5). 152 total passing.
+
+### Changed
+- **plugin.json description** — Updated to reflect 9 agents, knowledge injection, 11-phase review, 9-gate safety chain.
+
+---
+
 ## [7.6.1] - 2026-03-25
 
 ### Added

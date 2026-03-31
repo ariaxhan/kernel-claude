@@ -1442,6 +1442,111 @@ test_classify_profile_production_by_projects() {
   assert_equals "github-production" "$result"
 }
 
+# --- Triage & Understudier Agent Tests ---
+
+test_triage_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/triage.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/triage.md" | grep -q "^---"
+}
+
+test_triage_model_haiku() {
+  grep -q "^model: haiku" "$PLUGIN_ROOT/agents/triage.md"
+}
+
+test_triage_has_complexity_classification() {
+  grep -q "low.*medium.*high.*epic" "$PLUGIN_ROOT/agents/triage.md" ||
+  (grep -q "low:" "$PLUGIN_ROOT/agents/triage.md" &&
+   grep -q "medium:" "$PLUGIN_ROOT/agents/triage.md" &&
+   grep -q "high:" "$PLUGIN_ROOT/agents/triage.md" &&
+   grep -q "epic:" "$PLUGIN_ROOT/agents/triage.md")
+}
+
+test_understudier_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/understudier.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/understudier.md" | grep -q "^---"
+}
+
+test_understudier_model_haiku() {
+  grep -q "^model: haiku" "$PLUGIN_ROOT/agents/understudier.md"
+}
+
+test_understudier_has_viability_assessment() {
+  grep -q "viable" "$PLUGIN_ROOT/agents/understudier.md" &&
+  grep -q "risky" "$PLUGIN_ROOT/agents/understudier.md" &&
+  grep -q "blocked" "$PLUGIN_ROOT/agents/understudier.md"
+}
+
+test_claude_md_references_triage() {
+  grep -q 'agent id="triage"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
+test_claude_md_references_understudier() {
+  grep -q 'agent id="understudier"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
+# --- Inject Context Tests ---
+
+test_inject_context_command_exists() {
+  grep -q "inject-context" "$PLUGIN_ROOT/orchestration/agentdb/agentdb"
+}
+
+test_inject_context_surgeon_gotchas() {
+  agentdb init >/dev/null
+  agentdb learn failure "never use eval" "security risk" >/dev/null
+  agentdb learn pattern "use sql_escape" "prevents injection" >/dev/null
+  local output
+  output=$(agentdb inject-context surgeon)
+  assert_contains "$output" "Known Gotchas" &&
+  assert_contains "$output" "Proven Patterns"
+}
+
+test_inject_context_adversary_failures() {
+  agentdb init >/dev/null
+  agentdb learn failure "timeout on large queries" "prod incident" >/dev/null
+  local output
+  output=$(agentdb inject-context adversary)
+  assert_contains "$output" "Past Failures" &&
+  assert_contains "$output" "Known Gotchas" &&
+  assert_contains "$output" "Recent Errors"
+}
+
+test_inject_context_unknown_fallback() {
+  agentdb init >/dev/null
+  local output
+  output=$(agentdb inject-context unknown_type_xyz)
+  # Falls back to read-start which outputs "AgentDB Context"
+  assert_contains "$output" "AgentDB Context"
+}
+
+test_orchestration_skill_has_injection() {
+  grep -q "knowledge_injection" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+}
+
+# --- Phase 2 Agents Tests ---
+
+test_reviewer_has_review_protocol() {
+  local file="$PLUGIN_ROOT/agents/reviewer.md"
+  assert_contains "$(cat "$file")" "review_protocol"
+}
+
+test_reviewer_has_confidence_scoring() {
+  local file="$PLUGIN_ROOT/agents/reviewer.md"
+  assert_contains "$(cat "$file")" "confidence_scoring"
+}
+
+test_validator_has_safety_chain() {
+  local file="$PLUGIN_ROOT/agents/validator.md"
+  assert_contains "$(cat "$file")" "safety_chain"
+}
+
+test_validator_has_9_gates() {
+  local file="$PLUGIN_ROOT/agents/validator.md"
+  local content
+  content=$(cat "$file")
+  assert_contains "$content" "Gate 1:"
+  assert_contains "$content" "Gate 9:"
+}
+
 # === Run Tests ===
 
 run_test_suite() {
@@ -1629,6 +1734,29 @@ run_test_suite() {
       run_test "classify_profile production by envs" test_classify_profile_production_by_envs
       run_test "classify_profile production by projects" test_classify_profile_production_by_projects
       ;;
+    inject_context)
+      run_test "inject-context command exists" test_inject_context_command_exists
+      run_test "inject-context surgeon outputs gotchas" test_inject_context_surgeon_gotchas
+      run_test "inject-context adversary outputs failures" test_inject_context_adversary_failures
+      run_test "inject-context unknown falls back to read-start" test_inject_context_unknown_fallback
+      run_test "orchestration SKILL.md has knowledge_injection" test_orchestration_skill_has_injection
+      ;;
+    phase2_agents)
+      run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
+      run_test "reviewer has confidence scoring" test_reviewer_has_confidence_scoring
+      run_test "validator has safety_chain" test_validator_has_safety_chain
+      run_test "validator has 9 gates" test_validator_has_9_gates
+      ;;
+    triage_understudier)
+      run_test "triage.md exists with frontmatter" test_triage_exists_with_frontmatter
+      run_test "triage.md has model: haiku" test_triage_model_haiku
+      run_test "triage.md has complexity classification" test_triage_has_complexity_classification
+      run_test "understudier.md exists with frontmatter" test_understudier_exists_with_frontmatter
+      run_test "understudier.md has model: haiku" test_understudier_model_haiku
+      run_test "understudier.md has viability assessment" test_understudier_has_viability_assessment
+      run_test "CLAUDE.md references triage agent" test_claude_md_references_triage
+      run_test "CLAUDE.md references understudier agent" test_claude_md_references_understudier
+      ;;
   esac
 }
 
@@ -1667,6 +1795,9 @@ main() {
     run_test_suite "diagnose"
     run_test_suite "retrospective"
     run_test_suite "profile"
+    run_test_suite "phase2_agents"
+    run_test_suite "triage_understudier"
+    run_test_suite "inject_context"
   else
     run_test_suite "$target"
   fi

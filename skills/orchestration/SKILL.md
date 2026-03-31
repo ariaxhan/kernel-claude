@@ -65,6 +65,26 @@ Every agent boundary is lossy compression.
 - Never rely on conversation history across agents
 </context_transfer>
 
+<knowledge_injection>
+  Before spawning any agent, inject relevant context:
+
+  orchestrator_protocol:
+    1. Build context slice: `agentdb inject-context <agent_type>`
+    2. Include slice in agent prompt (not as a separate tool call)
+    3. Agent receives pre-loaded context — doesn't need to search
+
+  agent_slicing:
+    surgeon: gotchas + patterns + active contract
+    adversary: past failures + gotchas + recent errors
+    reviewer: same as adversary (test for known failure modes)
+    researcher: all learnings by domain + recent verdicts
+    triage: complexity signals + recent contracts
+    understudier: same as triage
+
+  rule: inject BEFORE spawn. Never let agents discover context at runtime.
+  rule: orchestrator owns injection. Agents don't call inject-context themselves.
+</knowledge_injection>
+
 <anti_patterns>
 - Holding context in memory instead of AgentDB
 - Assuming agent completed without reading DB
