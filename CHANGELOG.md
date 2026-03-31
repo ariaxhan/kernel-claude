@@ -2,6 +2,21 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.8.1] - 2026-03-30
+
+### Added
+- **Skill template system** — `skills/TEMPLATE.md` provides documented skeleton for creating domain-specific skills. Covers: source loading, triggers, quality gates, output format, flags, anti-patterns. (#115)
+- **Pre-tool validation hook** — `validate-structure.sh` warns on missing frontmatter (commands/agents) and missing triggers (skills). Async, never blocks. (#117)
+- **Analyzer agent** — Opus-powered cross-task intelligence. Dependency detection, batch analysis, systemic patterns, priority recommendation. (#93)
+- **Progressive autonomy** — Confidence-based human escalation in orchestration skill. Supervised → semi-autonomous → autonomous. Security-sensitive changes always escalate. (#95)
+- **Budget-aware agents** — Token budget tracking and self-regulation protocol. Alerts at 50/80/95%. Agents see remaining budget and adjust complexity. (#94)
+- **ADSR anomaly detection** — Proactive deviation detection in quality skill. Anomaly → Detection → Suppression → Recovery. Baselines from historical data. (#112)
+- **Checkpoint-based recovery** — Resume from last good state in orchestration skill. Saves 40-60% on failures. Version safety prevents stale state. (#113)
+- **Co-change graph** — `agentdb co-change <file>` mines git history for file co-modification patterns. Predicts impacted files. (#114)
+- **18 new tests** — Framework (8), agents (6), extensions (4). 153 total passing.
+
+---
+
 ## [7.6.1] - 2026-03-25
 
 ### Added

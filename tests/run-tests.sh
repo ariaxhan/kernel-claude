@@ -1789,6 +1789,7 @@ main() {
     run_test_suite "retrospective"
     run_test_suite "profile"
     run_test_suite "phase4_agents"
+    run_test_suite "phase4_extensions"
     run_test_suite "phase4_framework"
   else
     run_test_suite "$target"

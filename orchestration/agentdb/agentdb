@@ -1024,6 +1024,30 @@ cmd_metrics() {
   fi
 }
 
+# === CO-CHANGE GRAPH ===
+cmd_co_change() {
+  local file="${1:-}"
+  local limit="${2:-10}"
+
+  [ -z "$file" ] && { echo "Usage: agentdb co-change <file> [limit]"; exit 1; }
+  validate_int "$limit" "limit"
+
+  local project_root
+  project_root=$(find_project_root)
+
+  echo "## Co-Change Graph: $file"
+  echo "Files frequently modified alongside $file:"
+  echo ""
+
+  # Mine git log for co-modifications
+  # For each commit that touched $file, list other files changed
+  git -C "$project_root" log --pretty=format:"%H" --follow -- "$file" 2>/dev/null | head -50 | while read -r commit; do
+    git -C "$project_root" diff-tree --no-commit-id --name-only -r "$commit" 2>/dev/null
+  done | grep -v "^$(basename "$file")$" | sort | uniq -c | sort -rn | head -"$limit" | while read -r count cofile; do
+    echo "- $cofile ($count co-changes)"
+  done
+}
+
 # === DISPATCH ===
 case "${1:-help}" in
   init)           cmd_init ;;
@@ -1051,6 +1075,7 @@ case "${1:-help}" in
   schema)      shift; cmd_schema "$@" ;;
   export)      cmd_export ;;
   recent)      shift; cmd_recent "$@" ;;
+  co-change)   shift; cmd_co_change "$@" ;;
   *)
     echo "KERNEL AgentDB - Every agent reads on start, writes on end"
     echo ""
@@ -1080,6 +1105,9 @@ case "${1:-help}" in
     echo "  wtf                     What just happened? (errors, failures, contract)"
     echo "  timeline [N]            Last N events across all tables (default: 20)"
     echo "  guide                   Quick reference cheat sheet"
+    echo ""
+    echo "ANALYSIS:"
+    echo "  co-change <file> [N]    Show files frequently modified alongside <file>"
     echo ""
     echo "UTILITIES:"
     echo "  status                  DB health, counts"
