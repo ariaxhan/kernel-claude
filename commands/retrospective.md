@@ -36,6 +36,12 @@ resolves contradictions, merges duplicates, archives stale entries, promotes hig
    - Promote patterns: Recommend additions to CLAUDE.md or skill reference docs
    - If non-local profile: surface promoted patterns to GitHub Discussions (Learnings category)
 
+   <ask_user>
+     Use AskUserQuestion when: promotable patterns found (reinforced 2+)
+     Ask: "Found {N} promotable patterns. Which should be encoded into rules?"
+     Options: promote all, review each, skip promotion
+   </ask_user>
+
 5. Write synthesis to AgentDB:
    ```bash
    agentdb write-end '{"did":"retrospective","clusters":N,"merged":N,"archived":N,"promoted":N}'

@@ -96,6 +96,12 @@ Reference when applicable: skills/context/reference/context-research.md, skills/
     </output>
   </phase>
 
+  <ask_user>
+    Use AskUserQuestion when: a risk zone is found (auth, payments, migrations, high-churn)
+    Ask: "Risk zone found: {area}. Investigate deeper, or flag and move on?"
+    Options: investigate deeper, flag and move on
+  </ask_user>
+
   <phase id="risks" label="What's dangerous?">
     <step>Flag: migration files, auth modules, database schemas, payment logic.</step>
     <step>Flag: files marked TODO, deprecated, legacy, hack, workaround.</step>

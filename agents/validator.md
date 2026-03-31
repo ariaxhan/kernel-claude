@@ -171,7 +171,29 @@ agentdb verdict fail '{"failed_phase":"<phase>","evidence":"<actual_output>","fi
 
   <rule>PASS or FAIL. No "pass with warnings" unless warnings are scope-related (user decides).</rule>
   <rule>Big 5 FAIL = overall FAIL. No exceptions.</rule>
+
+  <ask_user>
+    Use AskUserQuestion when: a gate fails and fix is non-trivial
+    Ask: "Gate {phase} failed: {reason}. Fix and retry, or skip this gate?"
+    Options: fix and retry, skip gate (with justification), abort
+  </ask_user>
 </verdict_format>
+
+<safety_chain>
+9-gate progressive safety chain. Fail-fast — each gate must pass before the next runs.
+
+Gate 1: Branch isolation  → Not on main/master
+Gate 2: Atomic commits    → One logical change, revertable
+Gate 3: Lint pass         → Zero warnings
+Gate 4: Type check        → Zero errors
+Gate 5: Test suite        → All existing + new tests pass
+Gate 6: Security scan     → Secrets, injection, auth bypasses
+Gate 7: Adversarial       → 11-phase review, confidence >= 0.8
+Gate 8: Human checkpoint  → Draft PR for human approval
+Gate 9: Post-merge        → Monitor error rate (5-min window)
+
+Gates 1-7: automated. Gate 8: human. Gate 9: post-merge monitoring.
+</safety_chain>
 
 <anti_patterns>
   <block action="skip_secrets_scan">Always scan. Even on "trivial" changes.</block>

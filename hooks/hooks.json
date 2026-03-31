@@ -37,6 +37,12 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/detect-secrets.sh",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-structure.sh",
+            "timeout": 5,
+            "async": true
           }
         ]
       }

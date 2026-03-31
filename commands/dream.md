@@ -104,6 +104,12 @@ on_domain:
   </council>
 
   Each persona: 2-3 lines per perspective. Specific concerns, not essays.
+
+  <ask_user>
+    Use AskUserQuestion when: perspectives generated, before running council
+    Ask: "Three perspectives ready. Which resonates, or run all through stress test?"
+    Options: stress test all, lean toward {minimalist|maximalist|pragmatist}, rethink framing
+  </ask_user>
 </phase>
 
 <phase id="3_measure" name="Integrity Scoring">
@@ -148,6 +154,12 @@ on_domain:
 
   **Next:** /kernel:forge {approach} or /kernel:ingest for guided execution.
   </output_format>
+
+  <ask_user>
+    Use AskUserQuestion when: results presented with ranked perspectives
+    Ask: "Proceed with {winner}, hybrid approach, or rethink the problem?"
+    Options: proceed with winner, hybrid of top 2, rethink
+  </ask_user>
 </phase>
 
 <phase id="thermal_shock" name="All Perspectives Shattered" trigger="all_shatter">

@@ -59,6 +59,12 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
     Tier 2+: spawn parallel surgeon agents, one per approach.
     Tier 3: spawn full council (researcher + scout in parallel → dreamer → surgeons).
 
+    <ask_user>
+      Use AskUserQuestion when: approaches generated and user is present (not overnight)
+      Ask: "Generated {N} approaches. Prefer a direction, or let forge pick the strongest?"
+      Options: pick for me, lean toward {approach_name}, show me the approaches first
+    </ask_user>
+
     ```bash
     agentdb emit command "forge-heat" "" '{"approaches":N,"tier":N}'
     # If non-local profile: create tracking issue via _gh_create_issue
@@ -127,6 +133,12 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
     Max anneals: 3. After 3 structural failures → STOP.
     "Tried 3 distinct approaches. All shattered. Here's why. Human decision needed."
 
+    <ask_user>
+      Use AskUserQuestion when: approach shatters and alternatives remain
+      Ask: "Approach {X} shattered: {reason}. Try a different angle, or stop and reassess?"
+      Options: try next approach, stop and reassess, reframe the problem
+    </ask_user>
+
     ```bash
     agentdb emit command "forge-anneal" "" '{"reason":"X","approaches_exhausted":N}'
     ```
@@ -140,6 +152,12 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
     - github: commit + push
     - github-oss: feature branch → PR → self-review via /kernel:review
     - github-production: feature branch → PR → request review
+
+    <ask_user>
+      Use AskUserQuestion when: solution survived quench and is ready to ship
+      Ask: "Integrity {score}. Ready to ship, or want to review before committing?"
+      Options: ship it, review first, run one more quench cycle
+    </ask_user>
 
     ```bash
     agentdb learn pattern "what worked" "approach X, integrity Y"
@@ -164,28 +182,9 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
 </council>
 
 <loop_control>
-  continue_if: making progress (tests improving, integrity increasing)
-  anneal_if: integrity < 0.6 (approach is fundamentally flawed)
-  stop_if: 3 anneals (3 structurally different approaches all shattered)
-  stop_if: 10 total iterations without convergence
-  stop_if: scope creep (files growing beyond original scope)
-  escalate_if: architectural decision outside original scope
-
-  on_stop: full audit trail:
-    - approaches tried (with integrity scores)
-    - why each succeeded or shattered
-    - tests written
-    - learnings captured
-    - recommendation for human
+  continue_if: progress (tests improving, integrity increasing)
+  anneal_if: integrity < 0.6 | stop_if: 3 anneals OR 10 iterations OR scope creep
+  on_stop: audit trail (approaches+scores, shatter reasons, tests, learnings, recommendation)
 </loop_control>
-
-<protocol_fallback>
-If session-start hook did not fire:
-- AgentDB: read at start, write at end, learn on discovery
-- Skills ARE the methodology — load aggressively
-- Research anti-patterns BEFORE solutions. Tests BEFORE code.
-- Tier 1: execute directly. Tier 2+: orchestrate via agents.
-- Built-in beats library. Library beats custom.
-</protocol_fallback>
 
 </command>

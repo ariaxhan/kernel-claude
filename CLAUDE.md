@@ -1,4 +1,4 @@
-<kernel version="7.6.0">
+<kernel version="7.7.0">
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->
@@ -24,11 +24,14 @@
 
 <philosophy>
 Every AI-written line is a liability. Research proves solutions before coding.
-AgentDB-first. Read at start. Write at end.
-Read at start, write at end. Continuity depends on it.
-Research before coding. Capture learnings after.
-Orchestrate, don't implement (tier 2+).
+AgentDB-first. Read at start, write at end. Continuity depends on it.
 Most SWE work is solved problems. Find the solution, don't invent it.
+Orchestrate, don't implement (tier 2+). Agents write code, you coordinate.
+Slow down to speed up. Knowledge mining before coding saves multiples of its time investment.
+Pre-load over ask. Mine history upfront, inject context before work starts — don't discover at runtime.
+Fallback-first. When uncertain: deny. When scanner fails: block. When budget exceeded: stop. Never degrade a safety gate.
+Composite quality over binary. Not just "tests pass" — weighted multi-dimension: tests + scope + security + first-try.
+Ask at decision points. A 5-second question saves 5 minutes of wrong-direction work.
 </philosophy>
 
 <!-- ============================================ -->
@@ -71,6 +74,10 @@ Location: _meta/agentdb/agent.db
   <agent id="researcher">agents/researcher.md. Pre-implementation research. Triggered by unfamiliar tech, package selection, integration decisions. Load: build skill + build-research.</agent>
   <agent id="scout">agents/scout.md. Codebase reconnaissance. Triggered on first interaction or discovery requests. Maps structure, detects tooling, identifies risk zones. Load: context, architecture skills.</agent>
   <agent id="validator">agents/validator.md. Pre-commit quality gate. Runs: build, types, lint, tests, security scan. Blocks commit on failure. Load: testing, security skills.</agent>
+  <agent id="triage">agents/triage.md. Haiku complexity classifier. Single fast call before expensive work. Low/medium/high/epic classification.</agent>
+  <agent id="understudier">agents/understudier.md. Haiku pre-flight before surgeon. Validates approach viability cheaply before committing expensive resources.</agent>
+  <agent id="approval-learner">agents/approval-learner.md. Sonnet observer. Extracts patterns from human review decisions. Progressive rule promotion with confidence scoring.</agent>
+  <agent id="analyzer">agents/analyzer.md. Cross-task intelligence. Dependency detection, batch analysis, systemic patterns, priority recommendation.</agent>
   <rule>Tier 2+: you orchestrate. Agents write to AgentDB, not conversation.</rule>
   <rule>Every agent must load relevant skills/*/SKILL.md and reference skills/*/reference/*-research.md when applicable.</rule>
 </agents>

@@ -123,6 +123,12 @@ HIGH
 Summary: APPROVE | REQUEST CHANGES | COMMENT
 </output_format>
 
+<ask_user>
+  Use AskUserQuestion when: a finding is between 70-85% confidence (ambiguous)
+  Ask: "Found {issue} at {file:line} (confidence {X}%). Intentional, or should I flag it?"
+  Options: intentional — skip, flag it, investigate deeper
+</ask_user>
+
 <verdict_rules>
 - **APPROVE**: No critical or high issues
 - **REQUEST CHANGES**: Any critical or high issue

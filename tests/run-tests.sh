@@ -1505,14 +1505,12 @@ test_classify_profile_production_by_projects() {
 # === Phase 0 Bug Fix Tests ===
 
 test_capture_error_reads_tool_name() {
-  # capture-error.sh should read tool_name from stdin JSON (not tool)
   grep -q 'tool_name' "$PLUGIN_ROOT/hooks/scripts/capture-error.sh"
 }
 
 test_capture_error_logs_tool_correctly() {
   setup_test_env
   agentdb init >/dev/null 2>&1
-  # Simulate what capture-error.sh does with correct field
   local INPUT='{"tool_name":"Edit","error":"file not found","tool_input":{}}'
   local TOOL=$(echo "$INPUT" | jq -r '.tool_name // .tool // "unknown"' 2>/dev/null)
   assert_equals "Edit" "$TOOL" "tool_name should be extracted correctly"
@@ -1520,8 +1518,355 @@ test_capture_error_logs_tool_correctly() {
 }
 
 test_session_start_creates_memory_dir() {
-  # session-start.sh should contain MEMORY.md creation logic
   grep -q 'MEMORY.md' "$PLUGIN_ROOT/hooks/scripts/session-start.sh"
+}
+
+# --- Worktree Safety Tests ---
+
+test_surgeon_has_worktree_safety() {
+  local file="$PLUGIN_ROOT/agents/surgeon.md"
+  assert_file_exists "$file"
+  local content
+  content=$(cat "$file")
+  assert_contains "$content" "worktree_safety" "surgeon.md should contain worktree_safety section"
+  assert_contains "$content" "constraints.files" "surgeon.md should reference constraints.files"
+  assert_contains "$content" "git diff --name-only" "surgeon.md should have diff validation"
+}
+
+test_orchestration_has_constraint_validation() {
+  local file="$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+  assert_file_exists "$file"
+  local content
+  content=$(cat "$file")
+  assert_contains "$content" "worktree_safety" "orchestration SKILL.md should contain worktree_safety"
+  assert_contains "$content" "constraints.files" "orchestration SKILL.md should reference constraints.files"
+  assert_contains "$content" "Post-agent validation" "orchestration SKILL.md should have post-agent validation"
+}
+
+test_agentdb_contract_accepts_constraints() {
+  local output
+  output=$(agentdb contract '{"goal":"test","constraints":{"files":["a.sh","b.md"]},"tier":2}' 2>&1)
+  assert_contains "$output" "Contract: CR-"
+  local stored
+  stored=$(agentdb query "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1" 2>&1)
+  assert_contains "$stored" "constraints"
+  assert_contains "$stored" "a.sh"
+}
+
+# --- Triage & Understudier Agent Tests ---
+
+test_triage_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/triage.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/triage.md" | grep -q "^---"
+}
+
+test_triage_model_haiku() {
+  grep -q "^model: haiku" "$PLUGIN_ROOT/agents/triage.md"
+}
+
+test_triage_has_complexity_classification() {
+  grep -q "low.*medium.*high.*epic" "$PLUGIN_ROOT/agents/triage.md" ||
+  (grep -q "low:" "$PLUGIN_ROOT/agents/triage.md" &&
+   grep -q "medium:" "$PLUGIN_ROOT/agents/triage.md" &&
+   grep -q "high:" "$PLUGIN_ROOT/agents/triage.md" &&
+   grep -q "epic:" "$PLUGIN_ROOT/agents/triage.md")
+}
+
+test_understudier_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/understudier.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/understudier.md" | grep -q "^---"
+}
+
+test_understudier_model_haiku() {
+  grep -q "^model: haiku" "$PLUGIN_ROOT/agents/understudier.md"
+}
+
+test_understudier_has_viability_assessment() {
+  grep -q "viable" "$PLUGIN_ROOT/agents/understudier.md" &&
+  grep -q "risky" "$PLUGIN_ROOT/agents/understudier.md" &&
+  grep -q "blocked" "$PLUGIN_ROOT/agents/understudier.md"
+}
+
+test_claude_md_references_triage() {
+  grep -q 'agent id="triage"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
+test_claude_md_references_understudier() {
+  grep -q 'agent id="understudier"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
+# --- Inject Context Tests ---
+
+test_inject_context_command_exists() {
+  grep -q "inject-context" "$PLUGIN_ROOT/orchestration/agentdb/agentdb"
+}
+
+test_inject_context_surgeon_gotchas() {
+  agentdb init >/dev/null
+  agentdb learn failure "never use eval" "security risk" >/dev/null
+  agentdb learn pattern "use sql_escape" "prevents injection" >/dev/null
+  local output
+  output=$(agentdb inject-context surgeon)
+  assert_contains "$output" "Known Gotchas" &&
+  assert_contains "$output" "Proven Patterns"
+}
+
+test_inject_context_adversary_failures() {
+  agentdb init >/dev/null
+  agentdb learn failure "timeout on large queries" "prod incident" >/dev/null
+  local output
+  output=$(agentdb inject-context adversary)
+  assert_contains "$output" "Past Failures" &&
+  assert_contains "$output" "Known Gotchas" &&
+  assert_contains "$output" "Recent Errors"
+}
+
+test_inject_context_unknown_fallback() {
+  agentdb init >/dev/null
+  local output
+  output=$(agentdb inject-context unknown_type_xyz)
+  # Falls back to read-start which outputs "AgentDB Context"
+  assert_contains "$output" "AgentDB Context"
+}
+
+test_orchestration_skill_has_injection() {
+  grep -q "knowledge_injection" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+}
+
+# --- Phase 2 Agents Tests ---
+
+test_reviewer_has_review_protocol() {
+  local file="$PLUGIN_ROOT/agents/reviewer.md"
+  assert_contains "$(cat "$file")" "review_protocol"
+}
+
+test_reviewer_has_confidence_scoring() {
+  local file="$PLUGIN_ROOT/agents/reviewer.md"
+  assert_contains "$(cat "$file")" "confidence_scoring"
+}
+
+test_validator_has_safety_chain() {
+  local file="$PLUGIN_ROOT/agents/validator.md"
+  assert_contains "$(cat "$file")" "safety_chain"
+}
+
+test_validator_has_9_gates() {
+  local file="$PLUGIN_ROOT/agents/validator.md"
+  local content
+  content=$(cat "$file")
+  assert_contains "$content" "Gate 1:"
+  assert_contains "$content" "Gate 9:"
+}
+
+# === Approval Learner + R-Factor Tests ===
+
+test_approval_learner_exists_with_frontmatter() {
+  local agent_file="$PLUGIN_ROOT/agents/approval-learner.md"
+  assert_file_exists "$agent_file"
+  head -1 "$agent_file" | grep -q "^---" || {
+    echo "FAIL: approval-learner.md missing frontmatter"
+    return 1
+  }
+}
+
+test_approval_learner_model_sonnet() {
+  grep -q "model: sonnet" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should have model: sonnet"
+    return 1
+  }
+}
+
+test_approval_learner_has_confidence_scoring() {
+  grep -q "confidence_scoring" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should have confidence scoring"
+    return 1
+  }
+  grep -q "times_validated / times_applied" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should define confidence formula"
+    return 1
+  }
+}
+
+test_approval_learner_has_progressive_trust() {
+  grep -qi "progressive trust" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should have progressive trust"
+    return 1
+  }
+  grep -q "observe.*suggest.*enforce" "$PLUGIN_ROOT/agents/approval-learner.md" || {
+    echo "FAIL: approval-learner.md should define trust levels: observe, suggest, enforce"
+    return 1
+  }
+}
+
+test_quality_skill_has_r_factor() {
+  grep -q "r_factor" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
+    echo "FAIL: quality SKILL.md should have r_factor section"
+    return 1
+  }
+}
+
+test_r_factor_has_weighted_formula() {
+  grep -q "0.20 \* test_pass_rate" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
+    echo "FAIL: r_factor should have weighted formula with test_pass_rate"
+    return 1
+  }
+  grep -q "0.15 \* scope_accuracy" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
+    echo "FAIL: r_factor should have scope_accuracy weight"
+    return 1
+  }
+}
+
+test_claude_md_references_approval_learner() {
+  grep -q "approval-learner" "$PLUGIN_ROOT/CLAUDE.md" || {
+    echo "FAIL: CLAUDE.md should reference approval-learner agent"
+    return 1
+  }
+}
+
+# === Learning System Tests ===
+
+test_migration_005_file_exists() {
+  assert_file_exists "$PLUGIN_ROOT/orchestration/agentdb/migrations/005_learning_system.sql"
+}
+
+test_migration_005_creates_execution_traces() {
+  agentdb init >/dev/null
+  RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT name FROM sqlite_master WHERE type='table' AND name='execution_traces';")
+  assert_equals "execution_traces" "$RESULT" "execution_traces table should exist"
+}
+
+test_execution_traces_has_correct_columns() {
+  agentdb init >/dev/null
+  local cols
+  cols=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT name FROM pragma_table_info('execution_traces') ORDER BY cid;" | tr '\n' ',')
+  assert_contains "$cols" "id,"
+  assert_contains "$cols" "goal,"
+  assert_contains "$cols" "exploration,"
+  assert_contains "$cols" "plan,"
+  assert_contains "$cols" "action,"
+  assert_contains "$cols" "outcome,"
+  assert_contains "$cols" "success,"
+  assert_contains "$cols" "tokens_used,"
+  assert_contains "$cols" "domain,"
+}
+
+test_agentdb_trace_records() {
+  agentdb init >/dev/null
+  OUTPUT=$(agentdb trace '{"goal":"test goal","outcome":"success","success":1}' 2>&1)
+  assert_contains "$OUTPUT" "Trace: TR-"
+  RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT goal FROM execution_traces LIMIT 1;")
+  assert_equals "test goal" "$RESULT" "trace goal"
+}
+
+test_agentdb_decay_runs() {
+  agentdb init >/dev/null
+  OUTPUT=$(agentdb decay 2>&1)
+  assert_contains "$OUTPUT" "stale learnings"
+}
+
+test_agentdb_antibody_searches() {
+  agentdb init >/dev/null
+  agentdb learn pattern "always validate inputs" "test evidence" >/dev/null
+  OUTPUT=$(agentdb antibody "validate" 2>&1)
+  assert_contains "$OUTPUT" "Pattern Antibodies"
+  assert_contains "$OUTPUT" "validate inputs"
+}
+
+# === Analyzer Agent Tests (Phase 4) ===
+
+test_analyzer_agent_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/analyzer.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/analyzer.md" | grep -q "^---"
+}
+
+test_analyzer_agent_has_dependency_detection() {
+  grep -q "dependency_detection" "$PLUGIN_ROOT/agents/analyzer.md"
+}
+
+test_analyzer_agent_has_model_opus() {
+  grep -q "model: opus" "$PLUGIN_ROOT/agents/analyzer.md"
+}
+
+test_orchestration_has_progressive_autonomy() {
+  grep -q "progressive_autonomy" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+}
+
+test_orchestration_has_budget_awareness() {
+  grep -q "budget_awareness" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+}
+
+test_claude_md_references_analyzer() {
+  grep -q 'id="analyzer"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
+# === Extension Tests (Phase 4) ===
+
+test_quality_has_adsr() {
+  grep -q "adsr" "$PLUGIN_ROOT/skills/quality/SKILL.md"
+}
+
+test_orchestration_has_checkpoint_recovery() {
+  grep -q "checkpoint_recovery" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+}
+
+test_agentdb_co_change_exists() {
+  grep -q "cmd_co_change" "$PLUGIN_ROOT/orchestration/agentdb/agentdb"
+}
+
+test_agentdb_co_change_runs() {
+  # Run co-change on CLAUDE.md (exists in repo, will have git history)
+  local output
+  output=$(agentdb co-change "CLAUDE.md" 5 2>&1) || true
+  assert_contains "$output" "Co-Change Graph"
+}
+
+# === Framework Tests (Phase 4) ===
+
+test_template_exists() {
+  assert_file_exists "$PLUGIN_ROOT/skills/TEMPLATE.md" "TEMPLATE.md should exist"
+}
+
+test_template_has_sources() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  assert_contains "$content" "sources:" "TEMPLATE.md should have sources section"
+}
+
+test_template_has_triggers() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  assert_contains "$content" "triggers:" "TEMPLATE.md should have triggers section"
+}
+
+test_template_has_gates() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  assert_contains "$content" "gates:" "TEMPLATE.md should have gates section"
+}
+
+test_template_has_output() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  assert_contains "$content" "output:" "TEMPLATE.md should have output section"
+}
+
+test_validate_structure_exists() {
+  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" "validate-structure.sh should exist"
+  local perms
+  perms=$(ls -l "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" | cut -c4)
+  assert_equals "x" "$perms" "validate-structure.sh should be executable"
+}
+
+test_hooks_json_has_validate_structure() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/hooks/hooks.json")
+  assert_contains "$content" "validate-structure.sh" "hooks.json should reference validate-structure.sh"
+}
+
+test_validate_structure_sources_common() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh")
+  assert_contains "$content" "common.sh" "validate-structure.sh should source common.sh"
 }
 
 # === Run Tests ===
@@ -1729,6 +2074,75 @@ run_test_suite() {
       run_test "classify_profile production by envs" test_classify_profile_production_by_envs
       run_test "classify_profile production by projects" test_classify_profile_production_by_projects
       ;;
+    worktree_safety)
+      run_test "surgeon has worktree_safety section" test_surgeon_has_worktree_safety
+      run_test "orchestration has constraint validation" test_orchestration_has_constraint_validation
+      run_test "agentdb contract accepts constraints" test_agentdb_contract_accepts_constraints
+      ;;
+    inject_context)
+      run_test "inject-context command exists" test_inject_context_command_exists
+      run_test "inject-context surgeon outputs gotchas" test_inject_context_surgeon_gotchas
+      run_test "inject-context adversary outputs failures" test_inject_context_adversary_failures
+      run_test "inject-context unknown falls back to read-start" test_inject_context_unknown_fallback
+      run_test "orchestration SKILL.md has knowledge_injection" test_orchestration_skill_has_injection
+      ;;
+    phase2_agents)
+      run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
+      run_test "reviewer has confidence scoring" test_reviewer_has_confidence_scoring
+      run_test "validator has safety_chain" test_validator_has_safety_chain
+      run_test "validator has 9 gates" test_validator_has_9_gates
+      ;;
+    triage_understudier)
+      run_test "triage.md exists with frontmatter" test_triage_exists_with_frontmatter
+      run_test "triage.md has model: haiku" test_triage_model_haiku
+      run_test "triage.md has complexity classification" test_triage_has_complexity_classification
+      run_test "understudier.md exists with frontmatter" test_understudier_exists_with_frontmatter
+      run_test "understudier.md has model: haiku" test_understudier_model_haiku
+      run_test "understudier.md has viability assessment" test_understudier_has_viability_assessment
+      run_test "CLAUDE.md references triage agent" test_claude_md_references_triage
+      run_test "CLAUDE.md references understudier agent" test_claude_md_references_understudier
+      ;;
+    approval_rfactor)
+      run_test "approval-learner exists with frontmatter" test_approval_learner_exists_with_frontmatter
+      run_test "approval-learner model is sonnet" test_approval_learner_model_sonnet
+      run_test "approval-learner has confidence scoring" test_approval_learner_has_confidence_scoring
+      run_test "approval-learner has progressive trust" test_approval_learner_has_progressive_trust
+      run_test "quality SKILL.md has r_factor" test_quality_skill_has_r_factor
+      run_test "r_factor has weighted formula" test_r_factor_has_weighted_formula
+      run_test "CLAUDE.md references approval-learner" test_claude_md_references_approval_learner
+      ;;
+    learning_system)
+      run_test "migration 005 file exists" test_migration_005_file_exists
+      run_test "migration 005 creates execution_traces" test_migration_005_creates_execution_traces
+      run_test "execution_traces has correct columns" test_execution_traces_has_correct_columns
+      run_test "agentdb trace records trace" test_agentdb_trace_records
+      run_test "agentdb decay runs" test_agentdb_decay_runs
+      run_test "agentdb antibody searches learnings" test_agentdb_antibody_searches
+      ;;
+    phase4_agents)
+      run_test "analyzer agent exists with frontmatter" test_analyzer_agent_exists_with_frontmatter
+      run_test "analyzer agent has dependency detection" test_analyzer_agent_has_dependency_detection
+      run_test "analyzer agent has model opus" test_analyzer_agent_has_model_opus
+      run_test "orchestration has progressive_autonomy" test_orchestration_has_progressive_autonomy
+      run_test "orchestration has budget_awareness" test_orchestration_has_budget_awareness
+      run_test "CLAUDE.md references analyzer" test_claude_md_references_analyzer
+      ;;
+    phase4_extensions)
+      run_test "quality SKILL.md has adsr section" test_quality_has_adsr
+      run_test "orchestration SKILL.md has checkpoint_recovery" test_orchestration_has_checkpoint_recovery
+      run_test "agentdb co-change command exists" test_agentdb_co_change_exists
+      run_test "co-change runs without error" test_agentdb_co_change_runs
+      ;;
+    phase4_framework)
+      run_test "TEMPLATE.md exists" test_template_exists
+      run_test "TEMPLATE.md has sources section" test_template_has_sources
+      run_test "TEMPLATE.md has triggers section" test_template_has_triggers
+      run_test "TEMPLATE.md has gates section" test_template_has_gates
+      run_test "TEMPLATE.md has output section" test_template_has_output
+      run_test "validate-structure.sh exists and is executable" test_validate_structure_exists
+      run_test "hooks.json references validate-structure.sh" test_hooks_json_has_validate_structure
+      run_test "validate-structure.sh sources common.sh" test_validate_structure_sources_common
+      ;;
   esac
 }
 
@@ -1769,6 +2183,15 @@ main() {
     run_test_suite "github_integration"
     run_test_suite "profile"
     run_test_suite "phase0_fixes"
+    run_test_suite "worktree_safety"
+    run_test_suite "phase2_agents"
+    run_test_suite "triage_understudier"
+    run_test_suite "inject_context"
+    run_test_suite "approval_rfactor"
+    run_test_suite "learning_system"
+    run_test_suite "phase4_agents"
+    run_test_suite "phase4_extensions"
+    run_test_suite "phase4_framework"
   else
     run_test_suite "$target"
   fi

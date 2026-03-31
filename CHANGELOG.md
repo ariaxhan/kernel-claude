@@ -10,6 +10,49 @@ All notable changes to KERNEL are documented in this file.
 
 ### Added
 - **Phase 0 bug fix tests** — 3 new regression tests for capture-error tool extraction and memory directory creation.
+## [7.7.0] - 2026-03-30
+
+### Added
+- **AskUserQuestion integration** — All 11 commands (except help) now have `<ask_user>` blocks at phase boundaries. 7 agent definitions include decision-point questions. Session-start hook surfaces stale contracts and uncommitted files as prompts. (#119)
+- **Worktree safety protocol** — Surgeon agent validates file modifications against contract constraints. Orchestration skill enforces pre-spawn clean state and post-agent diff validation. `constraints.files` documented in contract JSON schema. (#116)
+- **3 new worktree safety tests** — Validates surgeon, orchestration, and agentdb constraint support.
+
+### Changed
+- **Philosophy rewrite** — Comprehensive rewrite of `<philosophy>` section. All original principles preserved. 5 new principles: pre-load over ask, fallback-first, composite quality, ask at decision points, slow down to speed up. (#118)
+- **Token budget compliance** — Trimmed ingest.md (214→190 lines) and forge.md (207→188 lines) to stay under 200-line budget after AskUserQuestion additions.
+## [7.7.1] - 2026-03-30
+
+### Added
+- **11-phase adversarial review protocol** — Reviewer agent upgraded with structured review: checkpoint → Big5 → scope → smoke → edge cases → error paths → regression → security → contract → mutation → quality. Confidence scoring formula with 0.8 threshold. (#89)
+- **9-gate safety chain** — Validator agent upgraded with progressive gates: branch isolation → atomic commits → lint → types → tests → security → adversarial review → human checkpoint → post-merge monitoring. Fail-fast model. (#91)
+- **Triage agent** — Haiku-powered complexity classifier. Single fast call classifies low/medium/high/epic before expensive agents spawn. (#92)
+- **Understudier agent** — Haiku pre-flight validates approach viability before surgeon commit. Checks: existence, compatibility, conflicts, dependencies, test infrastructure. (#40)
+- **Knowledge injection system** — `agentdb inject-context <agent_type>` builds agent-specific context slices. Orchestrator injects before spawn. Surgeon gets gotchas+patterns, adversary gets failures+errors, researcher gets all learnings by domain. (#110)
+- **17 new tests** — Phase 2 agent tests (4), triage/understudier tests (8), knowledge injection tests (5). 152 total passing.
+
+### Changed
+- **plugin.json description** — Updated to reflect 9 agents, knowledge injection, 11-phase review, 9-gate safety chain.
+## [7.8.0] - 2026-03-30
+
+### Added
+- **GEPA execution traces** — `agentdb trace <json>` records goal/exploration/plan/action/outcome for every task. New `execution_traces` table via migration 005. (#90)
+- **IMMUNE pattern antibodies** — `agentdb antibody <pattern>` searches learnings by pattern match. Finds proven solutions and known failures for similar problems. (#96)
+- **Learning decay** — `agentdb decay` archives stale learnings (0 hits, >46 days). Reports freshness distribution: high-confidence/reinforced/unvalidated. (#97)
+- **Approval learner agent** — Sonnet observer that extracts patterns from human review decisions. Progressive rule promotion: observe → suggest → enforce. Confidence = validated/applied. (#111)
+- **R-factor quality scoring** — Composite weighted quality score replacing binary pass/fail. 6 dimensions: tests + acceptance + scope + security + budget + first-try. Thresholds: 0.85 (production), 0.70 (good), 0.50 (acceptable). (#68)
+- **13 new tests** — Learning system (6), approval learner + R-factor (7). 148 total passing.
+## [7.8.1] - 2026-03-30
+
+### Added
+- **Skill template system** — `skills/TEMPLATE.md` provides documented skeleton for creating domain-specific skills. Covers: source loading, triggers, quality gates, output format, flags, anti-patterns. (#115)
+- **Pre-tool validation hook** — `validate-structure.sh` warns on missing frontmatter (commands/agents) and missing triggers (skills). Async, never blocks. (#117)
+- **Analyzer agent** — Opus-powered cross-task intelligence. Dependency detection, batch analysis, systemic patterns, priority recommendation. (#93)
+- **Progressive autonomy** — Confidence-based human escalation in orchestration skill. Supervised → semi-autonomous → autonomous. Security-sensitive changes always escalate. (#95)
+- **Budget-aware agents** — Token budget tracking and self-regulation protocol. Alerts at 50/80/95%. Agents see remaining budget and adjust complexity. (#94)
+- **ADSR anomaly detection** — Proactive deviation detection in quality skill. Anomaly → Detection → Suppression → Recovery. Baselines from historical data. (#112)
+- **Checkpoint-based recovery** — Resume from last good state in orchestration skill. Saves 40-60% on failures. Version safety prevents stale state. (#113)
+- **Co-change graph** — `agentdb co-change <file>` mines git history for file co-modification patterns. Predicts impacted files. (#114)
+- **18 new tests** — Framework (8), agents (6), extensions (4). 153 total passing.
 
 ---
 

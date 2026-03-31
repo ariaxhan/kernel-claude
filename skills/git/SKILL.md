@@ -59,29 +59,36 @@ Bad:
 - Mixing unrelated changes in one commit
 - Force pushing to shared branches
 - Skipping commit messages
+- Including AI tool attribution in commit messages (Co-Authored-By, "Generated with Claude Code", etc.)
 </anti_patterns>
 
-<pr_structure>
-<!-- Updated 2026-03-28: https://addyo.substack.com/p/code-review-in-the-age-of-ai -->
-As of 2026, 41% of commits are AI-assisted. PRs must include human accountability:
+<!-- Updated 2026-03-30: Claude Code best practices, Anthropic prompt engineering guide -->
+<agentic_git_discipline>
+Agentic workflows introduce new git failure modes. Mitigate them:
 
-```
-## Intent
-1-2 sentences: what this changes and why.
+**Pre-task snapshot**: Before any agent starts work, record the HEAD commit SHA in AgentDB.
+If the task needs rollback, you know exactly where to return.
 
-## Proof it works
-- [ ] Tests added/updated
-- [ ] Manual test steps: [describe]
+```bash
+# Record before agent work
+git rev-parse HEAD  # save this to AgentDB
 
-## Risk tier
-low | medium | high — and which parts were AI-generated.
-
-## Review focus
-1-2 specific areas where human judgment is needed.
+# Rollback if needed
+git reset --hard <saved-sha>
 ```
 
-AI reviewers break down on large diffs (>500 lines). Keep PRs small and focused.
-Non-breaking additions (new fields, optional params, new endpoints) don't need a version bump.
-</pr_structure>
+**Dirty-state check**: If `git status` shows uncommitted changes at task start, stop.
+Prior agent left state. Commit, stash, or discard before proceeding — never silently overwrite.
+
+**Branch-per-agent for tier 2+**: Each agent working on distinct features gets its own
+branch. Merging branches (not rebasing) preserves intent and makes conflicts explicit.
+
+**Squash before merge**: Agent commits tend to be fine-grained and mechanical.
+Squash to one meaningful commit per feature before merging to main. Message should
+describe the feature, not the implementation steps.
+
+**No force-push to shared branches**: An agent force-pushing destroys another agent's
+or human's commits silently. Use `--force-with-lease` only, never bare `--force`.
+</agentic_git_discipline>
 
 </skill>
