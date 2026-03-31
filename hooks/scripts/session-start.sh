@@ -226,6 +226,30 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
     echo ""
   fi
 
+  # === BLOCKER SURFACING ===
+  # Tell Claude to ask about blockers instead of assuming
+  BLOCKERS=""
+
+  # Check for stale contracts (>24h with no checkpoint)
+  STALE_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM context WHERE type='contract' AND ts < datetime('now', '-1 day') AND contract_id NOT IN (SELECT COALESCE(contract_id, '') FROM context WHERE type='verdict');" 2>/dev/null || echo "0")
+  if [ "$STALE_COUNT" -gt 0 ]; then
+    BLOCKERS="${BLOCKERS}\n- $STALE_COUNT stale contract(s) >24h without verdict"
+  fi
+
+  # Check for recent errors (>3 in last hour)
+  ERROR_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM errors WHERE ts > datetime('now', '-1 hour');" 2>/dev/null || echo "0")
+  if [ "$ERROR_COUNT" -gt 3 ]; then
+    BLOCKERS="${BLOCKERS}\n- $ERROR_COUNT errors in last hour (possible loop)"
+  fi
+
+  if [ -n "$BLOCKERS" ]; then
+    echo "## Blockers Detected"
+    printf "%b\n" "$BLOCKERS"
+    echo ""
+    echo "**ASK USER:** Use AskUserQuestion to confirm: address blockers first, or proceed with new work?"
+    echo ""
+  fi
+
   PENDING=$("$AGENTDB" query "SELECT agent, content FROM context WHERE type='checkpoint' AND ts > (SELECT COALESCE(MAX(ts), '1970-01-01') FROM context WHERE type='verdict') ORDER BY ts DESC LIMIT 1" 2>/dev/null)
   if [ -n "$PENDING" ] && ! echo "$PENDING" | grep -q "pre-compact"; then
     echo "## Pending Review"

@@ -1799,6 +1799,81 @@ test_claude_md_references_analyzer() {
   grep -q 'id="analyzer"' "$PLUGIN_ROOT/CLAUDE.md"
 }
 
+# === Cartographer & Coroner Tests ===
+
+test_cartographer_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/cartographer.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/cartographer.md" | grep -q "^---"
+}
+
+test_cartographer_model_opus() {
+  grep -q "^model: opus" "$PLUGIN_ROOT/agents/cartographer.md"
+}
+
+test_cartographer_has_codebase_map_output() {
+  grep -q "codebase.map\|codebase_map\|modules.*dependencies.*risk" "$PLUGIN_ROOT/agents/cartographer.md"
+}
+
+test_coroner_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/coroner.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/coroner.md" | grep -q "^---"
+}
+
+test_coroner_model_sonnet() {
+  grep -q "^model: sonnet" "$PLUGIN_ROOT/agents/coroner.md"
+}
+
+test_coroner_has_post_mortem_analysis() {
+  grep -q "post.mortem\|cause_of_death\|root.cause" "$PLUGIN_ROOT/agents/coroner.md"
+}
+
+test_claude_md_references_cartographer() {
+  grep -q 'id="cartographer"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
+test_claude_md_references_coroner() {
+  grep -q 'id="coroner"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
+# === Pre-Ship + App-Dev Tests ===
+
+test_pre_ship_exists_with_frontmatter() {
+  [ -f "$PLUGIN_ROOT/agents/pre-ship.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/agents/pre-ship.md" | grep -q "^---"
+}
+
+test_pre_ship_has_composite_verdict() {
+  grep -q "composite_verdict\|SHIP.*NO-SHIP\|SHIP-WITH-WARNINGS" "$PLUGIN_ROOT/agents/pre-ship.md"
+}
+
+test_pre_ship_spawns_parallel_validators() {
+  grep -q "parallel" "$PLUGIN_ROOT/agents/pre-ship.md" && \
+  grep -q "validator" "$PLUGIN_ROOT/agents/pre-ship.md" && \
+  grep -q "reviewer" "$PLUGIN_ROOT/agents/pre-ship.md" && \
+  grep -q "security_scan" "$PLUGIN_ROOT/agents/pre-ship.md" && \
+  grep -q "test_suite" "$PLUGIN_ROOT/agents/pre-ship.md"
+}
+
+test_app_dev_skill_exists() {
+  [ -f "$PLUGIN_ROOT/skills/app-dev/SKILL.md" ]
+}
+
+test_app_dev_has_store_submission() {
+  grep -q "store submission\|Store Submission\|App Store\|Play Console" "$PLUGIN_ROOT/skills/app-dev/SKILL.md"
+}
+
+test_app_dev_has_triggers() {
+  grep -q "app.*mobile\|EAS\|store submission\|expo\|react native" "$PLUGIN_ROOT/skills/app-dev/SKILL.md"
+}
+
+test_claude_md_references_pre_ship() {
+  grep -q 'id="pre-ship"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
+test_claude_md_references_app_dev() {
+  grep -q 'id="app-dev"' "$PLUGIN_ROOT/CLAUDE.md"
+}
+
 # === Extension Tests (Phase 4) ===
 
 test_quality_has_adsr() {
@@ -1867,6 +1942,52 @@ test_validate_structure_sources_common() {
   local content
   content=$(cat "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh")
   assert_contains "$content" "common.sh" "validate-structure.sh should source common.sh"
+}
+
+# === Hooks v2 Tests ===
+
+test_validate_json_schema_exists() {
+  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/validate-json-schema.sh" "validate-json-schema.sh should exist"
+  local perms
+  perms=$(ls -l "$PLUGIN_ROOT/hooks/scripts/validate-json-schema.sh" | cut -c4)
+  assert_equals "x" "$perms" "validate-json-schema.sh should be executable"
+}
+
+test_warn_hardcoded_exists() {
+  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" "warn-hardcoded.sh should exist"
+  local perms
+  perms=$(ls -l "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" | cut -c4)
+  assert_equals "x" "$perms" "warn-hardcoded.sh should be executable"
+}
+
+test_hooks_json_has_validate_json_schema() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/hooks/hooks.json")
+  assert_contains "$content" "validate-json-schema.sh" "hooks.json should reference validate-json-schema.sh"
+}
+
+test_hooks_json_has_warn_hardcoded() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/hooks/hooks.json")
+  assert_contains "$content" "warn-hardcoded.sh" "hooks.json should reference warn-hardcoded.sh"
+}
+
+test_session_start_has_blocker_surfacing() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/hooks/scripts/session-start.sh")
+  assert_contains "$content" "BLOCKER SURFACING" "session-start.sh should have blocker surfacing section"
+}
+
+test_validate_json_schema_sources_common() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/hooks/scripts/validate-json-schema.sh")
+  assert_contains "$content" "common.sh" "validate-json-schema.sh should source common.sh"
+}
+
+test_warn_hardcoded_sources_common() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh")
+  assert_contains "$content" "common.sh" "warn-hardcoded.sh should source common.sh"
 }
 
 # === Run Tests ===
@@ -2119,6 +2240,16 @@ run_test_suite() {
       run_test "agentdb decay runs" test_agentdb_decay_runs
       run_test "agentdb antibody searches learnings" test_agentdb_antibody_searches
       ;;
+    cartographer_coroner)
+      run_test "cartographer.md exists with frontmatter" test_cartographer_exists_with_frontmatter
+      run_test "cartographer.md has model: opus" test_cartographer_model_opus
+      run_test "cartographer.md has codebase map output" test_cartographer_has_codebase_map_output
+      run_test "coroner.md exists with frontmatter" test_coroner_exists_with_frontmatter
+      run_test "coroner.md has model: sonnet" test_coroner_model_sonnet
+      run_test "coroner.md has post-mortem analysis" test_coroner_has_post_mortem_analysis
+      run_test "CLAUDE.md references cartographer" test_claude_md_references_cartographer
+      run_test "CLAUDE.md references coroner" test_claude_md_references_coroner
+      ;;
     phase4_agents)
       run_test "analyzer agent exists with frontmatter" test_analyzer_agent_exists_with_frontmatter
       run_test "analyzer agent has dependency detection" test_analyzer_agent_has_dependency_detection
@@ -2133,6 +2264,15 @@ run_test_suite() {
       run_test "agentdb co-change command exists" test_agentdb_co_change_exists
       run_test "co-change runs without error" test_agentdb_co_change_runs
       ;;
+    hooks_v2)
+      run_test "validate-json-schema.sh exists and is executable" test_validate_json_schema_exists
+      run_test "warn-hardcoded.sh exists and is executable" test_warn_hardcoded_exists
+      run_test "hooks.json references validate-json-schema" test_hooks_json_has_validate_json_schema
+      run_test "hooks.json references warn-hardcoded" test_hooks_json_has_warn_hardcoded
+      run_test "session-start.sh has blocker surfacing section" test_session_start_has_blocker_surfacing
+      run_test "validate-json-schema.sh sources common.sh" test_validate_json_schema_sources_common
+      run_test "warn-hardcoded.sh sources common.sh" test_warn_hardcoded_sources_common
+      ;;
     phase4_framework)
       run_test "TEMPLATE.md exists" test_template_exists
       run_test "TEMPLATE.md has sources section" test_template_has_sources
@@ -2142,6 +2282,16 @@ run_test_suite() {
       run_test "validate-structure.sh exists and is executable" test_validate_structure_exists
       run_test "hooks.json references validate-structure.sh" test_hooks_json_has_validate_structure
       run_test "validate-structure.sh sources common.sh" test_validate_structure_sources_common
+      ;;
+    pre_ship_app)
+      run_test "pre-ship.md exists with frontmatter" test_pre_ship_exists_with_frontmatter
+      run_test "pre-ship.md has composite verdict" test_pre_ship_has_composite_verdict
+      run_test "pre-ship.md spawns parallel validators" test_pre_ship_spawns_parallel_validators
+      run_test "app-dev SKILL.md exists" test_app_dev_skill_exists
+      run_test "app-dev SKILL.md has store submission" test_app_dev_has_store_submission
+      run_test "app-dev SKILL.md has triggers" test_app_dev_has_triggers
+      run_test "CLAUDE.md references pre-ship" test_claude_md_references_pre_ship
+      run_test "CLAUDE.md references app-dev" test_claude_md_references_app_dev
       ;;
   esac
 }
@@ -2191,7 +2341,9 @@ main() {
     run_test_suite "learning_system"
     run_test_suite "phase4_agents"
     run_test_suite "phase4_extensions"
+    run_test_suite "hooks_v2"
     run_test_suite "phase4_framework"
+    run_test_suite "cartographer_coroner"
   else
     run_test_suite "$target"
   fi

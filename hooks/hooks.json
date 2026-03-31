@@ -43,6 +43,12 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-structure.sh",
             "timeout": 5,
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/warn-hardcoded.sh",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -66,6 +72,12 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-write.sh",
+            "timeout": 5,
+            "async": true
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-json-schema.sh",
             "timeout": 5,
             "async": true
           }
