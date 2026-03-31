@@ -2,6 +2,18 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.8.0] - 2026-03-30
+
+### Added
+- **GEPA execution traces** — `agentdb trace <json>` records goal/exploration/plan/action/outcome for every task. New `execution_traces` table via migration 005. (#90)
+- **IMMUNE pattern antibodies** — `agentdb antibody <pattern>` searches learnings by pattern match. Finds proven solutions and known failures for similar problems. (#96)
+- **Learning decay** — `agentdb decay` archives stale learnings (0 hits, >46 days). Reports freshness distribution: high-confidence/reinforced/unvalidated. (#97)
+- **Approval learner agent** — Sonnet observer that extracts patterns from human review decisions. Progressive rule promotion: observe → suggest → enforce. Confidence = validated/applied. (#111)
+- **R-factor quality scoring** — Composite weighted quality score replacing binary pass/fail. 6 dimensions: tests + acceptance + scope + security + budget + first-try. Thresholds: 0.85 (production), 0.70 (good), 0.50 (acceptable). (#68)
+- **13 new tests** — Learning system (6), approval learner + R-factor (7). 148 total passing.
+
+---
+
 ## [7.6.1] - 2026-03-25
 
 ### Added
