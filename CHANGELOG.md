@@ -2,6 +2,17 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.6.4] - 2026-03-30
+
+### Fixed
+- **capture-error.sh reads `tool_name`** — PostToolUseFailure hook now reads `tool_name` from stdin JSON (was reading `tool`, causing all errors to log as 'unknown'). (#103)
+- **session-start creates MEMORY.md** — Auto-memory directory and MEMORY.md are created on first session if missing, preventing read-start crash. (#104)
+
+### Added
+- **Phase 0 bug fix tests** — 3 new regression tests for capture-error tool extraction and memory directory creation.
+
+---
+
 ## [7.6.1] - 2026-03-25
 
 ### Added
