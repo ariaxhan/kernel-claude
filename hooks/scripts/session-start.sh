@@ -6,9 +6,6 @@ set -eo pipefail
 source "$(dirname "$0")/common.sh"
 _kernel_hook_start
 
-# Self-heal: update current symlink if newer version available
-update_current_symlink
-
 # Detect paths
 VAULTS=$(detect_vaults)
 AGENTDB=$(get_agentdb "$VAULTS")

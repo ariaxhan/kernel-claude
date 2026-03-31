@@ -6,18 +6,27 @@
 command -v jq >/dev/null 2>&1 || { echo "Warning: jq not found, some hooks may not work" >&2; }
 
 # Auto-update current symlink to latest version (fixes stale hook issue)
-# Claude Code downloads new versions but doesn't update the symlink
+# Claude Code downloads new versions AFTER session-start hooks run,
+# so we check on every hook invocation (throttled to once per 60s).
+# Uses BASH_SOURCE[0] (common.sh itself) to find cache dir reliably,
+# regardless of call depth or caller location.
 update_current_symlink() {
-  local SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[1]}")" && pwd)"
-  local CACHE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+  # common.sh lives at {cache}/{version}/hooks/scripts/common.sh
+  # So 3 levels up from common.sh = the plugin parent dir (e.g. kernel/)
+  local COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local CACHE_DIR="$(cd "$COMMON_DIR/../../.." && pwd)"
 
   # Only run if we're in the plugin cache (not dev mode)
   [[ "$CACHE_DIR" == *"plugins/cache"* ]] || return 0
 
-  # Find highest semver directory
-  # CACHE_DIR is 2 levels up from hooks/scripts/ — lands at the VERSION dir (e.g. 7.5.2/)
-  # We need the PARENT (e.g. kernel/) to find other versions
-  CACHE_DIR="$(dirname "$CACHE_DIR")"
+  # Throttle: skip if checked within last 60 seconds
+  local STAMP="$CACHE_DIR/.update_checked"
+  if [ -f "$STAMP" ]; then
+    local stamp_age
+    stamp_age=$(( $(date +%s) - $(stat -f %m "$STAMP" 2>/dev/null || stat -c %Y "$STAMP" 2>/dev/null || echo 0) ))
+    [ "$stamp_age" -lt 60 ] && return 0
+  fi
+  touch "$STAMP" 2>/dev/null || true
 
   local LATEST
   LATEST=$(ls -d "$CACHE_DIR"/[0-9]*/ 2>/dev/null \
@@ -80,6 +89,8 @@ _KERNEL_HOOK_START_MS=""
 _kernel_hook_start() {
   # macOS date doesn't support %N, use python for ms precision
   _KERNEL_HOOK_START_MS=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo "")
+  # Check for plugin updates on every hook (throttled to 60s in the function)
+  update_current_symlink 2>/dev/null || true
 }
 
 _kernel_hook_end() {
