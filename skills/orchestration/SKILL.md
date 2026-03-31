@@ -88,7 +88,6 @@ Every agent boundary is lossy compression.
 - Never rely on conversation history across agents
 </context_transfer>
 
-<<<<<<< HEAD
 <knowledge_injection>
   Before spawning any agent, inject relevant context:
 
@@ -108,7 +107,6 @@ Every agent boundary is lossy compression.
   rule: inject BEFORE spawn. Never let agents discover context at runtime.
   rule: orchestrator owns injection. Agents don't call inject-context themselves.
 </knowledge_injection>
-=======
 <progressive_autonomy>
   Confidence-based human escalation. Higher confidence = less human involvement.
 
@@ -193,7 +191,6 @@ Every agent boundary is lossy compression.
   rule: always checkpoint before risky operations.
   rule: checkpoint is cheap. Not checkpointing is expensive.
 </checkpoint_recovery>
->>>>>>> feature/phase-4-framework
 
 <anti_patterns>
 - Holding context in memory instead of AgentDB

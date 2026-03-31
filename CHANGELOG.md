@@ -2,9 +2,6 @@
 
 All notable changes to KERNEL are documented in this file.
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
 ## [7.6.4] - 2026-03-30
 
 ### Fixed
@@ -23,7 +20,6 @@ All notable changes to KERNEL are documented in this file.
 ### Changed
 - **Philosophy rewrite** — Comprehensive rewrite of `<philosophy>` section. All original principles preserved. 5 new principles: pre-load over ask, fallback-first, composite quality, ask at decision points, slow down to speed up. (#118)
 - **Token budget compliance** — Trimmed ingest.md (214→190 lines) and forge.md (207→188 lines) to stay under 200-line budget after AskUserQuestion additions.
-=======
 ## [7.7.1] - 2026-03-30
 
 ### Added
@@ -36,8 +32,6 @@ All notable changes to KERNEL are documented in this file.
 
 ### Changed
 - **plugin.json description** — Updated to reflect 9 agents, knowledge injection, 11-phase review, 9-gate safety chain.
->>>>>>> feature/phase-2-agents
-=======
 ## [7.8.0] - 2026-03-30
 
 ### Added
@@ -47,8 +41,6 @@ All notable changes to KERNEL are documented in this file.
 - **Approval learner agent** — Sonnet observer that extracts patterns from human review decisions. Progressive rule promotion: observe → suggest → enforce. Confidence = validated/applied. (#111)
 - **R-factor quality scoring** — Composite weighted quality score replacing binary pass/fail. 6 dimensions: tests + acceptance + scope + security + budget + first-try. Thresholds: 0.85 (production), 0.70 (good), 0.50 (acceptable). (#68)
 - **13 new tests** — Learning system (6), approval learner + R-factor (7). 148 total passing.
->>>>>>> feature/phase-3-learning
-=======
 ## [7.8.1] - 2026-03-30
 
 ### Added
@@ -61,7 +53,6 @@ All notable changes to KERNEL are documented in this file.
 - **Checkpoint-based recovery** — Resume from last good state in orchestration skill. Saves 40-60% on failures. Version safety prevents stale state. (#113)
 - **Co-change graph** — `agentdb co-change <file>` mines git history for file co-modification patterns. Predicts impacted files. (#114)
 - **18 new tests** — Framework (8), agents (6), extensions (4). 153 total passing.
->>>>>>> feature/phase-4-framework
 
 ---
 

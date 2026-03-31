@@ -1,24 +1,7 @@
 {
   "name": "kernel",
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-  "version": "7.6.4",
-=======
-  "version": "7.7.0",
->>>>>>> feature/phase-1-foundation
-=======
-  "version": "7.8.0",
->>>>>>> feature/phase-3-learning
-=======
   "version": "7.8.1",
->>>>>>> feature/phase-4-framework
-  "description": "Persistent memory, multi-agent orchestration, and project-aware context for Claude Code. AgentDB tracks failures, patterns, and telemetry across sessions. Profile detection auto-adapts to local, private, OSS, and production projects. 17 skills (TDD, security, debugging, API design, backend patterns). Tiered routing: surgeon, adversary, reviewer, dreamer agents. Circuit breakers, compaction recovery, secret detection.",
-=======
-  "version": "7.7.1",
-  "description": "Persistent memory, multi-agent orchestration, and project-aware context for Claude Code. AgentDB tracks failures, patterns, and telemetry across sessions. Profile detection auto-adapts to local, private, OSS, and production projects. 17 skills (TDD, security, debugging, API design, backend patterns). Tiered routing: 9 agents (surgeon, adversary, reviewer, dreamer, scout, validator, triage, understudier, researcher). Knowledge injection, 11-phase review, 9-gate safety chain, circuit breakers, compaction recovery, secret detection.",
->>>>>>> feature/phase-2-agents
+  "description": "Persistent memory, multi-agent orchestration, and project-aware context for Claude Code. AgentDB tracks failures, patterns, and telemetry across sessions. Profile detection auto-adapts to local, private, OSS, and production projects. 17 skills (TDD, security, debugging, API design, backend patterns). Tiered routing: 10 agents (surgeon, adversary, reviewer, dreamer, scout, validator, triage, understudier, researcher, analyzer). Knowledge injection, 11-phase review, 9-gate safety chain, GEPA traces, IMMUNE antibodies, R-factor scoring, circuit breakers, compaction recovery, secret detection.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"

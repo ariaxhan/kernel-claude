@@ -62,30 +62,6 @@ Bad:
 - Including AI tool attribution in commit messages (Co-Authored-By, "Generated with Claude Code", etc.)
 </anti_patterns>
 
-<<<<<<< HEAD
-<pr_structure>
-<!-- Updated 2026-03-28: https://addyo.substack.com/p/code-review-in-the-age-of-ai -->
-As of 2026, 41% of commits are AI-assisted. PRs must include human accountability:
-
-```
-## Intent
-1-2 sentences: what this changes and why.
-
-## Proof it works
-- [ ] Tests added/updated
-- [ ] Manual test steps: [describe]
-
-## Risk tier
-low | medium | high — and which parts were AI-generated.
-
-## Review focus
-1-2 specific areas where human judgment is needed.
-```
-
-AI reviewers break down on large diffs (>500 lines). Keep PRs small and focused.
-Non-breaking additions (new fields, optional params, new endpoints) don't need a version bump.
-</pr_structure>
-=======
 <!-- Updated 2026-03-30: Claude Code best practices, Anthropic prompt engineering guide -->
 <agentic_git_discipline>
 Agentic workflows introduce new git failure modes. Mitigate them:
@@ -114,6 +90,5 @@ describe the feature, not the implementation steps.
 **No force-push to shared branches**: An agent force-pushing destroys another agent's
 or human's commits silently. Use `--force-with-lease` only, never bare `--force`.
 </agentic_git_discipline>
->>>>>>> feature/phase-4-framework
 
 </skill>

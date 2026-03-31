@@ -1031,7 +1031,6 @@ cmd_metrics() {
   fi
 }
 
-<<<<<<< HEAD
 cmd_inject_context() {
   local agent_type="${1:-surgeon}"
   [ ! -f "$DB" ] && cmd_init >/dev/null
@@ -1155,7 +1154,8 @@ cmd_antibody() {
     WHERE insight LIKE '%$safe_pattern%' OR domain LIKE '%$safe_pattern%'
     ORDER BY hit_count DESC, ts DESC
     LIMIT 10;"
-=======
+}
+
 # === CO-CHANGE GRAPH ===
 cmd_co_change() {
   local file="${1:-}"
@@ -1178,7 +1178,6 @@ cmd_co_change() {
   done | grep -v "^$(basename "$file")$" | sort | uniq -c | sort -rn | head -"$limit" | while read -r count cofile; do
     echo "- $cofile ($count co-changes)"
   done
->>>>>>> feature/phase-4-framework
 }
 
 # === DISPATCH ===
@@ -1243,17 +1242,14 @@ case "${1:-help}" in
     echo "  timeline [N]            Last N events across all tables (default: 20)"
     echo "  guide                   Quick reference cheat sheet"
     echo ""
-<<<<<<< HEAD
     echo "KNOWLEDGE INJECTION:"
     echo "  inject-context <type>   Build agent-specific context slice"
     echo "LEARNING SYSTEM (after migration 005):"
     echo "  trace <json>            Record GEPA execution trace"
     echo "  decay                   Archive stale learnings, show freshness"
     echo "  antibody <text>         Search learnings for pattern matches"
-=======
     echo "ANALYSIS:"
     echo "  co-change <file> [N]    Show files frequently modified alongside <file>"
->>>>>>> feature/phase-4-framework
     echo ""
     echo "UTILITIES:"
     echo "  status                  DB health, counts"
