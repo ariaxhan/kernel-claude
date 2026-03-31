@@ -125,14 +125,15 @@ _gh_ensure_labels() {
 # Args: title body labels(comma-separated)
 _gh_create_issue() {
   _gh_available || return 0
-  local title="${1:-}" body="${2:-}" labels="${3:-}"
+  local title="${1:-}" body="${2:-}" labels
+  labels="${3:-}"
   [[ -z "$title" ]] && return 0
 
   local repo
   repo=$(_gh_repo) || return 0
 
   local args=("issue" "create" "-R" "$repo" "--title" "$title" "--body" "${body:-}")
-  [[ -n "$labels" ]] && args+=("--label" "$labels")
+  [[ -n "${labels:-}" ]] && args+=("--label" "${labels}")
 
   local url
   url=$(gh "${args[@]}" 2>/dev/null) || return 0
