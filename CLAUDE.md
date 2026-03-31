@@ -78,6 +78,9 @@ Location: _meta/agentdb/agent.db
   <agent id="understudier">agents/understudier.md. Haiku pre-flight before surgeon. Validates approach viability cheaply before committing expensive resources.</agent>
   <agent id="approval-learner">agents/approval-learner.md. Sonnet observer. Extracts patterns from human review decisions. Progressive rule promotion with confidence scoring.</agent>
   <agent id="analyzer">agents/analyzer.md. Cross-task intelligence. Dependency detection, batch analysis, systemic patterns, priority recommendation.</agent>
+  <agent id="cartographer">agents/cartographer.md. Opus whole-codebase mapper. 1M context for holistic understanding. Maps modules, dependencies, risk zones.</agent>
+  <agent id="coroner">agents/coroner.md. Sonnet post-mortem analyst. Structured cause-of-death for failed contracts using AgentDB telemetry.</agent>
+  <agent id="pre-ship">agents/pre-ship.md. Composite release gate. Spawns 4 parallel validators, aggregates into SHIP/NO-SHIP verdict.</agent>
   <rule>Tier 2+: you orchestrate. Agents write to AgentDB, not conversation.</rule>
   <rule>Every agent must load relevant skills/*/SKILL.md and reference skills/*/reference/*-research.md when applicable.</rule>
 </agents>
@@ -225,6 +228,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <!-- WORKFLOW -->
   <skill id="git" triggers="commit, branch, merge, PR">Atomic commits, conventional messages, branch strategies, merge protocols.</skill>
   <skill id="design" triggers="UI, frontend, styling, visual">/design command. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
+  <skill id="app-dev" triggers="app, mobile, EAS, store submission, build, deploy">Mobile/web build pipeline, EAS, store submission, pre-submission checklists.</skill>
 
   <rule>Load relevant skill before acting. Match triggers to task. Reference research docs when methodology applies.</rule>
 </skills>
