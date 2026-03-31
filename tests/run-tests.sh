@@ -1990,6 +1990,37 @@ test_warn_hardcoded_sources_common() {
   assert_contains "$content" "common.sh" "warn-hardcoded.sh should source common.sh"
 }
 
+# --- Entropy Adaptive Tests ---
+
+test_orchestration_has_entropy_adaptive() {
+  local file="$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+  assert_file_exists "$file"
+  local content
+  content=$(cat "$file")
+  assert_contains "$content" "entropy_adaptive" "orchestration SKILL.md should have entropy_adaptive section"
+}
+
+test_entropy_adaptive_has_adaptation_levels() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
+  assert_contains "$content" "low_entropy" "should have low_entropy adaptation"
+  assert_contains "$content" "medium_entropy" "should have medium_entropy adaptation"
+  assert_contains "$content" "high_entropy" "should have high_entropy adaptation"
+}
+
+test_forge_has_entropy_measurement() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/commands/forge.md")
+  assert_contains "$content" "Measure entropy" "forge.md should mention entropy measurement"
+}
+
+test_entropy_adaptive_has_security_override() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
+  assert_contains "$content" "security-sensitive changes always get full pipeline" "should have security override"
+  assert_contains "$content" "never skip security checks" "should enforce security regardless of entropy"
+}
+
 # === Run Tests ===
 
 run_test_suite() {
@@ -2293,6 +2324,12 @@ run_test_suite() {
       run_test "CLAUDE.md references pre-ship" test_claude_md_references_pre_ship
       run_test "CLAUDE.md references app-dev" test_claude_md_references_app_dev
       ;;
+    entropy_adaptive)
+      run_test "orchestration has entropy_adaptive section" test_orchestration_has_entropy_adaptive
+      run_test "entropy_adaptive has low/medium/high adaptation" test_entropy_adaptive_has_adaptation_levels
+      run_test "forge.md mentions entropy measurement" test_forge_has_entropy_measurement
+      run_test "entropy_adaptive has security override" test_entropy_adaptive_has_security_override
+      ;;
   esac
 }
 
@@ -2344,6 +2381,8 @@ main() {
     run_test_suite "hooks_v2"
     run_test_suite "phase4_framework"
     run_test_suite "cartographer_coroner"
+    run_test_suite "pre_ship_app"
+    run_test_suite "entropy_adaptive"
   else
     run_test_suite "$target"
   fi

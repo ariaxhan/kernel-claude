@@ -192,6 +192,51 @@ Every agent boundary is lossy compression.
   rule: checkpoint is cheap. Not checkpointing is expensive.
 </checkpoint_recovery>
 
+<entropy_adaptive>
+  Dynamic agent orchestration based on task entropy. Replace fixed workflows with adaptive coordination.
+
+  entropy_measurement:
+    low:    familiar pattern, existing tests, clear scope → streamline (fewer agents, faster)
+    medium: some unknowns, partial test coverage → standard workflow
+    high:   unfamiliar tech, no tests, cross-cutting → full council + extra research
+
+  signals:
+    - agentdb learning count in domain (high count = low entropy)
+    - test coverage for affected files (high coverage = low entropy)
+    - number of recent failures in domain (high failures = high entropy)
+    - file co-change complexity (many co-changes = high entropy)
+    - triage agent classification (low/medium/high/epic)
+
+  adaptation:
+    low_entropy:
+      skip: researcher, scout
+      use: surgeon directly (tier 1 behavior even for tier 2 file counts)
+      rationale: known territory, don't waste tokens on research
+
+    medium_entropy:
+      standard: researcher → surgeon → validator
+      skip: adversary (unless security-sensitive)
+      rationale: some unknowns but manageable risk
+
+    high_entropy:
+      full: researcher + scout → triage → understudier → surgeon → adversary → reviewer
+      add: coroner on failure (automatic post-mortem)
+      rationale: maximum coverage, expect failures, learn from them
+
+  override:
+    - security-sensitive changes always get full pipeline regardless of entropy
+    - human can force entropy level via AskUserQuestion
+    - first session in new project always starts at high entropy
+
+  integration:
+    - triage agent outputs entropy estimate alongside complexity
+    - forge heat phase measures entropy before choosing approach count
+    - ingest classify step uses entropy to decide research depth
+
+  rule: entropy decreases as learnings accumulate. Reward the system for learning.
+  rule: never skip security checks regardless of entropy level.
+</entropy_adaptive>
+
 <anti_patterns>
 - Holding context in memory instead of AgentDB
 - Assuming agent completed without reading DB
