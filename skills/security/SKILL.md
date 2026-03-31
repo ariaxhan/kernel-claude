@@ -259,6 +259,35 @@ Before ANY production deployment:
 - [ ] **File Uploads**: Validated (size, type, extension)
 </pre_deployment_checklist>
 
+<supply_chain>
+<!-- Updated 2026-03-30: Claude Code best practices, OWASP supply chain guidance -->
+AI-generated code introduces supply chain risks beyond traditional OWASP top 10:
+
+- **Hallucinated packages**: AI may reference packages that don't exist or have been
+  name-squatted. Always verify package existence and download counts before installing.
+- **Version pinning**: Pin exact versions in package.json/requirements.txt for production.
+  Floating versions allow silent breaking changes on redeploy.
+- **Dependency audit cadence**: Run `npm audit` / `pip audit` / `cargo audit` on every PR,
+  not just on release. CI gate should block merge on HIGH/CRITICAL findings.
+- **Lockfile integrity**: Commit lockfiles. Verify lockfile wasn't modified unexpectedly
+  before merging PRs (lockfile tampering is a supply chain attack vector).
+</supply_chain>
+
+<prompt_injection>
+<!-- Updated 2026-03-30: Anthropic prompt engineering guide, agentic security research -->
+When building AI-integrated features, prevent prompt injection:
+
+- **Untrusted content isolation**: Never interpolate user-provided text directly into
+  system prompts. Use structured data formats (JSON tool calls) instead of free-text.
+- **Output validation**: Treat LLM output as untrusted input. Validate and sanitize before
+  rendering or executing.
+- **Capability scoping**: AI agents should have only the permissions needed for their task.
+  An agent that reads files shouldn't be able to write to disk unless explicitly required.
+- **Indirect injection**: User-provided data can contain injections that activate when
+  processed by an AI (e.g., "Ignore previous instructions and..."). Sanitize on ingestion,
+  not just on display.
+</prompt_injection>
+
 <anti_patterns>
 - "We'll add security later" (you won't)
 - Disabling security for development (gets shipped)
@@ -266,6 +295,7 @@ Before ANY production deployment:
 - Security through obscurity (it's not security)
 - Trusting client-side validation alone
 - Logging sensitive data
+- Installing AI-suggested packages without verifying they exist and are legitimate
 </anti_patterns>
 
 </skill>

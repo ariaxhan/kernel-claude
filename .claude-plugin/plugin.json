@@ -3,6 +3,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   "version": "7.6.4",
 =======
   "version": "7.7.0",
@@ -10,6 +11,9 @@
 =======
   "version": "7.8.0",
 >>>>>>> feature/phase-3-learning
+=======
+  "version": "7.8.1",
+>>>>>>> feature/phase-4-framework
   "description": "Persistent memory, multi-agent orchestration, and project-aware context for Claude Code. AgentDB tracks failures, patterns, and telemetry across sessions. Profile detection auto-adapts to local, private, OSS, and production projects. 17 skills (TDD, security, debugging, API design, backend patterns). Tiered routing: surgeon, adversary, reviewer, dreamer agents. Circuit breakers, compaction recovery, secret detection.",
 =======
   "version": "7.7.1",

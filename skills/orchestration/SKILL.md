@@ -88,6 +88,7 @@ Every agent boundary is lossy compression.
 - Never rely on conversation history across agents
 </context_transfer>
 
+<<<<<<< HEAD
 <knowledge_injection>
   Before spawning any agent, inject relevant context:
 
@@ -107,6 +108,92 @@ Every agent boundary is lossy compression.
   rule: inject BEFORE spawn. Never let agents discover context at runtime.
   rule: orchestrator owns injection. Agents don't call inject-context themselves.
 </knowledge_injection>
+=======
+<progressive_autonomy>
+  Confidence-based human escalation. Higher confidence = less human involvement.
+
+  levels:
+    supervised:    confidence < 0.6 — human confirms every decision
+    semi_autonomous: 0.6 <= confidence < 0.8 — human confirms tier 2+ only
+    autonomous:    confidence >= 0.8 — human reviews results, not decisions
+
+  escalation_triggers:
+    - confidence below threshold for current level
+    - unfamiliar tech or pattern (no matching learnings)
+    - scope exceeds contract by >20%
+    - security-sensitive change detected
+    - breaking change to public API
+
+  measurement:
+    agent_confidence: from reviewer 11-phase scoring
+    historical_accuracy: from approval-learner pattern matching
+    domain_familiarity: from agentdb learning count in this domain
+
+  rule: start supervised. Earn autonomy through consistent quality.
+  rule: any security concern instantly drops to supervised level.
+</progressive_autonomy>
+
+<budget_awareness>
+  Agents see their remaining budget. Self-regulate complexity.
+
+  allocation:
+    tier_1: low cost (direct execution)
+    tier_2: medium cost (orchestrator + surgeon)
+    tier_3: high cost (full council)
+
+  tracking:
+    - agentdb emit tracks token usage per agent per session
+    - orchestrator monitors cumulative cost across spawned agents
+    - budget injected into agent context: "Remaining budget: ~{N} tokens"
+
+  alerts:
+    50%: normal — continue
+    80%: warn — simplify approach
+    95%: critical — wrap up, checkpoint, stop spawning
+
+  self_regulation:
+    - agent sees remaining budget in injected context
+    - high budget: explore multiple approaches
+    - low budget: pick simplest viable approach
+    - exhausted: checkpoint and report to human
+
+  rule: never exceed budget silently. Alert at 80%, hard stop at 95%.
+  rule: budget is per-contract, not per-session.
+</budget_awareness>
+
+<checkpoint_recovery>
+  Resume from last good state, not restart from scratch. Saves 40-60% on failures.
+
+  checkpoint_schema:
+    agent_id: which agent was working
+    step: last completed step number
+    state: JSON blob of current progress
+    files_modified: list of files changed so far
+    tests_passing: count of passing tests at this point
+    timestamp: when checkpoint was written
+
+  protocol:
+    on_spawn: check agentdb for existing checkpoint with same contract_id
+    if_found: resume from step + 1, skip completed work
+    if_not_found: start fresh
+    on_each_step: write checkpoint via agentdb write-end
+    on_failure: checkpoint is preserved — next spawn resumes
+
+  version_safety:
+    - each checkpoint stores list of files_modified
+    - on resume: verify files haven't changed since checkpoint
+    - if changed externally: invalidate checkpoint, start fresh
+    - prevents "double update" from stale state
+
+  integration:
+    - surgeon writes checkpoint after each file modification
+    - forge checks for checkpoint before each heat cycle
+    - orchestrator reads checkpoint to determine resume point
+
+  rule: always checkpoint before risky operations.
+  rule: checkpoint is cheap. Not checkpointing is expensive.
+</checkpoint_recovery>
+>>>>>>> feature/phase-4-framework
 
 <anti_patterns>
 - Holding context in memory instead of AgentDB

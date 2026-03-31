@@ -1,0 +1,15 @@
+{
+	"/": [
+		"src/routes/+page.server.ts"
+	],
+	"/files": [
+		"src/routes/files/+page.server.ts"
+	],
+	"/github": [
+		"src/routes/github/+page.server.ts"
+	],
+	"/help": [],
+	"/memory": [
+		"src/routes/memory/+page.server.ts"
+	]
+}

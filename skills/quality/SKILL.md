@@ -90,5 +90,32 @@ Fix before commit. No exceptions.
   rule: R-factor is informational, not a hard gate. Use thresholds as guidelines.
   rule: Track R-factor over time to measure improvement, not as a one-time score.
 </r_factor>
+<adsr>
+  Proactive deviation detection. Don't wait for bugs — detect behavioral anomalies.
+
+  cycle:
+    anomaly:     deviation from baseline (token spike, unusual files, scope creep)
+    detection:   automated on every checkpoint (compare to historical averages)
+    suppression: block progression, alert human, quarantine work
+    recovery:    critical = human review required. medium = auto-retry after fix
+
+  baselines:
+    tokens_per_tier: avg from agentdb execution_traces
+    files_per_contract: avg from agentdb contracts
+    duration_per_task: avg from agentdb events
+
+  thresholds:
+    warning: > 1.5x baseline
+    anomaly: > 2x baseline
+    critical: > 3x baseline
+
+  integration:
+    - validator checks baselines during quench phase
+    - forge loop checks between iterations
+    - orchestrator checks after each agent completes
+
+  rule: anomaly = pause and ask, not auto-abort.
+  rule: build baselines from at least 10 historical data points before enforcing.
+</adsr>
 
 </skill>

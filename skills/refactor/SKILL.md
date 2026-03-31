@@ -67,6 +67,26 @@ Refactoring is the antidote: systematically improve what AI generates.
 But it requires understanding the code. No understanding = no safe refactor.
 </vibe_coding_crisis>
 
+<!-- Updated 2026-03-30: AI code review best practices, Claude Code best practices -->
+<agentic_refactor_safety>
+When refactoring AI-generated code, additional risks apply:
+
+**Phantom abstraction**: AI frequently creates abstractions that look useful but are used
+in only one place. Rule: if an abstraction has exactly one call site, inline it. Wait for
+a second use case before abstracting.
+
+**Comment drift**: AI comments often describe what the code WAS doing before an edit, not
+what it does now. Audit every comment for accuracy during refactor — stale comments are
+worse than no comments.
+
+**Parallel agent conflicts**: If multiple agents touched the same file, check git log for
+overlapping changes. The "final" file may be a merge artifact, not intentional code.
+
+**Scope creep detection**: Before starting, write down EXACTLY what you're changing.
+After finishing, diff your changes against that list. Any extras are scope creep — revert
+them and open a separate task.
+</agentic_refactor_safety>
+
 <on_complete>
 agentdb write-end '{"skill":"refactor","type":"<extract|inline|rename|simplify>","files_touched":<N>,"tests_status":"green","behavior_changed":false}'
 
