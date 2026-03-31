@@ -11,7 +11,6 @@ All notable changes to KERNEL are documented in this file.
 
 ### Added
 - **Phase 0 bug fix tests** — 3 new regression tests for capture-error tool extraction and memory directory creation.
-=======
 ## [7.7.0] - 2026-03-30
 
 ### Added
@@ -22,7 +21,20 @@ All notable changes to KERNEL are documented in this file.
 ### Changed
 - **Philosophy rewrite** — Comprehensive rewrite of `<philosophy>` section. All original principles preserved. 5 new principles: pre-load over ask, fallback-first, composite quality, ask at decision points, slow down to speed up. (#118)
 - **Token budget compliance** — Trimmed ingest.md (214→190 lines) and forge.md (207→188 lines) to stay under 200-line budget after AskUserQuestion additions.
->>>>>>> feature/phase-1-foundation
+=======
+## [7.7.1] - 2026-03-30
+
+### Added
+- **11-phase adversarial review protocol** — Reviewer agent upgraded with structured review: checkpoint → Big5 → scope → smoke → edge cases → error paths → regression → security → contract → mutation → quality. Confidence scoring formula with 0.8 threshold. (#89)
+- **9-gate safety chain** — Validator agent upgraded with progressive gates: branch isolation → atomic commits → lint → types → tests → security → adversarial review → human checkpoint → post-merge monitoring. Fail-fast model. (#91)
+- **Triage agent** — Haiku-powered complexity classifier. Single fast call classifies low/medium/high/epic before expensive agents spawn. (#92)
+- **Understudier agent** — Haiku pre-flight validates approach viability before surgeon commit. Checks: existence, compatibility, conflicts, dependencies, test infrastructure. (#40)
+- **Knowledge injection system** — `agentdb inject-context <agent_type>` builds agent-specific context slices. Orchestrator injects before spawn. Surgeon gets gotchas+patterns, adversary gets failures+errors, researcher gets all learnings by domain. (#110)
+- **17 new tests** — Phase 2 agent tests (4), triage/understudier tests (8), knowledge injection tests (5). 152 total passing.
+
+### Changed
+- **plugin.json description** — Updated to reflect 9 agents, knowledge injection, 11-phase review, 9-gate safety chain.
+>>>>>>> feature/phase-2-agents
 
 ---
 

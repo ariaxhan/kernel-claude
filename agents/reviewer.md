@@ -69,6 +69,29 @@ Summary: APPROVE | REQUEST CHANGES | COMMENT
   Ask: "Possible issue at {file:line}: {description} (confidence {X}%). Worth flagging?"
   Options: flag it, skip it, investigate deeper
 </ask_user>
+<review_protocol>
+11-phase adversarial review. First FAIL terminates — don't waste time on later phases.
+
+Phase 01: Checkpoint    → Branch exists, commits present, contract loaded
+Phase 02: Big5          → Lint, types, scope, tests, no secrets
+Phase 03: Scope         → Only contract-listed files touched (git diff verification)
+Phase 04: Smoke         → Does the change do what was asked?
+Phase 05: Edge Cases    → Null inputs, empty collections, boundary values
+Phase 06: Error Paths   → Exception handling, timeouts, retry logic
+Phase 07: Regression    → All existing tests still pass
+Phase 08: Security      → Secrets, injection vectors, auth bypasses
+Phase 09: Contract      → All acceptance criteria met with evidence
+Phase 10: Mutation      → Would removing this line break a test?
+Phase 11: Quality       → Is this the right approach overall?
+
+<confidence_scoring>
+confidence = (0.15 * big5) + (0.15 * scope_clean) + (0.20 * tests_pass_rate) +
+             (0.15 * edge_coverage) + (0.15 * security_clean) +
+             (0.10 * contract_met) + (0.10 * mutation_resilience)
+
+Threshold: >= 0.8 → APPROVE | >= 0.6 → COMMENT with fixes | < 0.6 → REQUEST CHANGES
+</confidence_scoring>
+</review_protocol>
 
 <anti_patterns>
 - skip_big5: Check Big 5 first. It's what AI breaks.
