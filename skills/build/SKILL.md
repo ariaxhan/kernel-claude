@@ -139,6 +139,27 @@ agentdb write-end '{"skill":"build","feature":"X","files":["Y"],"approach":"Z"}'
 
 ---
 
+# AGENTIC BUILD PATTERNS
+
+<!-- Updated 2026-03-30: Claude Code best practices, Anthropic prompt engineering guide -->
+
+**Subagent scoping**: When spawning agents for implementation, scope each agent to a
+single file or function boundary. Cross-file agents produce merge conflicts and silent overrides.
+
+**Prefer Read before Write**: Always read the target file before editing it, even when
+the task is purely additive. Prevents format drift and ensures you match existing style.
+
+**Minimal footprint**: Request only the permissions and file access actually needed.
+Touch the minimum viable set of files. Unanticipated side effects compound across agents.
+
+**Interrupt-safe commits**: Commit every working state, not just at milestone boundaries.
+If an agent is interrupted mid-task, the last commit must be valid and buildable.
+
+**Clarify before long tasks**: For tasks estimated >5 min, surface ambiguities before
+starting. Mid-task clarification requests cause partial-state problems.
+
+---
+
 # FLAGS
 
 - `--quick`: skip confirmations, minimal prompts

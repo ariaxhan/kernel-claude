@@ -116,6 +116,29 @@ Every bug fix MUST include a regression test. No exceptions.
 - Bug only in production → add targeted monitoring, document, move on.
 </escalation>
 
+<!-- Updated 2026-03-30: Claude Code debugging techniques, Anthropic prompt engineering guide -->
+<agentic_debugging>
+When debugging in an agentic context, additional failure modes arise:
+
+**Agent-introduced bugs**: Check whether the bug was introduced by an AI edit. Run
+`git log --oneline -20` to identify when it appeared. `git bisect` between last known-good
+and first known-bad agent commit. AI edits tend to: drop early returns, misplace null
+checks, and silently change API call signatures.
+
+**Tool-call failures vs logic failures**: Distinguish between:
+- Tool call returned wrong result (environment/permissions issue)
+- Tool call succeeded but logic was wrong (code issue)
+These have completely different fixes. Check tool outputs before assuming logic error.
+
+**Interrupted state**: If a previous agent session was interrupted, check for partial
+writes or uncommitted changes (`git status`, `git diff`) before assuming the code is
+the canonical version.
+
+**Reproduce with minimal agent context**: If bug is hard to reproduce, reduce the
+problem to its smallest form BEFORE spawning any agents. Agents given a vague reproduction
+reproduce the wrong thing.
+</agentic_debugging>
+
 <on_complete>
 agentdb write-end '{"skill":"debug","bug":"<description>","root_cause":"<what_broke>","fix":"<what_fixed>","test":"<regression_test_name>","learned":"<pattern_for_future>"}'
 

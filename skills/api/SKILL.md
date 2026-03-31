@@ -236,6 +236,61 @@ Retry-After: 60
 <block id="no_pagination">Returning all records. Pagination is mandatory for lists.</block>
 </anti_patterns>
 
+<!-- Updated 2026-03-30: Claude Code best practices, REST API 2026 patterns -->
+<idempotency>
+Idempotency is mandatory for state-changing operations in distributed and agentic contexts:
+
+```typescript
+// POST with idempotency key prevents duplicate operations
+export async function POST(req: NextRequest) {
+  const idempotencyKey = req.headers.get('Idempotency-Key')
+
+  if (idempotencyKey) {
+    const existing = await cache.get(`idem:${idempotencyKey}`)
+    if (existing) return NextResponse.json(existing, { status: 200 })
+  }
+
+  const result = await processRequest(req)
+
+  if (idempotencyKey) {
+    await cache.set(`idem:${idempotencyKey}`, result, { ttl: 86400 })
+  }
+
+  return NextResponse.json(result, { status: 201 })
+}
+```
+
+Idempotency keys are especially important for:
+- Payment and order endpoints (AI agent retries on timeout)
+- Bulk import operations
+- Any endpoint an agent might call in a retry loop
+</idempotency>
+
+<health_and_observability>
+Every API should expose health and observability endpoints:
+
+```
+GET /health          # Liveness: returns 200 if process is alive
+GET /health/ready    # Readiness: returns 200 if all dependencies are up
+GET /health/startup  # Startup probe: returns 200 once initialization complete
+```
+
+Health response format:
+```json
+{
+  "status": "ok",
+  "version": "1.2.3",
+  "dependencies": {
+    "database": "ok",
+    "cache": "ok",
+    "queue": "degraded"
+  }
+}
+```
+
+503 if any critical dependency is down. 200 with "degraded" if non-critical.
+</health_and_observability>
+
 <on_complete>
 agentdb write-end '{"skill":"api","endpoints_created":<N>,"validation":"zod|pydantic|none","pagination":"cursor|offset|none","versioning":"v1|none"}'
 

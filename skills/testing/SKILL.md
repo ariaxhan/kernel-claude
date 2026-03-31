@@ -50,6 +50,27 @@ No maintenance burden (tests don't persist). Mutation-based fault injection.
 Consider for high-churn code where traditional test suites rot faster than they help.
 </jit_testing>
 
+<!-- Updated 2026-03-30: Claude Code best practices, AI code review research -->
+<golden_ratio_principle>
+Test coverage follows diminishing returns past ~80%. Beyond that, invest in:
+- Mutation testing (verify your tests actually catch real mutations)
+- Property-based testing for complex logic (fast-check, hypothesis)
+- Contract tests at service boundaries (Pact, schema mocks)
+
+Coverage % is a vanity metric without mutation score.
+</golden_ratio_principle>
+
+<ai_generated_test_review>
+When reviewing AI-generated tests, specifically check:
+1. Does the assertion verify the RIGHT thing? (.toBe(true) catches nothing meaningful)
+2. Is the test coupled to implementation? (mocking internals → brittle)
+3. Is the test isolated? (shared state between tests → order-dependent failures)
+4. Does it test requirements or code? (test what SHOULD happen, not what code does)
+
+AI-generated tests frequently validate bugs because they're synthesized FROM the code.
+Read them as if the implementation might be wrong — because it might be.
+</ai_generated_test_review>
+
 <on_complete>
 agentdb write-end '{"skill":"testing","tests_added":<N>,"coverage_delta":"<+X%>","edge_cases":["<list>"],"assertions":"<strong|weak>"}'
 

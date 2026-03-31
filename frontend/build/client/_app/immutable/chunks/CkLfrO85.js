@@ -1,0 +1,2 @@
+const u=[...` 	
+\r\f \v\uFEFF`];function o(l,e,r){var n=l==null?"":""+l;if(r){for(var t of Object.keys(r))if(r[t])n=n?n+" "+t:t;else if(n.length)for(var i=t.length,s=0;(s=n.indexOf(t,s))>=0;){var f=s+i;(s===0||u.includes(n[s-1]))&&(f===n.length||u.includes(n[f]))?n=(s===0?"":n.substring(0,s))+n.substring(f+1):s=f}}return n===""?null:n}function c(l,e){return l==null?null:String(l)}export{c as a,o as t};
