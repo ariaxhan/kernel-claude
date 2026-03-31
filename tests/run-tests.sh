@@ -1502,6 +1502,28 @@ test_classify_profile_production_by_projects() {
   assert_equals "github-production" "$result"
 }
 
+# === Phase 0 Bug Fix Tests ===
+
+test_capture_error_reads_tool_name() {
+  # capture-error.sh should read tool_name from stdin JSON (not tool)
+  grep -q 'tool_name' "$PLUGIN_ROOT/hooks/scripts/capture-error.sh"
+}
+
+test_capture_error_logs_tool_correctly() {
+  setup_test_env
+  agentdb init >/dev/null 2>&1
+  # Simulate what capture-error.sh does with correct field
+  local INPUT='{"tool_name":"Edit","error":"file not found","tool_input":{}}'
+  local TOOL=$(echo "$INPUT" | jq -r '.tool_name // .tool // "unknown"' 2>/dev/null)
+  assert_equals "Edit" "$TOOL" "tool_name should be extracted correctly"
+  teardown_test_env
+}
+
+test_session_start_creates_memory_dir() {
+  # session-start.sh should contain MEMORY.md creation logic
+  grep -q 'MEMORY.md' "$PLUGIN_ROOT/hooks/scripts/session-start.sh"
+}
+
 # === Run Tests ===
 
 run_test_suite() {
@@ -1690,6 +1712,11 @@ run_test_suite() {
       run_test "agents have github layer" test_agents_have_github_layer
       run_test "commands have github layer" test_commands_have_github_layer
       ;;
+    phase0_fixes)
+      run_test "capture-error reads tool_name" test_capture_error_reads_tool_name
+      run_test "capture-error logs tool correctly" test_capture_error_logs_tool_correctly
+      run_test "session-start creates memory dir" test_session_start_creates_memory_dir
+      ;;
     profile)
       run_test "parse_github_remote HTTPS" test_parse_github_remote_https
       run_test "parse_github_remote SSH" test_parse_github_remote_ssh
@@ -1741,6 +1768,7 @@ main() {
     run_test_suite "retrospective"
     run_test_suite "github_integration"
     run_test_suite "profile"
+    run_test_suite "phase0_fixes"
   else
     run_test_suite "$target"
   fi

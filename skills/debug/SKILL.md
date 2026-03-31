@@ -107,7 +107,9 @@ Every bug fix MUST include a regression test. No exceptions.
 4. "What changed?" Check git log, git diff, dependency updates, env changes.
 5. Search exact error message in quotes.
 6. Step away. Bias accumulates under sustained focus.
+7. **Plan Mode**: For complex or sensitive bugs, use Plan Mode to analyze errors and form hypotheses without making any code changes until the approach is approved. Paste stack traces and error messages in Plan Mode first.
 </when_stuck>
+<!-- Updated 2026-03-28: https://code.claude.com/docs/en/best-practices, https://claudelog.com/faqs/how-to-use-claude-code-for-debugging/ -->
 
 <escalation>
 - 30+ min on single hypothesis with no evidence → abandon it.

@@ -11,7 +11,7 @@ AGENTDB=$(get_agentdb "$VAULTS")
 
 # Read from stdin (same as all other hooks)
 INPUT=$(cat)
-TOOL=$(echo "$INPUT" | jq -r '.tool // "unknown"' 2>/dev/null)
+TOOL=$(echo "$INPUT" | jq -r '.tool_name // .tool // "unknown"' 2>/dev/null)
 ERROR=$(echo "$INPUT" | jq -r '.error // .message // "unknown error"' 2>/dev/null)
 FILE=$(echo "$INPUT" | jq -r '.file_path // .path // ""' 2>/dev/null)
 

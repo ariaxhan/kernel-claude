@@ -14,6 +14,13 @@ VAULTS=$(detect_vaults)
 AGENTDB=$(get_agentdb "$VAULTS")
 PROJECT_ROOT=$(get_project_root)
 
+# Ensure auto-memory MEMORY.md exists (prevents first-session crash)
+MEMORY_DIR="$HOME/.claude/projects/-$(echo "$PROJECT_ROOT" | tr '/' '-' | sed 's/^-//')/memory"
+if [ ! -f "$MEMORY_DIR/MEMORY.md" ]; then
+  mkdir -p "$MEMORY_DIR" 2>/dev/null || true
+  [ ! -f "$MEMORY_DIR/MEMORY.md" ] && echo "# Memory Index" > "$MEMORY_DIR/MEMORY.md" 2>/dev/null || true
+fi
+
 # Generate agent name and persist for other hooks
 AGENT_NAME="main-$$"
 AGENTS_DIR="$VAULTS/_meta/agents"
