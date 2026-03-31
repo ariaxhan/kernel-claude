@@ -35,6 +35,12 @@ resolves contradictions, merges duplicates, archives stale entries, promotes hig
    - Archive stale: `agentdb query "DELETE FROM learnings WHERE id = {id}"`
    - Promote patterns: Recommend additions to CLAUDE.md or skill reference docs
 
+   <ask_user>
+     Use AskUserQuestion when: promotable patterns found (reinforced 2+)
+     Ask: "Found {N} promotable patterns. Which should be encoded into rules?"
+     Options: promote all, review each, skip promotion
+   </ask_user>
+
 5. Write synthesis to AgentDB:
    ```bash
    agentdb write-end '{"did":"retrospective","clusters":N,"merged":N,"archived":N,"promoted":N}'

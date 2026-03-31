@@ -171,6 +171,12 @@ agentdb verdict fail '{"failed_phase":"<phase>","evidence":"<actual_output>","fi
 
   <rule>PASS or FAIL. No "pass with warnings" unless warnings are scope-related (user decides).</rule>
   <rule>Big 5 FAIL = overall FAIL. No exceptions.</rule>
+
+  <ask_user>
+    Use AskUserQuestion when: a gate fails and fix is non-trivial
+    Ask: "Gate {phase} failed: {reason}. Fix and retry, or skip this gate?"
+    Options: fix and retry, skip gate (with justification), abort
+  </ask_user>
 </verdict_format>
 
 <anti_patterns>

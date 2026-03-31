@@ -2,6 +2,19 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.7.0] - 2026-03-30
+
+### Added
+- **AskUserQuestion integration** — All 11 commands (except help) now have `<ask_user>` blocks at phase boundaries. 7 agent definitions include decision-point questions. Session-start hook surfaces stale contracts and uncommitted files as prompts. (#119)
+- **Worktree safety protocol** — Surgeon agent validates file modifications against contract constraints. Orchestration skill enforces pre-spawn clean state and post-agent diff validation. `constraints.files` documented in contract JSON schema. (#116)
+- **3 new worktree safety tests** — Validates surgeon, orchestration, and agentdb constraint support.
+
+### Changed
+- **Philosophy rewrite** — Comprehensive rewrite of `<philosophy>` section. All original principles preserved. 5 new principles: pre-load over ask, fallback-first, composite quality, ask at decision points, slow down to speed up. (#118)
+- **Token budget compliance** — Trimmed ingest.md (214→190 lines) and forge.md (207→188 lines) to stay under 200-line budget after AskUserQuestion additions.
+
+---
+
 ## [7.6.1] - 2026-03-25
 
 ### Added

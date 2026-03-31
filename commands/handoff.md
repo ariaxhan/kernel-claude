@@ -57,6 +57,12 @@ agentdb query "SELECT * FROM context WHERE type IN ('contract','checkpoint') ORD
 ```
 </phase>
 
+<ask_user>
+  Use AskUserQuestion when: state extraction complete, before writing handoff
+  Ask: "Anything to add to the handoff? Blockers, decisions, or context I might have missed?"
+  Options: looks complete, add context, skip handoff
+</ask_user>
+
 <phase id="3_hygiene" name="GIT HYGIENE">
 <checks>
 uncommitted: Commit with "wip: checkpoint before handoff" or stash

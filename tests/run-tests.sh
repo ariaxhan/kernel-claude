@@ -1442,6 +1442,39 @@ test_classify_profile_production_by_projects() {
   assert_equals "github-production" "$result"
 }
 
+# --- Worktree Safety Tests ---
+
+test_surgeon_has_worktree_safety() {
+  local file="$PLUGIN_ROOT/agents/surgeon.md"
+  assert_file_exists "$file"
+  local content
+  content=$(cat "$file")
+  assert_contains "$content" "worktree_safety" "surgeon.md should contain worktree_safety section"
+  assert_contains "$content" "constraints.files" "surgeon.md should reference constraints.files"
+  assert_contains "$content" "git diff --name-only" "surgeon.md should have diff validation"
+}
+
+test_orchestration_has_constraint_validation() {
+  local file="$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+  assert_file_exists "$file"
+  local content
+  content=$(cat "$file")
+  assert_contains "$content" "worktree_safety" "orchestration SKILL.md should contain worktree_safety"
+  assert_contains "$content" "constraints.files" "orchestration SKILL.md should reference constraints.files"
+  assert_contains "$content" "Post-agent validation" "orchestration SKILL.md should have post-agent validation"
+}
+
+test_agentdb_contract_accepts_constraints() {
+  local output
+  output=$(agentdb contract '{"goal":"test","constraints":{"files":["a.sh","b.md"]},"tier":2}' 2>&1)
+  assert_contains "$output" "Contract: CR-"
+  # Verify the constraint data is stored
+  local stored
+  stored=$(agentdb query "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1" 2>&1)
+  assert_contains "$stored" "constraints"
+  assert_contains "$stored" "a.sh"
+}
+
 # === Run Tests ===
 
 run_test_suite() {
@@ -1629,6 +1662,11 @@ run_test_suite() {
       run_test "classify_profile production by envs" test_classify_profile_production_by_envs
       run_test "classify_profile production by projects" test_classify_profile_production_by_projects
       ;;
+    worktree_safety)
+      run_test "surgeon has worktree_safety section" test_surgeon_has_worktree_safety
+      run_test "orchestration has constraint validation" test_orchestration_has_constraint_validation
+      run_test "agentdb contract accepts constraints" test_agentdb_contract_accepts_constraints
+      ;;
   esac
 }
 
@@ -1667,6 +1705,7 @@ main() {
     run_test_suite "diagnose"
     run_test_suite "retrospective"
     run_test_suite "profile"
+    run_test_suite "worktree_safety"
   else
     run_test_suite "$target"
   fi

@@ -38,6 +38,12 @@ Load: skills/debug/SKILL.md, skills/testing/SKILL.md, skills/architecture/SKILL.
         Form 2-3 hypotheses for root cause.
         For each hypothesis: what evidence would confirm or reject it?
         Test each hypothesis with minimal code changes or debug output.
+
+        <ask_user>
+          Use AskUserQuestion when: hypotheses formed and user may have domain knowledge
+          Ask: "Top hypothesis: {hypothesis}. Does this match what you're seeing, or is there context I'm missing?"
+          Options: investigate that, I have more context, try a different hypothesis
+        </ask_user>
       </step>
       <step id="diagnose">
         Identify confirmed root cause.

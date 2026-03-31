@@ -46,8 +46,16 @@ pragmatist:
 4. Generate Minimalist perspective (grounded in what can be deleted/reused)
 5. Generate Maximalist perspective (grounded in what the ideal architecture looks like)
 6. Generate Pragmatist perspective (grounded in what ships with acceptable tradeoffs)
-7. Write to _meta/dreams/{topic}.md
-8. If gh authenticated: post to GitHub Discussions (Decisions category)
+7. Present perspectives to user
+
+<ask_user>
+  Use AskUserQuestion when: all three perspectives generated
+  Ask: "Three perspectives ready. Which resonates, or stress test all?"
+  Options: stress test all, lean toward {perspective}, rethink the framing
+</ask_user>
+
+8. Write to _meta/dreams/{topic}.md
+9. If gh authenticated: post to GitHub Discussions (Decisions category)
 </workflow>
 
 <constraints>

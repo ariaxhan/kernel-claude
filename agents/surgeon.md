@@ -64,6 +64,31 @@ Write to AgentDB: files, commit hash, evidence, big5 status.
 </phase>
 </protocol>
 
+<worktree_safety>
+Before any work:
+1. Parse contract JSON. Extract `constraints.files` array — this is the exhaustive allowlist.
+2. If `constraints.files` is missing or empty: STOP. Ask orchestrator to add file constraints.
+
+During work:
+3. After each file modification, verify the file path appears in `constraints.files`.
+4. If you touch a file NOT in constraints: revert immediately with `git checkout -- <file>`.
+
+Before checkpoint/commit:
+5. Run `git diff --name-only` and verify EVERY changed file is in `constraints.files`.
+6. If any out-of-scope file detected: STOP. Do NOT commit. Report to orchestrator.
+7. Only `git add` files that are in `constraints.files`. Never `git add -A`.
+
+Before parallel work (worktree):
+8. Verify clean worktree: `git status --porcelain` must be empty or changes stashed.
+9. Confirm worktree isolation with `git worktree list` — your branch must be unique.
+</worktree_safety>
+
+<ask_user>
+  Use AskUserQuestion when: change requires touching files outside contract scope
+  Ask: "Fix requires changes to {file} (outside contract scope). Expand scope, or work around it?"
+  Options: expand scope, work around, checkpoint and stop
+</ask_user>
+
 <failure_paths>
 - blocked: Checkpoint and STOP. Let orchestrator decide.
 - scope_expansion: Checkpoint and STOP. Orchestrator approves.
