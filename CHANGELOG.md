@@ -2,6 +2,21 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.9.2] - 2026-04-01
+
+### Fixed
+- **AgentDB read utilization** — `read-start` now bumps `hit_count`/`last_hit` on surfaced learnings, enabling natural selection (useful learnings accumulate hits, stale ones get pruned). (#127)
+- **Gotchas never surfaced** — `read-start` now includes "Known Gotchas" section (34/37 gotchas were invisible). (#127)
+- **Domain column empty** — `learn` auto-infers domain from `$PWD` basename when not explicitly provided. (#127)
+- **Symlink test** — test checked `session-start.sh` but `update_current_symlink` moved to `common.sh` in v7.9.1.
+- **CI shellcheck** — excluded `node_modules/` from shellcheck scan.
+
+### Changed
+- **Agent context injection** — surgeon, adversary, reviewer, researcher now use `agentdb inject-context <role>` for role-scoped knowledge instead of generic `read-start` dumps. (#127)
+- **3 new tests** — 230 total passing.
+
+---
+
 ## [7.9.0] - 2026-03-31
 
 ### Added
