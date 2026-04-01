@@ -1209,6 +1209,18 @@ test_dream_command_registered_in_plugin_json() {
   grep -q "dream.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
 }
 
+# --- Version Sync Tests ---
+
+test_version_sync_plugin_marketplace() {
+  local plugin_v marketplace_v
+  plugin_v=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/.claude-plugin/plugin.json'))['version'])")
+  marketplace_v=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/.claude-plugin/marketplace.json'))['plugins'][0]['version'])")
+  [ "$plugin_v" = "$marketplace_v" ] || {
+    echo "FAIL: plugin.json ($plugin_v) != marketplace.json ($marketplace_v)"
+    return 1
+  }
+}
+
 test_dreamer_agent_exists_with_frontmatter() {
   [ -f "$PLUGIN_ROOT/agents/dreamer.md" ] || return 1
   head -1 "$PLUGIN_ROOT/agents/dreamer.md" | grep -q "^---"
@@ -2274,6 +2286,9 @@ run_test_suite() {
     learn)
       run_test "learn auto-populates domain from PWD" test_learn_auto_populates_domain
       ;;
+    version_sync)
+      run_test "plugin.json and marketplace.json versions match" test_version_sync_plugin_marketplace
+      ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
       run_test "reviewer has confidence scoring" test_reviewer_has_confidence_scoring
@@ -2421,6 +2436,7 @@ main() {
     run_test_suite "entropy_adaptive"
     run_test_suite "read_start"
     run_test_suite "learn"
+    run_test_suite "version_sync"
   else
     run_test_suite "$target"
   fi

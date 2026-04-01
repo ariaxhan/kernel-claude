@@ -36,6 +36,26 @@ jobs:
       - name: Run test suite
         run: ./tests/run-tests.sh
 
+  version-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Verify plugin.json and marketplace.json versions match
+        run: |
+          set -euo pipefail
+          PLUGIN_V=$(jq -r '.version' .claude-plugin/plugin.json)
+          MARKET_V=$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)
+          echo "plugin.json:      $PLUGIN_V"
+          echo "marketplace.json: $MARKET_V"
+          if [ "$PLUGIN_V" != "$MARKET_V" ]; then
+            echo "FAIL: version mismatch — plugin.json ($PLUGIN_V) != marketplace.json ($MARKET_V)"
+            echo "Both files must be updated together on every release."
+            exit 1
+          fi
+          echo "Version sync check passed: $PLUGIN_V"
+
   schema-check:
     runs-on: ubuntu-latest
     steps:
