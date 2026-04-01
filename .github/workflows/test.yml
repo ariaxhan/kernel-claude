@@ -21,7 +21,7 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Run shellcheck on all .sh files
-        run: find . -name "*.sh" -exec shellcheck -x -S warning -e SC1091 -e SC2034 -e SC2155 -e SC2164 -e SC2011 {} +
+        run: find . -name "*.sh" -not -path "*/node_modules/*" -not -path "*/.git/*" -exec shellcheck -x -S warning -e SC1091 -e SC2034 -e SC2155 -e SC2164 -e SC2011 {} +
 
   tests:
     runs-on: ubuntu-latest

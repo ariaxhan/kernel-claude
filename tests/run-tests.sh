@@ -600,9 +600,9 @@ test_update_current_symlink_exists() {
 }
 
 test_session_start_calls_update_symlink() {
-  # session-start.sh should call update_current_symlink
-  grep -q "update_current_symlink" "$PLUGIN_ROOT/hooks/scripts/session-start.sh" || {
-    echo "FAIL: session-start.sh should call update_current_symlink"
+  # update_current_symlink should be called in common.sh _kernel_hook_start (runs on every hook, including session-start)
+  grep -q "update_current_symlink" "$PLUGIN_ROOT/hooks/scripts/common.sh" || {
+    echo "FAIL: common.sh should call update_current_symlink"
     return 1
   }
 }
@@ -1629,6 +1629,35 @@ test_inject_context_unknown_fallback() {
   assert_contains "$output" "AgentDB Context"
 }
 
+# --- Read-Start Utilization Tests ---
+
+test_read_start_outputs_gotchas() {
+  agentdb init >/dev/null
+  agentdb learn gotcha "always escape SQL inputs" "injection risk" >/dev/null
+  local output
+  output=$(agentdb read-start)
+  assert_contains "$output" "Known Gotchas"
+}
+
+test_read_start_bumps_hit_count() {
+  agentdb init >/dev/null
+  agentdb learn failure "never skip validation" "broke prod" >/dev/null
+  agentdb read-start >/dev/null
+  local hit
+  hit=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT hit_count FROM learnings WHERE type='failure' LIMIT 1;")
+  [ "$hit" -ge 1 ] || { echo "Expected hit_count >= 1, got $hit"; return 1; }
+}
+
+# --- Learn Domain Auto-Population Tests ---
+
+test_learn_auto_populates_domain() {
+  agentdb init >/dev/null
+  agentdb learn pattern "test domain inference" "evidence" >/dev/null
+  local domain
+  domain=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT domain FROM learnings ORDER BY ts DESC LIMIT 1;")
+  [ -n "$domain" ] && [ "$domain" != "" ] || { echo "Expected non-empty domain, got '$domain'"; return 1; }
+}
+
 test_orchestration_skill_has_injection() {
   grep -q "knowledge_injection" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
 }
@@ -2238,6 +2267,13 @@ run_test_suite() {
       run_test "inject-context unknown falls back to read-start" test_inject_context_unknown_fallback
       run_test "orchestration SKILL.md has knowledge_injection" test_orchestration_skill_has_injection
       ;;
+    read_start)
+      run_test "read-start outputs Known Gotchas section" test_read_start_outputs_gotchas
+      run_test "read-start bumps hit_count on surfaced learnings" test_read_start_bumps_hit_count
+      ;;
+    learn)
+      run_test "learn auto-populates domain from PWD" test_learn_auto_populates_domain
+      ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
       run_test "reviewer has confidence scoring" test_reviewer_has_confidence_scoring
@@ -2383,6 +2419,8 @@ main() {
     run_test_suite "cartographer_coroner"
     run_test_suite "pre_ship_app"
     run_test_suite "entropy_adaptive"
+    run_test_suite "read_start"
+    run_test_suite "learn"
   else
     run_test_suite "$target"
   fi

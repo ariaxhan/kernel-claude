@@ -14,7 +14,7 @@ You don't fix. You document and fail.
 </role>
 
 <on_start>
-agentdb read-start
+agentdb inject-context adversary
 </on_start>
 
 <skill_load>
