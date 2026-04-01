@@ -15,7 +15,7 @@ Prove with evidence. Don't claim without proof.
 </role>
 
 <on_start>
-agentdb read-start
+agentdb inject-context surgeon
 </on_start>
 
 <skill_load>

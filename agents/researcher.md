@@ -26,7 +26,7 @@ investment:
 </mindset>
 
 <on_start>
-agentdb read-start
+agentdb inject-context researcher
 </on_start>
 
 <skill_load>

@@ -270,10 +270,17 @@ cmd_read_start() {
 
   echo "## Recent Failures (AVOID THESE)"
   db_exec "SELECT '- ' || insight FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (SELECT id FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 5);" 2>/dev/null
   echo ""
 
   echo "## Active Patterns"
   db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (SELECT id FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5);" 2>/dev/null
+  echo ""
+
+  echo "## Known Gotchas"
+  db_exec "SELECT '- ' || insight FROM learnings WHERE type='gotcha' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (SELECT id FROM learnings WHERE type='gotcha' ORDER BY hit_count DESC, ts DESC LIMIT 5);" 2>/dev/null
   echo ""
 
   echo "## Recent Errors"
@@ -332,6 +339,12 @@ cmd_learn() {
   local insight="${2:-}"
   local evidence="${3:-}"
   local domain="${4:-}"
+
+  # Auto-infer domain from PWD if not explicitly provided
+  if [ -z "$domain" ]; then
+    domain=$(basename "$PWD" 2>/dev/null || echo "general")
+    [ -z "$domain" ] && domain="general"
+  fi
 
   [ -z "$type" ] || [ -z "$insight" ] && { echo "Usage: agentdb learn <type> <insight> [evidence] [domain]"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
