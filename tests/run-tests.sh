@@ -600,9 +600,9 @@ test_update_current_symlink_exists() {
 }
 
 test_session_start_calls_update_symlink() {
-  # session-start.sh should call update_current_symlink
-  grep -q "update_current_symlink" "$PLUGIN_ROOT/hooks/scripts/session-start.sh" || {
-    echo "FAIL: session-start.sh should call update_current_symlink"
+  # update_current_symlink should be called in common.sh _kernel_hook_start (runs on every hook, including session-start)
+  grep -q "update_current_symlink" "$PLUGIN_ROOT/hooks/scripts/common.sh" || {
+    echo "FAIL: common.sh should call update_current_symlink"
     return 1
   }
 }
