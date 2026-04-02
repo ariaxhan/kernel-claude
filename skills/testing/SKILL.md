@@ -78,6 +78,25 @@ AI-generated tests frequently validate bugs because they're synthesized FROM the
 Read them as if the implementation might be wrong — because it might be.
 </ai_generated_test_review>
 
+<!-- Updated 2026-04-02: https://code.claude.com/docs/en/best-practices, https://testdino.com/blog/claude-code-with-playwright/ -->
+<multi_agent_test_patterns>
+**Writer/Reviewer split**: Have one agent write tests, a separate agent write code to pass them.
+This prevents the common failure where AI writes tests FROM the code (validating bugs, not behavior).
+The test-writing agent must only see the SPECIFICATION, not the implementation.
+
+**Parallel hypothesis testing**: When coverage gaps exist across multiple modules, spawn agents
+per module boundary. Each agent tests its domain independently. Prevents agents from stepping
+on each other's test state or sharing fixtures incorrectly.
+
+**Test-before-code in agentic context**: When issuing a contract to a surgeon agent, include
+acceptance criteria as executable test cases. The surgeon's done-when is tests passing, not
+code written. This forces behavioral specification before implementation.
+
+**Verification criteria = highest leverage**: Claude performs dramatically better when it can
+verify its own work by running tests. Always give agents runnable verification — a test
+suite they can execute — not just a written description of done.
+</multi_agent_test_patterns>
+
 <on_complete>
 agentdb write-end '{"skill":"testing","tests_added":<N>,"coverage_delta":"<+X%>","edge_cases":["<list>"],"assertions":"<strong|weak>"}'
 

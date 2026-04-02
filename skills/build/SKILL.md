@@ -162,6 +162,24 @@ starting. Mid-task clarification requests cause partial-state problems.
 
 ---
 
+<!-- Updated 2026-04-02: https://code.claude.com/docs/en/best-practices, https://www.morphllm.com/claude-code-best-practices -->
+# CONTEXT WINDOW HYGIENE
+
+Long build sessions degrade model performance as context fills. Mitigate:
+
+- **Compact at ~70% context usage**: Use `/compact` before context degrades. Signal: responses
+  getting shorter, earlier instructions being ignored, more mistakes per edit.
+- **Scope sessions by task, not by time**: One session = one feature or one bug. Don't let a
+  session sprawl across multiple concerns. Use `/clear` between unrelated tasks.
+- **Delegate research to subagents**: Research subtasks consume context without adding code.
+  Spawn a researcher agent for deep exploration, synthesize the result into a brief, then
+  start the implementation session with that brief injected as context — not the full research.
+- **Verification criteria before coding**: State done-when criteria at session START, not end.
+  Claude performs dramatically better when it can run tests to verify its own output throughout
+  the session, not just at the end.
+
+---
+
 # FLAGS
 
 - `--quick`: skip confirmations, minimal prompts

@@ -119,6 +119,32 @@ Every bug fix MUST include a regression test. No exceptions.
 </escalation>
 
 <!-- Updated 2026-03-30: Claude Code debugging techniques, Anthropic prompt engineering guide -->
+<!-- Updated 2026-04-02: https://claudefa.st/blog/guide/agents/agent-teams, https://medium.com/@Coda./inside-claude-code-engineering-the-future-of-agentic-development-508050bf37a2 -->
+<parallel_debug_strategy>
+**Competing hypothesis agents**: For bugs with multiple plausible causes, spawn separate agents
+per hypothesis. Each investigates independently with a fresh, unpolluted context window.
+Agents with fresh context catch what a single long session anchors past.
+
+```
+Agent A: Hypothesis — race condition in cache layer
+Agent B: Hypothesis — API contract mismatch on response shape
+Agent C: Hypothesis — off-by-one in pagination cursor
+
+Each reports: evidence_for | evidence_against | confidence (0-1)
+Coroner agent synthesizes findings.
+```
+
+**Fresh context advantage**: Long debugging sessions accumulate cognitive anchoring.
+A fresh agent given only the minimal reproduction case (not 200 lines of chat history)
+reasons more clearly. When stuck >30 min, spawn a fresh agent with only:
+- The exact input that triggers the bug
+- The expected vs actual output
+- The relevant code section (not the whole file)
+
+**AgentDB as debug log**: Write each hypothesis and its test result to AgentDB before
+abandoning it. Prevents the same hypothesis being re-investigated in the next session.
+</parallel_debug_strategy>
+
 <agentic_debugging>
 When debugging in an agentic context, additional failure modes arise:
 
