@@ -91,4 +91,20 @@ describe the feature, not the implementation steps.
 or human's commits silently. Use `--force-with-lease` only, never bare `--force`.
 </agentic_git_discipline>
 
+<!-- Updated 2026-04-04: AI code review best practices, https://collinwilkins.com/articles/ai-code-review-best-practices-approaches-tools.html -->
+<diff_sizing>
+Diff size is the single biggest lever for AI code review quality:
+
+- **50-200 lines**: optimal — AI catches logic errors, security issues, edge cases
+- **200-500 lines**: acceptable — AI catches obvious issues, misses subtle interactions
+- **500+ lines**: degraded — AI overwhelmed, misses important context, feedback generic
+- **1000+ lines**: near-useless — context saturation, review becomes superficial
+
+Rule: if a diff exceeds 500 lines, split the PR before requesting AI review.
+
+**AI review before human review**: Run AI review (~90 seconds) before requesting human review.
+Developer fixes cheap issues first, humans see a cleaner diff and focus on intent and design.
+Sequence: AI review → fix → human review. Not parallel.
+</diff_sizing>
+
 </skill>

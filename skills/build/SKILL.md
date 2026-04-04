@@ -180,6 +180,30 @@ Long build sessions degrade model performance as context fills. Mitigate:
 
 ---
 
+# VELOCITY CALIBRATION
+<!-- Updated 2026-04-04: METR 2025 research, https://code.claude.com/docs/en/best-practices -->
+
+**The Velocity Paradox (METR 2025)**: Developers with AI assistance feel ~20% faster but measure ~19% slower.
+Root cause: shifting to ~10% planning / ~90% implementation — AI makes coding cheap, so people skip planning.
+Fix: **50-70% planning / 30-50% implementation** → 50% fewer refactors, 3x overall velocity.
+
+Invest in:
+- Goal extraction and done-when criteria BEFORE any code
+- Generating 2-3 approaches and rejecting the first one
+- Writing or specifying test cases before implementation
+
+**Verification-first multiplier**: Providing tests, screenshots, or expected outputs BEFORE asking Claude to
+implement changes quality dramatically. Claude can run verification against its own output throughout the
+session — not just at the end. State verification criteria at session START.
+
+**Adaptive thinking (Claude 4.6)**: Claude Opus/Sonnet 4.6 uses adaptive thinking, not `budget_tokens`.
+When spawning agents for deep reasoning, guide effort via instruction:
+- Complex architecture/multi-file: `"After reviewing tool results, reflect carefully before proceeding"`
+- Standard implementation: no special instruction needed
+- Simple edits/validation: explicitly say `"This is straightforward, implement directly"`
+
+---
+
 # FLAGS
 
 - `--quick`: skip confirmations, minimal prompts
