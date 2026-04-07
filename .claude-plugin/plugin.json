@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "7.9.2",
-  "description": "Persistent memory, multi-agent orchestration, and project-aware context for Claude Code. AgentDB tracks failures, patterns, and telemetry across sessions. Profile detection auto-adapts to local, private, OSS, and production projects. 18 skills. Tiered routing: 13 agents (surgeon, adversary, reviewer, dreamer, scout, validator, triage, understudier, researcher, analyzer, cartographer, coroner, pre-ship). Knowledge injection, 11-phase review, 9-gate safety chain, entropy-adaptive coordination, GEPA traces, IMMUNE antibodies, R-factor scoring, circuit breakers, compaction recovery, secret detection.",
+  "version": "7.10.0",
+  "description": "Persistent memory, multi-agent orchestration, and project-aware context for Claude Code. AgentDB tracks failures, patterns, and telemetry across sessions. Profile detection auto-adapts to local, private, OSS, and production projects. 19 skills. Tiered routing: 13 agents. Experiment engine: every rule is a hypothesis — Bayesian confidence scoring, autonomous seed/test/graduate/kill cycle. Knowledge injection, 11-phase review, 9-gate safety chain, entropy-adaptive coordination, circuit breakers, compaction recovery, secret detection.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"
@@ -32,6 +32,7 @@
     "./commands/dream.md",
     "./commands/diagnose.md",
     "./commands/metrics.md",
-    "./commands/retrospective.md"
+    "./commands/retrospective.md",
+    "./commands/experiment.md"
   ]
 }
