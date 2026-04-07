@@ -185,6 +185,10 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <command id="/kernel:metrics" purpose="Observability dashboard. Sessions, agents, hooks, learnings." file="commands/metrics.md">
     Wraps agentdb metrics + health with actionable insights.
   </command>
+  <command id="/kernel:experiment" purpose="Scientific experimentation mode. Every rule is a hypothesis until proven. Seed, test, graduate, or kill rules based on evidence." file="commands/experiment.md">
+    Subcommands: seed, list, test, verdict, report, graduate, kill.
+    Load: quality skill always. Testing + eval skills for test subcommand.
+  </command>
   <rule>Commands must load relevant skills and reference research before executing.</rule>
 
   <workflows>
@@ -229,6 +233,9 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <skill id="git" triggers="commit, branch, merge, PR">Atomic commits, conventional messages, branch strategies, merge protocols.</skill>
   <skill id="design" triggers="UI, frontend, styling, visual">/design command. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
   <skill id="app-dev" triggers="app, mobile, EAS, store submission, build, deploy">Mobile/web build pipeline, EAS, store submission, pre-submission checklists.</skill>
+
+  <!-- EXPERIMENTATION -->
+  <skill id="experiment" triggers="experiment, hypothesis, prove, test rule, validate methodology, scientific, evidence">Scientific method for rules. Every rule is a hypothesis until proven. Seed, test, graduate, or kill based on evidence.</skill>
 
   <rule>Load relevant skill before acting. Match triggers to task. Reference research docs when methodology applies.</rule>
 </skills>

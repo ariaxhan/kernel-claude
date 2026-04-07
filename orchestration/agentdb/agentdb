@@ -1169,6 +1169,307 @@ cmd_antibody() {
     LIMIT 10;"
 }
 
+# === HYPOTHESIS TESTING ===
+
+cmd_hypothesis() {
+  local subcmd="${1:-}"
+  shift 2>/dev/null || true
+
+  case "$subcmd" in
+    add)    cmd_hypothesis_add "$@" ;;
+    list)   cmd_hypothesis_list "$@" ;;
+    update) cmd_hypothesis_update "$@" ;;
+    export) cmd_hypothesis_export ;;
+    *)      echo "Usage: agentdb hypothesis <add|list|update|export>" >&2; exit 1 ;;
+  esac
+}
+
+cmd_hypothesis_add() {
+  local statement=""
+  local domain=""
+  local source=""
+
+  # Parse: statement is first positional, then flags
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --domain) domain="${2:-}"; shift 2 ;;
+      --source) source="${2:-}"; shift 2 ;;
+      *)
+        if [ -z "$statement" ]; then
+          statement="$1"
+        fi
+        shift ;;
+    esac
+  done
+
+  [ -z "$statement" ] && { echo "Usage: agentdb hypothesis add <statement> [--domain X] [--source Y]" >&2; exit 1; }
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  # Auto-generate next H### ID
+  local max_num
+  max_num=$(db_exec "SELECT COALESCE(MAX(CAST(SUBSTR(id, 2) AS INTEGER)), 0) FROM hypotheses WHERE id LIKE 'H%';" 2>/dev/null || echo "0")
+  local next_num=$(( max_num + 1 ))
+  local id
+  id=$(printf "H%03d" "$next_num")
+
+  local safe_statement safe_domain safe_source
+  safe_statement=$(sql_escape "$statement")
+  safe_domain=$(sql_escape "$domain")
+  safe_source=$(sql_escape "$source")
+
+  db_exec "INSERT INTO hypotheses (id, statement, domain, source) VALUES ('$id', '$safe_statement', '$safe_domain', '$safe_source');"
+  echo "Hypothesis: $id — $statement"
+}
+
+cmd_hypothesis_list() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  local domain=""
+  local status=""
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --domain) domain="${2:-}"; shift 2 ;;
+      --status) status="${2:-}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  local where="1=1"
+  if [ -n "$domain" ]; then
+    local safe_domain
+    safe_domain=$(sql_escape "$domain")
+    where="$where AND domain='$safe_domain'"
+  fi
+  if [ -n "$status" ]; then
+    local safe_status
+    safe_status=$(sql_escape "$status")
+    where="$where AND status='$safe_status'"
+  fi
+
+  db_exec_opts "-header -column" "
+    SELECT id,
+           printf('%.2f', confidence) AS conf,
+           status,
+           COALESCE(domain, '') AS domain,
+           substr(statement, 1, 60) AS statement
+    FROM hypotheses
+    WHERE $where
+    ORDER BY created_at DESC;
+  "
+}
+
+cmd_hypothesis_update() {
+  local id="${1:-}"
+  [ -z "$id" ] && { echo "Usage: agentdb hypothesis update <id> --status X [--confidence Y]" >&2; exit 1; }
+  shift
+
+  local status=""
+  local confidence=""
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --status) status="${2:-}"; shift 2 ;;
+      --confidence) confidence="${2:-}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  [ -z "$status" ] && { echo "Usage: agentdb hypothesis update <id> --status X [--confidence Y]" >&2; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  local safe_id safe_status
+  safe_id=$(sql_escape "$id")
+  safe_status=$(sql_escape "$status")
+
+  local set_clause="status='$safe_status', updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')"
+  if [ -n "$confidence" ]; then
+    set_clause="$set_clause, confidence=$confidence"
+  fi
+  if [ "$status" = "graduated" ]; then
+    set_clause="$set_clause, graduated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')"
+  fi
+
+  db_exec "UPDATE hypotheses SET $set_clause WHERE id='$safe_id';"
+  echo "Updated: $id → status=$status"
+}
+
+cmd_hypothesis_export() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  echo "# Hypothesis Report"
+  echo ""
+  echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo ""
+
+  local domains
+  domains=$(db_exec "SELECT DISTINCT COALESCE(domain, 'uncategorized') FROM hypotheses ORDER BY domain;")
+
+  for d in $domains; do
+    local safe_d
+    safe_d=$(sql_escape "$d")
+    echo "## $d"
+    echo ""
+    db_exec "
+      SELECT '### ' || h.id || ' [' || h.status || ' | conf: ' || printf('%.2f', h.confidence) || ']' || char(10) ||
+             h.statement || char(10) ||
+             'Evidence: ' || h.evidence_for || ' for, ' || h.evidence_against || ' against' || char(10) ||
+             'Experiments: ' || (SELECT COUNT(*) FROM experiments WHERE hypothesis_id = h.id) || char(10)
+      FROM hypotheses h
+      WHERE COALESCE(h.domain, 'uncategorized') = '$safe_d'
+      ORDER BY h.confidence DESC;
+    "
+    echo ""
+  done
+}
+
+cmd_experiment() {
+  local subcmd="${1:-}"
+  shift 2>/dev/null || true
+
+  case "$subcmd" in
+    add)     cmd_experiment_add "$@" ;;
+    verdict) cmd_experiment_verdict "$@" ;;
+    list)    cmd_experiment_list "$@" ;;
+    *)       echo "Usage: agentdb experiment <add|verdict|list>" >&2; exit 1 ;;
+  esac
+}
+
+cmd_experiment_add() {
+  local hypothesis_id="${1:-}"
+  local method="${2:-}"
+  local measurement="${3:-}"
+  shift 3 2>/dev/null || true
+
+  local pass_criteria=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --pass-criteria) pass_criteria="${2:-}"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  [ -z "$hypothesis_id" ] || [ -z "$method" ] || [ -z "$measurement" ] && {
+    echo "Usage: agentdb experiment add <hypothesis_id> <method> <measurement> [--pass-criteria X]" >&2
+    exit 1
+  }
+  [ ! -f "$DB" ] && cmd_init >/dev/null
+
+  # Verify hypothesis exists
+  local exists
+  exists=$(db_exec "SELECT 1 FROM hypotheses WHERE id='$(sql_escape "$hypothesis_id")' LIMIT 1;" 2>/dev/null || echo "")
+  [ -z "$exists" ] && { echo "Error: hypothesis $hypothesis_id not found" >&2; exit 1; }
+
+  # Auto-generate next EXP-### ID
+  local max_num
+  max_num=$(db_exec "SELECT COALESCE(MAX(CAST(SUBSTR(id, 5) AS INTEGER)), 0) FROM experiments WHERE id LIKE 'EXP-%';" 2>/dev/null || echo "0")
+  local next_num=$(( max_num + 1 ))
+  local id
+  id=$(printf "EXP-%03d" "$next_num")
+
+  local safe_hid safe_method safe_measurement safe_criteria
+  safe_hid=$(sql_escape "$hypothesis_id")
+  safe_method=$(sql_escape "$method")
+  safe_measurement=$(sql_escape "$measurement")
+  safe_criteria=$(sql_escape "$pass_criteria")
+
+  db_exec "INSERT INTO experiments (id, hypothesis_id, method, measurement, pass_criteria) VALUES ('$id', '$safe_hid', '$safe_method', '$safe_measurement', '$safe_criteria');"
+  echo "Experiment: $id → $hypothesis_id"
+}
+
+cmd_experiment_verdict() {
+  local exp_id="${1:-}"
+  local verdict="${2:-}"
+  local evidence="${3:-}"
+
+  [ -z "$exp_id" ] || [ -z "$verdict" ] || [ -z "$evidence" ] && {
+    echo "Usage: agentdb experiment verdict <exp_id> <supports|refutes|inconclusive> <evidence>" >&2
+    exit 1
+  }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  # Validate verdict value
+  case "$verdict" in
+    supports|refutes|inconclusive) ;;
+    *) echo "Error: verdict must be supports|refutes|inconclusive" >&2; exit 1 ;;
+  esac
+
+  local safe_id safe_verdict safe_evidence
+  safe_id=$(sql_escape "$exp_id")
+  safe_verdict=$(sql_escape "$verdict")
+  safe_evidence=$(sql_escape "$evidence")
+
+  # Update the experiment
+  db_exec "UPDATE experiments SET verdict='$safe_verdict', evidence='$safe_evidence', result='$safe_evidence' WHERE id='$safe_id';"
+
+  # Get parent hypothesis ID
+  local hyp_id
+  hyp_id=$(db_exec "SELECT hypothesis_id FROM experiments WHERE id='$safe_id';" 2>/dev/null)
+  [ -z "$hyp_id" ] && { echo "Error: experiment $exp_id not found" >&2; exit 1; }
+
+  local safe_hid
+  safe_hid=$(sql_escape "$hyp_id")
+
+  # Update parent hypothesis based on verdict
+  case "$verdict" in
+    supports)
+      db_exec "
+        UPDATE hypotheses SET
+          evidence_for = evidence_for + 1,
+          confidence = MIN(1.0, confidence + (1.0 - confidence) * 0.25),
+          status = CASE WHEN status = 'unproven' THEN 'testing' ELSE status END,
+          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE id = '$safe_hid';
+      "
+      ;;
+    refutes)
+      db_exec "
+        UPDATE hypotheses SET
+          evidence_against = evidence_against + 1,
+          confidence = MAX(0.0, confidence - confidence * 0.3),
+          status = CASE WHEN status = 'unproven' THEN 'testing' ELSE status END,
+          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE id = '$safe_hid';
+      "
+      ;;
+    inconclusive)
+      db_exec "
+        UPDATE hypotheses SET
+          status = CASE WHEN status = 'unproven' THEN 'testing' ELSE status END,
+          updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+        WHERE id = '$safe_hid';
+      "
+      ;;
+  esac
+
+  local new_conf
+  new_conf=$(db_exec "SELECT printf('%.2f', confidence) FROM hypotheses WHERE id='$safe_hid';" 2>/dev/null)
+  echo "Verdict: $exp_id → $verdict ($hyp_id confidence: $new_conf)"
+}
+
+cmd_experiment_list() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+
+  local hypothesis_id="${1:-}"
+
+  if [ -n "$hypothesis_id" ]; then
+    local safe_hid
+    safe_hid=$(sql_escape "$hypothesis_id")
+    db_exec_opts "-header -column" "
+      SELECT id, hypothesis_id, COALESCE(verdict, 'pending') AS verdict, substr(method, 1, 40) AS method, substr(COALESCE(evidence, ''), 1, 40) AS evidence
+      FROM experiments
+      WHERE hypothesis_id = '$safe_hid'
+      ORDER BY created_at DESC;
+    "
+  else
+    db_exec_opts "-header -column" "
+      SELECT id, hypothesis_id, COALESCE(verdict, 'pending') AS verdict, substr(method, 1, 40) AS method, substr(COALESCE(evidence, ''), 1, 40) AS evidence
+      FROM experiments
+      ORDER BY created_at DESC;
+    "
+  fi
+}
+
 # === CO-CHANGE GRAPH ===
 cmd_co_change() {
   local file="${1:-}"
@@ -1225,6 +1526,8 @@ case "${1:-help}" in
   export)      cmd_export ;;
   recent)      shift; cmd_recent "$@" ;;
   co-change)   shift; cmd_co_change "$@" ;;
+  hypothesis)  shift; cmd_hypothesis "$@" ;;
+  experiment)  shift; cmd_experiment "$@" ;;
   *)
     echo "KERNEL AgentDB - Every agent reads on start, writes on end"
     echo ""
@@ -1261,6 +1564,15 @@ case "${1:-help}" in
     echo "  trace <json>            Record GEPA execution trace"
     echo "  decay                   Archive stale learnings, show freshness"
     echo "  antibody <text>         Search learnings for pattern matches"
+    echo "HYPOTHESIS TESTING (after migration 006):"
+    echo "  hypothesis add <stmt> [--domain X] [--source Y]  Create hypothesis"
+    echo "  hypothesis list [--domain X] [--status Y]        List hypotheses"
+    echo "  hypothesis update <id> --status X [--confidence Y]  Update hypothesis"
+    echo "  hypothesis export                                 Markdown report"
+    echo "  experiment add <hyp_id> <method> <measurement> [--pass-criteria X]"
+    echo "  experiment verdict <exp_id> <supports|refutes|inconclusive> <evidence>"
+    echo "  experiment list [hypothesis_id]                   List experiments"
+    echo ""
     echo "ANALYSIS:"
     echo "  co-change <file> [N]    Show files frequently modified alongside <file>"
     echo ""
