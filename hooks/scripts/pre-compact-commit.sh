@@ -53,6 +53,29 @@ $(ls "$AGENTS_DIR"/*.json 2>/dev/null | while read f; do
 done)
 SNAP
 
+# === STEP 1b: TOKEN ESTIMATION + KEY TERM EXTRACTION ===
+# Token estimate: bytes / 4 (±20% for mixed code/prose). Documented margin.
+SNAPSHOT_BYTES=$(wc -c < "$SNAPSHOT" 2>/dev/null | tr -d ' ')
+TOKENS_BEFORE=$(( SNAPSHOT_BYTES / 4 ))
+
+# Extract key terms for retention scoring after compaction.
+# Terms: branch name, commit hashes, file paths from status, contract goal words.
+KEYTERMS_FILE="$PROJECT_ROOT/_meta/.compact-keyterms"
+{
+  # Branch name
+  cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null
+  # Recent commit short hashes (unique identifiers)
+  cd "$PROJECT_ROOT" && git log --format='%h' -5 2>/dev/null
+  # Changed file paths (basenames for fuzzy matching)
+  cd "$PROJECT_ROOT" && git status --short 2>/dev/null | awk '{print $NF}' | head -10
+  # Active contract goal keywords (split on spaces, take significant words)
+  if [ -n "${ACTIVE_GOAL:-}" ]; then
+    echo "$ACTIVE_GOAL" | tr ' ,:;' '\n' | grep -E '^[a-zA-Z_-]{4,}' | head -10
+  fi
+} 2>/dev/null | sort -u | grep -v '^$' > "$KEYTERMS_FILE" 2>/dev/null || true
+
+KEYTERMS_COUNT=$(wc -l < "$KEYTERMS_FILE" 2>/dev/null | tr -d ' ')
+
 # === STEP 2: UPDATE AGENT REGISTRY STATUS ===
 REG_FILE="$AGENTS_DIR/${AGENT}.json"
 if [ -f "$REG_FILE" ]; then
@@ -124,6 +147,8 @@ INSERT INTO context (id, type, content, agent) VALUES (
         'goal', '$_ACTIVE_GOAL',
         'uncommitted_files', $UNCOMMITTED,
         'files_committed', ${FILES_CHANGED:-0},
+        'tokens_before', ${TOKENS_BEFORE:-0},
+        'key_terms', ${KEYTERMS_COUNT:-0},
         'timestamp', '$_TIMESTAMP'
     ),
     '$_AGENT'
@@ -139,6 +164,7 @@ BRANCH=$(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null || echo "no
 {
   echo "**Branch:** $BRANCH"
   echo "**Compacted at:** $TIMESTAMP"
+  echo "**Tokens before:** ~${TOKENS_BEFORE:-0} (±20%)"
   echo ""
   if [ -n "$ACTIVE_GOAL" ]; then
     echo "### Active Contract"

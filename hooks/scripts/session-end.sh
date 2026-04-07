@@ -29,25 +29,22 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
     "$AGENTDB" write-end "{\"agent\":\"$AGENT\",\"event\":\"session-end\",\"branch\":\"$BRANCH\",\"uncommitted_files\":$FILES_CHANGED}" 2>/dev/null || true
 fi
 
-# Emit session end event with duration
-SESSION_DURATION_S=""
+# Compute session duration from epoch stored at session start (no date parsing needed)
+SESSION_DURATION_MS=""
 AGENT_JSON="$AGENTS_DIR/${AGENT}.json"
 if [ -f "$AGENT_JSON" ]; then
-  STARTED=$(jq -r '.started // empty' "$AGENT_JSON" 2>/dev/null)
-  if [ -n "$STARTED" ]; then
-    START_EPOCH=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$STARTED" +%s 2>/dev/null || python3 -c "from datetime import datetime; print(int(datetime.fromisoformat('$STARTED'.replace('Z','+00:00')).timestamp()))" 2>/dev/null || echo "")
-    if [ -n "$START_EPOCH" ]; then
-      NOW_EPOCH=$(date +%s)
-      SESSION_DURATION_S=$(( NOW_EPOCH - START_EPOCH ))
-    fi
+  START_EPOCH=$(jq -r '.started_epoch // empty' "$AGENT_JSON" 2>/dev/null)
+  if [ -n "$START_EPOCH" ] && [ "$START_EPOCH" -gt 0 ] 2>/dev/null; then
+    NOW_EPOCH=$(date +%s)
+    SESSION_DURATION_MS=$(( (NOW_EPOCH - START_EPOCH) * 1000 ))
   fi
 fi
-"$AGENTDB" emit session "session:end" "${SESSION_DURATION_S:+$(( SESSION_DURATION_S * 1000 ))}" "{\"branch\":\"$BRANCH\",\"files_changed\":$FILES_CHANGED,\"agent\":\"$AGENT\"}" "" "" 2>/dev/null &
+"$AGENTDB" emit session "session:end" "${SESSION_DURATION_MS:-}" "{\"branch\":\"$BRANCH\",\"files_changed\":$FILES_CHANGED,\"agent\":\"$AGENT\",\"duration_s\":${SESSION_DURATION_MS:+$(( SESSION_DURATION_MS / 1000 ))}}" "" "" 2>/dev/null &
 
 # === GITHUB LAYER: Post session summary for non-local profiles ===
 if type _gh_available &>/dev/null && _gh_available; then
     DURATION_DISPLAY=""
-    [ -n "$SESSION_DURATION_S" ] && DURATION_DISPLAY=" (${SESSION_DURATION_S}s)"
+    [ -n "$SESSION_DURATION_MS" ] && DURATION_DISPLAY=" ($(( SESSION_DURATION_MS / 1000 ))s)"
     _gh_post_session_summary "$AGENT" "$BRANCH" \
         "${FILES_CHANGED} files changed${DURATION_DISPLAY}" "" "" &
 fi

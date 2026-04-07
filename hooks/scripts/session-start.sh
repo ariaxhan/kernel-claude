@@ -28,6 +28,7 @@ cat > "$AGENTS_DIR/${AGENT_NAME}.json" << EOF
 {
   "agent_name": "$AGENT_NAME",
   "started": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "started_epoch": $(date +%s),
   "branch": "$(git branch --show-current 2>/dev/null || echo "none")",
   "project": "$PROJECT_ROOT"
 }

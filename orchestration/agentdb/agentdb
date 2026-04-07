@@ -1033,6 +1033,26 @@ cmd_metrics() {
   fi
   echo ""
 
+  # === Compaction ===
+  echo "## Compaction (last ${days}d)"
+  local has_compaction
+  has_compaction=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='compaction_events' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -n "$has_compaction" ]; then
+    local compact_count avg_retention avg_compression
+    compact_count=$(db_exec "SELECT COUNT(*) FROM compaction_events WHERE created_at > datetime('now', '-${days} days');" 2>/dev/null || echo "0")
+    if [ "$compact_count" -gt 0 ] 2>/dev/null; then
+      avg_retention=$(db_exec "SELECT ROUND(AVG(retention_score) * 100, 0) FROM compaction_events WHERE created_at > datetime('now', '-${days} days');" 2>/dev/null || echo "?")
+      avg_compression=$(db_exec "SELECT ROUND(AVG(compression_ratio) * 100, 0) FROM compaction_events WHERE created_at > datetime('now', '-${days} days');" 2>/dev/null || echo "?")
+      echo "  Events: $compact_count | Avg retention: ${avg_retention}% | Avg compression: ${avg_compression}%"
+      db_exec "SELECT '  ' || id || ': ' || tokens_before || '→' || tokens_after || ' tokens (' || ROUND(retention_score * 100, 0) || '% retained)' FROM compaction_events WHERE created_at > datetime('now', '-${days} days') ORDER BY created_at DESC LIMIT 3;" 2>/dev/null || true
+    else
+      echo "  No compaction events recorded"
+    fi
+  else
+    echo "  Table not initialized (run: agentdb init)"
+  fi
+  echo ""
+
   # === Errors ===
   echo "## Errors (last ${days}d)"
   local error_count
