@@ -42,6 +42,8 @@ Invert the pyramid at your peril. More E2E = slower feedback = less testing.
 <block id="happy_path_only">Normal inputs rarely fail. Test edges, nulls, boundaries, concurrent access.</block>
 <block id="ai_test_trust">AI generates tests that validate bugs. Review AI tests for what they ACTUALLY assert.</block>
 <block id="flaky_tolerance">Flaky test = broken test. Fix or delete. Never ignore.</block>
+<!-- Updated 2026-04-07: https://www.ontestautomation.com/writing-tests-with-claude-code-part-1-initial-results/ -->
+<block id="skip_or_only">Never use .skip() or .only() — Claude will rewrite tests to pass against buggy code rather than fix the bug. Disabled tests become permanent. Fix or delete.</block>
 </anti_patterns>
 
 <verification_gate>

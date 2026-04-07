@@ -119,6 +119,46 @@ Or just type `/ingest` and describe what you want on the next line.
 
 ---
 
+## Updating KERNEL
+
+### Quick Update (CLI)
+
+```
+/plugin marketplace update kernel-marketplace
+/plugin update kernel@kernel-marketplace
+/reload-plugins
+```
+
+### Interactive Update
+
+1. Type `/plugin` and go to the **Installed** tab
+2. Select **KERNEL**
+3. Choose **Update to latest**
+4. Run `/reload-plugins` to apply without restarting
+
+### Enable Auto-Update (Recommended)
+
+So you never get stuck on an old version:
+
+1. Type `/plugin` and go to the **Marketplaces** tab
+2. Select **kernel-marketplace**
+3. Toggle **Enable auto-update**
+
+With auto-update on, KERNEL updates itself whenever a new version is published.
+
+### Stuck on an Old Version?
+
+If commands are missing or behaving unexpectedly, you may be on a stale version. Run the CLI update commands above, or uninstall and reinstall:
+
+```
+/plugin uninstall kernel@kernel-marketplace
+/plugin install kernel@kernel-marketplace
+/reload-plugins
+/kernel:init
+```
+
+---
+
 ## Local Development (For Contributors)
 
 If you're developing KERNEL locally, symlink the cache to avoid stale copies:
@@ -144,9 +184,10 @@ Now edits to your local copy take effect immediately—no version bumps or reins
 
 **Commands not showing up?**
 ```
-/plugin marketplace refresh
+/plugin marketplace update kernel-marketplace
+/plugin update kernel@kernel-marketplace
+/reload-plugins
 ```
-Then restart Claude Code.
 
 **Claude isn't reading memory?**
 Start with `/ingest` (or `/kernel:ingest` in terminal). Plain requests skip the memory system.

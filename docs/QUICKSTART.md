@@ -74,7 +74,9 @@ Type `/kernel:` in Claude Code. You should see these commands appear:
 
 If the commands don't appear, try:
 ```
-/plugin marketplace refresh
+/plugin marketplace update kernel-marketplace
+/plugin update kernel@kernel-marketplace
+/reload-plugins
 ```
 Then restart Claude Code.
 
@@ -271,7 +273,9 @@ Claude Code reads this at the start of every conversation. Think of it as standi
 
 Run these commands:
 ```
-/plugin marketplace refresh
+/plugin marketplace update kernel-marketplace
+/plugin update kernel@kernel-marketplace
+/reload-plugins
 ```
 
 Then restart Claude Code. If still not working, try:
@@ -295,13 +299,39 @@ Say: "Remember this mistake permanently so you never repeat it." Be specific abo
 
 ## Updating KERNEL
 
-To get the latest version:
+### Quick Update (CLI)
 
 ```
-/plugin marketplace refresh
+/plugin marketplace update kernel-marketplace
+/plugin update kernel@kernel-marketplace
+/reload-plugins
 ```
 
-Then go to `/plugin`, find KERNEL, and select "Update now".
+### Interactive Update
+
+1. Type `/plugin` and go to the **Installed** tab
+2. Select **KERNEL**
+3. Choose **Update to latest**
+4. Run `/reload-plugins` to apply without restarting
+
+### Enable Auto-Update
+
+So you never get stuck on an old version:
+
+1. Type `/plugin` → **Marketplaces** tab
+2. Select **kernel-marketplace**
+3. Toggle **Enable auto-update**
+
+### Stuck on an Old Version?
+
+If commands are missing or behaving unexpectedly:
+
+```
+/plugin uninstall kernel@kernel-marketplace
+/plugin install kernel@kernel-marketplace
+/reload-plugins
+/kernel:init
+```
 
 ---
 
