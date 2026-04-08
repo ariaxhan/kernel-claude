@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "7.11.1",
+  "version": "7.12.0",
   "description": "Persistent memory, multi-agent orchestration, and project-aware context for Claude Code. AgentDB tracks failures, patterns, and telemetry across sessions. Profile detection auto-adapts to local, private, OSS, and production projects. 19 skills. Tiered routing: 13 agents. Experiment engine: every rule is a hypothesis — Bayesian confidence scoring, autonomous seed/test/graduate/kill cycle. Knowledge injection, 11-phase review, 9-gate safety chain, entropy-adaptive coordination, circuit breakers, compaction telemetry with retention scoring, secret detection.",
   "author": {
     "name": "Aria Han",
