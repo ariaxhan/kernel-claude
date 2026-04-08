@@ -532,16 +532,30 @@ cmd_error() {
   local tool="${1:-}"
   local error="${2:-}"
   local file="${3:-}"
+  local domain="${4:-}"
 
-  [ -z "$tool" ] || [ -z "$error" ] && { echo "Usage: agentdb error <tool> <error> [file]"; exit 1; }
+  [ -z "$tool" ] || [ -z "$error" ] && { echo "Usage: agentdb error <tool> <error> [file] [domain]"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
-  local safe_tool safe_error safe_file
+  # H103: Auto-infer domain from file path or error content if not provided
+  if [ -z "$domain" ]; then
+    case "$file$error" in
+      *hook*|*guard*|*plugin*)  domain="infrastructure" ;;
+      *test*|*spec*|*assert*)  domain="testing" ;;
+      *auth*|*secret*|*token*) domain="security" ;;
+      *merge*|*conflict*|*worktree*|*agent*) domain="coordination" ;;
+      *api*|*endpoint*|*route*) domain="backend" ;;
+      *) domain="" ;;
+    esac
+  fi
+
+  local safe_tool safe_error safe_file safe_domain
   safe_tool=$(sql_escape "$tool")
   safe_error=$(sql_escape "$error")
   safe_file=$(sql_escape "$file")
+  safe_domain=$(sql_escape "$domain")
 
-  db_exec "INSERT INTO errors (tool, error, file) VALUES ('$safe_tool', '$safe_error', '$safe_file');"
+  db_exec "INSERT INTO errors (tool, error, file, domain) VALUES ('$safe_tool', '$safe_error', '$safe_file', '$safe_domain');"
 }
 
 cmd_query() {

@@ -29,43 +29,55 @@ Reference: skills/quality/reference/quality-research.md
 </startup_reads>
 
 <protocol>
-<phase id="checkpoint" priority="0">
+<phase id="coordination" priority="0">
+<!-- H093: Coordination failures are 4.3x more impactful than code quality (52.5% of hit impact).
+     Run BEFORE code review. If coordination fails, code review is pointless. -->
+Verify coordination integrity (tier 2+ contracts):
+- File overlap: Did multiple agents modify the same files? `git diff --name-only` per branch.
+- Claim verification: Agent claims completion — verify output files actually exist and are non-empty.
+- Scope drift: Files changed outside contract constraints = FAIL.
+- Duplicate work: Identical changes across agent branches = coordination failure.
+Coordination FAIL = STOP. Do not proceed to code review. Fix coordination first.
+Evidence: list conflicting files, duplicate diffs, or missing claimed outputs.
+</phase>
+
+<phase id="checkpoint" priority="1">
 Validate surgeon checkpoint has: files, commits, evidence, branch.
 Missing fields = FAIL immediately.
 </phase>
 
-<phase id="big5" priority="1">
+<phase id="big5" priority="2">
 Load skills/quality/SKILL.md. Run Big 5 checks.
 Any violation = FAIL. These are what AI breaks.
 </phase>
 
-<phase id="scope" priority="2">
+<phase id="scope" priority="3">
 git diff --name-only: only contract files changed?
 Scope violation = automatic FAIL.
 </phase>
 
-<phase id="smoke" priority="3">
+<phase id="smoke" priority="4">
 Run basic happy path. If fails, FAIL immediately.
 </phase>
 
-<phase id="edge_cases" priority="4">
+<phase id="edge_cases" priority="5">
 Test: null, empty, boundary, invalid, concurrent, large input.
 At least 3 categories per review.
 </phase>
 
-<phase id="error_paths" priority="5">
+<phase id="error_paths" priority="6">
 Invalid input returns useful error? Errors logged, not swallowed?
 </phase>
 
-<phase id="regression" priority="6">
+<phase id="regression" priority="7">
 Run full test suite. New failures = FAIL.
 </phase>
 
-<phase id="security" priority="7">
+<phase id="security" priority="8">
 Input validated? Auth protected? No secrets exposed?
 </phase>
 
-<phase id="contract" priority="8">
+<phase id="contract" priority="9">
 All success criteria met with evidence?
 Partial = FAIL.
 </phase>
@@ -94,6 +106,7 @@ agentdb write-end '{"agent":"adversary","result":"pass|fail","phases_completed":
 </on_end>
 
 <checklist>
+- [ ] Coordination verified (tier 2+): file overlap, claims, scope drift, duplicates
 - [ ] Surgeon checkpoint validated
 - [ ] Big 5 checked (quality skill loaded)
 - [ ] Scope verified
