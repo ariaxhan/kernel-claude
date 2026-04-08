@@ -59,18 +59,59 @@ Workflow steps guide the phase sequence. Human confirms at each step (ingest mod
 </step>
 
 <branch after="classify">
+  IF type == handoff → go to HANDOFF RESUME (below)
   IF familiar AND tier_likely_1 → skip to step 3 (scope), mark research="skipped (familiar)"
   IF unfamiliar OR complex → proceed to step 2 (research)
   ALWAYS: check _meta/research/ cache regardless (cache != full research)
 </branch>
 
+<step id="1b_handoff_resume" trigger="classify.type == handoff">
+  Auto-detect and resume from a handoff file.
+
+  1. **Find the handoff**: If user specified a file path, read it. Otherwise:
+     ```bash
+     ls -t _meta/handoffs/*.md | head -1
+     ```
+     Read the most recent handoff file.
+
+  2. **Extract resume context**: Parse the handoff for:
+     - **Goal**: What the prior session was doing
+     - **Current state**: Where it left off (branch, dirty/clean, artifacts)
+     - **Decisions made**: Choices to preserve (don't re-explore rejected alternatives)
+     - **Next steps**: The numbered action items — these become the task
+     - **Warnings**: Failed approaches to avoid
+     - **Tier**: Inherited from handoff
+
+  3. **Verify state matches**: Check that git state matches handoff expectations:
+     ```bash
+     git branch --show-current    # matches handoff branch?
+     git status --short            # matches handoff dirty/clean?
+     ```
+     If state diverges from handoff (e.g., branch was merged, files already committed),
+     note the divergence and adjust next steps accordingly.
+
+  4. **Resume**: Skip classify/research/scope (already done in prior session).
+     Jump directly to the appropriate step:
+     - If next steps are "commit and push" → go to step 5 (execute)
+     - If next steps are "implement X" → go to step 4 (tests) then step 5
+     - If next steps are "research X" → go to step 2 (research)
+     - If next steps are "review/test" → go to step 4 (tests)
+
+  Output: "Resuming from handoff: {filename}. Goal: {goal}. Next: {first action}."
+</step>
+
 <step id="2_research" mandatory="true">
+**RULE: Research without verification is theory fiction.** Every research finding must be verified
+with a minimal test, prototype, or proof before it drives implementation. 8 research agents and
+6 docs mean nothing if nobody built a test to prove the approach works. (LRN-F11)
+
 <substeps>
 1. Check existing: ls _meta/research/, agentdb query
 2. anti_patterns FIRST: "{tech} not working", "{tech} gotchas"
 3. Solutions: official docs, GitHub issues, Stack Overflow
 4. Built-in check: framework > stdlib > npm package
-5. Write to: _meta/research/{topic}.md
+5. **Verify**: build minimal proof (test screen, script, unit test) before committing to approach
+6. Write to: _meta/research/{topic}.md (include verification result)
 </substeps>
 
 <format>
