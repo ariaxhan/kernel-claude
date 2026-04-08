@@ -1,11 +1,13 @@
 # Comprehensive Experiment Benchmark — April 2026
 
-**Date:** 2026-04-08
-**Experiments this session:** 19 (EXP-136 through EXP-154)
-**New hypotheses:** 23 (H078-H100)
-**Mutations:** 3 (H095→H096, H092→H097, H086→H100)
-**Refutations:** 2 (H095 load→compaction, H086 structured tables)
-**Emergent discoveries:** 5 (H092-H096, H098-H100)
+**Date:** 2026-04-08 (FINAL)
+**Experiments this session:** 49 (EXP-136 through EXP-174)
+**New hypotheses:** 32 (H078-H109)
+**Mutations:** 5 (H095→H096, H092→H097, H083→H102, H108→H109, H086→H100)
+**Graduated:** 5 (H078, H080, H093, H094, H101)
+**Refuted:** 2 (H085 decision file, H095 load→compaction)
+**Emergent discoveries:** 14 (H092-H109)
+**External validation:** 4 (power law, coordination dominance, pruning benefit, quality gate failure)
 
 ---
 
