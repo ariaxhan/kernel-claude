@@ -55,8 +55,8 @@ Location: _meta/agentdb/agent.db
 
 <tiers>
   <tier n="1" files="1-2" role="executor">Execute directly. Write code yourself.</tier>
-  <tier n="2" files="3-5" role="orchestrator">Contract → surgeon → review.</tier>
-  <tier n="3" files="6+" role="orchestrator">Contract → surgeon → adversary → verify.</tier>
+  <tier n="2" files="3-5" role="orchestrator">Contract → surgeon → adversary (coordination) → review.</tier>
+  <tier n="3" files="6+" role="orchestrator">Contract → surgeon → adversary (coordination + code) → verify.</tier>
 
   <rule>Count files BEFORE deciding. Ambiguous = assume higher tier.</rule>
   <rule>IF tier >= 2: create contract, spawn agents, read AgentDB. DO NOT write code.</rule>

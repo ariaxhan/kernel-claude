@@ -104,8 +104,13 @@ _kernel_hook_end() {
   vaults=$(detect_vaults)
   local agentdb
   agentdb=$(get_agentdb "$vaults")
+  # Read session_id from persisted file (written by session-start.sh)
+  local session_id
+  local project_root
+  project_root=$(get_project_root)
+  session_id=$(cat "$project_root/_meta/.session_id" 2>/dev/null || echo "")
   # Fire-and-forget: never block hook on telemetry
-  "$agentdb" emit hook "$hook_name" "$duration_ms" "{\"exit_code\":$exit_code}" "" "" 2>/dev/null &
+  "$agentdb" emit hook "$hook_name" "$duration_ms" "{\"exit_code\":$exit_code}" "" "$session_id" 2>/dev/null &
 }
 
 # === Project Profile Detection ===

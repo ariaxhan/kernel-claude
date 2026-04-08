@@ -18,6 +18,11 @@ if [ ! -f "$MEMORY_DIR/MEMORY.md" ]; then
   [ ! -f "$MEMORY_DIR/MEMORY.md" ] && echo "# Memory Index" > "$MEMORY_DIR/MEMORY.md" 2>/dev/null || true
 fi
 
+# Generate session ID and persist for other hooks
+KERNEL_SESSION_ID="sess-$(date +%Y%m%d%H%M%S)-$$"
+echo "$KERNEL_SESSION_ID" > "$PROJECT_ROOT/_meta/.session_id" 2>/dev/null || true
+export KERNEL_SESSION_ID
+
 # Generate agent name and persist for other hooks
 AGENT_NAME="main-$$"
 AGENTS_DIR="$VAULTS/_meta/agents"
@@ -338,5 +343,5 @@ if [ "$PROFILE" = "github-production" ]; then
 fi
 
 # Emit session start event
-"$AGENTDB" emit session "session:start" "" "{\"branch\":\"$(git branch --show-current 2>/dev/null || echo none)\",\"profile\":\"$PROFILE\",\"project\":\"$PROJECT_ROOT\"}" "" "" 2>/dev/null &
+"$AGENTDB" emit session "session:start" "" "{\"branch\":\"$(git branch --show-current 2>/dev/null || echo none)\",\"profile\":\"$PROFILE\",\"project\":\"$PROJECT_ROOT\"}" "" "$KERNEL_SESSION_ID" 2>/dev/null &
 _kernel_hook_end "session-start" 0

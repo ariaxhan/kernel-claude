@@ -262,51 +262,121 @@ cmd_preflight() {
 }
 
 cmd_read_start() {
-  # Ensure DB exists
+  local mode="${1:---weighted}"
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
   echo "# AgentDB Context"
-  echo ""
 
-  echo "## Recent Failures (AVOID THESE)"
-  db_exec "SELECT '- ' || insight FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
-  db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (SELECT id FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 5);" 2>/dev/null
-  echo ""
+  case "$mode" in
+    --full)
+      # Legacy: load everything (~23K tokens). Use for deep debugging.
+      echo "## Mode: full (all learnings)"
+      echo ""
+      echo "## Failures (AVOID THESE)"
+      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+      echo ""
+      echo "## Patterns"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+      echo ""
+      echo "## Preferences"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type='preference' ORDER BY ts DESC;" 2>/dev/null || echo "None"
+      # Update hit counts for all loaded
+      db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now');" 2>/dev/null
+      ;;
 
-  echo "## Active Patterns"
-  db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || echo "None"
-  db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (SELECT id FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5);" 2>/dev/null
-  echo ""
+    --summary)
+      # Minimal: top 10 by score (~400 tokens). Use in tight context.
+      echo "## Mode: summary (top 10)"
+      echo ""
+      db_exec "
+        SELECT '- [' || type || '] ' || insight FROM (
+          SELECT type, insight,
+            (hit_count * 10)
+            + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END)
+            AS score
+          FROM learnings ORDER BY score DESC LIMIT 10
+        );
+      " 2>/dev/null || echo "None"
+      db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+            (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
+          FROM learnings ORDER BY score DESC LIMIT 10
+        )
+      );" 2>/dev/null
+      ;;
 
-  echo "## Known Gotchas"
-  db_exec "SELECT '- ' || insight FROM learnings WHERE type='gotcha' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || echo "None"
-  db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (SELECT id FROM learnings WHERE type='gotcha' ORDER BY hit_count DESC, ts DESC LIMIT 5);" 2>/dev/null
-  echo ""
+    --tiered)
+      # Quality: hot + warm + cold (~8K tokens). Use for tier 3 contracts.
+      echo "## Mode: tiered (hot + warm + cold)"
+      echo ""
+      echo "### Hot (high-hit, proven valuable)"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count > 5 ORDER BY hit_count DESC;" 2>/dev/null || echo "None"
+      echo ""
+      echo "### Warm (all failures + gotchas)"
+      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') AND hit_count <= 5 ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+      echo ""
+      echo "### Cold (last 7 days)"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count <= 5 AND type NOT IN ('failure','gotcha') AND julianday('now') - julianday(ts) < 7 ORDER BY ts DESC;" 2>/dev/null || echo "None"
+      # Update hits for tiered set
+      db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7;" 2>/dev/null
+      ;;
 
+    --weighted|*)
+      # Default: WEIGHTED-75 (~3.4K tokens, 84% failure coverage). H078 graduated.
+      # Score = (hit_count * 10) + (failure_bonus * 50) + (recency_7d * 10) + (recency_14d * 5)
+      echo "## Mode: weighted-75"
+      echo ""
+      db_exec "
+        SELECT '- [' || type || '] ' || insight FROM (
+          SELECT type, insight,
+            (hit_count * 10)
+            + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END)
+            AS score
+          FROM learnings ORDER BY score DESC LIMIT 75
+        );
+      " 2>/dev/null || echo "None"
+      # Update hit counts for loaded learnings
+      db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (
+        SELECT id FROM (
+          SELECT id,
+            (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
+          FROM learnings ORDER BY score DESC LIMIT 75
+        )
+      );" 2>/dev/null
+      ;;
+  esac
+
+  echo ""
   echo "## Recent Errors"
-  db_exec "SELECT '- [' || tool || '] ' || error || COALESCE(' (' || file || ')', '') FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+  db_exec "SELECT '- [' || tool || '] ' || substr(error, 1, 120) FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
   echo ""
 
   # Error replay detection: warn if recent errors match known failure patterns
   local replay_warnings
   replay_warnings=$(db_exec "
-    SELECT DISTINCT '⚠ REPLAY RISK: error \"' || substr(e.error, 1, 60) || '\" matches known failure: ' || l.insight
+    SELECT DISTINCT '- REPLAY RISK: \"' || substr(e.error, 1, 60) || '\" matches: ' || l.insight
     FROM errors e
     JOIN learnings l ON l.type = 'failure'
     WHERE e.ts > datetime('now', '-24 hours')
     AND (
-      -- Match if error text contains key words from the failure insight
       e.error LIKE '%' || substr(l.insight, 1, 30) || '%'
       OR l.insight LIKE '%' || REPLACE(REPLACE(e.error, CHAR(10), ' '), CHAR(13), ' ') || '%'
-      -- Match on tool/domain overlap
       OR (e.tool != 'unknown' AND l.domain IS NOT NULL AND e.tool = l.domain)
     )
     LIMIT 3;
   " 2>/dev/null || echo "")
   if [ -n "$replay_warnings" ]; then
-    echo "## ⚠ Error Replay Detection"
-    echo "These recent errors match known failure patterns. Review before proceeding:"
-    echo "$replay_warnings" | sed 's/^/- /'
+    echo "## Replay Detection"
+    echo "$replay_warnings"
     echo ""
   fi
 
@@ -462,16 +532,30 @@ cmd_error() {
   local tool="${1:-}"
   local error="${2:-}"
   local file="${3:-}"
+  local domain="${4:-}"
 
-  [ -z "$tool" ] || [ -z "$error" ] && { echo "Usage: agentdb error <tool> <error> [file]"; exit 1; }
+  [ -z "$tool" ] || [ -z "$error" ] && { echo "Usage: agentdb error <tool> <error> [file] [domain]"; exit 1; }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
-  local safe_tool safe_error safe_file
+  # H103: Auto-infer domain from file path or error content if not provided
+  if [ -z "$domain" ]; then
+    case "$file$error" in
+      *hook*|*guard*|*plugin*)  domain="infrastructure" ;;
+      *test*|*spec*|*assert*)  domain="testing" ;;
+      *auth*|*secret*|*token*) domain="security" ;;
+      *merge*|*conflict*|*worktree*|*agent*) domain="coordination" ;;
+      *api*|*endpoint*|*route*) domain="backend" ;;
+      *) domain="" ;;
+    esac
+  fi
+
+  local safe_tool safe_error safe_file safe_domain
   safe_tool=$(sql_escape "$tool")
   safe_error=$(sql_escape "$error")
   safe_file=$(sql_escape "$file")
+  safe_domain=$(sql_escape "$domain")
 
-  db_exec "INSERT INTO errors (tool, error, file) VALUES ('$safe_tool', '$safe_error', '$safe_file');"
+  db_exec "INSERT INTO errors (tool, error, file, domain) VALUES ('$safe_tool', '$safe_error', '$safe_file', '$safe_domain');"
 }
 
 cmd_query() {
@@ -581,13 +665,31 @@ cmd_prune() {
       after_con=$(db_exec "SELECT COUNT(*) FROM context WHERE type='contract';")
       echo "Pruned $(( before_con - after_con )) contract(s). Kept $after_con."
       ;;
+    learnings)
+      # H081: Prune stale learnings. Safe targets: hit_count=0, >14 days old, pattern/preference type.
+      # Failures and gotchas are never auto-pruned (safety-critical).
+      local before_lrn
+      before_lrn=$(db_exec "SELECT COUNT(*) FROM learnings;")
+      local pruned_lrn
+      pruned_lrn=$(db_exec "SELECT COUNT(*) FROM learnings WHERE hit_count = 0 AND julianday('now') - julianday(ts) > 14 AND type IN ('pattern', 'preference');")
+      db_exec "
+        DELETE FROM learnings
+        WHERE hit_count = 0
+          AND julianday('now') - julianday(ts) > 14
+          AND type IN ('pattern', 'preference');
+      "
+      local after_lrn
+      after_lrn=$(db_exec "SELECT COUNT(*) FROM learnings;")
+      echo "Pruned $pruned_lrn stale learning(s) (hit=0, >14d, pattern/preference). $after_lrn remain."
+      ;;
     all)
       cmd_prune checkpoints "$keep"
       cmd_prune errors "$keep"
       cmd_prune contracts 1
+      cmd_prune learnings
       ;;
     *)
-      echo "Usage: agentdb prune <checkpoints|errors|contracts|all> [keep_count]" >&2
+      echo "Usage: agentdb prune <checkpoints|errors|contracts|learnings|all> [keep_count]" >&2
       exit 1
       ;;
   esac
@@ -1518,7 +1620,7 @@ cmd_co_change() {
 case "${1:-help}" in
   init)           cmd_init ;;
   preflight)      cmd_preflight ;;
-  read-start)     cmd_read_start ;;
+  read-start)     shift; cmd_read_start "${1:---weighted}" ;;
   write-end)      shift; cmd_write_end "$@" ;;
   learn)          shift; cmd_learn "$@" ;;
   contract)       shift; cmd_contract "$@" ;;
