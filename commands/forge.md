@@ -1,6 +1,6 @@
 ---
 name: kernel:forge
-description: "Autonomous development engine. Heats solutions with adversarial entropy, hammers them through iteration, quenches with quality gates. Runs until antifragile or reports why it can't be. Run overnight, come back to shipped code."
+description: "Autonomous development engine with experimental self-correction. Heats solutions, hammers through iteration, quenches with quality gates, experiments on its own output. Runs until antifragile or reports why it can't be."
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, WebSearch, WebFetch
 ---
@@ -14,9 +14,13 @@ The forge metaphor is literal:
   HEAT   — generate competing approaches, inject entropy
   HAMMER — iterate implementation against failing tests
   QUENCH — quality gates, adversarial review, convergence check
+  TEMPER — experiment on output, discover emergent patterns, self-correct
   ANNEAL — if brittle, reheat and try a different crystalline structure
 
-Run this overnight. Come back to shipped code + full audit trail in agentdb.
+TEMPER is the evolution: the forge doesn't just build — it measures, hypothesizes,
+tests, and adapts. Every cycle produces data. Every data point refines the next cycle.
+
+Run this overnight. Come back to shipped code + experimental evidence + emergent learnings.
 </purpose>
 
 <skill_load>
@@ -50,26 +54,28 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
   <phase id="heat" name="HEAT — Generate Competing Approaches">
     Raise the temperature. Don't commit to the first idea.
 
+    **RULE: Research without verification is theory fiction.** (LRN-F11)
+    Never generate approaches from research alone. Each candidate must have a verification path
+    (test, prototype, visual proof) defined upfront. If you can't verify it, don't propose it.
+
+    **RULE: Avoid specific multiplier claims.** (H104 graduated meta-rule)
+    Approaches that promise "3-5x improvement" or "always better" have a 71% refutation rate.
+    Frame as directional: "reduces X" not "reduces X by 80%." Measure after, not before.
+
     1. Read agentdb context + _meta/research/ for prior work.
     1b. Measure entropy: check agentdb learning count in domain, test coverage, recent failures.
         Low entropy → generate 1 approach (streamlined). High entropy → generate 3 approaches (full exploration).
     2. Classify task: type, tier, domain.
     3. Generate 2-3 candidate approaches (not variations — genuinely different strategies).
-    4. For each: files affected, tests needed, effort estimate, known risks.
+    4. For each: files affected, tests needed, effort estimate, known risks, **verification method**.
+    5. For each: **hypothesis** — what testable claim does this approach make?
 
     Tier 1: generate inline.
     Tier 2+: spawn parallel surgeon agents, one per approach.
     Tier 3: spawn full council (researcher + scout in parallel → dreamer → surgeons).
 
-    <ask_user>
-      Use AskUserQuestion when: approaches generated and user is present (not overnight)
-      Ask: "Generated {N} approaches. Prefer a direction, or let forge pick the strongest?"
-      Options: pick for me, lean toward {approach_name}, show me the approaches first
-    </ask_user>
-
     ```bash
-    agentdb emit command "forge-heat" "" '{"approaches":N,"tier":N}'
-    # If non-local profile: create tracking issue via _gh_create_issue
+    agentdb emit command "forge-heat" "" '{"approaches":N,"tier":N,"hypotheses":["H-FORGE-1","H-FORGE-2"]}'
     ```
   </phase>
 
@@ -80,6 +86,7 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
     2. Implement minimal code to pass (green).
     3. Refactor while green.
     4. Run full suite: tests + lint + types.
+    5. **Measure**: record metrics that will feed TEMPER phase (tokens, time, error count, coverage).
 
     Inner loop (max 5 strikes per approach):
       - failing → fix implementation, not tests
@@ -87,7 +94,7 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
       - stuck after 3 strikes → switch to next candidate approach from heat phase
 
     ```bash
-    agentdb emit command "forge-hammer" "" '{"approach":"X","strikes":N,"tests_passing":N}'
+    agentdb emit command "forge-hammer" "" '{"approach":"X","strikes":N,"tests_passing":N,"metrics":{}}'
     ```
   </phase>
 
@@ -98,7 +105,13 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
       Spawn adversary (or self-adversary for tier 1). Their mandate:
       DON'T ask "is this valid?" ASK "can I destroy this?"
 
-      Attack vectors:
+      **Coordination checks FIRST** (H093 — 4.3x more impactful than code quality):
+      - Did agents touch overlapping files?
+      - Did agents claim completion without evidence?
+      - Did scope drift beyond contract?
+      - Is there duplicate work across branches?
+
+      Then code quality attack vectors:
       - What input breaks this?
       - What race condition exists?
       - What happens at 10x scale?
@@ -111,7 +124,7 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
 
     <integrity_measure>
       Score: 0.0 (shattered) to 1.0 (antifragile).
-      - >= 0.8: SURVIVED. Solution is robust. Proceed to ship.
+      - >= 0.8: SURVIVED. Proceed to TEMPER.
       - >= 0.6: CRACKED. Fixable flaws. Back to hammer with adversary feedback.
       - < 0.6: SHATTERED. Approach is fundamentally flawed. Anneal.
     </integrity_measure>
@@ -121,13 +134,55 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
     ```
   </phase>
 
+  <phase id="temper" name="TEMPER — Experiment on Output" trigger="quench.survived">
+    The forge's emergent intelligence. Don't just ship — learn.
+
+    After quench survives, run experiments on the forged output:
+
+    1. **Measure what changed**: diff size, token impact, test count, coverage delta.
+    2. **Test the hypothesis from HEAT**: does the measured outcome match the predicted outcome?
+       If yes → record as supporting evidence. If no → record what actually happened.
+    3. **Cross-reference with AgentDB**: does this change interact with known patterns or failures?
+       Query: `SELECT insight FROM learnings WHERE domain = '{task_domain}' AND type = 'failure'`
+       Any match = potential regression risk. Investigate before shipping.
+    4. **Discover emergent patterns**: what surprised you? What worked that shouldn't have?
+       What failed that should have worked? These are the seeds of new hypotheses.
+    5. **Self-correct**: if temper reveals a problem quench missed, go back to hammer.
+       If temper reveals an opportunity, seed a hypothesis for the next forge cycle.
+
+    <emergence>
+    The temper phase is where the forge develops intelligence across runs:
+    - Cycle 1: baseline measurements, hypothesis formation
+    - Cycle 2: compare against cycle 1 measurements, detect trends
+    - Cycle 3+: patterns emerge — the forge knows which approaches work for which problems
+    - Cross-session: temper learnings feed into HEAT phase of future forge runs
+    </emergence>
+
+    ```bash
+    # Record measurements
+    agentdb learn pattern "forge-temper: {what worked and why}" "{metrics}"
+    
+    # Seed hypothesis if emergent pattern found
+    agentdb learn pattern "forge-hypothesis: {testable claim}" "{evidence from this cycle}"
+    
+    # Record cycle metrics for cross-session learning
+    agentdb emit command "forge-temper" "" '{"cycle":N,"hypothesis_confirmed":true|false,"emergent":["..."],"metrics":{}}'
+    ```
+
+    If temper passes → proceed to SHIP.
+    If temper reveals issue → back to HAMMER with temper feedback.
+  </phase>
+
   <phase id="anneal" name="ANNEAL — Reheat and Restructure" trigger="quench.shattered">
     The current crystalline structure is brittle. Don't patch — remelt.
 
     1. Record WHY it shattered: agentdb learn failure "approach X failed because Y"
     2. Penalize this approach: mark as explored-and-failed.
-    3. Return to HEAT with the shatter reason as new constraint.
-    4. The next approach MUST be structurally different.
+    3. **Experiment on the failure**: WHY did this approach shatter? Is it a pattern?
+       Check: does this shatter reason match any prior forge failures?
+       If pattern found → skip entire class of approaches, not just this variant.
+    4. Return to HEAT with the shatter reason + pattern analysis as new constraints.
+    5. The next approach MUST be structurally different.
 
     This prevents hammering a fundamentally flawed approach into submission.
     Sometimes the metal needs a different alloy, not more force.
@@ -135,19 +190,14 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
     Max anneals: 3. After 3 structural failures → STOP.
     "Tried 3 distinct approaches. All shattered. Here's why. Human decision needed."
 
-    <ask_user>
-      Use AskUserQuestion when: approach shatters and alternatives remain
-      Ask: "Approach {X} shattered: {reason}. Try a different angle, or stop and reassess?"
-      Options: try next approach, stop and reassess, reframe the problem
-    </ask_user>
-
     ```bash
-    agentdb emit command "forge-anneal" "" '{"reason":"X","approaches_exhausted":N}'
+    agentdb learn failure "forge-shatter: approach X because Y" "{diff, test output, adversary verdict}"
+    agentdb emit command "forge-anneal" "" '{"reason":"X","approaches_exhausted":N,"pattern_match":"..."}'
     ```
   </phase>
 
-  <phase id="ship" name="SHIP — Release the Forged Artifact" trigger="quench.survived">
-    Solution survived entropy. Ship it.
+  <phase id="ship" name="SHIP — Release the Forged Artifact" trigger="temper.passed">
+    Solution survived entropy AND experimentation. Ship it.
 
     Profile-gated:
     - local: commit to main
@@ -155,18 +205,10 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
     - github-oss: feature branch → PR → self-review via /kernel:review
     - github-production: feature branch → PR → request review
 
-    <ask_user>
-      Use AskUserQuestion when: solution survived quench and is ready to ship
-      Ask: "Integrity {score}. Ready to ship, or want to review before committing?"
-      Options: ship it, review first, run one more quench cycle
-    </ask_user>
-
     ```bash
-    agentdb learn pattern "what worked" "approach X, integrity Y"
-    agentdb emit command "forge-ship" "" '{"iterations":N,"integrity":0.X,"approach":"X"}'
-    agentdb write-end '{"command":"forge","iterations":N,"tests":N,"integrity":0.X,"shipped":true}'
-    # If non-local profile: close tracking issue with completion summary
-    # Suggest /kernel:retrospective if learnings accumulated across forge cycles
+    agentdb learn pattern "forge-shipped: {approach}, integrity {score}, {key metric}" "{evidence}"
+    agentdb emit command "forge-ship" "" '{"iterations":N,"integrity":0.X,"approach":"X","temper_findings":[]}'
+    agentdb write-end '{"command":"forge","iterations":N,"tests":N,"integrity":0.X,"shipped":true,"emergent_hypotheses":N}'
     ```
   </phase>
 
@@ -177,16 +219,39 @@ Load ALL always-skills immediately. Load task/domain skills after classify.
   - researcher + scout: parallel reconnaissance
   - dreamer: 3 competing approaches (after recon)
   - surgeon: implement winning approach
-  - adversary: entropy testing (quench phase)
+  - adversary: coordination + entropy testing (quench phase)
 
   Council communicates via agentdb. Each reads prior agents' output.
   You orchestrate the sequence and handle annealing.
 </council>
 
 <loop_control>
-  continue_if: progress (tests improving, integrity increasing)
-  anneal_if: integrity < 0.6 | stop_if: 3 anneals OR 10 iterations OR scope creep
-  on_stop: audit trail (approaches+scores, shatter reasons, tests, learnings, recommendation)
+  continue_if: progress (tests improving, integrity increasing, temper passing)
+  anneal_if: integrity < 0.6
+  temper_back_to_hammer_if: temper reveals missed issue
+  stop_if: 3 anneals OR 10 iterations OR scope creep
+  on_stop: audit trail (approaches+scores, shatter reasons, temper findings, emergent hypotheses, learnings)
 </loop_control>
+
+<experimental_behavior>
+  The forge is not just a build tool — it's a learning system.
+
+  **Within a single run:**
+  - Each cycle generates data (metrics, failures, successes)
+  - TEMPER phase analyzes that data and forms hypotheses
+  - Subsequent cycles test those hypotheses
+  - Emergent patterns are captured as learnings
+
+  **Across runs:**
+  - HEAT reads prior forge learnings (forge-temper, forge-shatter, forge-shipped)
+  - Approaches that worked before are preferred (but not blindly repeated)
+  - Shatter patterns are avoided (but not blindly excluded — context matters)
+  - The forge gets smarter with each use, not just from code but from self-measurement
+
+  **What makes this different from plain iteration:**
+  - Plain iteration: try → fail → try again
+  - Forge with temper: try → measure → hypothesize → test hypothesis → learn → try smarter
+  - The difference is the hypothesis step: the forge doesn't just retry, it asks WHY
+</experimental_behavior>
 
 </command>
