@@ -1,4 +1,4 @@
-<kernel version="7.11.0">
+<kernel version="7.11.1">
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->
