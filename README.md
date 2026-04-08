@@ -1,8 +1,8 @@
 # KERNEL
 
-**Permanent memory and multi-agent orchestration for Claude Code.**
+**Claude Code learns from itself.**
 
-Claude Code forgets everything when you close it. KERNEL gives it memory that persists forever—what worked, what broke, where you left off. Every conversation makes Claude Code smarter about YOUR project.
+Your agent forgets everything when you close it. KERNEL gives it persistent memory, multi-agent orchestration, and a scientific experiment engine that proves which rules actually work. Every session makes it smarter about YOUR project.
 
 ---
 
@@ -34,69 +34,49 @@ See [docs/QUICKSTART.md](docs/QUICKSTART.md) for the full setup guide.
 
 ## What It Does
 
-### Memory
-Claude Code remembers everything across sessions. What worked. What broke. Where you left off. Lessons learned. It's all saved in `_meta/` and persists forever.
+### Memory That Compounds
 
-### Agents
-Specialized helpers for different tasks:
-- **Surgeon** - Builds features with minimal changes
-- **Adversary** - QA agent, finds edge cases and bugs
-- **Reviewer** - Code review with >80% confidence threshold
-- **Researcher** - Looks up solutions before building
-- **Scout** - Explores and maps your codebase
-- **Validator** - Pre-commit checks (tests, lint, security)
+AgentDB remembers what worked, what broke, and where you left off — across every session. Not just logs. Weighted retrieval surfaces the learnings that matter (top 7% deliver 80% of value) while pruning what doesn't. Your agent stops repeating the same mistakes.
 
-### Tiered Routing
-KERNEL automatically routes your requests:
+### Agents That Coordinate
 
-| Tier | Files | Approach |
-|------|-------|----------|
-| 1 | 1-2 | Execute directly. No subagents needed. |
-| 2 | 3-5 | Spawn surgeon agents to implement. |
-| 3 | 6+ | Surgeon agents implement; adversary agents verify. |
+13 specialized agents route by complexity. Tier 1 (1-2 files) executes directly. Tier 2+ spawns surgeons to implement and an adversary to verify. The adversary checks **coordination first** (file overlap, scope drift, duplicate work) because our telemetry proved coordination failures are 4.3x more impactful than code bugs.
 
-### Skills
-Skills are methodologies that load on-demand. When you mention "debug" or "security," the relevant skill loads automatically. Skills inform HOW agents work.
+| Agent | Role |
+|-------|------|
+| **Surgeon** | Minimal-diff implementation. Checkpoints to AgentDB. |
+| **Adversary** | Coordination verification + code quality. Assumes broken until proven. |
+| **Reviewer** | 11-phase code review, >80% confidence threshold. |
+| **Researcher** | Finds solutions before building. Anti-patterns first. |
+| **Scout** | Maps codebase structure, detects tooling, identifies risk. |
+| **Validator** | Pre-commit: tests, lint, types, security scan. |
+| **Triage** | Fast complexity classifier before expensive work. |
 
-| Skill | What It Does |
-|-------|--------------|
-| `debug` | Scientific debugging: reproduce, hypothesize, binary search to root cause |
-| `testing` | Test behavior not implementation; edge cases over happy paths |
-| `tdd` | Test-driven: red-green-refactor cycle, tests before code |
-| `security` | Input validation, auth, secrets management, OWASP top 10 |
-| `api` | REST design: resource naming, status codes, pagination, versioning |
-| `backend` | Repository pattern, caching, queues, N+1 prevention |
-| `e2e` | Playwright: Page Object Model, flaky test strategies |
-| `refactor` | Behavior-preserving transforms; tests green before AND after |
-| `design` | Frontend aesthetics; break generic AI patterns |
-| `architecture` | System design, modules, dependencies, coupling |
-| `git` | Atomic commits, conventional messages, branch strategies |
-| `context-mgmt` | Token management, compaction strategies, handoffs |
-| `orchestration` | Multi-agent coordination, contracts, fault tolerance |
-| `performance` | Measure before optimizing; identify real bottlenecks |
-| `eval` | Eval-driven development for AI workflows |
+### Rules That Prove Themselves
 
-Skills live in `skills/{name}/SKILL.md`. Each has a reference doc in `skills/{name}/reference/`.
+The experiment engine treats every rule as a hypothesis. It seeds them from your CLAUDE.md, designs experiments, runs them against AgentDB telemetry, and graduates rules that survive or kills rules that don't. 22 rules graduated from 107 hypotheses across 205 experiments. The forge command uses this: after building, it **tempers** — experiments on its own output, discovers emergent patterns, and self-corrects before shipping.
+
+### Skills That Load On-Demand
+
+19 skills (testing, security, debug, api, backend, architecture, etc.) load when relevant — not at startup. Each is a methodology: HOW to approach a problem, not just tools to use.
 
 ---
 
 ## Daily Use
 
-**Start every request with `/ingest`**
-
-This is the universal entry point. It reads memory, classifies your task, picks the right approach, and routes to the right agent. Always start here.
+**Start with `/ingest`** — the universal entry point. Reads memory, classifies your task, routes to the right agent.
 
 ```
 /ingest add user authentication to the app
 ```
 
-Or just type `/ingest` and describe what you want on the next line.
+**Run overnight with `/forge`** — autonomous engine. Generates competing approaches, iterates against tests, adversarial review, experiments on output. Come back to shipped code.
 
-> **Note:** In Claude Code terminal, commands use the `kernel:` prefix (`/kernel:ingest`). In Claude Desktop and Cursor, they appear without the prefix (`/ingest`). Same functionality, different naming.
+**Save with `/handoff`** before closing. Next session, `/ingest` auto-resumes from where you left off.
 
-**Check:** `/kernel:validate` before committing
+**Check with `/validate`** before committing. Tests, lint, types, security.
 
-**Save:** `/kernel:handoff` before closing
+> **Note:** In Claude Code terminal, commands use the `kernel:` prefix (`/kernel:ingest`). In Claude Desktop and Cursor, they appear without the prefix (`/ingest`).
 
 ---
 
@@ -104,12 +84,13 @@ Or just type `/ingest` and describe what you want on the next line.
 
 | Terminal | Desktop/Cursor | What It Does |
 |----------|----------------|--------------|
-| `/kernel:ingest` | `/ingest` | Guided flow — classify, scope, execute with human confirmation |
-| `/kernel:forge` | `/forge` | Autonomous engine — heat/hammer/quench/anneal until antifragile |
+| `/kernel:ingest` | `/ingest` | Guided flow — classify, scope, execute. Auto-resumes from handoffs. |
+| `/kernel:forge` | `/forge` | Autonomous — heat/hammer/quench/temper/anneal until antifragile |
+| `/kernel:experiment` | `/experiment` | Run the hypothesis engine — seed, test, graduate, kill rules |
 | `/kernel:dream` | `/dream` | Creative exploration — 3 perspectives, 4-persona stress test |
 | `/kernel:diagnose` | `/diagnose` | Systematic debugging + refactor analysis before fixing |
 | `/kernel:retrospective` | `/retrospective` | Cross-session learning synthesis + pattern promotion |
-| `/kernel:metrics` | `/metrics` | Observability dashboard — sessions, agents, hooks, learnings |
+| `/kernel:metrics` | `/metrics` | Observability — sessions, agents, hooks, learnings |
 | `/kernel:validate` | `/validate` | Pre-commit quality gates |
 | `/kernel:tearitapart` | `/tearitapart` | Critical pre-implementation review |
 | `/kernel:review` | `/review` | Code review for PRs |
@@ -129,26 +110,13 @@ Or just type `/ingest` and describe what you want on the next line.
 /reload-plugins
 ```
 
-### Interactive Update
-
-1. Type `/plugin` and go to the **Installed** tab
-2. Select **KERNEL**
-3. Choose **Update to latest**
-4. Run `/reload-plugins` to apply without restarting
-
 ### Enable Auto-Update (Recommended)
-
-So you never get stuck on an old version:
 
 1. Type `/plugin` and go to the **Marketplaces** tab
 2. Select **kernel-marketplace**
 3. Toggle **Enable auto-update**
 
-With auto-update on, KERNEL updates itself whenever a new version is published.
-
 ### Stuck on an Old Version?
-
-If commands are missing or behaving unexpectedly, you may be on a stale version. Run the CLI update commands above, or uninstall and reinstall:
 
 ```
 /plugin uninstall kernel@kernel-marketplace
@@ -161,82 +129,52 @@ If commands are missing or behaving unexpectedly, you may be on a stale version.
 
 ## Local Development (For Contributors)
 
-If you're developing KERNEL locally, symlink the cache to avoid stale copies:
+Symlink the cache to avoid stale copies:
 
 ```bash
-# Remove cached copy
-rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/7.1.0
-
-# Symlink to your local dev version
-ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/7.1.0
-
-# Verify
-ls -la ~/.claude/plugins/cache/kernel-marketplace/kernel/
+rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/7.12.1
+ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/7.12.1
 ```
 
-Now edits to your local copy take effect immediately—no version bumps or reinstalls needed.
-
-**Why this matters:** Claude Code [caches plugins](https://dev.to/wkusnierczyk/claude-code-plugin-cache-1dn) by version. Without the symlink, you'd need to bump version + reinstall after every change.
+Edits take effect immediately — no version bumps or reinstalls needed. Claude Code [caches plugins](https://dev.to/wkusnierczyk/claude-code-plugin-cache-1dn) by version; the symlink bypasses this.
 
 ---
 
 ## Troubleshooting
 
-**Commands not showing up?**
-```
-/plugin marketplace update kernel-marketplace
-/plugin update kernel@kernel-marketplace
-/reload-plugins
-```
+**Commands not showing up?** Run the quick update commands above.
 
-**Claude isn't reading memory?**
-Start with `/ingest` (or `/kernel:ingest` in terminal). Plain requests skip the memory system.
+**Claude isn't reading memory?** Start with `/ingest`. Plain requests skip the memory system.
 
-**Claude forgot everything between sessions?**
-Run `/kernel:handoff` before closing. This saves context to AgentDB.
+**Claude forgot everything?** Run `/kernel:handoff` before closing. Or just run `/ingest` next session — it auto-resumes from the latest handoff.
 
-**Same mistake keeps happening?**
-Say: "Remember this as a failure pattern." KERNEL will log it and avoid it next time.
+**Same mistake keeps happening?** Say: "Remember this as a failure pattern." KERNEL logs it to AgentDB and avoids it next time.
 
-**"AgentDB not found" error?**
-Run `/kernel:init` first. This creates the `_meta/` folder and database.
+**"AgentDB not found" error?** Run `/kernel:init` first.
 
-**Claude doing too much at once?**
-KERNEL routes big tasks (6+ files) to multiple agents. If you want simpler execution, say "Tier 1 only" or "just do it directly."
+**Agents not spawning?** Use `/ingest`. Direct requests bypass the tiering system.
 
-**Agents not spawning?**
-Make sure you're using `/ingest` (or `/kernel:ingest` in terminal). Direct requests bypass the tiering system.
+---
+
+## Architecture
+
+### AgentDB
+
+SQLite database at `_meta/agentdb/agent.db`. Stores learnings, events, errors, hypotheses, experiments, contracts, checkpoints, verdicts. Graduated retrieval loads the top 75 by weighted score (86% token savings vs loading everything).
+
+### Graph Layer (Built on aDNA)
+
+Context graph inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtocol/adna) from Lattice Protocol. Models context as nodes + edges — which skills load well together, which agent combinations succeed, which nodes conflict. The graph learns over time.
+
+### Experiment Engine
+
+107 hypotheses, 205 experiments, 22 graduated rules. Every rule in CLAUDE.md is a hypothesis until proven by evidence. The engine seeds rules, designs experiments against AgentDB telemetry, issues verdicts (supports/refutes/inconclusive), and graduates or kills rules based on Bayesian confidence scoring. Runs autonomously via `/kernel:experiment`.
 
 ---
 
 ## Full Documentation
 
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for:
-- Detailed installation steps
-- Daily workflow guide
-- All commands explained
-- Common situations and fixes
-- What's inside KERNEL
-
----
-
-## Graph Architecture — Built on aDNA
-
-KERNEL's context graph system is directly inspired by [**aDNA (Agentic DNA)**](https://github.com/LatticeProtocol/adna) from Lattice Protocol. Full credit and thanks.
-
-AgentDB's graph tracking (migration 002, added in v7.0.0) models context as **nodes, edges, and sessions** — the same directed-graph-of-connected-components pattern that aDNA uses for lattice composition. Specifically:
-
-| aDNA | KERNEL (AgentDB graph) |
-|------|----------------------|
-| **Lattices** — directed graphs of modules + datasets | **Nodes + Edges** — directed graph of skills, commands, agents, research |
-| **`context_graph`** lattice type — knowledge retrieval + reasoning | **`context_sessions`** — tracks which nodes loaded together and whether they succeeded |
-| **Edge relations** (input/output between modules) | **Edge relations** (`loads`, `references`, `depends_on`, `conflicts_with`, `succeeds_with`) |
-| **Success correlation** across lattice executions | **`v_successful_combos`** view — which node combinations correlate with success |
-| **Node performance** tracking | **`v_node_performance`** view — access count × success rate = confidence score |
-
-The graph learns over time: which skills load well together for bug fixes? Which agent+skill combinations succeed? Which nodes conflict? This is aDNA's lattice composition concept applied to Claude Code's context window.
-
-**If you want the full graph architecture** — lattice YAML schemas, directed-graph composition, context libraries with progressive loading, multi-project federation, and a framework that works with any AI agent — **go to [aDNA](https://github.com/LatticeProtocol/adna)**. It's the deeper, more general system.
+See [docs/QUICKSTART.md](docs/QUICKSTART.md) for detailed installation, daily workflow, and what's inside KERNEL.
 
 ---
 
