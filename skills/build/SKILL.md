@@ -25,6 +25,16 @@ OUTPUTS: [What should exist when done?]
 DONE-WHEN: [How do we know it's complete?]
 ```
 
+<!-- Updated 2026-04-10: https://code.claude.com/docs/en/best-practices -->
+**Interview pattern for large features**: For ambiguous or complex features, instead of
+filling in the template manually, prompt Claude to interview you:
+> "I want to build [brief description]. Interview me using the AskUserQuestion tool.
+> Ask about technical implementation, UI/UX, edge cases, and tradeoffs. Don't ask
+> obvious questions — dig into the hard parts. Then write a complete spec to _meta/plans/."
+
+Start a fresh session after the spec is written. The implementation session gets clean context
+focused entirely on execution, with a written spec to reference throughout.
+
 ---
 
 # SOLUTION EXPLORATION (NEVER SKIP)
@@ -53,6 +63,11 @@ Evaluation criteria (ordered):
 ---
 
 # RESEARCH CACHE
+
+**RULE: Research without verification is theory fiction.** (LRN-F11)
+Every research finding must be verified with a minimal test before it drives implementation.
+Cached research is a starting point, not a conclusion. If the cache says "use approach X",
+build a 10-line proof before committing to X across your codebase.
 
 Before web search, check for cached research in `_meta/research/`.
 
@@ -169,6 +184,8 @@ Long build sessions degrade model performance as context fills. Mitigate:
 
 - **Compact at ~70% context usage**: Use `/compact` before context degrades. Signal: responses
   getting shorter, earlier instructions being ignored, more mistakes per edit.
+  Use `/compact <instructions>` to control what survives: e.g. `/compact Focus on API changes only`.
+  For partial compaction, use `Esc+Esc` → `/rewind`, select a checkpoint, choose "Summarize from here".
 - **Scope sessions by task, not by time**: One session = one feature or one bug. Don't let a
   session sprawl across multiple concerns. Use `/clear` between unrelated tasks.
 - **Delegate research to subagents**: Research subtasks consume context without adding code.
@@ -177,6 +194,10 @@ Long build sessions degrade model performance as context fills. Mitigate:
 - **Verification criteria before coding**: State done-when criteria at session START, not end.
   Claude performs dramatically better when it can run tests to verify its own output throughout
   the session, not just at the end.
+- **Side questions with `/btw`**: Quick questions that don't need to stay in context go in `/btw`.
+  The answer appears as a dismissible overlay and never enters conversation history.
+  Use it for "what does this function do?" or "what's the flag for X?" without growing context.
+<!-- Updated 2026-04-10: https://code.claude.com/docs/en/best-practices -->
 
 ---
 

@@ -108,13 +108,16 @@ Every bug fix MUST include a regression test. No exceptions.
 5. Search exact error message in quotes.
 6. Step away. Bias accumulates under sustained focus.
 7. **Plan Mode**: For complex or sensitive bugs, use Plan Mode to analyze errors and form hypotheses without making any code changes until the approach is approved. Paste stack traces and error messages in Plan Mode first.
+8. **Rewind to pre-bug state**: `Esc+Esc` or `/rewind` opens checkpoint history. Restore code state to before the suspected change without losing conversation context. Faster than manual git reset when the bug was introduced in the current session.
 </when_stuck>
 <!-- Updated 2026-03-28: https://code.claude.com/docs/en/best-practices, https://claudelog.com/faqs/how-to-use-claude-code-for-debugging/ -->
+<!-- Updated 2026-04-10: https://code.claude.com/docs/en/best-practices -->
 
 <escalation>
 - 30+ min on single hypothesis with no evidence → abandon it.
 - 3+ hypotheses rejected → step back, re-examine assumptions.
 - 2 failed fix attempts → orchestrator should invoke tearitapart. May be design problem, not implementation.
+- 2+ failed corrections in same session → `/clear` and rewrite the initial prompt incorporating lessons learned. A clean session with a better prompt outperforms a long session polluted with failed approaches.
 - Bug only in production → add targeted monitoring, document, move on.
 </escalation>
 

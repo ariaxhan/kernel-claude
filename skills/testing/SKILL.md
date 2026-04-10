@@ -78,6 +78,18 @@ When reviewing AI-generated tests, specifically check:
 
 AI-generated tests frequently validate bugs because they're synthesized FROM the code.
 Read them as if the implementation might be wrong — because it might be.
+
+<!-- Updated 2026-04-10: https://code.claude.com/docs/en/best-practices, https://utofa.com/blogs/ai-code-review-2026-best-practices/ -->
+**Pre-generation test descriptions**: When asking Claude to generate code, provide at minimum
+the test case descriptions (inputs and expected outputs) BEFORE requesting implementation.
+This forces behavioral specification first and prevents tautological tests that just validate
+what the code does rather than what it should do. Example:
+> "Write validateEmail. Test cases: user@example.com → true, invalid → false, user@.com → false.
+> Write the tests first, then implement the function to pass them."
+
+**40-70% of production code is now AI-generated** (industry estimate, 2026). The proportion
+of tautological tests in codebases is rising proportionally. Manual review of AI-generated
+tests for behavioral correctness is non-optional.
 </ai_generated_test_review>
 
 <!-- Updated 2026-04-02: https://code.claude.com/docs/en/best-practices, https://testdino.com/blog/claude-code-with-playwright/ -->
