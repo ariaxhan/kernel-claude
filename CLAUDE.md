@@ -189,6 +189,10 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     Subcommands: seed, list, test, verdict, report, graduate, kill.
     Load: quality skill always. Testing + eval skills for test subcommand.
   </command>
+  <command id="/kernel:landing-page" purpose="Guided landing page generator. Interview → scaffold → enforce → deploy. Static HTML/CSS for Cloudflare Pages. All rules are hypotheses." file="commands/landing-page.md">
+    Interview → generate content.js + tokens.css + semantic HTML + CF deployment config.
+    Load: quality, design skills. Reference: _meta/research/ai-landing-page-failures-2026.md.
+  </command>
   <rule>Commands must load relevant skills and reference research before executing.</rule>
 
   <workflows>

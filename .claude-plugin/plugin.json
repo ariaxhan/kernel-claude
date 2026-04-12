@@ -33,6 +33,7 @@
     "./commands/diagnose.md",
     "./commands/metrics.md",
     "./commands/retrospective.md",
-    "./commands/experiment.md"
+    "./commands/experiment.md",
+    "./commands/landing-page.md"
   ]
 }
