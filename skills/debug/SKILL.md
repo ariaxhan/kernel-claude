@@ -109,6 +109,8 @@ Every bug fix MUST include a regression test. No exceptions.
 6. Step away. Bias accumulates under sustained focus.
 7. **Plan Mode**: For complex or sensitive bugs, use Plan Mode to analyze errors and form hypotheses without making any code changes until the approach is approved. Paste stack traces and error messages in Plan Mode first.
 8. **Rewind to pre-bug state**: `Esc+Esc` or `/rewind` opens checkpoint history. Restore code state to before the suspected change without losing conversation context. Faster than manual git reset when the bug was introduced in the current session.
+9. **Visibility-first**: Don't describe the problem — show the raw evidence. Paste terminal output, actual error logs, or screenshots directly. Let Claude read the data, not your interpretation of it. A description of a bug introduces your assumptions; the raw output doesn't.
+<!-- Updated 2026-04-14: https://allierays.com/posts/5-techniques-to-debug-claude-code/ -->
 </when_stuck>
 <!-- Updated 2026-03-28: https://code.claude.com/docs/en/best-practices, https://claudelog.com/faqs/how-to-use-claude-code-for-debugging/ -->
 <!-- Updated 2026-04-10: https://code.claude.com/docs/en/best-practices -->

@@ -107,4 +107,18 @@ Developer fixes cheap issues first, humans see a cleaner diff and focus on inten
 Sequence: AI review → fix → human review. Not parallel.
 </diff_sizing>
 
+
+<!-- Updated 2026-04-14: https://javaworldmag.com/evolving-code-reviews-with-ai-in-2026/ -->
+<ai_pr_transparency>
+When merging AI-assisted work, PR descriptions should answer three questions:
+
+1. **What was the AI's role?** (generated scaffold, wrote tests, suggested approach, full implementation)
+2. **What prompt or instructions drove it?** (as important as a commit message — reviewers evaluate the generation process, not just the output)
+3. **What was the human contribution?** (reviewed, modified, architecture decisions, requirements)
+
+Reviewers then focus on: design decisions, architecture fit, business logic correctness — not line-by-line syntax the AI already handled.
+
+This is not ceremony — it's the minimum for a meaningful review of AI-assisted code. Without it, reviewers are auditing output with no context on how it was generated.
+</ai_pr_transparency>
+
 </skill>
