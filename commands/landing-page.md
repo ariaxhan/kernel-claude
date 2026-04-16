@@ -47,26 +47,57 @@ agentdb emit command "landing-page-start" "" '{}'
 
   <steps>
 
-  ## Step 1: Create project directory
+  ## Step 1: Locate or create project directory
+
+  Three modes, auto-detected:
+
+  **Mode A — In-place (CWD is the target):**
+  If `$(basename $PWD)` matches the project name OR the CWD is empty / contains only
+  hidden files, initialize in place. This is the common case when the user runs
+  `mkdir ourlastframe && cd ourlastframe && /kernel:landing-page`.
+
+  **Mode B — Create subdir (CWD is parent):**
+  Create `$PWD/${PROJECT}/`, cd into it.
+
+  **Mode C — Refuse (CWD has unrelated content):**
+  If CWD is non-empty and name doesn't match, refuse and tell user to either cd to parent
+  or choose mode A explicitly.
 
   ```bash
   PROJECT="${project_name_slugified}"   # from interview Phase 1 answer
-  PARENT="${PWD}"                        # or ask user for parent dir
-  TARGET="${PARENT}/${PROJECT}"
+  CWD_BASE="$(basename "$PWD")"
+  # Count non-hidden entries
+  VISIBLE_COUNT=$(ls -1 2>/dev/null | wc -l | tr -d ' ')
 
-  if [ -e "$TARGET" ]; then
-    echo "ERROR: $TARGET already exists. Abort or choose different name."
+  if [ "$CWD_BASE" = "$PROJECT" ] || [ "$VISIBLE_COUNT" = "0" ]; then
+    # Mode A: in-place
+    TARGET="$PWD"
+    echo "INIT MODE: in-place at $TARGET"
+  elif [ ! -e "$PWD/$PROJECT" ]; then
+    # Mode B: create subdir
+    TARGET="$PWD/$PROJECT"
+    mkdir -p "$TARGET"
+    cd "$TARGET"
+    echo "INIT MODE: created $TARGET"
+  else
+    # Mode C: refuse
+    echo "ERROR: Cannot init. CWD has unrelated content and $PWD/$PROJECT exists."
+    echo "Either: (1) cd to empty parent dir, or (2) cd into ${PROJECT}/ to init in-place."
     exit 1
   fi
 
-  mkdir -p "$TARGET"/{styles,assets}
-  cd "$TARGET"
+  mkdir -p styles assets
   ```
 
-  ## Step 2: Initialize git
+  ## Step 2: Initialize git (idempotent)
 
   ```bash
-  git init -b main
+  # Skip if already a git repo (in-place mode may land in one)
+  if [ ! -d .git ]; then
+    git init -b main
+  else
+    echo "Git repo already present, skipping init."
+  fi
   cat > .gitignore <<'EOF'
   # Cloudflare
   .wrangler/
@@ -132,11 +163,15 @@ agentdb emit command "landing-page-start" "" '{}'
     "{\"project\":\"${PROJECT}\",\"path\":\"${TARGET}\"}"
   ```
 
-  ## Step 6: Initial commit
+  ## Step 6: Initial commit (only if we have something new to commit)
 
   ```bash
-  git add .gitignore README.md
-  git commit -m "chore: init ${PROJECT} landing page scaffold"
+  git add .gitignore README.md 2>/dev/null || true
+  if ! git diff --cached --quiet; then
+    git commit -m "chore: init ${PROJECT} landing page scaffold"
+  else
+    echo "Nothing new to commit for scaffold."
+  fi
   ```
 
   </steps>
