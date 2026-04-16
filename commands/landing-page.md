@@ -37,6 +37,125 @@ agentdb emit command "landing-page-start" "" '{}'
 </on_start>
 
 <!-- ============================================ -->
+<!-- PHASE 0: INIT — Bootstrap Project Repo       -->
+<!-- ============================================ -->
+
+<phase id="init" name="INIT — Bootstrap Project (before anything else)">
+  Mirror the /kernel:init pattern: don't just dump raw files, set up a proper project.
+
+  <requirements>Git, Node (for wrangler), curl</requirements>
+
+  <steps>
+
+  ## Step 1: Create project directory
+
+  ```bash
+  PROJECT="${project_name_slugified}"   # from interview Phase 1 answer
+  PARENT="${PWD}"                        # or ask user for parent dir
+  TARGET="${PARENT}/${PROJECT}"
+
+  if [ -e "$TARGET" ]; then
+    echo "ERROR: $TARGET already exists. Abort or choose different name."
+    exit 1
+  fi
+
+  mkdir -p "$TARGET"/{styles,assets}
+  cd "$TARGET"
+  ```
+
+  ## Step 2: Initialize git
+
+  ```bash
+  git init -b main
+  cat > .gitignore <<'EOF'
+  # Cloudflare
+  .wrangler/
+  .dev.vars
+
+  # Node (only if user later adds build tooling)
+  node_modules/
+
+  # OS
+  .DS_Store
+  Thumbs.db
+
+  # Editor
+  .vscode/
+  .idea/
+  *.swp
+
+  # Logs
+  *.log
+  npm-debug.log*
+  EOF
+  ```
+
+  ## Step 3: Create README
+
+  ```bash
+  cat > README.md <<EOF
+  # ${PROJECT}
+
+  ${tagline}
+
+  ## Edit content
+  Open \`content.js\` — every string on the site is there.
+
+  ## Edit design
+  Open \`styles/tokens.css\` — every color, font, spacing value is there.
+
+  ## Preview locally
+  Open \`index.html\` in a browser. Works without a server.
+
+  ## Deploy
+  \`\`\`bash
+  npx wrangler login     # first time only
+  npx wrangler pages deploy . --project-name=${PROJECT}
+  \`\`\`
+  EOF
+  ```
+
+  ## Step 4: Wrangler check (non-blocking)
+
+  ```bash
+  if ! command -v npx >/dev/null 2>&1; then
+    echo "WARNING: npx not found. Install Node.js for deployment."
+  elif ! npx --no-install wrangler --version >/dev/null 2>&1; then
+    echo "NOTE: wrangler will be auto-fetched on first deploy via npx."
+  fi
+  ```
+
+  ## Step 5: AgentDB tracking
+
+  ```bash
+  agentdb emit command "landing-page-init" "" \
+    "{\"project\":\"${PROJECT}\",\"path\":\"${TARGET}\"}"
+  ```
+
+  ## Step 6: Initial commit
+
+  ```bash
+  git add .gitignore README.md
+  git commit -m "chore: init ${PROJECT} landing page scaffold"
+  ```
+
+  </steps>
+
+  <hypothesis id="H-LP-INIT">
+    CLAIM: A proper repo scaffold (git init + .gitignore + README + AgentDB tracking)
+    produces better long-term maintenance than a raw file dump. Users will actually
+    version-control the site and deploy from git.
+    CONFIDENCE: 0.7 (standard pattern, untested in this context)
+  </hypothesis>
+
+  <rule id="INIT_BEFORE_GENERATE">
+    Phase 0 runs BEFORE Phase 1 interview confirmation triggers generation.
+    Phases 2-6 write into the initialized repo. Phase 7 audit runs git diff.
+    Phase 8 handoff includes git status + remote suggestion.
+  </rule>
+</phase>
+
+<!-- ============================================ -->
 <!-- PHASE 1: INTERVIEW                           -->
 <!-- ============================================ -->
 
@@ -696,8 +815,17 @@ agentdb emit command "landing-page-start" "" '{}'
   TO EDIT CONTENT: Open content.js, change any text, refresh browser.
   TO EDIT COLORS:  Open styles/tokens.css, change --accent or --surface values, refresh.
   TO ADD A PAGE:   Copy index.html, change content references.
-  TO DEPLOY:       npx wrangler deploy (first time: npx wrangler login)
+  TO DEPLOY:       npx wrangler pages deploy . --project-name={project}
+                   (first time: npx wrangler login)
   TO PREVIEW:      Open index.html in browser (works without a server).
+  TO VERSION:      git status / git add . / git commit (repo already initialized)
+  TO PUSH REMOTE:  gh repo create {project} --public --source=. --push
+  ```
+
+  Git status at handoff:
+  ```bash
+  git log --oneline
+  git status --short
   ```
 </phase>
 
@@ -711,6 +839,7 @@ Run /kernel:experiment against a real site generation to test them.
 
 | ID | Claim | Confidence | Domain |
 |----|-------|------------|--------|
+| H-LP-INIT | Proper repo scaffold (git + .gitignore + README) > raw files | 0.7 | architecture |
 | H-LP-INTERVIEW | Single-prompt interview > multi-step wizard | 0.5 | methodology |
 | H-LP-STRUCTURE | This file structure minimizes AI generation errors | 0.6 | architecture |
 | H-LP-NOBUILD | Zero build tools > any framework for simple sites | 0.7 | architecture |
