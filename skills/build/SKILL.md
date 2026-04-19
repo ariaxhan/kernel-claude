@@ -197,6 +197,11 @@ Long build sessions degrade model performance as context fills. Mitigate:
 - **Side questions with `/btw`**: Quick questions that don't need to stay in context go in `/btw`.
   The answer appears as a dismissible overlay and never enters conversation history.
   Use it for "what does this function do?" or "what's the flag for X?" without growing context.
+- **Cross-context state persistence**: For tasks that span multiple context windows, write state to
+  `_meta/context/progress.json` before context fills. Include: completed steps, current position,
+  next action, key decisions made. New context reads this file first and resumes where the previous left off.
+  Models now understand their own token budget in real-time — use this to trigger state saves proactively.
+<!-- Updated 2026-04-19: Anthropic April 2026 prompting guide -->
 <!-- Updated 2026-04-10: https://code.claude.com/docs/en/best-practices -->
 
 ---
@@ -222,6 +227,19 @@ When spawning agents for deep reasoning, guide effort via instruction:
 - Complex architecture/multi-file: `"After reviewing tool results, reflect carefully before proceeding"`
 - Standard implementation: no special instruction needed
 - Simple edits/validation: explicitly say `"This is straightforward, implement directly"`
+
+<!-- Updated 2026-04-19: Anthropic Opus 4.7 migration guide -->
+**Effort parameter (Opus 4.7)**: Opus 4.7 uses an explicit `effort` parameter, not instruction-based guidance.
+- `xhigh`: production code, architecture decisions, deep multi-file reasoning
+- `high`: test generation, code review, moderate complexity tasks
+- `medium`: standard implementation (default if unspecified)
+- `low`: validation, linting, trivial edits — model does only what's asked, no elaboration
+Use `effort: xhigh` when spawning surgeon agents for tier 2+ work. At `low`, the model won't generalize — be explicit about scope.
+
+**Explicit scope instructions (Opus 4.7 literal following)**: Opus 4.7 interprets instructions precisely — it won't auto-generalize.
+- Wrong: "Apply this validation pattern" (applies to first occurrence only)
+- Right: "Apply this validation pattern to EVERY endpoint in /src/api/"
+State the full scope explicitly in every agent prompt. Assume nothing is inferred.
 
 ---
 

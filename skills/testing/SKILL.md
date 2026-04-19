@@ -109,6 +109,13 @@ code written. This forces behavioral specification before implementation.
 **Verification criteria = highest leverage**: Claude performs dramatically better when it can
 verify its own work by running tests. Always give agents runnable verification — a test
 suite they can execute — not just a written description of done.
+
+<!-- Updated 2026-04-19: Anthropic Opus 4.7 migration guide -->
+**Effort levels for test agents (Opus 4.7)**: Use `effort: high` when spawning test-generation agents.
+Opus 4.7 at default effort under-generates edge cases. At `high`, it produces fuller coverage with
+more boundary conditions. At `xhigh`, test generation is exhaustive — use for security-critical code.
+Pair with "Report ALL issues" framing: avoid "be conservative" prompts that cause under-reporting.
+Opus 4.7 has 11pp better recall on issues — don't filter it out at the prompt level.
 </multi_agent_test_patterns>
 
 <on_complete>

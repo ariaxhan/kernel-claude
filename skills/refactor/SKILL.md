@@ -85,6 +85,13 @@ overlapping changes. The "final" file may be a merge artifact, not intentional c
 **Scope creep detection**: Before starting, write down EXACTLY what you're changing.
 After finishing, diff your changes against that list. Any extras are scope creep — revert
 them and open a separate task.
+
+<!-- Updated 2026-04-19: Anthropic Opus 4.7 migration guide (literal instruction following) -->
+**Explicit scope for refactor agents (Opus 4.7)**: Opus 4.7 follows instructions literally — it won't
+generalize "rename this function" to all call sites. State full scope explicitly:
+- Wrong: "Rename `getUserData` to `fetchUser`"
+- Right: "Rename `getUserData` to `fetchUser` in ALL files across the codebase, including imports, tests, and docs"
+When spawning a surgeon for a refactor, enumerate the specific files in the contract. Ambiguous scope = partial refactor.
 </agentic_refactor_safety>
 
 <on_complete>
