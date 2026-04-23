@@ -172,6 +172,40 @@ problem to its smallest form BEFORE spawning any agents. Agents given a vague re
 reproduce the wrong thing.
 </agentic_debugging>
 
+<!-- Updated 2026-04-23: https://code.claude.com/docs/en/best-practices (debugging anti-patterns) -->
+<persistent_truth_file>
+Long debugging sessions create circles: Claude tries fix, fails, context compresses, Claude forgets what was tried.
+Prevent this with a persistent investigation file that survives auto-compaction.
+
+Create `_meta/context/DEBUG.md` at session start. Update it throughout. Claude reads it before each attempt.
+
+Template:
+```markdown
+# Debugging Session: [Issue Title]
+
+## Problem Statement
+[Concise problem + exact error message]
+
+## What We Know
+- [confirmed fact 1]
+- [confirmed fact 2]
+
+## Approaches Tried
+- [ ] Approach A: [description] → Failed because [reason]
+- [ ] Approach B: [description] → Failed because [reason]
+- [x] Approach C: [description] → Partially works, need to [next step]
+
+## Current Hypothesis
+[Best current theory of root cause]
+
+## Next Steps
+1. [specific action]
+```
+
+Instruct Claude: "Read _meta/context/DEBUG.md before each attempt. Update it after each attempt."
+Prevents re-trying failed approaches across context compression boundaries.
+</persistent_truth_file>
+
 <on_complete>
 agentdb write-end '{"skill":"debug","bug":"<description>","root_cause":"<what_broke>","fix":"<what_fixed>","test":"<regression_test_name>","learned":"<pattern_for_future>"}'
 

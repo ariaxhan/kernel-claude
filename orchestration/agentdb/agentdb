@@ -405,10 +405,27 @@ cmd_write_end() {
 }
 
 cmd_learn() {
-  local type="${1:-}"
-  local insight="${2:-}"
-  local evidence="${3:-}"
-  local domain="${4:-}"
+  # Usage: agentdb learn <type> <insight> [evidence] [domain]
+  #        agentdb learn <type> <insight> [evidence] [domain] --visibility <agent|human_only|operational> --sensitivity <low|medium|high>
+  local type="" insight="" evidence="" domain="" visibility="agent" sensitivity="low"
+  local positional=()
+
+  # Parse mixed positional + flag arguments
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --visibility) visibility="${2:-agent}"; shift 2 ;;
+      --sensitivity) sensitivity="${2:-low}"; shift 2 ;;
+      --domain) domain="${2:-}"; shift 2 ;;
+      --evidence) evidence="${2:-}"; shift 2 ;;
+      -*) shift ;;  # skip unknown flags
+      *) positional+=("$1"); shift ;;
+    esac
+  done
+
+  type="${positional[0]:-}"
+  insight="${positional[1]:-}"
+  [[ -z "$evidence" ]] && evidence="${positional[2]:-}"
+  [[ -z "$domain" ]] && domain="${positional[3]:-}"
 
   # Auto-infer domain from PWD if not explicitly provided
   if [ -z "$domain" ]; then
@@ -416,18 +433,28 @@ cmd_learn() {
     [ -z "$domain" ] && domain="general"
   fi
 
-  [ -z "$type" ] || [ -z "$insight" ] && { echo "Usage: agentdb learn <type> <insight> [evidence] [domain]"; exit 1; }
+  [ -z "$type" ] || [ -z "$insight" ] && {
+    echo "Usage: agentdb learn <type> <insight> [evidence] [domain] [--visibility agent|human_only|operational] [--sensitivity low|medium|high]"
+    exit 1
+  }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
-  # Escape inputs to prevent SQL injection
-  local safe_type safe_insight safe_evidence safe_domain
+  # Validate enums
+  [[ "$visibility" =~ ^(agent|human_only|operational)$ ]] || visibility="agent"
+  [[ "$sensitivity" =~ ^(low|medium|high)$ ]] || sensitivity="low"
+
+  # Escape all inputs
+  local safe_type safe_insight safe_evidence safe_domain safe_visibility safe_sensitivity
   safe_type=$(sql_escape "$type")
   safe_insight=$(sql_escape "$insight")
   safe_evidence=$(sql_escape "$evidence")
   safe_domain=$(sql_escape "$domain")
+  safe_visibility=$(sql_escape "$visibility")
+  safe_sensitivity=$(sql_escape "$sensitivity")
 
   # Dedup: if similar learning exists, reinforce instead of duplicating
-  local safe_substr=$(sql_escape "${insight:0:40}")
+  local safe_substr
+  safe_substr=$(sql_escape "${insight:0:40}")
   local existing
   existing=$(db_exec "SELECT id FROM learnings WHERE insight LIKE '%${safe_substr}%' AND type='$safe_type' LIMIT 1;" 2>/dev/null || echo "")
   if [ -n "$existing" ]; then
@@ -437,8 +464,64 @@ cmd_learn() {
   fi
 
   local id="LRN-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
-  db_exec "INSERT INTO learnings (id, type, insight, evidence, domain) VALUES ('$id', '$safe_type', '$safe_insight', '$safe_evidence', '$safe_domain');"
+  db_exec "INSERT INTO learnings (id, type, insight, evidence, domain, visibility, sensitivity)
+    VALUES ('$id', '$safe_type', '$safe_insight', '$safe_evidence', '$safe_domain', '$safe_visibility', '$safe_sensitivity');"
   echo "Learned: [$type] $insight"
+}
+
+cmd_active() {
+  # agentdb active [get]              — show current active.md
+  # agentdb active set "task" [tier]  — update task in active.md
+  local subcmd="${1:-get}"
+  local active_path
+  active_path="$(find_project_root)/_meta/context/active.md"
+
+  case "$subcmd" in
+    get)
+      if [ -f "$active_path" ]; then
+        cat "$active_path"
+      else
+        echo "No active session (active.md not found)"
+      fi
+      ;;
+    set)
+      local task="${2:-unknown task}"
+      local tier="${3:-1}"
+      local branch
+      branch=$(git -C "$(find_project_root)" symbolic-ref --short -q HEAD 2>/dev/null || echo "unknown")
+      mkdir -p "$(dirname "$active_path")"
+      cat > "$active_path" <<EOF
+# Active Session
+updated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+task: $task
+branch: $branch
+tier: $tier
+status: active
+EOF
+      echo "Active session set: $task"
+      ;;
+    clear)
+      if [ -f "$active_path" ]; then
+        sed -i.bak 's/^status: .*/status: ended/' "$active_path" && rm -f "${active_path}.bak"
+        echo "Active session cleared"
+      fi
+      ;;
+    *)
+      echo "Usage: agentdb active [get|set <task> [tier]|clear]"
+      ;;
+  esac
+}
+
+cmd_done() {
+  # Convenience wrapper: agentdb done "what I did" "what's next"
+  # Human-friendly alternative to write-end with JSON syntax.
+  local did="${1:-session ended}"
+  local next="${2:-}"
+  local json
+  json="{\"did\":\"$(json_escape "$did")\",\"next\":\"$(json_escape "$next")\"}"
+  cmd_write_end "$json"
+  cmd_active clear 2>/dev/null || true
+  echo "Session checkpoint written."
 }
 
 cmd_contract() {
@@ -1636,6 +1719,8 @@ case "${1:-help}" in
   suggest-context) shift; cmd_suggest_context "$@" ;;
   inject-context) shift; cmd_inject_context "$@" ;;
   emit)        shift; cmd_emit "$@" ;;
+  active)      shift; cmd_active "$@" ;;
+  done)        shift; cmd_done "$@" ;;
   health)      cmd_health ;;
   metrics)     shift; cmd_metrics "$@" ;;
   wtf)         cmd_wtf ;;

@@ -118,6 +118,48 @@ Pair with "Report ALL issues" framing: avoid "be conservative" prompts that caus
 Opus 4.7 has 11pp better recall on issues — don't filter it out at the prompt level.
 </multi_agent_test_patterns>
 
+<!-- Updated 2026-04-23: https://code.claude.com/docs/en/best-practices, https://www.tech-reader.blog/2026/04/the-secret-life-of-claude-code-testing.html -->
+<behavior_vs_implementation>
+AI tends to write tests that validate implementation details, not behavior. These break on refactoring.
+Test WHAT the code does, not HOW it does it.
+
+```javascript
+// POOR: Tests implementation (breaks on refactor)
+test('validateEmail uses regex pattern', () => {
+  expect(validateEmail).toHaveBeenCalledWith(expect.stringMatching(/\w+@\w+/));
+});
+
+// GOOD: Tests behavior (survives refactor)
+test('validateEmail rejects invalid formats', () => {
+  expect(validateEmail('user@.com')).toBe(false);
+  expect(validateEmail('user@example.com')).toBe(true);
+  expect(validateEmail('invalid')).toBe(false);
+});
+```
+</behavior_vs_implementation>
+
+<!-- Updated 2026-04-23: https://code.claude.com/docs/en/best-practices (QA automation section) -->
+<edge_case_discovery>
+Claude's testing strength is edge case discovery, not boilerplate unit tests.
+Prompt explicitly for edge cases rather than asking for generic coverage.
+
+Effective prompt structure:
+1. "What edge cases exist for [function]?"
+2. Show 2–3 expected edge cases to anchor thinking.
+3. "What boundary conditions or interaction effects might break this?"
+4. "Generate N test cases covering these scenarios."
+
+Example for validateEmail:
+```
+"Write tests covering:
+- Invalid formats (missing @, missing domain, invalid chars)
+- Boundary cases (empty string, very long email, null/undefined)
+- Interaction effects (uppercase, spaces, international domains)
+- Security cases (SQL injection payloads, newline injection)
+Generate 15 cases that would catch a developer who forgot one category."
+```
+</edge_case_discovery>
+
 <on_complete>
 agentdb write-end '{"skill":"testing","tests_added":<N>,"coverage_delta":"<+X%>","edge_cases":["<list>"],"assertions":"<strong|weak>"}'
 

@@ -121,4 +121,25 @@ Reviewers then focus on: design decisions, architecture fit, business logic corr
 This is not ceremony — it's the minimum for a meaningful review of AI-assisted code. Without it, reviewers are auditing output with no context on how it was generated.
 </ai_pr_transparency>
 
+<!-- Updated 2026-04-23: https://stackoverflow.blog/2026/03/26/coding-guidelines-for-ai-agents-and-people-too/, https://javaworldmag.com/evolving-code-reviews-with-ai-in-2026/ -->
+<review_conventions>
+**"Nit:" prefix for optional comments**: Prefix style-only feedback with "Nit:" to signal it's optional.
+Prevents authors from treating cosmetic suggestions as blockers.
+
+```
+# Required (no prefix)
+"Line 24: userId could be null here — add validation before the DB call"
+
+# Optional (Nit prefix)
+"Nit: 'x' would be clearer as 'userCount'"
+```
+
+Without the prefix, reviewers and authors waste cycles on non-critical changes.
+
+**AI-first review sequence**: AI review catches style/logic issues BEFORE human review.
+Sequence: AI review (90s) → author fixes cheap issues → human reviews cleaner diff.
+Humans then focus on architecture, business logic, and intent — not nitpicks the AI already caught.
+Never parallelize AI + human review: humans see a noisier diff and duplicate AI feedback.
+</review_conventions>
+
 </skill>
