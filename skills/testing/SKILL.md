@@ -54,9 +54,13 @@ Review AI-generated tests for: do they test the actual risk area, or just the ha
 </verification_gate>
 
 <jit_testing>
-From Meta (Feb 2026): tests generated on-the-fly before code lands.
+<!-- Updated 2026-04-25: https://www.infoq.com/news/2026/04/meta-jit-testing-ai-detection/ -->
+From Meta: Just-in-Time (JiT) testing generates tests *during code review* instead of relying on static suites.
+Result: **~4x bug detection improvement** in AI-assisted development (InfoQ, April 2026).
 No maintenance burden (tests don't persist). Mutation-based fault injection.
 Consider for high-churn code where traditional test suites rot faster than they help.
+Also useful during refactoring: generate behavioral tests for the code being refactored *before* making changes,
+run them after to confirm behavior preservation without a pre-existing test suite.
 </jit_testing>
 
 <!-- Updated 2026-03-30: Claude Code best practices, AI code review research -->

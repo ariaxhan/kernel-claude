@@ -439,7 +439,11 @@ cmd_learn() {
   }
   [ ! -f "$DB" ] && cmd_init >/dev/null
 
-  # Validate enums
+  # Validate enums — warn on operational (never auto-surfaced; human-only)
+  if [[ "$visibility" == "operational" ]]; then
+    echo "[agentdb] WARNING: visibility=operational — this learning will NOT be surfaced to agents automatically." >&2
+    echo "[agentdb]   Use --visibility agent (default) for learnings agents should recall." >&2
+  fi
   [[ "$visibility" =~ ^(agent|human_only|operational)$ ]] || visibility="agent"
   [[ "$sensitivity" =~ ^(low|medium|high)$ ]] || sensitivity="low"
 

@@ -156,6 +156,27 @@ agentdb write-end '{"skill":"build","feature":"X","files":["Y"],"approach":"Z"}'
 
 ---
 
+# CONTEXT ENGINEERING
+
+<!-- Updated 2026-04-25: https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview, https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ -->
+The field has shifted from "prompt engineering" to **context engineering**: optimizing *everything* the model sees, not just the instruction.
+
+The context payload = system prompt + tools + examples + conversation history + available files.
+Each element is a lever. Optimize all of them, not just the user message.
+
+**Explore-Plan-Act loop** (three permission-escalating phases):
+1. **Explore** (read-only): Find relevant files, understand architecture, map dependencies. No writes.
+2. **Plan**: Propose strategy. Human reviews and adjusts before implementation begins.
+3. **Act** (full tools): Implement plan, run tests, iterate on failures.
+
+Anthropic internal data: unguided attempts (Act only, skip Explore+Plan) succeed ~33% of the time.
+Structured Explore-Plan-Act: ~80%+. The phases aren't ceremony — they're the multiplier.
+
+**CLAUDE.md hygiene**: Reference separate files for large domain docs. Inlining >1KB into CLAUDE.md
+consumes token budget before work starts. Use `_meta/reference/` and load on demand.
+
+---
+
 # AGENTIC BUILD PATTERNS
 
 <!-- Updated 2026-03-30: Claude Code best practices, Anthropic prompt engineering guide -->

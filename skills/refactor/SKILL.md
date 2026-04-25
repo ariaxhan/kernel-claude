@@ -94,6 +94,19 @@ generalize "rename this function" to all call sites. State full scope explicitly
 When spawning a surgeon for a refactor, enumerate the specific files in the contract. Ambiguous scope = partial refactor.
 </agentic_refactor_safety>
 
+<!-- Updated 2026-04-25: https://www.infoq.com/news/2026/04/meta-jit-testing-ai-detection/ -->
+<jit_refactor_verification>
+When the code being refactored lacks test coverage, use JiT (Just-in-Time) testing:
+1. Before starting: ask Claude to generate behavioral tests for the current code (what it *does*, not how).
+2. Run them: they should pass (green baseline).
+3. Refactor.
+4. Run them again: must still pass.
+
+These tests are disposable — they exist only to verify behavior preservation during this refactor.
+Delete them after if they're not worth keeping. The 4x bug-detection improvement from Meta's JiT research
+applies here: generating tests at the point of change catches regressions that pre-existing suites miss.
+</jit_refactor_verification>
+
 <on_complete>
 agentdb write-end '{"skill":"refactor","type":"<extract|inline|rename|simplify>","files_touched":<N>,"tests_status":"green","behavior_changed":false}'
 

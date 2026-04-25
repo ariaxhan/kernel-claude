@@ -206,6 +206,17 @@ Instruct Claude: "Read _meta/context/DEBUG.md before each attempt. Update it aft
 Prevents re-trying failed approaches across context compression boundaries.
 </persistent_truth_file>
 
+<!-- Updated 2026-04-25: https://medium.com/@sean.j.moran/effective-claude-code-workflows-in-2026-what-changed-and-what-works-now-c93ebc6f8f50, https://allierays.com/posts/5-techniques-to-debug-claude-code/ -->
+<tooling_2026>
+In 2026, Claude Code's default tooling handles more of the debugging burden automatically:
+
+- **Compaction**: Auto-manages context window limits. You no longer need to manually `/compact` during debug sessions — the system does it. But instruct compaction to preserve `_meta/context/DEBUG.md` so investigation state survives.
+- **Plan Mode**: Use for complex or multi-file bugs before touching code. Scope the exploration, form hypotheses, get approval — then switch to Act mode for fixes.
+- **Agent tool for parallel exploration**: Spawn competing-hypothesis agents without polluting the main context. Each agent gets only the minimal reproduction, not 200 lines of chat history.
+
+**Root cause over fast fix**: Claude solves the immediate problem by finding the fastest path to making the error go away. The fastest fix is frequently wrong — it patches the symptom and breaks something downstream. When a fix "works" but you can't explain *why the bug occurred*, you haven't fixed it.
+</tooling_2026>
+
 <on_complete>
 agentdb write-end '{"skill":"debug","bug":"<description>","root_cause":"<what_broke>","fix":"<what_fixed>","test":"<regression_test_name>","learned":"<pattern_for_future>"}'
 
