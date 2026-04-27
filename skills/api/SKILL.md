@@ -291,6 +291,31 @@ Health response format:
 503 if any critical dependency is down. 200 with "degraded" if non-critical.
 </health_and_observability>
 
+<!-- Updated 2026-04-27: https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents, https://code.claude.com/docs/en/best-practices -->
+<agentic_client_design>
+When your API will be called by AI agents (not just browsers/mobile), additional design rules apply:
+
+**Retry-safe by default**: Agents retry on timeout and network error. Every state-changing endpoint
+must be idempotent OR require an Idempotency-Key header. Document which one. Agents that can't
+safely retry will corrupt state or lose operations.
+
+**Explicit error taxonomy**: Agents parse error responses to decide retry vs. abort. Use distinct
+error codes for distinct failure modes. "error: something went wrong" forces agents to guess.
+
+```json
+{ "error": { "code": "rate_limit_exceeded", "retry_after": 60 } }  // agent knows: wait 60s, retry
+{ "error": { "code": "validation_error", "field": "email" } }       // agent knows: fix input, don't retry
+{ "error": { "code": "insufficient_credits" } }                     // agent knows: abort, escalate to human
+```
+
+**Batch endpoints**: Agents calling N endpoints in a loop amplify latency. Offer bulk variants
+for high-frequency reads (GET /api/v1/users/batch?ids=a,b,c) for lists an agent might traverse.
+
+**Machine-readable pagination**: Always return `next_cursor` as a direct string, never compute
+it from `page + per_page`. Agents parsing offset arithmetic introduce off-by-one bugs.
+Cursor approach: return cursor string, agent passes it back verbatim — no math required.
+</agentic_client_design>
+
 <on_complete>
 agentdb write-end '{"skill":"api","endpoints_created":<N>,"validation":"zod|pydantic|none","pagination":"cursor|offset|none","versioning":"v1|none"}'
 

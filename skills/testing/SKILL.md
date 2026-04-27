@@ -28,6 +28,27 @@ Skill-specific: skills/testing/reference/testing-research.md
 5. REGRESSION OVER COVERAGE: One test that catches a real bug beats 10 tests that pad metrics.
 </core_principles>
 
+<!-- Updated 2026-04-27: https://medium.com/ngconf/create-reliable-unit-tests-with-claude-code-9147d050d557, https://code.claude.com/docs/en/best-practices -->
+<naming_convention>
+BDD format: GIVEN/WHEN/SHOULD. Reads as specification, not code description.
+
+```javascript
+// POOR: describes implementation
+test('validateEmail regex check')
+
+// GOOD: describes behavior
+test('GIVEN an email without domain WHEN validated SHOULD return false')
+test('GIVEN a valid email WHEN validated SHOULD return true')
+```
+
+If a test name can't be written in GIVEN/WHEN/SHOULD form, the test is ambiguous.
+Also applies to test suites: describe() should be the subject, it()/test() should be the scenario.
+
+**"Don't modify the tests" instruction**: When asking Claude to fix failing tests, include
+"Do not modify the tests — fix the implementation to pass them." Without this, Claude takes
+the fastest path to green: weakening assertions or skipping edge cases rather than fixing the bug.
+</naming_convention>
+
 <test_hierarchy>
 1. Unit tests: isolated functions, fast, many.
 2. Integration tests: component boundaries, medium speed, focused.

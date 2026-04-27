@@ -179,7 +179,13 @@ consumes token budget before work starts. Use `_meta/reference/` and load on dem
 
 # AGENTIC BUILD PATTERNS
 
-<!-- Updated 2026-03-30: Claude Code best practices, Anthropic prompt engineering guide -->
+<!-- Updated 2026-04-27: https://marmelab.com/blog/2026/04/24/claude-code-tips-i-wish-id-had-from-day-one.html, https://code.claude.com/docs/en/best-practices -->
+**Writer/Reviewer session split**: Implementation session and review session use separate contexts
+to avoid confirmation bias. Session A implements. Session B opens a fresh context, reads only the
+diff and the spec, and reviews without any memory of the implementation choices.
+
+Without this split, the implementing agent unconsciously validates its own code. Fresh context
+has no investment in prior decisions — it catches what the implementing session rationalized past.
 
 **Subagent scoping**: When spawning agents for implementation, scope each agent to a
 single file or function boundary. Cross-file agents produce merge conflicts and silent overrides.
