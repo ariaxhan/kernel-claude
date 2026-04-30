@@ -187,6 +187,11 @@ diff and the spec, and reviews without any memory of the implementation choices.
 Without this split, the implementing agent unconsciously validates its own code. Fresh context
 has no investment in prior decisions — it catches what the implementing session rationalized past.
 
+<!-- Updated 2026-04-29: https://code.claude.com/docs/en/best-practices, https://www.builder.io/blog/claude-code-tips-best-practices -->
+**Worktree isolation for parallel features**: Use `claude --worktree <branch-name>` to create
+an isolated branch + context per feature. Multiple worktrees run in parallel without file conflicts.
+Preferred over spawning agents on the same working tree when features touch overlapping files.
+
 **Subagent scoping**: When spawning agents for implementation, scope each agent to a
 single file or function boundary. Cross-file agents produce merge conflicts and silent overrides.
 

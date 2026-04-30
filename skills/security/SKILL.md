@@ -288,6 +288,17 @@ When building AI-integrated features, prevent prompt injection:
   not just on display.
 </prompt_injection>
 
+<!-- Updated 2026-04-29: https://javaworldmag.com/evolving-code-reviews-with-ai-in-2026/, https://codeintelligently.com/blog/ai-code-quality-guide-2026 -->
+<cautionary_pattern_library>
+AI code reviewers miss security issues that require system context humans possess.
+Maintain a living doc at `_meta/security/cautionary-patterns.md` capturing:
+- AI hallucinations that produced plausible but insecure code (non-existent APIs called, wrong auth flows)
+- Patterns where AI bypassed validation "for simplicity" that later became vulnerabilities
+- Successful security prompts that caught real issues (promote to skills)
+
+Review this doc before any security-sensitive implementation. Institutional memory beats repeated audits.
+</cautionary_pattern_library>
+
 <anti_patterns>
 - "We'll add security later" (you won't)
 - Disabling security for development (gets shipped)
