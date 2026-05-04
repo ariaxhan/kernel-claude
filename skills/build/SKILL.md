@@ -164,6 +164,18 @@ The field has shifted from "prompt engineering" to **context engineering**: opti
 The context payload = system prompt + tools + examples + conversation history + available files.
 Each element is a lever. Optimize all of them, not just the user message.
 
+**Long context query position (20k+ tokens)**: When the context payload exceeds ~20K tokens
+(multi-document inputs, large codebases), place your query and instructions at the END, after all
+document content. Anthropic data: this improves response quality by up to 30%. Structure:
+```xml
+<documents>
+  <document index="1"><document_content>{{CONTENT}}</document_content></document>
+  ...
+</documents>
+[Your query and instructions HERE — after all documents, not before]
+```
+<!-- Updated 2026-05-04: https://platform.claude.com/docs/en/docs/build-with-claude/prompt-engineering/overview -->
+
 **Explore-Plan-Act loop** (three permission-escalating phases):
 1. **Explore** (read-only): Find relevant files, understand architecture, map dependencies. No writes.
 2. **Plan**: Propose strategy. Human reviews and adjusts before implementation begins.
@@ -233,6 +245,11 @@ Long build sessions degrade model performance as context fills. Mitigate:
   `_meta/context/progress.json` before context fills. Include: completed steps, current position,
   next action, key decisions made. New context reads this file first and resumes where the previous left off.
   Models now understand their own token budget in real-time — use this to trigger state saves proactively.
+- **Two-failure reset rule**: If Claude makes the same mistake twice in a session (same instruction
+  ignored twice, same wrong approach tried twice), run `/clear` and restart with a refined prompt
+  that encodes the lessons as constraints. A clean session with a better prompt outperforms a long
+  session polluted with corrections and failed attempts. Two corrections = stop, reflect, rewrite.
+<!-- Updated 2026-05-04: https://code.claude.com/docs/en/best-practices, https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ -->
 <!-- Updated 2026-04-19: Anthropic April 2026 prompting guide -->
 <!-- Updated 2026-04-10: https://code.claude.com/docs/en/best-practices -->
 
