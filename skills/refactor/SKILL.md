@@ -107,6 +107,21 @@ Delete them after if they're not worth keeping. The 4x bug-detection improvement
 applies here: generating tests at the point of change catches regressions that pre-existing suites miss.
 </jit_refactor_verification>
 
+<!-- Updated 2026-05-06: https://getdx.com/blog/enterprise-ai-refactoring-best-practices/, https://www.augmentcode.com/tools/ai-code-refactoring-tools-tactics-and-best-practices -->
+<strategic_refactoring>
+**Target high-impact components**: Teams targeting critical high-ROI components see 4x better results than comprehensive refactoring sweeps. Identify by: change frequency, bug density, review time. Start there, not at the edges.
+
+**Atomic transformations under 200 lines**: Keeping each change under 200 lines reduces code review time by 60% and lowers regression risk. Anything larger is a separate task.
+
+**Document before refactoring**: Before starting, create an architectural diagram and document any complex business logic the AI is unlikely to understand. AI frequently mishandles domain-specific constraints and niche patterns. Organizations that prepare this context see 3x faster modernization cycles.
+
+**Success metrics**: A successful refactor measurably reduces cyclomatic complexity by 15-25%. If it doesn't, the refactor didn't simplify — it shuffled. Organizations with systematic pre/post testing see 70% fewer post-deployment issues.
+
+**Embed into regular development**: Refactoring as a periodic "cleanup project" fails from adoption friction. Integrate into normal PR workflow: every merge includes a small cleanup. Don't batch technical debt.
+
+**Rollback procedure required**: Establish a clear rollback path (git SHA or stash) before every refactor. Subtle behavioral changes hide in refactored code. Never merge without the ability to undo.
+</strategic_refactoring>
+
 <on_complete>
 agentdb write-end '{"skill":"refactor","type":"<extract|inline|rename|simplify>","files_touched":<N>,"tests_status":"green","behavior_changed":false}'
 

@@ -185,6 +185,19 @@ Generate 15 cases that would catch a developer who forgot one category."
 ```
 </edge_case_discovery>
 
+<!-- Updated 2026-05-06: https://medium.com/@karkeralathesh/the-complete-guide-to-testing-claude-code-skills-with-the-skill-creator-1ae3821bd7b8 -->
+<negative_case_testing>
+Test what code should NOT do. In AI-assisted development, positive-case tests dominate and negative-case behavior is routinely untested.
+
+Negative cases to add to every test suite:
+- Rejection of out-of-scope inputs (tool/function declines gracefully, not crashes)
+- Invalid type/shape returns an error, not a corrupted result
+- Empty/null/undefined handled at boundary, not propagated
+- Security inputs (injection payloads, oversized strings) rejected at entry, not silently processed
+
+**The rejection quality test**: A function that correctly declines invalid input is more production-grade than one that accepts everything. Test this explicitly — it's not covered by happy-path suites.
+</negative_case_testing>
+
 <on_complete>
 agentdb write-end '{"skill":"testing","tests_added":<N>,"coverage_delta":"<+X%>","edge_cases":["<list>"],"assertions":"<strong|weak>"}'
 

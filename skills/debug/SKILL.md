@@ -179,6 +179,8 @@ Prevent this with a persistent investigation file that survives auto-compaction.
 
 Create `_meta/context/DEBUG.md` at session start. Update it throughout. Claude reads it before each attempt.
 
+**Evidence**: Structured persistent investigation achieves ~95% first-time fix rate vs ~40% for ad-hoc debugging. The file prevents circular re-investigation across context compression boundaries. <!-- Updated 2026-05-06: https://allierays.com/posts/5-techniques-to-debug-claude-code/ -->
+
 Template:
 ```markdown
 # Debugging Session: [Issue Title]

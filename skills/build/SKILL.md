@@ -204,8 +204,32 @@ has no investment in prior decisions — it catches what the implementing sessio
 an isolated branch + context per feature. Multiple worktrees run in parallel without file conflicts.
 Preferred over spawning agents on the same working tree when features touch overlapping files.
 
+<!-- Updated 2026-05-06: https://code.claude.com/docs/en/best-practices -->
+**Subagent definition files**: Define reusable subagents in `.claude/agents/<name>.md` with their own model, tools, and system prompt. Each agent gets isolated context. Use for: security review, test generation, research tasks that would pollute main session.
+
+```markdown
+# .claude/agents/security-reviewer.md
+---
+name: security-reviewer
+description: Reviews code for security vulnerabilities
+tools: Read, Grep, Glob, Bash
+model: opus
+---
+Review for SQL injection, XSS, auth flaws, secrets, insecure data handling.
+Provide line references and remediation steps.
+```
+
 **Subagent scoping**: When spawning agents for implementation, scope each agent to a
 single file or function boundary. Cross-file agents produce merge conflicts and silent overrides.
+
+**Fan-out batch pattern**: For large-scale migrations (2,000+ files), distribute work across parallel non-interactive invocations. Test on 2-3 files first, then scale.
+
+```bash
+for file in $(cat files.txt); do
+  claude -p "Migrate $file from React to Vue. Return OK or FAIL." \
+    --allowedTools "Edit,Bash(git commit *)"
+done
+```
 
 **Prefer Read before Write**: Always read the target file before editing it, even when
 the task is purely additive. Prevents format drift and ensures you match existing style.
