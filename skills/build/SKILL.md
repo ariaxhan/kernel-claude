@@ -187,6 +187,9 @@ Structured Explore-Plan-Act: ~80%+. The phases aren't ceremony — they're the m
 **CLAUDE.md hygiene**: Reference separate files for large domain docs. Inlining >1KB into CLAUDE.md
 consumes token budget before work starts. Use `_meta/reference/` and load on demand.
 
+<!-- Updated 2026-05-10: https://smart-webtech.com/blog/claude-code-workflows-and-best-practices/, https://discuss.huggingface.co/t/10-essential-claude-code-best-practices-you-need-to-know/174731 -->
+**Context7 for versioned library docs**: Use the Context7 MCP plugin instead of asking Claude to web-search documentation. Context7 indexes library docs at a precise version and serves exactly the page Claude needs — no hallucinated APIs, no stale docs from wrong versions. Install once, reference with `use context7` in prompts when working with specific library versions.
+
 ---
 
 # AGENTIC BUILD PATTERNS

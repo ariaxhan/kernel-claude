@@ -102,6 +102,9 @@ Diff size is the single biggest lever for AI code review quality:
 
 Rule: if a diff exceeds 500 lines, split the PR before requesting AI review.
 
+<!-- Updated 2026-05-10: https://www.codeant.ai/blogs/good-code-review-practices-guide, https://codeintelligently.com/blog/ai-code-quality-guide-2026 -->
+**Team-level PR size target**: Set P50 PR size < 300 LOC as a team metric (median PR, not max). Teams that track this and enforce it see 40-60% reduction in review time. Track with: `git log --oneline -20 --shortstat | grep -E "changed"`. The 500-line hard cap is the ceiling; 300-line P50 is the steady-state goal.
+
 **AI review before human review**: Run AI review (~90 seconds) before requesting human review.
 Developer fixes cheap issues first, humans see a cleaner diff and focus on intent and design.
 Sequence: AI review → fix → human review. Not parallel.
