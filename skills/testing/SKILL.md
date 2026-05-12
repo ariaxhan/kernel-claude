@@ -198,6 +198,20 @@ Negative cases to add to every test suite:
 **The rejection quality test**: A function that correctly declines invalid input is more production-grade than one that accepts everything. Test this explicitly — it's not covered by happy-path suites.
 </negative_case_testing>
 
+<!-- Updated 2026-05-12: https://code.claude.com/docs/en/best-practices, https://testdino.com/blog/claude-code-with-playwright/ -->
+<browser_verification>
+Use browser automation (Playwright + MCP browser tools) to verify UI features before declaring done. Claude runs the browser, sees console errors, iterates until the feature works end-to-end. Not a substitute for unit tests — complements them by catching integration failures that unit tests can't.
+
+Effective sequence: unit tests (fast feedback) → integration tests (component boundaries) → browser automation (real user path). Browser tests are slow — reserve for critical user-visible flows only.
+</browser_verification>
+
+<!-- Updated 2026-05-12: https://www.mindstudio.ai/blog/code-w-claude-2026-new-agent-features -->
+<grader_pattern>
+For complex features where "all tests pass" isn't sufficient: define a success rubric (expected behaviors, edge case handling, performance bounds) BEFORE writing tests or code. After implementation, spawn a grader agent in a fresh context — no knowledge of how the code was written — to evaluate output against the rubric.
+
+Grader failure returns specific, addressable issues. Implementing agent takes another pass. This outer loop catches the "tautological test" failure mode (tests pass, rubric fails) by separating evaluation context from implementation context.
+</grader_pattern>
+
 <on_complete>
 agentdb write-end '{"skill":"testing","tests_added":<N>,"coverage_delta":"<+X%>","edge_cases":["<list>"],"assertions":"<strong|weak>"}'
 

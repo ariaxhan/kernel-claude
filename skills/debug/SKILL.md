@@ -108,7 +108,7 @@ Every bug fix MUST include a regression test. No exceptions.
 5. Search exact error message in quotes.
 6. Step away. Bias accumulates under sustained focus.
 7. **Plan Mode**: For complex or sensitive bugs, use Plan Mode to analyze errors and form hypotheses without making any code changes until the approach is approved. Paste stack traces and error messages in Plan Mode first.
-8. **Rewind to pre-bug state**: `Esc+Esc` or `/rewind` opens checkpoint history. Restore code state to before the suspected change without losing conversation context. Faster than manual git reset when the bug was introduced in the current session.
+8. **Rewind to pre-bug state**: `Esc+Esc` or `/rewind` opens checkpoint history. Restore code state to before the suspected change without losing conversation context. Faster than manual git reset when the bug was introduced in the current session. Checkpoints persist across terminal closes — they survive session restarts.
 9. **Visibility-first**: Don't describe the problem — show the raw evidence. Paste terminal output, actual error logs, or screenshots directly. Let Claude read the data, not your interpretation of it. A description of a bug introduces your assumptions; the raw output doesn't.
 <!-- Updated 2026-04-14: https://allierays.com/posts/5-techniques-to-debug-claude-code/ -->
 </when_stuck>
@@ -121,6 +121,8 @@ Every bug fix MUST include a regression test. No exceptions.
 - 2 failed fix attempts → orchestrator should invoke tearitapart. May be design problem, not implementation.
 - 2+ failed corrections in same session → `/clear` and rewrite the initial prompt incorporating lessons learned. A clean session with a better prompt outperforms a long session polluted with failed approaches.
 - Bug only in production → add targeted monitoring, document, move on.
+<!-- Updated 2026-05-12: https://bits-bytes-nn.github.io/insights/agentic-ai/2026/03/31/claude-code-architecture-analysis.html -->
+- **Diminishing returns signal**: If Claude produces 3 consecutive responses under ~500 tokens without progress, the session has anchored. Don't retry — `/clear`, strip the problem to its minimal reproduction, restart fresh. A shorter prompt with better constraints beats a longer session with more correction attempts.
 </escalation>
 
 <!-- Updated 2026-03-30: Claude Code debugging techniques, Anthropic prompt engineering guide -->

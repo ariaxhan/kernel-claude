@@ -299,6 +299,15 @@ Maintain a living doc at `_meta/security/cautionary-patterns.md` capturing:
 Review this doc before any security-sensitive implementation. Institutional memory beats repeated audits.
 </cautionary_pattern_library>
 
+<!-- Updated 2026-05-12: https://www.coderabbit.ai/blog/claude-opus-4-7-for-ai-code-review -->
+<agentic_security_scanning>
+**In-agent dependency scanning**: Use Snyk MCP (or equivalent) to run vulnerability checks inside the agent rather than as a separate CI step. Agent sees results inline, can fix issues before committing. Install once, invoke via MCP tool calls.
+
+**Tool count limit**: Give each security-review agent ≤5 tools. Each tool adds context overhead; beyond 5, agents lose focus and tool selection degrades. For security review: Read + Grep + Bash (run audit) + one MCP scanner. That's it.
+
+**Agent permission audit**: Before spawning any agent that touches auth, payments, or PII, explicitly list its allowed tools and file scope in the contract. An agent scoped to read `src/api/` should never touch `src/auth/` or `.env`. Least-privilege applies to agents, not just users.
+</agentic_security_scanning>
+
 <anti_patterns>
 - "We'll add security later" (you won't)
 - Disabling security for development (gets shipped)
@@ -307,6 +316,7 @@ Review this doc before any security-sensitive implementation. Institutional memo
 - Trusting client-side validation alone
 - Logging sensitive data
 - Installing AI-suggested packages without verifying they exist and are legitimate
+- Giving agents more tools or file access than their task requires
 </anti_patterns>
 
 </skill>

@@ -240,6 +240,16 @@ the task is purely additive. Prevents format drift and ensures you match existin
 **Minimal footprint**: Request only the permissions and file access actually needed.
 Touch the minimum viable set of files. Unanticipated side effects compound across agents.
 
+<!-- Updated 2026-05-12: https://hamy.xyz/blog/2026-02_code-reviews-claude-subagents, https://code.claude.com/docs/en/best-practices -->
+**Parallel multi-aspect review**: Spin up 5–9 parallel subagents, each scoped to a single concern (security, performance, edge cases, concurrency, business logic, API contracts, etc.). Each agent gets a tight prompt describing exactly what it looks for. Aggregated feedback outperforms a single model reviewing everything — scope focus beats breadth.
+
+**Outcomes rubric + grader pattern**: Before implementation, write a rubric of success criteria (expected behaviors, acceptance criteria). After implementation, spawn a *separate* grader agent that evaluates the output against the rubric in its own context — no memory of how the code was written. Grader failure returns specific issues; agent retakes a pass. Solves "looks good but doesn't actually work."
+
+**Three-part prompt structure for agents**: Identity (who the agent is + its specialty) → Rules (constraints + behaviors, XML-tagged) → Output Format (structured expectations). XML tags create semantic boundaries Claude honors better than markdown headings. More precise than free-text system prompts for multi-agent chains.
+
+<!-- Updated 2026-05-12: https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents -->
+**Init script session validation**: For long-running agentic builds, write `init.sh` that runs at every session start: confirms prior work didn't break the application, verifies key invariants, resets to clean state. Each new feature starts from a verified baseline. Prevents accumulated technical debt from silently compounding across sessions.
+
 **Interrupt-safe commits**: Commit every working state, not just at milestone boundaries.
 If an agent is interrupted mid-task, the last commit must be valid and buildable.
 
