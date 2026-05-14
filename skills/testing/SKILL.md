@@ -212,6 +212,19 @@ For complex features where "all tests pass" isn't sufficient: define a success r
 Grader failure returns specific, addressable issues. Implementing agent takes another pass. This outer loop catches the "tautological test" failure mode (tests pass, rubric fails) by separating evaluation context from implementation context.
 </grader_pattern>
 
+<!-- Updated 2026-05-14: https://www.infoq.com/news/2026/04/claude-code-review/, https://www.coderabbit.ai/blog/claude-opus-4-7-for-ai-code-review -->
+<native_code_review_stats>
+Anthropic's Code Review feature (launched March 2026) integrates with GitHub and leaves inline comments automatically on PRs.
+Production stats:
+- Large PRs (>1000 lines): 84% get findings, avg 7.5 issues flagged
+- Small PRs (<50 lines): 31% get findings, avg 0.5 issues
+- Average review time: ~20 minutes. Average cost: $15–25/review (token-based)
+- Focus: logical errors over style. Opus 4.7 has stronger cross-file reasoning for multi-module issues.
+
+Best ROI: large PRs where human reviewers are most likely to miss cross-file interactions.
+Use small PRs strategically to reduce both review time and cost.
+</native_code_review_stats>
+
 <on_complete>
 agentdb write-end '{"skill":"testing","tests_added":<N>,"coverage_delta":"<+X%>","edge_cases":["<list>"],"assertions":"<strong|weak>"}'
 

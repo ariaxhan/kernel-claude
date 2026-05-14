@@ -145,4 +145,16 @@ Humans then focus on architecture, business logic, and intent — not nitpicks t
 Never parallelize AI + human review: humans see a noisier diff and duplicate AI feedback.
 </review_conventions>
 
+<!-- Updated 2026-05-14: https://www.codeant.ai/blogs/good-code-review-practices-guide, https://codeintelligently.com/blog/ai-code-quality-guide-2026 -->
+<tiered_review_risk>
+Not all changes warrant the same review depth. Route by tier to capture the 40-60% review time reduction without sacrificing judgment on critical changes:
+
+- **Tier 1 — AI handles completely**: style, formatting, naming, simple logic, boilerplate, test assertions
+- **Tier 2 — AI + quick human skim**: error handling, input validation, moderate business logic
+- **Tier 3 — human required**: architecture decisions, security-sensitive paths, auth/payments/PII, anything affecting critical systems
+
+The review time savings come from AI absorbing Tier 1 entirely — not from replacing Tier 3 judgment.
+Complex architectural decisions and business logic in critical flows always need a human eye.
+</tiered_review_risk>
+
 </skill>

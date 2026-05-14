@@ -221,6 +221,17 @@ In 2026, Claude Code's default tooling handles more of the debugging burden auto
 **Root cause over fast fix**: Claude solves the immediate problem by finding the fastest path to making the error go away. The fastest fix is frequently wrong — it patches the symptom and breaks something downstream. When a fix "works" but you can't explain *why the bug occurred*, you haven't fixed it.
 </tooling_2026>
 
+<!-- Updated 2026-05-14: https://gitnation.com/contents/advanced-claude-code-techniques-for-2026, https://github.com/AlmogBaku/debug-skill -->
+<debugger_mcp_integration>
+MCP debugger tools let Claude Code set breakpoints, step through code, and evaluate expressions at runtime — rather than relying solely on print-based logging.
+
+When to use: binary search isolation isn't sufficient, or the bug only manifests under specific runtime state that's hard to reproduce via logging alone.
+
+Reference implementation: github.com/AlmogBaku/debug-skill
+
+Advantage over logging: Claude sees exact variable state at each execution step. Faster convergence on root cause for state-mutation bugs, closure bugs, and async timing issues where print-based debugging distorts timing.
+</debugger_mcp_integration>
+
 <on_complete>
 agentdb write-end '{"skill":"debug","bug":"<description>","root_cause":"<what_broke>","fix":"<what_fixed>","test":"<regression_test_name>","learned":"<pattern_for_future>"}'
 
