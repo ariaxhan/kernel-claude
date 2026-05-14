@@ -16,11 +16,14 @@ CREATE TABLE IF NOT EXISTS learnings (
   evidence TEXT,
   domain TEXT,  -- e.g., 'auth', 'database', 'frontend'
   hit_count INTEGER DEFAULT 0,
-  last_hit TEXT
+  last_hit TEXT,
+  visibility TEXT DEFAULT 'agent',     -- agent | human_only | operational
+  sensitivity TEXT DEFAULT 'low'       -- low | medium | high
 );
 
 CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
 CREATE INDEX IF NOT EXISTS idx_learnings_domain ON learnings(domain);
+CREATE INDEX IF NOT EXISTS idx_learnings_visibility ON learnings(visibility);
 
 -- CONTEXT: Work state (ephemeral per-contract)
 -- Types: contract, checkpoint, handoff, verdict

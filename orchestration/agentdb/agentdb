@@ -167,7 +167,7 @@ cmd_preflight() {
   done
 
   # Check 3: learnings schema has all expected columns
-  local expected_cols="id ts type insight evidence domain hit_count last_hit"
+  local expected_cols="id ts type insight evidence domain hit_count last_hit visibility sensitivity"
   for col in $expected_cols; do
     local has_col
     has_col=$(db_exec "SELECT 1 FROM pragma_table_info('learnings') WHERE name='$col' LIMIT 1;" 2>/dev/null || echo "")
@@ -175,10 +175,12 @@ cmd_preflight() {
       echo "preflight:missing_column — learnings.$col not found, adding"
       # Determine type for the missing column
       case "$col" in
-        hit_count) db_exec "ALTER TABLE learnings ADD COLUMN hit_count INTEGER DEFAULT 0;" 2>/dev/null || true ;;
-        last_hit)  db_exec "ALTER TABLE learnings ADD COLUMN last_hit TEXT;" 2>/dev/null || true ;;
-        domain)    db_exec "ALTER TABLE learnings ADD COLUMN domain TEXT;" 2>/dev/null || true ;;
-        *)         echo "preflight:error — unknown column $col, manual fix required"; warnings=$((warnings + 1)); continue ;;
+        hit_count)   db_exec "ALTER TABLE learnings ADD COLUMN hit_count INTEGER DEFAULT 0;" 2>/dev/null || true ;;
+        last_hit)    db_exec "ALTER TABLE learnings ADD COLUMN last_hit TEXT;" 2>/dev/null || true ;;
+        domain)      db_exec "ALTER TABLE learnings ADD COLUMN domain TEXT;" 2>/dev/null || true ;;
+        visibility)  db_exec "ALTER TABLE learnings ADD COLUMN visibility TEXT DEFAULT 'agent';" 2>/dev/null || true ;;
+        sensitivity) db_exec "ALTER TABLE learnings ADD COLUMN sensitivity TEXT DEFAULT 'low';" 2>/dev/null || true ;;
+        *)           echo "preflight:error — unknown column $col, manual fix required"; warnings=$((warnings + 1)); continue ;;
       esac
       repairs=$((repairs + 1))
     fi
