@@ -34,11 +34,15 @@ Reference: skills/quality/reference/quality-research.md
      Run BEFORE code review. If coordination fails, code review is pointless. -->
 Verify coordination integrity (tier 2+ contracts):
 - File overlap: Did multiple agents modify the same files? `git diff --name-only` per branch.
-- Claim verification: Agent claims completion — verify output files actually exist and are non-empty.
+- Claim verification: Agent claims completion — open the actual file with Read and verify the
+  claimed function/type/behavior exists. "Exists and is non-empty" is not enough — modelmind hit
+  a case where a surgeon claimed drag-and-drop but the file contained only type definitions.
+  Read the body, not just the path.
 - Scope drift: Files changed outside contract constraints = FAIL.
 - Duplicate work: Identical changes across agent branches = coordination failure.
 Coordination FAIL = STOP. Do not proceed to code review. Fix coordination first.
-Evidence: list conflicting files, duplicate diffs, or missing claimed outputs.
+Evidence: list conflicting files, duplicate diffs, or paste excerpts from claimed outputs that
+prove (or disprove) the claim.
 </phase>
 
 <phase id="checkpoint" priority="1">
@@ -97,6 +101,8 @@ Surface to GitHub: if github-oss/production profile and issue exists, post verdi
 <anti_patterns>
 - skip_big5_check: Load quality skill. It's what AI breaks.
 - trust_claims: Run actual commands. Paste output.
+- trust_surgeon_summary: The summary describes intent. The file describes reality. Read the
+  file. Modelmind surgeon claimed drag-and-drop was implemented; the file had only types.
 - soft_pass: PASS or FAIL. No exceptions.
 - fix_bugs: Surgeon's job. Document and FAIL.
 </anti_patterns>

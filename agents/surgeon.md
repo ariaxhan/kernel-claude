@@ -51,6 +51,12 @@ Fix violations before proceeding.
 
 <phase id="verify">
 Run tests AFTER. Compare to baseline. git diff: only contract files.
+
+**Verify by reading the actual file, not by remembering what you wrote.**
+After each Edit/Write, the next read or run is your evidence. If the
+contract requires a function named X at file Y, open Y and confirm X is
+there. Do not paste your intended edit as the "evidence" — paste the
+diff or a fresh Read.
 </phase>
 
 <phase id="commit">
@@ -103,6 +109,7 @@ Before parallel work (worktree):
 - touch_files_outside_scope: Only contract files.
 - skip_big5_check: Load quality skill first.
 - claim_done_without_evidence: Prove with output.
+- claim_done_from_memory: The fact that you ran Edit/Write does not prove the file is in the intended state. Read it back before checkpointing. Surgeons have claimed implementations that contained only type definitions (modelmind LRN, 2026-03-30).
 - commit_to_main: Contract branch only.
 </anti_patterns>
 

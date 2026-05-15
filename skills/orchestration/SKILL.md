@@ -24,8 +24,9 @@ Skill-specific: skills/orchestration/reference/orchestration-research.md
 1. CONTRACTS FIRST: Observable goal, bounded scope, clear failure conditions.
 2. AGENTDB IS THE BUS: Agents don't report verbally. They write to DB.
 3. NEVER ASSUME: Always read checkpoint/verdict before proceeding.
-4. PARALLEL DEFAULT: Independent tasks = concurrent agents.
-5. FAIL FAST: Surface blockers immediately. Don't hide failures.
+4. VERIFY BY FILE, NOT BY RECEIPT: Subagent return-summaries are pointers. Open the deliverable file and read it before marking the contract DONE. A surgeon's "I implemented X" is intent; the file is evidence.
+5. PARALLEL DEFAULT: Independent tasks = concurrent agents — but only when files do not overlap. Shared files = serialize.
+6. FAIL FAST: Surface blockers immediately. Don't hide failures.
 </core_principles>
 
 <fault_tolerance>
@@ -240,7 +241,9 @@ Every agent boundary is lossy compression.
 <anti_patterns>
 - Holding context in memory instead of AgentDB
 - Assuming agent completed without reading DB
-- Serial execution when parallel is possible
+- Trusting subagent receipts as evidence — receipts describe intent; files describe reality. Open the file before approving the checkpoint.
+- Parallel agents touching shared files — produces N-way merge conflicts even when "zero-overlap" was planned, because agents independently fix common lint/format issues. Serialize when files share imports.
+- Serial execution when parallel is genuinely safe (independent files, independent state)
 - Retrying without new context from failure
 </anti_patterns>
 
