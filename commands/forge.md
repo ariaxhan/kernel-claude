@@ -40,9 +40,20 @@ on_tier:
 <on_start>
 ```bash
 agentdb read-start
-agentdb emit command "forge-start" "" '{"goal":"..."}'
+agentdb emit command "forge-start" "" '{"goal":"...","max_budget_usd":N.NN}'
 ```
 Load ALL always-skills immediately. Load task/domain skills after classify.
+
+**Budget preflight (mandatory before any forge cycle):**
+1. Confirm `max_budget_usd` is set on the contract or the forge invocation.
+2. If unset: AskUserQuestion — "Forge runs are autonomous loops. Set a cost ceiling
+   (default: $5 tier 2 / $15 tier 3), or proceed unbounded?" Never proceed unbounded silently.
+3. Cumulative cost tracked via agentdb emit each cycle. Hard stop at 100% of budget.
+4. Hitting the cap = forge halts and reports. This is the circuit breaker working.
+
+Why: one stuck retry at $0.40-0.60/query × 200 retries = $120 silently. The cap is the only
+mechanism that prevents this — there is no in-session signal that cost is runaway.
+See `skills/orchestration/SKILL.md` <max_budget_usd_invariant>.
 </on_start>
 
 <!-- ============================================ -->

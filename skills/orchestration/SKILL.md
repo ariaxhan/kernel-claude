@@ -160,6 +160,28 @@ Every agent boundary is lossy compression.
   rule: budget is per-contract, not per-session.
 </budget_awareness>
 
+<max_budget_usd_invariant>
+  **`max_budget_usd` is mandatory infrastructure, not optional config.** Treat it like a circuit
+  breaker, not a preference. One stuck retry loop at $0.40-0.60/query × hundreds of retries
+  becomes a silent four-figure invoice. The cap is the only thing standing between you and that.
+
+  Required for:
+  - Any /kernel:forge autonomous run (heat → hammer → quench → temper → anneal loops)
+  - Any multi-agent spawn (tier 2+) where total cost is unbounded by the human in the loop
+  - Any "run overnight" or "let it iterate until done" pattern
+  - Any agentdb antibody-search-driven loop where match counts determine spawn counts
+
+  Preflight protocol (orchestrator enforces):
+  1. Before spawning any autonomous loop, confirm `max_budget_usd` is set on the contract.
+  2. If unset: AskUserQuestion — "About to start an autonomous loop with no cost cap. Set a
+     ceiling, or proceed unbounded? Default: $5 for tier 2, $15 for tier 3."
+  3. Track cumulative cost via agentdb emit. Hard stop at 100%, soft warn at 80%.
+  4. Hitting the cap is not a failure — it's the safety mechanism working. Report and stop.
+
+  Why this is an invariant, not a guideline: cost overruns are silent until billing fires. There
+  is no in-session signal that something is going wrong. The cap is the signal.
+</max_budget_usd_invariant>
+
 <checkpoint_recovery>
   Resume from last good state, not restart from scratch. Saves 40-60% on failures.
 
