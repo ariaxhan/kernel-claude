@@ -10,11 +10,19 @@ allowed-tools: Read, Bash, Task
 Context is finite. Every token competes for attention.
 Longer context makes things WORSE (30%+ accuracy drop for middle info).
 Progressive disclosure: load what's needed when it's needed.
+
+**Reasoning fidelity is the real metric, not token count.** Quality degrades at ~60-70% fill, not at the limit. The agent appears to work normally during degradation; only the output gets shallower.
 </purpose>
 
 <prerequisite>
-Monitor context usage. Offer handoff proactively at ~70% capacity.
+Monitor context usage. **Compact or hand off proactively at ~60% capacity** — not 80%, not at limit.
 Use native /context command to check usage. This skill is for methodology.
+
+Why 60%, not 70-80%:
+- HF Daily Papers research: solve rate drops 65%→21% when architectural mental model gets evicted from context.
+- Fidelity shallowing starts at ~60% fill — the agent still produces output, but stops backtracking, exploring alternatives, or maintaining hypothesis depth.
+- By the time native compaction fires (typically near limit), the degraded reasoning has already shipped to code.
+- Token count is the lagging indicator. Hypothesis depth and step count are leading indicators.
 </prerequisite>
 
 <reference>
@@ -40,6 +48,8 @@ Graph tracking: orchestration/agentdb/migrations/002_graph_tracking.sql
 </token_budget>
 
 <compaction_protocol>
+Trigger compaction at ~60% fill, BEFORE reasoning quality degrades. Do not wait for native auto-compact (too late).
+
 Before compaction:
 1. Write critical state to AgentDB
 2. Commit any uncommitted changes
@@ -50,6 +60,19 @@ After compaction:
 2. Run agentdb read-start for failures, patterns, contracts
 3. Check for pending checkpoints to review
 </compaction_protocol>
+
+<fidelity_health_check>
+Don't trust token count alone. Watch for these reasoning-fidelity signals before compaction is even visible as a token problem:
+
+- **Hypothesis depth dropping**: agent stops exploring alternatives, defaults to first idea
+- **Backtracking absent**: errors get patched in place rather than root-caused
+- **Step count contracting**: multi-step plans collapse to one-shot attempts
+- **Cross-file awareness fading**: agent forgets earlier files in the same session
+- **Inline checks disappearing**: agent stops verifying assumptions before acting
+
+Any one of these = compact or hand off NOW, even if /context shows <60% fill.
+The token meter measures bytes, not thinking.
+</fidelity_health_check>
 
 <compaction_strategies>
 
