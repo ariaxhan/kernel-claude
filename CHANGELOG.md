@@ -20,13 +20,17 @@ Six-week refresh after a research+audit pass synthesizing modelmind, cross-proje
 ### Fixed
 - **`--no-verify` hidden carve-out** — `session-end.sh` and `pre-compact-commit.sh` use `--no-verify` to avoid infinite hook loops. This was undocumented at the CLAUDE.md level, creating an invisible contradiction with the stated rule. Now explicit in `<git><hook_carve_outs>` with rationale, and both scripts reference the carve-out documentation inline. The exception is machine-only; user-driven and agent-driven commits must still pass all gates.
 
-### Coming next (Wave 2)
-- New `kernel:ship` skill (NEXUS routing already expects it).
-- New `blind-evaluator` agent + `skills/eval/SKILL.md` restructure for structural eval separation (self-scoring inflates 36%).
-- `coroner` agent enhanced with AgentRx 4-type failure taxonomy.
-- `max_budget_usd` invariant in orchestration + forge.
-- `commands/ingest.md` spec-completeness gate (execution-ready artifacts, not goal descriptions).
-- CLAUDE.md absorbs three highest-leverage NEXUS invariants (I0.13 anchor-drift stop, I0.14 worktree isolation, I0.15 hook-enforced safety).
+### Added (Wave 2)
+- **`kernel:ship` skill** — `skills/ship/SKILL.md`. The release-gate sequence (preflight → validate → review → push → optional tag → checkpoint) NEXUS already routed to. Push to `main` requires explicit user confirmation (mirrors NEXUS I0.8). Force-push never auto-attempted on rejection.
+- **`blind-evaluator` agent** — `agents/blind-evaluator.md`. Structurally separate eval agent that receives only the problem statement + rubric, never the solution. Includes contamination check on input (refuses to score if implementer narrative leaked in). Self-scoring inflates ~36% structurally; only structural separation fixes it.
+- **AgentRx 4-type failure taxonomy in `agents/coroner.md`** — independent of root-cause-of-death, classify the failure *mechanism* as Action / Reasoning / Tool / State, each with distinct mitigations. Source: Microsoft Research AgentRx, 115 annotated trajectories. Enables queries like "mostly State failures lately = context-mgmt regression."
+- **`max_budget_usd` invariant** in `skills/orchestration/SKILL.md` and budget preflight in `commands/forge.md`. Promotes the cost cap from optional config to mandatory infrastructure for any autonomous loop or tier 2+ multi-agent spawn. One stuck retry at $0.40-0.60/query × 200 retries = $120 silently — the cap is the only mechanism that catches this.
+- **Spec-completeness gate (step 4b)** in `commands/ingest.md` — execution-ready artifacts (exact file paths, exact symbols, exact code snippets, exact configs/SQL) required before handing off to a surgeon or starting execution. Litmus test: "could a fresh agent execute this with zero follow-up?" If no, the spec is incomplete. Source: modelmind H002/H003, 0.95 confidence.
+
+### Changed (Wave 2)
+- **CLAUDE.md `<invariants>` block** — three highest-leverage NEXUS I0 invariants mirrored to the plugin for visibility: I0.13 (anchor-drift stop), I0.14 (worktree isolation for parallel agents), I0.15 (hooks-not-honor-system for critical safety). Full I0 list lives in `CodingVault/.claude/CLAUDE.md`.
+- **CLAUDE.md `<anti_patterns>`** gained three new blocks: `trust_agent_summary` (files describe reality, not receipts), `self_score_high_stakes_eval` (use blind-evaluator), `autonomous_loop_without_budget_cap` (`max_budget_usd` mandatory).
+- **`skills/eval/SKILL.md` restructure** — new core principle on structural separation, new `<blind_evaluation_protocol>` block, two-phase eval pattern (cold Run 1 scored, optimization Run 2), four new anti-patterns (self-score, post-merge eval, greenfield in golden dataset, context breadth before baseline).
 
 ---
 
