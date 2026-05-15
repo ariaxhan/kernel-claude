@@ -177,6 +177,35 @@ strong_assertions: specific values
 </principles>
 </step>
 
+<step id="4b_spec_completeness" mandatory="true">
+<rule>Spec framing > contract framing. Execution-ready, not goal-shaped.</rule>
+
+Specification prompts with exact code achieve 100% success across all scopes (modelmind H002/H003,
+0.95 confidence). Contract framing ("achieve X under constraint Y") leaves interpretation gaps
+that agents fill incorrectly.
+
+Before handing to surgeon (tier 2+) or starting execution (tier 1), the spec must answer:
+- **Exact file paths**: every file that will change, by absolute path
+- **Exact symbols**: every function/class/type to add/modify/remove, by name
+- **Exact code snippets** for non-trivial logic (not pseudocode, not "implement X")
+- **Exact configs/SQL/schemas**: if the change touches them, paste the literal block
+- **Exact verification commands**: how a fresh agent confirms success without asking
+
+Litmus test: **could a fresh agent in a new session execute this spec with zero follow-up
+questions?** If no, the spec is incomplete. Return to step 3 (scope) or step 4 (tests) and fill
+the gap before proceeding.
+
+Anti-pattern: shipping a contract that says "the surgeon will figure out X." The surgeon will
+figure out X by guessing, and the guess will be wrong.
+
+<ask_user>
+  Use AskUserQuestion when: the spec has a known gap and you need the user to decide which
+  exact path to take (rather than letting the surgeon guess).
+  Ask: "Spec gap at {location}: option A = {exact}, option B = {exact}. Which?"
+  Options: option A, option B, other
+</ask_user>
+</step>
+
 <step id="5_execute">
 <tier_1>
 1. Reference research doc
