@@ -2,6 +2,34 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.13.0] - 2026-05-14
+
+Six-week refresh after a research+audit pass synthesizing modelmind, cross-project, and dreams folder learnings. Source reports in `_meta/research/modelmind-mining-2026-05.md`, `_meta/research/cross-project-mining-2026-05.md`, `_meta/research/dreams-synthesis-2026-05.md`, and `_meta/audit/state-audit-2026-05.md`.
+
+### Added (Wave 1)
+- **Research-Failures-First protocol** — `_meta/reference/research-failures-first.md`. Empirically ranked channel taxonomy (GitHub issues 47% unique-find rate + production case studies 78% run in parallel; anti-pattern web search 15% dropped). Mandatory canonical map at `_meta/research/<topic>.md` with ≥10 entries before any native/schema/auth/sync/store-submission work.
+- **`deep-diver` agent** — `agents/deep-diver.md`. Sonnet agent that runs the Research-Failures-First protocol, spawns Channel-A + Channel-D in parallel, verifies deliverables by file (not by receipt), commits the canonical map, returns ≤200-word receipt to orchestrator. NEXUS layer was already routing to this agent; now it exists.
+- **Fidelity health check** in `skills/context-mgmt/SKILL.md` — five reasoning-quality signals (hypothesis depth, backtracking presence, step count, cross-file awareness, inline verification) that warrant compaction independent of the token meter.
+
+### Changed
+- **Compaction trigger** moved to **~60% context fill** in `skills/context-mgmt/SKILL.md`, with rationale: reasoning fidelity degrades at 60-70% (HF Daily Papers research). Previous threshold of "~70% capacity" was too late.
+- **Verify-by-file invariant** hardcoded across `agents/surgeon.md`, `agents/adversary.md`, and `skills/orchestration/SKILL.md`. Subagent receipts describe intent; the deliverable file is evidence. Modelmind LRN: surgeon claimed drag-and-drop "implemented" but the file contained only type definitions.
+- **Shared-file parallelism warning** in `skills/orchestration/SKILL.md` anti-patterns — even with zero-overlap file plans, parallel agents independently fix common lint/format issues and produce N-way merge conflicts.
+- **`_learnings.md` refresh** — log frozen at v6.0.0 (Mar 4) caught up to v7.12.2 with distilled entries from 6 weeks of CHANGELOG advances (GEPA traces, R-factor scoring, learning decay, 11-phase review, 9-gate safety, knowledge injection, approval learner, worktree safety, read-utilization tracking).
+
+### Fixed
+- **`--no-verify` hidden carve-out** — `session-end.sh` and `pre-compact-commit.sh` use `--no-verify` to avoid infinite hook loops. This was undocumented at the CLAUDE.md level, creating an invisible contradiction with the stated rule. Now explicit in `<git><hook_carve_outs>` with rationale, and both scripts reference the carve-out documentation inline. The exception is machine-only; user-driven and agent-driven commits must still pass all gates.
+
+### Coming next (Wave 2)
+- New `kernel:ship` skill (NEXUS routing already expects it).
+- New `blind-evaluator` agent + `skills/eval/SKILL.md` restructure for structural eval separation (self-scoring inflates 36%).
+- `coroner` agent enhanced with AgentRx 4-type failure taxonomy.
+- `max_budget_usd` invariant in orchestration + forge.
+- `commands/ingest.md` spec-completeness gate (execution-ready artifacts, not goal descriptions).
+- CLAUDE.md absorbs three highest-leverage NEXUS invariants (I0.13 anchor-drift stop, I0.14 worktree isolation, I0.15 hook-enforced safety).
+
+---
+
 ## [7.9.2] - 2026-04-01
 
 ### Fixed

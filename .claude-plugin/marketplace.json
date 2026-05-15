@@ -7,8 +7,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Claude Code learns from itself. KERNEL gives your agent persistent memory (AgentDB), multi-agent orchestration (13 agents, tiered routing), and a scientific experiment engine that proves which rules actually work. Your agent remembers failures across sessions, coordinates parallel work without merge conflicts, and evolves its own methodology through hypothesis testing. 19 skills, 13 commands, auto-adapting project profiles.",
-      "version": "7.12.2"
+      "description": "Claude Code learns from itself. KERNEL gives your agent persistent memory (AgentDB), multi-agent orchestration (15 agents, tiered routing), and a scientific experiment engine that proves which rules actually work. Your agent remembers failures across sessions, coordinates parallel work without merge conflicts, and evolves its own methodology through hypothesis testing. 19 skills, 14 commands, auto-adapting project profiles. v7.13: research-failures-first protocol, deep-diver agent, 60% compaction trigger, verify-by-file invariant.",
+      "version": "7.13.0"
     }
   ]
 }
