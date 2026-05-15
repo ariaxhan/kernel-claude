@@ -82,7 +82,9 @@ fi
 
 FILES_CHANGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
 REPO_NAME=$(basename "$PROJECT_ROOT")
-# --no-verify: intentional. Avoids infinite hook loops during session-end cleanup.
+# --no-verify: intentional carve-out documented in CLAUDE.md <git><hook_carve_outs>.
+# This hook fires inside SessionEnd; leaving verify enabled creates an infinite hook chain.
+# Carve-out is limited to this script + pre-compact-commit.sh. Do NOT reuse elsewhere.
 git commit -m "chore(session-end): $REPO_NAME [$AGENT] ($FILES_CHANGED files) $TIMESTAMP" --no-verify 2>/dev/null
 if ! git push 2>/dev/null; then
     echo "WARNING: git push failed. Changes committed locally but not pushed." >&2

@@ -1,4 +1,4 @@
-<kernel version="7.12.1">
+<kernel version="7.13.0">
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->
@@ -145,6 +145,15 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <rule>Commit every working state. Push before session end or handoff.</rule>
   <rule>Never commit broken code to main. Never auto-resolve merge conflicts silently.</rule>
   <rule>Stash before risky ops. Tag milestones.</rule>
+  <rule>Agent-authored and user-authored commits NEVER use --no-verify. If a gate fails, fix the gate or the change.</rule>
+  <hook_carve_outs>
+    Two automated hooks call `git commit --no-verify` intentionally:
+    - hooks/scripts/session-end.sh (SessionEnd batch commit)
+    - hooks/scripts/pre-compact-commit.sh (PreCompact checkpoint)
+    Reason: these hooks run inside the hook chain that --verify would re-invoke, so leaving verify
+    enabled creates an infinite loop. The carve-out is machine-only and limited to these two
+    scripts. If you find yourself reaching for --no-verify anywhere else, stop and fix the gate.
+  </hook_carve_outs>
 </git>
 
 <!-- ============================================ -->

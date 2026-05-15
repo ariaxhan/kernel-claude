@@ -104,7 +104,9 @@ fi
 
 FILES_CHANGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
 REPO_NAME=$(basename "$PROJECT_ROOT")
-# --no-verify: intentional. Avoids infinite hook loops during pre-compact cleanup.
+# --no-verify: intentional carve-out documented in CLAUDE.md <git><hook_carve_outs>.
+# This hook fires inside PreCompact; leaving verify enabled creates an infinite hook chain.
+# Carve-out is limited to this script + session-end.sh. Do NOT reuse elsewhere.
 git commit -m "chore(checkpoint): $REPO_NAME pre-compact [$AGENT] ($TRIGGER, $FILES_CHANGED files) $TIMESTAMP_SHORT" --no-verify 2>/dev/null
 git push 2>/dev/null || true
 
