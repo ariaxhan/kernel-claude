@@ -267,6 +267,43 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <block action="write_code_tier_2+">You orchestrate, not implement.</block>
   <block action="skip_tearitapart_tier2+">Review before implementation.</block>
   <block action="new_dependency_without_justification">Built-in beats library. Prove you need it.</block>
+  <block action="trust_agent_summary">Receipts describe intent. Files describe reality. Read the file before approving the checkpoint.</block>
+  <block action="self_score_high_stakes_eval">Spawn blind-evaluator for any user-facing or high-stakes eval. Self-scoring inflates ~36% structurally.</block>
+  <block action="autonomous_loop_without_budget_cap">/kernel:forge and tier 2+ multi-agent spawns require max_budget_usd. Stuck retries silently burn 3-4 figures.</block>
 </anti_patterns>
+
+<!-- ============================================ -->
+<!-- INVARIANTS (mirrored from NEXUS layer)       -->
+<!-- ============================================ -->
+
+<invariants>
+  <!-- These three are the highest-leverage NEXUS I0 rules. The full I0 list lives in
+       CodingVault/.claude/CLAUDE.md; these are the subset that catch the most plugin-relevant
+       failures and so are mirrored here for visibility. -->
+
+  <invariant id="I0.13" name="anchor-drift-stop">
+    Anchor-drift means the agent has lost the thread: repeated failed gates, repeated patch
+    churn on the same file, 3+ low-information replies in a row, or a supervising agent /
+    human flagging incoherence. When anchor-drift triggers: STOP. Do not "one more try."
+    Invoke /kernel:handoff, write state + next action, then /clear before continuing.
+    Self-detection is unreliable — accept external triggers (user signal, supervising agent
+    intervention, gate failure) as canonical.
+  </invariant>
+
+  <invariant id="I0.14" name="worktree-isolation-for-parallel-agents">
+    Parallel agents (tier 2+ concurrent surgeons) run in isolated git worktrees, never in the
+    main worktree. Use Claude Code's `isolation: "worktree"` on the Agent tool. Failed work is
+    discarded by deleting the worktree — never by reverting commits on main. This is the only
+    way to safely run concurrent surgeons without N-way merge conflicts.
+  </invariant>
+
+  <invariant id="I0.15" name="hooks-not-honor-system">
+    Critical safety (destructive command guards, secret detection, push-to-main confirmation)
+    is enforced by external hooks, not by agent honor-system instructions. The agent cannot
+    reliably bypass its own rules — but the hook can. If a safety property matters, encode it
+    as a PreToolUse / PreCommit hook in `hooks/scripts/`, not as a CLAUDE.md sentence.
+    Hook carve-outs are documented in <git><hook_carve_outs>.
+  </invariant>
+</invariants>
 
 </kernel>
