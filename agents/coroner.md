@@ -53,6 +53,34 @@ Root cause classification (exactly one primary):
 - cascade_failure: upstream agent failure propagated downstream
 </phase>
 
+<phase id="agentrx_taxonomy">
+Independent of root cause, also classify the failure mechanism using the AgentRx 4-type taxonomy
+(from Microsoft Research, 115 annotated agent failure trajectories). Pick exactly one:
+
+- **Action**: the agent took the wrong move. The decision was wrong even though reasoning, tools,
+  and state were intact. Example: chose to refactor when the task asked to bug-fix.
+  Mitigation: tighter contract constraints; rubric examples in the prompt; tearitapart gate.
+
+- **Reasoning**: the logic itself was flawed. Wrong inference from correct evidence; misapplied
+  pattern; hallucinated relationship between concepts. Example: claimed library X supports feature Y
+  without verifying. Mitigation: failure-mode map; verify-by-file; require source citation.
+
+- **Tool**: a tool call failed, returned bad data, or was used incorrectly. Example: Grep regex
+  silently matched nothing; Edit applied to wrong file; Bash exit code ignored.
+  Mitigation: tool result verification; fallback paths in skill protocols; explicit error
+  handling at tool boundaries.
+
+- **State**: the agent's working memory got corrupted. Context fill above ~60% caused fidelity
+  loss; cross-session learnings stale; AgentDB returned outdated checkpoint. Example: agent forgot
+  earlier files in the same session; reasoned from compacted-away assumptions.
+  Mitigation: compact at 60% fill; agentdb read-start; explicit "what do you currently know" check.
+
+Why this matters: different failure mechanisms need different fixes. Lumping them as "agent
+failed" prevents pattern queries like "are we mostly seeing State failures lately?" (which would
+indicate context-mgmt regression) vs. "mostly Reasoning failures" (which would indicate the
+research/verify pipeline is the bottleneck).
+</phase>
+
 <phase id="contributing_factors">
 Secondary factors that amplified the failure:
 - Was research skipped?
@@ -80,10 +108,11 @@ Structured post-mortem report:
 - contract_id: the failed contract
 - timeline: ordered sequence of events
 - cause_of_death: primary root cause classification
+- agentrx_type: Action | Reasoning | Tool | State (the failure mechanism, independent of root cause)
 - contributing_factors: list of secondary factors
 - evidence: specific AgentDB entries supporting diagnosis
-- prevention: actionable recommendations
-- learning: condensed insight for agentdb learn
+- prevention: actionable recommendations (cite type-specific mitigations from agentrx_taxonomy)
+- learning: condensed insight for agentdb learn (tag with both cause and agentrx_type for queryability)
 </output>
 
 <agentdb_integration>
@@ -106,17 +135,18 @@ Triggers: after forge anneal (3 shatters), after adversary rejection, manual via
 </anti_patterns>
 
 <on_end>
-agentdb write-end '{"agent":"coroner","contract":"ID","cause":"classification","prevention":"summary"}'
+agentdb write-end '{"agent":"coroner","contract":"ID","cause":"classification","agentrx_type":"Action|Reasoning|Tool|State","prevention":"summary"}'
 </on_end>
 
 <checklist>
 - [ ] All AgentDB traces gathered for failed contract
 - [ ] Timeline reconstructed with inflection point identified
 - [ ] Root cause classified (one primary)
+- [ ] AgentRx failure type classified (Action | Reasoning | Tool | State)
 - [ ] Contributing factors documented
 - [ ] Evidence cited for each finding
-- [ ] Prevention recommendations are actionable
-- [ ] Learning recorded to AgentDB
+- [ ] Prevention recommendations are actionable AND type-specific
+- [ ] Learning recorded to AgentDB with both cause and agentrx_type tags
 </checklist>
 
 </agent>

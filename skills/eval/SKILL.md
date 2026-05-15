@@ -24,10 +24,25 @@ Skill-specific: skills/eval/reference/eval-research.md
 <core_principles>
 1. DEFINE BEFORE CODE: Evals written first force clear thinking about success criteria.
 2. CODE GRADERS > MODEL GRADERS: Deterministic checks beat probabilistic judgments.
-3. TRACK PASS@K: pass@1 (first attempt), pass@3 (within 3 attempts). Target pass@3 > 90%.
-4. REGRESSION BEFORE SHIP: Every change must pass existing evals before merge.
-5. FAST EVALS GET RUN: Slow evals get skipped. Keep evaluation fast.
+3. STRUCTURAL SEPARATION FOR HIGH-STAKES: When stakes are real (security, payments, eval-of-evals, agent quality scoring), use the blind-evaluator agent — never self-score. Self-scoring inflates results ~36% structurally; procedural separation ("I won't peek") does not fix it.
+4. TRACK PASS@K: pass@1 (first attempt), pass@3 (within 3 attempts). Target pass@3 > 90%.
+5. REGRESSION BEFORE SHIP: Every change must pass existing evals before merge.
+6. FAST EVALS GET RUN: Slow evals get skipped. Keep evaluation fast.
 </core_principles>
+
+<blind_evaluation_protocol>
+For any eval where the implementing agent would otherwise score its own output:
+
+1. Spawn `agents/blind-evaluator.md` as a fresh agent.
+2. Pass it ONLY: problem statement, rubric (3-7 criteria with PASS conditions + weights), artifact path.
+3. Do NOT pass: implementer's checkpoint, summary, commit message, prompt, or expected solution.
+4. The blind evaluator runs a contamination check first; if it sees anything from the forbidden list, it returns `INVALID` and the eval is aborted until inputs are cleaned.
+5. Confidence < 0.7 from the blind evaluator = escalate to human grader.
+
+Use a two-phase eval protocol when feasible:
+- Run 1: implementing agent solves cold, with no eval feedback. Blind evaluator scores. This is the real number.
+- Run 2: implementing agent gets the Run 1 score + rubric breakdown, then optimizes. Useful for iteration but Run 1 is what you report externally.
+</blind_evaluation_protocol>
 
 <eval_types>
 <!-- Capability Eval: Can it do something new? -->
@@ -125,6 +140,10 @@ Status: READY FOR REVIEW
 <block id="skip_regression">Every change must pass regression evals. No exceptions.</block>
 <block id="slow_evals">Evals that take > 30s get skipped. Keep them fast.</block>
 <block id="no_tracking">Track pass@k over time. Declining reliability is a signal.</block>
+<block id="self_score">For any user-facing or high-stakes eval, the implementing agent scoring its own work inflates results ~36%. Spawn blind-evaluator instead.</block>
+<block id="post_merge_eval">Evaluating against a codebase that already contains the canonical solution = answer key in the eval set. Use pre-merge snapshots or a separate fixture.</block>
+<block id="greenfield_in_golden_dataset">Greenfield tickets in the golden eval set collapse to self=10, blind=3. Greenfields are not evaluable as solved tasks — exclude them from the dataset.</block>
+<block id="context_breadth_before_baseline">Optimizing how much context the evaluator gets before establishing a baseline score = can't distinguish signal from noise. Run minimal-context baseline first, then test additions one at a time.</block>
 </anti_patterns>
 
 <on_complete>
