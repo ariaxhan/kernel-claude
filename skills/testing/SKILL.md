@@ -225,6 +225,18 @@ Best ROI: large PRs where human reviewers are most likely to miss cross-file int
 Use small PRs strategically to reduce both review time and cost.
 </native_code_review_stats>
 
+<!-- Updated 2026-05-17: web research — https://www.kluster.ai/blog/best-code-review-practices, https://brightsec.com/blog/ai-code-review-best-practices-2-0-2026-toolchain/ -->
+<intent_verification>
+In 2026 codebases where 40–70% of production code is AI-generated, the failure mode is **intent drift**: AI correctly implements what it inferred from the prompt, not what the developer actually needed.
+
+When reviewing AI-generated tests or code, verify against the ORIGINAL intent:
+- What prompt or spec drove this generation?
+- Does the output match the business requirement, not just the code structure?
+- Are edge cases from the spec covered, or only edges visible in the code?
+
+Practical check: read the generation prompt (or ask the author for it), then read the output. Discrepancies between intent and output are specification bugs, not implementation bugs — fix the spec before the test.
+</intent_verification>
+
 <on_complete>
 agentdb write-end '{"skill":"testing","tests_added":<N>,"coverage_delta":"<+X%>","edge_cases":["<list>"],"assertions":"<strong|weak>"}'
 

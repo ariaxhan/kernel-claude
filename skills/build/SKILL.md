@@ -327,6 +327,9 @@ Use `effort: xhigh` when spawning surgeon agents for tier 2+ work. At `low`, the
 - Right: "Apply this validation pattern to EVERY endpoint in /src/api/"
 State the full scope explicitly in every agent prompt. Assume nothing is inferred.
 
+<!-- Updated 2026-05-17: web research — https://claudify.tech/blog/claude-code-best-practices, https://code.claude.com/docs/en/best-practices -->
+**CLAUDE.md signal-to-noise filter**: Keep root CLAUDE.md to 50–100 lines. For each line, ask: "Would removing this cause Claude to make mistakes?" If not, cut it. Use `@import` references to `_meta/reference/` for detailed sections — inlining more than ~1KB consumes token budget before work starts and is a harder failure to detect than a missing rule.
+
 ---
 
 # FLAGS

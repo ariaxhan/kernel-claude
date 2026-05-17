@@ -232,6 +232,13 @@ Reference implementation: github.com/AlmogBaku/debug-skill
 Advantage over logging: Claude sees exact variable state at each execution step. Faster convergence on root cause for state-mutation bugs, closure bugs, and async timing issues where print-based debugging distorts timing.
 </debugger_mcp_integration>
 
+<!-- Updated 2026-05-17: web research — https://claudify.tech/blog/claude-code-debugging-guide, https://www.anthropic.com/engineering/claude-code-best-practices -->
+<verbose_flag>
+Use `--verbose` when running Claude Code during active debugging sessions to see tool calls, file reads, and intermediate reasoning in real time. Turn it off in production or CI runs — the overhead is significant and the output is for human diagnosis only.
+
+When a debugging session produces an unexpected fix or Claude explains reasoning you can't follow, `--verbose` output is the receipt. Read it before accepting the fix.
+</verbose_flag>
+
 <on_complete>
 agentdb write-end '{"skill":"debug","bug":"<description>","root_cause":"<what_broke>","fix":"<what_fixed>","test":"<regression_test_name>","learned":"<pattern_for_future>"}'
 

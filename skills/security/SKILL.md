@@ -308,6 +308,18 @@ Review this doc before any security-sensitive implementation. Institutional memo
 **Agent permission audit**: Before spawning any agent that touches auth, payments, or PII, explicitly list its allowed tools and file scope in the contract. An agent scoped to read `src/api/` should never touch `src/auth/` or `.env`. Least-privilege applies to agents, not just users.
 </agentic_security_scanning>
 
+<!-- Updated 2026-05-17: web research — https://brightsec.com/blog/ai-code-review-best-practices-2-0-2026-toolchain/, https://www.kluster.ai/blog/best-code-review-practices -->
+<risk_based_review_config>
+Configure AI code review tools with risk-based rules — not blanket "review everything" settings. Default-enable scanning for:
+- Deleted input validations (highest risk: silent regression)
+- Auth flow changes (any modification to authentication/authorization logic)
+- Query changes touching user-scoped data (RLS bypass risk)
+- SQLi / XSS / unsafe API patterns
+- Functions exceeding complexity threshold (complexity correlates with audit misses)
+
+Turn off style and formatting rules in security scanning — noise drowns signal. Security reviewers should see zero false-positive noise to avoid alert fatigue.
+</risk_based_review_config>
+
 <anti_patterns>
 - "We'll add security later" (you won't)
 - Disabling security for development (gets shipped)
