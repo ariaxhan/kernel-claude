@@ -21,8 +21,8 @@ Session: kernel-claude main
 - **Hypothesis H-LP-INIT added at 0.7 confidence**: standard pattern but untested specifically for this command.
 
 **Artifacts created**:
-- `/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/commands/landing-page.md` — modified: added Phase 0 INIT (~100 lines), added H-LP-INIT hypothesis, updated Phase 8 handoff output with git status + remote push hint.
-- `/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/_meta/handoffs/landing-page-init-2026-04-15.md` — this file.
+- `/Users/ariaxhan/Vaults/CodingVault/kernel-claude/commands/landing-page.md` — modified: added Phase 0 INIT (~100 lines), added H-LP-INIT hypothesis, updated Phase 8 handoff output with git status + remote push hint.
+- `/Users/ariaxhan/Vaults/CodingVault/kernel-claude/_meta/handoffs/landing-page-init-2026-04-15.md` — this file.
 
 **Prior artifacts (from earlier session, still relevant)**:
 - `commands/landing-page.md` — 8 phases + 20 hypotheses (now 21 with H-LP-INIT).

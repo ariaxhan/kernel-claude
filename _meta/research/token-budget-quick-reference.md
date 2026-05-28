@@ -50,5 +50,5 @@ Context rot is a **performance gradient, not a cliff**. At 1M tokens available a
 
 ---
 
-**Reference:** /Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/_meta/research/token-budget-research.md
+**Reference:** /Users/ariaxhan/Vaults/CodingVault/kernel-claude/_meta/research/token-budget-research.md
 

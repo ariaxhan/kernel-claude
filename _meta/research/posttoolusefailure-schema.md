@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-30  
 **Status:** Verified from production code + official research  
-**Source:** `/Users/ariaxhan/Downloads/Vaults/_meta/docs/hooks-research.md` (line 135-140)
+**Source:** `/Users/ariaxhan/Vaults/_meta/docs/hooks-research.md` (line 135-140)
 
 ---
 
@@ -117,7 +117,7 @@ exit 0
 
 ## Real-World Example from Production
 
-From `/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/hooks/scripts/capture-error.sh` (line 14-16):
+From `/Users/ariaxhan/Vaults/CodingVault/kernel-claude/hooks/scripts/capture-error.sh` (line 14-16):
 
 ```bash
 TOOL=$(echo "$INPUT" | jq -r '.tool // "unknown"' 2>/dev/null)
@@ -143,9 +143,9 @@ FILE=$(echo "$INPUT" | jq -r '.file_path // .path // ""' 2>/dev/null)
 
 ## References
 
-- [Claude Code Hooks Documentation: PostToolUseFailure Section](https://code.claude.com/docs/en/hooks) (referenced in `/Users/ariaxhan/Downloads/Vaults/_meta/docs/hooks-research.md`)
-- Official hooks research: `/Users/ariaxhan/Downloads/Vaults/_meta/docs/hooks-research.md`, lines 135-140
-- Production implementation: `/Users/ariaxhan/Downloads/Vaults/CodingVault/kernel-claude/hooks/scripts/capture-error.sh`
+- [Claude Code Hooks Documentation: PostToolUseFailure Section](https://code.claude.com/docs/en/hooks) (referenced in `/Users/ariaxhan/Vaults/_meta/docs/hooks-research.md`)
+- Official hooks research: `/Users/ariaxhan/Vaults/_meta/docs/hooks-research.md`, lines 135-140
+- Production implementation: `/Users/ariaxhan/Vaults/CodingVault/kernel-claude/hooks/scripts/capture-error.sh`
 
 ---
 
