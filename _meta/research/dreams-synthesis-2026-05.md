@@ -1,6 +1,6 @@
 # Dreams folder synthesis for kernel-claude updates — 2026-05-14
 
-Sourced from /Users/ariaxhan/Downloads/Vaults/CodingVault/dreams/. 18 of 25 graduated docs post-date the last plugin update (Apr 7, 2026).
+Sourced from /Users/ariaxhan/Vaults/CodingVault/dreams/. 18 of 25 graduated docs post-date the last plugin update (Apr 7, 2026).
 
 ## Source files read (with mtime, all HIGH priority)
 - agent-architecture-composition.md (Apr 23)

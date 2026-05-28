@@ -1,6 +1,6 @@
 # Modelmind mining for kernel-claude updates — 2026-05-14
 
-Sourced from /Users/ariaxhan/Downloads/Vaults/CodingVault/modelmind/_meta/ (handoffs, plans, research, dreams, context). Excluded funjoin entirely.
+Sourced from /Users/ariaxhan/Vaults/CodingVault/modelmind/_meta/ (handoffs, plans, research, dreams, context). Excluded funjoin entirely.
 
 ---
 
