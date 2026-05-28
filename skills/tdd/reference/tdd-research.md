@@ -1,3 +1,7 @@
+---
+date: 2026-05-28
+---
+
 # TDD Research
 
 Deep reference for Test-Driven Development methodology.
@@ -197,6 +201,78 @@ def test_create_user_hashes_password(user_service):
         user_service.create(email='test@example.com', password='secret')
 
         mock_hash.assert_called_once_with('secret')
+```
+
+## Project-Specific Mock Patterns
+
+### Supabase
+```typescript
+jest.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: jest.fn(() => ({
+      select: jest.fn(() => ({
+        eq: jest.fn(() => Promise.resolve({
+          data: [{ id: 1, name: 'Test' }],
+          error: null
+        }))
+      }))
+    }))
+  }
+}))
+```
+
+### Redis
+```typescript
+jest.mock('@/lib/redis', () => ({
+  searchByVector: jest.fn(() => Promise.resolve([
+    { slug: 'test', similarity_score: 0.95 }
+  ])),
+  checkHealth: jest.fn(() => Promise.resolve({ connected: true }))
+}))
+```
+
+### OpenAI
+```typescript
+jest.mock('@/lib/openai', () => ({
+  generateEmbedding: jest.fn(() => Promise.resolve(
+    new Array(1536).fill(0.1)
+  ))
+}))
+```
+
+## Test Organization Layout (Colocated + E2E Separate)
+
+```
+src/
+  components/
+    Button/
+      Button.tsx
+      Button.test.tsx      # Unit tests colocated
+  app/
+    api/
+      users/
+        route.ts
+        route.test.ts      # Integration tests colocated
+e2e/
+  auth.spec.ts             # E2E tests separate
+  checkout.spec.ts
+```
+
+## Coverage Config (Jest)
+
+```json
+{
+  "jest": {
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    }
+  }
+}
 ```
 
 ## Resources

@@ -24,14 +24,14 @@ Skill-specific: skills/orchestration/reference/orchestration-research.md
 1. CONTRACTS FIRST: Observable goal, bounded scope, clear failure conditions.
 2. AGENTDB IS THE BUS: Agents don't report verbally. They write to DB.
 3. NEVER ASSUME: Always read checkpoint/verdict before proceeding.
-4. VERIFY BY FILE, NOT BY RECEIPT: Subagent return-summaries are pointers. Open the deliverable file and read it before marking the contract DONE. A surgeon's "I implemented X" is intent; the file is evidence.
-5. PARALLEL DEFAULT: Independent tasks = concurrent agents — but only when files do not overlap. Shared files = serialize.
+4. VERIFY BY FILE, NOT BY RECEIPT: Open the deliverable file before marking DONE. Receipt = intent; file = evidence.
+5. PARALLEL DEFAULT: Independent files = concurrent agents. Shared files = serialize.
 6. FAIL FAST: Surface blockers immediately. Don't hide failures.
 </core_principles>
 
 <fault_tolerance>
 4 required layers:
-1. RETRY: Transient failures (timeout, rate limit) → backoff, max 3 attempts
+1. RETRY: Transient failures → backoff, max 3 attempts
 2. FALLBACK: Model/provider failure → route to alternative
 3. CLASSIFICATION: Categorize failure type before choosing recovery
 4. CHECKPOINTING: Write state to AgentDB at every boundary
@@ -39,54 +39,40 @@ Skill-specific: skills/orchestration/reference/orchestration-research.md
 
 <worktree_isolation>
 Use git worktree isolation for tier 2+ when multiple surgeons run in parallel.
-
-**When**: Tier 2+ with 2+ concurrent surgeons touching different files.
-**How**: Claude Code natively supports `isolation: "worktree"` on the Agent tool.
-  - Each surgeon gets an isolated repo copy
-  - If changes are made, worktree path and branch are returned
-  - If no changes, worktree auto-cleans
-
-**Pattern**:
-```
-Agent tool call:
-  subagent_type: kernel:surgeon
-  isolation: "worktree"
-  prompt: "Contract CR-xxx: implement..."
-```
-
-**Merge protocol**: After surgeon completes, orchestrator reviews branch diff, then merges to main working tree.
-**Failure mode**: Surgeon fails → worktree abandoned (no main pollution). Read AgentDB checkpoint for details.
-**Tier 1**: Don't use worktrees. Unnecessary overhead for 1-2 file changes.
+- Set `isolation: "worktree"` on Agent tool call
+- Each surgeon gets isolated repo copy; failed work abandoned (no main pollution)
+- Merge protocol: review branch diff → merge to main working tree
+- Tier 1: skip worktrees (unnecessary overhead)
 </worktree_isolation>
 
 <worktree_safety>
 Constraint enforcement for parallel agents. Prevents scope creep and file conflicts.
 
 **Contract constraints (mandatory for tier 2+)**:
-- Every contract MUST include `constraints.files`: an exhaustive list of files the agent may touch.
+- Every contract MUST include `constraints.files`: exhaustive list of files agent may touch.
 - Format: `{"goal":"X","files":["a.sh"],"constraints":{"files":["a.sh","b.md"]},"tier":2}`
 - No two concurrent contracts may have overlapping `constraints.files`.
 
 **Pre-spawn validation**:
-- `git status --porcelain` must be empty or all changes stashed before spawning agents.
-- Each surgeon's constraint list must be disjoint from all other active surgeons.
+1. `git status --porcelain` must be clean or stashed before spawning.
+2. Each surgeon's constraint list must be disjoint from all active surgeons.
 
 **Post-agent validation**:
-- Read surgeon's checkpoint from AgentDB.
-- Run `git diff --name-only {base}..{surgeon_branch}` on the surgeon's branch.
-- Every file in the diff MUST appear in that contract's `constraints.files`.
-- If any file is out of scope: REJECT the agent's output. Do not merge. Re-contract.
+1. Read surgeon's checkpoint from AgentDB.
+2. Run `git diff --name-only {base}..{surgeon_branch}`.
+3. Every file in diff MUST appear in `constraints.files`.
+4. Out-of-scope file → REJECT output. Do not merge. Re-contract.
 
 **Merge protocol**:
 - Validate constraints before merging surgeon branch to main.
-- If constraints violated: abandon branch, log failure, re-contract with corrected scope.
+- If violated: abandon branch, log failure, re-contract with corrected scope.
 </worktree_safety>
 
 <context_transfer>
 Every agent boundary is lossy compression.
-- Pre-transfer: Write structured briefing to AgentDB
-- Post-transfer: Read AgentDB + active.md to restore
-- Never rely on conversation history across agents
+1. Pre-transfer: Write structured briefing to AgentDB
+2. Post-transfer: Read AgentDB + active.md to restore
+3. Never rely on conversation history across agents
 </context_transfer>
 
 <knowledge_injection>
@@ -108,13 +94,14 @@ Every agent boundary is lossy compression.
   rule: inject BEFORE spawn. Never let agents discover context at runtime.
   rule: orchestrator owns injection. Agents don't call inject-context themselves.
 </knowledge_injection>
+
 <progressive_autonomy>
-  Confidence-based human escalation. Higher confidence = less human involvement.
+  Confidence-based human escalation:
 
   levels:
-    supervised:    confidence < 0.6 — human confirms every decision
-    semi_autonomous: 0.6 <= confidence < 0.8 — human confirms tier 2+ only
-    autonomous:    confidence >= 0.8 — human reviews results, not decisions
+    supervised:       confidence < 0.6 — human confirms every decision
+    semi_autonomous:  0.6 <= confidence < 0.8 — human confirms tier 2+ only
+    autonomous:       confidence >= 0.8 — human reviews results, not decisions
 
   escalation_triggers:
     - confidence below threshold for current level
@@ -122,11 +109,6 @@ Every agent boundary is lossy compression.
     - scope exceeds contract by >20%
     - security-sensitive change detected
     - breaking change to public API
-
-  measurement:
-    agent_confidence: from reviewer 11-phase scoring
-    historical_accuracy: from approval-learner pattern matching
-    domain_familiarity: from agentdb learning count in this domain
 
   rule: start supervised. Earn autonomy through consistent quality.
   rule: any security concern instantly drops to supervised level.
@@ -140,132 +122,66 @@ Every agent boundary is lossy compression.
     tier_2: medium cost (orchestrator + surgeon)
     tier_3: high cost (full council)
 
-  tracking:
-    - agentdb emit tracks token usage per agent per session
-    - orchestrator monitors cumulative cost across spawned agents
-    - budget injected into agent context: "Remaining budget: ~{N} tokens"
-
   alerts:
     50%: normal — continue
     80%: warn — simplify approach
     95%: critical — wrap up, checkpoint, stop spawning
 
-  self_regulation:
-    - agent sees remaining budget in injected context
-    - high budget: explore multiple approaches
-    - low budget: pick simplest viable approach
-    - exhausted: checkpoint and report to human
+  preflight (orchestrator enforces before any autonomous loop):
+    1. Confirm `max_budget_usd` is set on contract.
+    2. If unset: AskUserQuestion — set ceiling or proceed unbounded.
+    3. Track cumulative cost via agentdb emit. Hard stop at 100%.
 
   rule: never exceed budget silently. Alert at 80%, hard stop at 95%.
   rule: budget is per-contract, not per-session.
 </budget_awareness>
 
-<max_budget_usd_invariant>
-  **`max_budget_usd` is mandatory infrastructure, not optional config.** Treat it like a circuit
-  breaker, not a preference. One stuck retry loop at $0.40-0.60/query × hundreds of retries
-  becomes a silent four-figure invoice. The cap is the only thing standing between you and that.
-
-  Required for:
-  - Any /kernel:forge autonomous run (heat → hammer → quench → temper → anneal loops)
-  - Any multi-agent spawn (tier 2+) where total cost is unbounded by the human in the loop
-  - Any "run overnight" or "let it iterate until done" pattern
-  - Any agentdb antibody-search-driven loop where match counts determine spawn counts
-
-  Preflight protocol (orchestrator enforces):
-  1. Before spawning any autonomous loop, confirm `max_budget_usd` is set on the contract.
-  2. If unset: AskUserQuestion — "About to start an autonomous loop with no cost cap. Set a
-     ceiling, or proceed unbounded? Default: $5 for tier 2, $15 for tier 3."
-  3. Track cumulative cost via agentdb emit. Hard stop at 100%, soft warn at 80%.
-  4. Hitting the cap is not a failure — it's the safety mechanism working. Report and stop.
-
-  Why this is an invariant, not a guideline: cost overruns are silent until billing fires. There
-  is no in-session signal that something is going wrong. The cap is the signal.
-</max_budget_usd_invariant>
-
 <checkpoint_recovery>
   Resume from last good state, not restart from scratch. Saves 40-60% on failures.
 
-  checkpoint_schema:
-    agent_id: which agent was working
-    step: last completed step number
-    state: JSON blob of current progress
-    files_modified: list of files changed so far
-    tests_passing: count of passing tests at this point
-    timestamp: when checkpoint was written
-
   protocol:
-    on_spawn: check agentdb for existing checkpoint with same contract_id
-    if_found: resume from step + 1, skip completed work
-    if_not_found: start fresh
-    on_each_step: write checkpoint via agentdb write-end
-    on_failure: checkpoint is preserved — next spawn resumes
+    1. on_spawn: check agentdb for existing checkpoint with same contract_id
+    2. if_found: resume from step + 1, skip completed work
+    3. if_not_found: start fresh
+    4. on_each_step: write checkpoint via agentdb write-end
+    5. on_failure: checkpoint preserved — next spawn resumes
 
   version_safety:
-    - each checkpoint stores list of files_modified
     - on resume: verify files haven't changed since checkpoint
     - if changed externally: invalidate checkpoint, start fresh
-    - prevents "double update" from stale state
-
-  integration:
-    - surgeon writes checkpoint after each file modification
-    - forge checks for checkpoint before each heat cycle
-    - orchestrator reads checkpoint to determine resume point
 
   rule: always checkpoint before risky operations.
   rule: checkpoint is cheap. Not checkpointing is expensive.
 </checkpoint_recovery>
 
 <entropy_adaptive>
-  Dynamic agent orchestration based on task entropy. Replace fixed workflows with adaptive coordination.
+  Dynamic orchestration based on task entropy.
 
   entropy_measurement:
-    low:    familiar pattern, existing tests, clear scope → streamline (fewer agents, faster)
-    medium: some unknowns, partial test coverage → standard workflow
-    high:   unfamiliar tech, no tests, cross-cutting → full council + extra research
-
-  signals:
-    - agentdb learning count in domain (high count = low entropy)
-    - test coverage for affected files (high coverage = low entropy)
-    - number of recent failures in domain (high failures = high entropy)
-    - file co-change complexity (many co-changes = high entropy)
-    - triage agent classification (low/medium/high/epic)
+    low:    familiar pattern, existing tests, clear scope
+    medium: some unknowns, partial coverage
+    high:   unfamiliar tech, no tests, cross-cutting
 
   adaptation:
-    low_entropy:
-      skip: researcher, scout
-      use: surgeon directly (tier 1 behavior even for tier 2 file counts)
-      rationale: known territory, don't waste tokens on research
-
-    medium_entropy:
-      standard: researcher → surgeon → validator
-      skip: adversary (unless security-sensitive)
-      rationale: some unknowns but manageable risk
-
-    high_entropy:
-      full: researcher + scout → triage → understudier → surgeon → adversary → reviewer
-      add: coroner on failure (automatic post-mortem)
-      rationale: maximum coverage, expect failures, learn from them
+    low_entropy:    skip researcher+scout; surgeon directly
+    medium_entropy: researcher → surgeon → validator; skip adversary
+    high_entropy:   full council + coroner on failure
 
   override:
     - security-sensitive changes always get full pipeline regardless of entropy
     - human can force entropy level via AskUserQuestion
     - first session in new project always starts at high entropy
 
-  integration:
-    - triage agent outputs entropy estimate alongside complexity
-    - forge heat phase measures entropy before choosing approach count
-    - ingest classify step uses entropy to decide research depth
-
-  rule: entropy decreases as learnings accumulate. Reward the system for learning.
+  rule: entropy decreases as learnings accumulate.
   rule: never skip security checks regardless of entropy level.
 </entropy_adaptive>
 
 <anti_patterns>
 - Holding context in memory instead of AgentDB
 - Assuming agent completed without reading DB
-- Trusting subagent receipts as evidence — receipts describe intent; files describe reality. Open the file before approving the checkpoint.
-- Parallel agents touching shared files — produces N-way merge conflicts even when "zero-overlap" was planned, because agents independently fix common lint/format issues. Serialize when files share imports.
-- Serial execution when parallel is genuinely safe (independent files, independent state)
+- Trusting subagent receipts as evidence — receipts describe intent; files describe reality
+- Parallel agents touching shared files — produces N-way merge conflicts
+- Serial execution when parallel is genuinely safe
 - Retrying without new context from failure
 </anti_patterns>
 

@@ -163,3 +163,292 @@ jailbreak success climbs from 4.3% baseline to 78.5% in multi-turn scenarios.
 - Invariants in kernel.md: no hardcoded secrets, no irreversible operations
   without confirmation.
 - tearitapart: security review is a dedicated phase in architecture assessment.
+
+---
+
+## Code Patterns: Secrets Management
+
+```typescript
+// BAD: Hardcoded secrets
+const apiKey = "sk-proj-xxxxx"  // NEVER
+
+// GOOD: Environment variables
+const apiKey = process.env.OPENAI_API_KEY
+if (!apiKey) throw new Error('OPENAI_API_KEY not configured')
+```
+
+Checklist before commit:
+- [ ] No API keys in code
+- [ ] No passwords in code
+- [ ] No connection strings with credentials
+- [ ] .env files in .gitignore
+- [ ] Secrets in environment variables or vault
+
+---
+
+## Code Patterns: Input Validation
+
+```typescript
+import { z } from 'zod'
+
+const CreateUserSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(100),
+  age: z.number().int().min(0).max(150)
+})
+
+export async function createUser(input: unknown) {
+  const validated = CreateUserSchema.parse(input)
+  return await db.users.create(validated)
+}
+```
+
+```typescript
+// File upload validation
+function validateFileUpload(file: File) {
+  const maxSize = 5 * 1024 * 1024  // 5MB
+  if (file.size > maxSize) throw new Error('File too large')
+
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif']
+  if (!allowedTypes.includes(file.type)) throw new Error('Invalid file type')
+
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif']
+  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0]
+  if (!ext || !allowedExtensions.includes(ext)) throw new Error('Invalid extension')
+}
+```
+
+---
+
+## Code Patterns: SQL Injection
+
+```typescript
+// BAD: String concatenation
+const query = `SELECT * FROM users WHERE email = '${userEmail}'`  // NEVER
+
+// GOOD: Parameterized queries
+const { data } = await supabase
+  .from('users')
+  .select('*')
+  .eq('email', userEmail)
+
+// Or with raw SQL
+await db.query('SELECT * FROM users WHERE email = $1', [userEmail])
+```
+
+---
+
+## Code Patterns: XSS Prevention
+
+```typescript
+import DOMPurify from 'isomorphic-dompurify'
+
+// ALWAYS sanitize user-provided HTML
+function renderUserContent(html: string) {
+  const clean = DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p'],
+    ALLOWED_ATTR: []
+  })
+  return <div dangerouslySetInnerHTML={{ __html: clean }} />
+}
+```
+
+```typescript
+// Content Security Policy
+const securityHeaders = [
+  {
+    key: 'Content-Security-Policy',
+    value: `
+      default-src 'self';
+      script-src 'self' 'unsafe-eval' 'unsafe-inline';
+      style-src 'self' 'unsafe-inline';
+      img-src 'self' data: https:;
+      connect-src 'self' https://api.example.com;
+    `.replace(/\s{2,}/g, ' ').trim()
+  }
+]
+```
+
+---
+
+## Code Patterns: Authentication
+
+```typescript
+// BAD: localStorage (vulnerable to XSS)
+localStorage.setItem('token', token)  // NEVER
+
+// GOOD: httpOnly cookies
+res.setHeader('Set-Cookie',
+  `token=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=3600`)
+```
+
+```typescript
+// Authorization check
+export async function deleteUser(userId: string, requesterId: string) {
+  const requester = await db.users.findUnique({ where: { id: requesterId } })
+
+  if (requester.role !== 'admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+  }
+
+  await db.users.delete({ where: { id: userId } })
+}
+```
+
+```sql
+-- Row Level Security (Supabase)
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users view own data"
+  ON users FOR SELECT
+  USING (auth.uid() = id);
+```
+
+---
+
+## Code Patterns: CSRF Protection
+
+```typescript
+import { csrf } from '@/lib/csrf'
+
+export async function POST(request: Request) {
+  const token = request.headers.get('X-CSRF-Token')
+
+  if (!csrf.verify(token)) {
+    return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 })
+  }
+
+  // Process request
+}
+```
+
+```typescript
+// SameSite cookies prevent CSRF
+res.setHeader('Set-Cookie',
+  `session=${sessionId}; HttpOnly; Secure; SameSite=Strict`)
+```
+
+---
+
+## Code Patterns: Rate Limiting
+
+```typescript
+import rateLimit from 'express-rate-limit'
+
+// General API rate limit
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,  // 15 minutes
+  max: 100,                   // 100 requests per window
+  message: 'Too many requests'
+})
+
+// Stricter limit for expensive operations
+const searchLimiter = rateLimit({
+  windowMs: 60 * 1000,  // 1 minute
+  max: 10,              // 10 requests per minute
+})
+
+app.use('/api/', limiter)
+app.use('/api/search', searchLimiter)
+```
+
+---
+
+## Code Patterns: Error Handling
+
+```typescript
+// BAD: Exposing internals
+catch (error) {
+  return NextResponse.json({
+    error: error.message,
+    stack: error.stack  // NEVER
+  }, { status: 500 })
+}
+
+// GOOD: Generic messages
+catch (error) {
+  console.error('Internal error:', error)  // Log for debugging
+  return NextResponse.json({
+    error: 'An error occurred. Please try again.'
+  }, { status: 500 })
+}
+```
+
+```typescript
+// BAD: Logging sensitive data
+console.log('User login:', { email, password })  // NEVER
+
+// GOOD: Redact sensitive fields
+console.log('User login:', { email, userId })
+```
+
+---
+
+## Supply Chain Security (Updated 2026-03-30)
+<!-- Sources: Claude Code best practices, OWASP supply chain guidance -->
+
+AI-generated code introduces supply chain risks beyond traditional OWASP top 10:
+
+- **Hallucinated packages**: AI may reference packages that don't exist or have been
+  name-squatted. Always verify package existence and download counts before installing.
+- **Version pinning**: Pin exact versions in package.json/requirements.txt for production.
+  Floating versions allow silent breaking changes on redeploy.
+- **Dependency audit cadence**: Run `npm audit` / `pip audit` / `cargo audit` on every PR,
+  not just on release. CI gate should block merge on HIGH/CRITICAL findings.
+- **Lockfile integrity**: Commit lockfiles. Verify lockfile wasn't modified unexpectedly
+  before merging PRs (lockfile tampering is a supply chain attack vector).
+
+---
+
+## Prompt Injection Patterns (Updated 2026-03-30)
+<!-- Sources: Anthropic prompt engineering guide, agentic security research -->
+
+When building AI-integrated features, prevent prompt injection:
+
+- **Untrusted content isolation**: Never interpolate user-provided text directly into
+  system prompts. Use structured data formats (JSON tool calls) instead of free-text.
+- **Output validation**: Treat LLM output as untrusted input. Validate and sanitize before
+  rendering or executing.
+- **Capability scoping**: AI agents should have only the permissions needed for their task.
+  An agent that reads files shouldn't be able to write to disk unless explicitly required.
+- **Indirect injection**: User-provided data can contain injections that activate when
+  processed by an AI (e.g., "Ignore previous instructions and..."). Sanitize on ingestion,
+  not just on display.
+
+---
+
+## Cautionary Pattern Library (Updated 2026-04-29)
+<!-- Sources: https://javaworldmag.com/evolving-code-reviews-with-ai-in-2026/, https://codeintelligently.com/blog/ai-code-quality-guide-2026 -->
+
+AI code reviewers miss security issues that require system context humans possess.
+Maintain a living doc at `_meta/security/cautionary-patterns.md` capturing:
+- AI hallucinations that produced plausible but insecure code (non-existent APIs called, wrong auth flows)
+- Patterns where AI bypassed validation "for simplicity" that later became vulnerabilities
+- Successful security prompts that caught real issues (promote to skills)
+
+Review this doc before any security-sensitive implementation. Institutional memory beats repeated audits.
+
+---
+
+## Agentic Security Scanning (Updated 2026-05-12)
+<!-- Source: https://www.coderabbit.ai/blog/claude-opus-4-7-for-ai-code-review -->
+
+**In-agent dependency scanning**: Use Snyk MCP (or equivalent) to run vulnerability checks inside the agent rather than as a separate CI step. Agent sees results inline, can fix issues before committing. Install once, invoke via MCP tool calls.
+
+**Tool count limit**: Give each security-review agent ≤5 tools. Each tool adds context overhead; beyond 5, agents lose focus and tool selection degrades. For security review: Read + Grep + Bash (run audit) + one MCP scanner. That's it.
+
+**Agent permission audit**: Before spawning any agent that touches auth, payments, or PII, explicitly list its allowed tools and file scope in the contract. An agent scoped to read `src/api/` should never touch `src/auth/` or `.env`. Least-privilege applies to agents, not just users.
+
+---
+
+## Risk-Based Review Configuration (Updated 2026-05-17)
+<!-- Sources: https://brightsec.com/blog/ai-code-review-best-practices-2-0-2026-toolchain/, https://www.kluster.ai/blog/best-code-review-practices -->
+
+Configure AI code review tools with risk-based rules — not blanket "review everything" settings. Default-enable scanning for:
+- Deleted input validations (highest risk: silent regression)
+- Auth flow changes (any modification to authentication/authorization logic)
+- Query changes touching user-scoped data (RLS bypass risk)
+- SQLi / XSS / unsafe API patterns
+- Functions exceeding complexity threshold (complexity correlates with audit misses)
+
+Turn off style and formatting rules in security scanning — noise drowns signal. Security reviewers should see zero false-positive noise to avoid alert fatigue.

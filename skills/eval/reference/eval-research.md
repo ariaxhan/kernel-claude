@@ -244,6 +244,52 @@ jobs:
           FAIL_ON_REGRESSION: true
 ```
 
+## Eval Type Templates (moved from SKILL.md 2026-05-28)
+
+### Capability Eval Format
+```markdown
+[CAPABILITY EVAL: semantic-search]
+Task: Search markets using natural language
+Success Criteria:
+  - [ ] Returns relevant results for query
+  - [ ] Handles empty query gracefully
+  - [ ] Falls back when vector DB unavailable
+Expected: Top 5 results match query intent
+```
+
+### Regression Eval Format
+```markdown
+[REGRESSION EVAL: auth-flow]
+Baseline: commit abc123
+Tests:
+  - login-with-valid-creds: PASS
+  - login-with-invalid-creds: PASS
+  - session-persistence: PASS
+Result: 3/3 passed (unchanged)
+```
+
+### Eval Report Format
+```markdown
+EVAL REPORT: feature-xyz
+========================
+Capability Evals:
+  create-user:     PASS (pass@1)
+  validate-email:  PASS (pass@2)
+  hash-password:   PASS (pass@1)
+  Overall:         3/3
+
+Regression Evals:
+  login-flow:      PASS
+  session-mgmt:    PASS
+  Overall:         2/2
+
+Metrics:
+  pass@1: 67% (2/3)
+  pass@3: 100% (3/3)
+
+Status: READY FOR REVIEW
+```
+
 ## Resources
 
 - Anthropic, "Evaluating Language Models"

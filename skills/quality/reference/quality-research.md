@@ -134,3 +134,45 @@ fix:
 **Why:** Time saved generating < time lost reviewing, debugging, fixing.
 
 **Fix:** 50-70% planning, 30-50% coding. Quality gates before review.
+
+---
+
+## R-Factor: Measurement Definitions
+
+Per-component measurement for the composite quality score:
+
+```
+test_pass_rate:      passing tests / total tests
+acceptance_rate:     acceptance criteria met / total criteria
+scope_accuracy:      files in contract / files actually changed (1.0 = perfect scope)
+security_clean_rate: 1.0 if no security findings, 0.0 otherwise
+budget_compliance:   1.0 if within budget, decreases proportionally over budget
+first_try_rate:      1.0 if merged without revision, decreases per revision round
+```
+
+### Usage integration
+
+- Validator reports R-factor in verdict
+- /kernel:forge uses R-factor in quench phase (>= 0.8 = survived)
+- /kernel:metrics displays R-factor trend
+- agentdb verdict stores R-factor in evidence JSON
+
+---
+
+## ADSR: Baselines and Integration
+
+### Baselines (computed from AgentDB history)
+
+```
+tokens_per_tier:     avg from agentdb execution_traces
+files_per_contract:  avg from agentdb contracts
+duration_per_task:   avg from agentdb events
+```
+
+Require at least 10 historical data points before enforcing thresholds.
+
+### Integration points
+
+- validator checks baselines during quench phase
+- forge loop checks between iterations
+- orchestrator checks after each agent completes

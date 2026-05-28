@@ -173,3 +173,171 @@ understand what you're testing.
   (65% vs lower). Missing context is the root cause; hallucinations are symptom.
 - **Self-healing tests**: 95% maintenance reduction claimed, but caution:
   may mask genuine product bugs. Use with transparent logging.
+
+---
+
+## Naming Convention — Extended (from SKILL.md 2026-04-27)
+
+Source: https://medium.com/ngconf/create-reliable-unit-tests-with-claude-code-9147d050d557
+
+BDD format: GIVEN/WHEN/SHOULD. Reads as specification, not code description.
+
+```javascript
+// POOR: describes implementation
+test('validateEmail regex check')
+
+// GOOD: describes behavior
+test('GIVEN an email without domain WHEN validated SHOULD return false')
+test('GIVEN a valid email WHEN validated SHOULD return true')
+```
+
+If a test name can't be written in GIVEN/WHEN/SHOULD form, the test is ambiguous.
+`describe()` should be the subject; `it()`/`test()` should be the scenario.
+
+**"Don't modify the tests" instruction**: When asking Claude to fix failing tests, include
+"Do not modify the tests — fix the implementation to pass them." Without this, Claude takes
+the fastest path to green: weakening assertions or skipping edge cases rather than fixing the bug.
+
+---
+
+## Behavior vs. Implementation — Code Examples (from SKILL.md 2026-04-23)
+
+Source: https://code.claude.com/docs/en/best-practices, https://www.tech-reader.blog/2026/04/the-secret-life-of-claude-code-testing.html
+
+```javascript
+// POOR: Tests implementation (breaks on refactor)
+test('validateEmail uses regex pattern', () => {
+  expect(validateEmail).toHaveBeenCalledWith(expect.stringMatching(/\w+@\w+/));
+});
+
+// GOOD: Tests behavior (survives refactor)
+test('validateEmail rejects invalid formats', () => {
+  expect(validateEmail('user@.com')).toBe(false);
+  expect(validateEmail('user@example.com')).toBe(true);
+  expect(validateEmail('invalid')).toBe(false);
+});
+```
+
+---
+
+## Edge Case Discovery — Prompting Patterns (from SKILL.md 2026-04-23)
+
+Source: https://code.claude.com/docs/en/best-practices (QA automation section)
+
+Claude's testing strength is edge case discovery, not boilerplate unit tests.
+Prompt explicitly for edge cases rather than asking for generic coverage.
+
+Effective prompt structure:
+1. "What edge cases exist for [function]?"
+2. Show 2–3 expected edge cases to anchor thinking.
+3. "What boundary conditions or interaction effects might break this?"
+4. "Generate N test cases covering these scenarios."
+
+Example for validateEmail:
+```
+"Write tests covering:
+- Invalid formats (missing @, missing domain, invalid chars)
+- Boundary cases (empty string, very long email, null/undefined)
+- Interaction effects (uppercase, spaces, international domains)
+- Security cases (SQL injection payloads, newline injection)
+Generate 15 cases that would catch a developer who forgot one category."
+```
+
+---
+
+## Negative Case Testing (from SKILL.md 2026-05-06)
+
+Source: https://medium.com/@karkeralathesh/the-complete-guide-to-testing-claude-code-skills-with-the-skill-creator-1ae3821bd7b8
+
+Test what code should NOT do. In AI-assisted development, positive-case tests dominate and
+negative-case behavior is routinely untested.
+
+Negative cases to add to every test suite:
+- Rejection of out-of-scope inputs (tool/function declines gracefully, not crashes)
+- Invalid type/shape returns an error, not a corrupted result
+- Empty/null/undefined handled at boundary, not propagated
+- Security inputs (injection payloads, oversized strings) rejected at entry, not silently processed
+
+**The rejection quality test**: A function that correctly declines invalid input is more
+production-grade than one that accepts everything. Test this explicitly.
+
+---
+
+## Browser Verification (from SKILL.md 2026-05-12)
+
+Source: https://code.claude.com/docs/en/best-practices, https://testdino.com/blog/claude-code-with-playwright/
+
+Use browser automation (Playwright + MCP browser tools) to verify UI features before declaring done.
+Claude runs the browser, sees console errors, iterates until the feature works end-to-end.
+Not a substitute for unit tests — complements them by catching integration failures unit tests can't.
+
+Effective sequence: unit tests (fast feedback) → integration tests (component boundaries) →
+browser automation (real user path). Browser tests are slow — reserve for critical user-visible flows only.
+
+---
+
+## Native Code Review Stats — Anthropic (from SKILL.md 2026-05-14)
+
+Source: https://www.infoq.com/news/2026/04/claude-code-review/, https://www.coderabbit.ai/blog/claude-opus-4-7-for-ai-code-review
+
+Anthropic's Code Review feature (launched March 2026) integrates with GitHub and leaves inline
+comments automatically on PRs.
+
+Production stats:
+- Large PRs (>1000 lines): 84% get findings, avg 7.5 issues flagged
+- Small PRs (<50 lines): 31% get findings, avg 0.5 issues
+- Average review time: ~20 minutes. Average cost: $15–25/review (token-based)
+- Focus: logical errors over style. Opus 4.7 has stronger cross-file reasoning for multi-module issues.
+
+Best ROI: large PRs where human reviewers are most likely to miss cross-file interactions.
+Use small PRs strategically to reduce both review time and cost.
+
+---
+
+## Golden Ratio Principle — Coverage Diminishing Returns (from SKILL.md 2026-03-30)
+
+Source: https://code.claude.com/docs/en/best-practices, AI code review research
+
+Test coverage follows diminishing returns past ~80%. Beyond that, invest in:
+- Mutation testing (verify your tests actually catch real mutations)
+- Property-based testing for complex logic (fast-check, hypothesis)
+- Contract tests at service boundaries (Pact, schema mocks)
+
+Coverage % is a vanity metric without mutation score.
+
+---
+
+## Pre-Generation Test Descriptions (from SKILL.md 2026-04-10)
+
+Source: https://code.claude.com/docs/en/best-practices, https://utofa.com/blogs/ai-code-review-2026-best-practices/
+
+When asking Claude to generate code, provide at minimum the test case descriptions (inputs and
+expected outputs) BEFORE requesting implementation. This forces behavioral specification first
+and prevents tautological tests that just validate what the code does rather than what it should do.
+
+Example:
+> "Write validateEmail. Test cases: user@example.com → true, invalid → false, user@.com → false.
+> Write the tests first, then implement the function to pass them."
+
+**40-70% of production code is now AI-generated** (industry estimate, 2026). The proportion
+of tautological tests in codebases is rising proportionally. Manual review of AI-generated
+tests for behavioral correctness is non-optional.
+
+---
+
+## Intent Drift — Verification Checklist (from SKILL.md 2026-05-17)
+
+Source: https://www.kluster.ai/blog/best-code-review-practices, https://brightsec.com/blog/ai-code-review-best-practices-2-0-2026-toolchain/
+
+In 2026 codebases where 40–70% of production code is AI-generated, the failure mode is
+**intent drift**: AI correctly implements what it inferred from the prompt, not what the
+developer actually needed.
+
+When reviewing AI-generated tests or code, verify against the ORIGINAL intent:
+- What prompt or spec drove this generation?
+- Does the output match the business requirement, not just the code structure?
+- Are edge cases from the spec covered, or only edges visible in the code?
+
+Practical check: read the generation prompt (or ask the author for it), then read the output.
+Discrepancies between intent and output are specification bugs, not implementation bugs —
+fix the spec before the test.

@@ -352,3 +352,137 @@ feature work. Key integration points:
 - tearitapart: for tier 2+, the plan is reviewed via tearitapart
   BEFORE the surgeon starts. Build methodology feeds plan creation;
   tearitapart validates it.
+
+---
+
+## Context Engineering
+
+Updated 2026-04-25 / 2026-05-04.
+
+Context payload = system prompt + tools + examples + conversation history + available files. Each element is a lever. Optimize all of them.
+
+**Long context query position (20k+ tokens)**: Place query/instructions at END, after all document content. Anthropic data: improves response quality up to 30%.
+
+```xml
+<documents>
+  <document index="1"><document_content>{{CONTENT}}</document_content></document>
+  ...
+</documents>
+[Your query and instructions HERE — after all documents, not before]
+```
+
+**Explore-Plan-Act loop** (three permission-escalating phases):
+1. **Explore** (read-only): Find relevant files, understand architecture, map dependencies. No writes.
+2. **Plan**: Propose strategy. Human reviews and adjusts before implementation begins.
+3. **Act** (full tools): Implement plan, run tests, iterate on failures.
+
+Unguided attempts (Act only, skip Explore+Plan) succeed ~33% of the time.
+Structured Explore-Plan-Act: ~80%+. The phases aren't ceremony — they're the multiplier.
+
+**CLAUDE.md hygiene**: Reference separate files for large domain docs. Inlining >1KB into CLAUDE.md consumes token budget before work starts.
+
+**Context7 for versioned library docs**: Use the Context7 MCP plugin instead of web-searching documentation. Context7 indexes library docs at a precise version — no hallucinated APIs, no stale docs from wrong versions.
+
+---
+
+## Agentic Build Patterns
+
+Updated 2026-04-27 / 2026-05-12.
+
+**Writer/Reviewer session split**: Implementation session and review session use separate contexts to avoid confirmation bias. Session A implements. Session B opens a fresh context, reads only the diff and spec, reviews without memory of implementation choices.
+
+**Worktree isolation for parallel features**: Use `claude --worktree <branch-name>` to create an isolated branch + context per feature. Multiple worktrees run in parallel without file conflicts. Preferred over spawning agents on the same working tree when features touch overlapping files.
+
+**Subagent definition files**: Define reusable subagents in `.claude/agents/<name>.md` with their own model, tools, and system prompt. Each agent gets isolated context. Use for: security review, test generation, research tasks that would pollute main session.
+
+```markdown
+# .claude/agents/security-reviewer.md
+---
+name: security-reviewer
+description: Reviews code for security vulnerabilities
+tools: Read, Grep, Glob, Bash
+model: opus
+---
+Review for SQL injection, XSS, auth flaws, secrets, insecure data handling.
+Provide line references and remediation steps.
+```
+
+**Subagent scoping**: When spawning agents for implementation, scope each agent to a single file or function boundary. Cross-file agents produce merge conflicts and silent overrides.
+
+**Fan-out batch pattern**: For large-scale migrations (2,000+ files), distribute work across parallel non-interactive invocations. Test on 2-3 files first, then scale.
+
+```bash
+for file in $(cat files.txt); do
+  claude -p "Migrate $file from React to Vue. Return OK or FAIL." \
+    --allowedTools "Edit,Bash(git commit *)"
+done
+```
+
+**Prefer Read before Write**: Always read the target file before editing it, even when the task is purely additive. Prevents format drift.
+
+**Minimal footprint**: Request only the permissions and file access actually needed. Touch minimum viable file set. Unanticipated side effects compound across agents.
+
+**Parallel multi-aspect review**: Spin up 5–9 parallel subagents, each scoped to a single concern (security, performance, edge cases, concurrency, business logic, API contracts). Aggregated feedback outperforms a single model reviewing everything.
+
+**Outcomes rubric + grader pattern**: Before implementation, write a rubric of success criteria. After implementation, spawn a separate grader agent that evaluates output against the rubric in its own context — no memory of how the code was written. Grader failure returns specific issues; agent retakes a pass.
+
+**Three-part prompt structure for agents**: Identity (who the agent is + specialty) → Rules (constraints + behaviors, XML-tagged) → Output Format (structured expectations). XML tags create semantic boundaries Claude honors better than markdown headings.
+
+**Init script session validation**: For long-running agentic builds, write `init.sh` that runs at every session start: confirms prior work didn't break the application, verifies key invariants, resets to clean state. Prevents accumulated technical debt from silently compounding.
+
+**Interrupt-safe commits**: Commit every working state, not just at milestone boundaries. If an agent is interrupted mid-task, the last commit must be valid and buildable.
+
+**Clarify before long tasks**: For tasks estimated >5 min, surface ambiguities before starting. Mid-task clarification requests cause partial-state problems.
+
+---
+
+## Context Window Hygiene
+
+Updated 2026-04-02 / 2026-05-04.
+
+Long build sessions degrade model performance as context fills. Mitigate:
+
+- **Compact at ~70% context usage**: Use `/compact` before context degrades. Signal: responses getting shorter, earlier instructions being ignored, more mistakes per edit.
+  Use `/compact <instructions>` to control what survives. For partial compaction: `Esc+Esc` → `/rewind`, select checkpoint, choose "Summarize from here".
+- **Scope sessions by task, not by time**: One session = one feature or one bug. Use `/clear` between unrelated tasks.
+- **Delegate research to subagents**: Research subtasks consume context without adding code. Spawn a researcher agent, synthesize to a brief, start implementation session with that brief as context — not the full research.
+- **Verification criteria before coding**: State done-when criteria at session START. Claude performs dramatically better when it can run tests to verify output throughout the session.
+- **Side questions with `/btw`**: Quick questions that don't need context history. The answer appears as a dismissible overlay and never enters conversation history.
+- **Cross-context state persistence**: Write state to `_meta/context/progress.json` before context fills. Include: completed steps, current position, next action, key decisions. New context reads this first and resumes where previous left off.
+- **Two-failure reset rule**: Same mistake twice → `/clear` and restart with refined prompt that encodes lessons as constraints. A clean session with a better prompt outperforms a long session polluted with corrections.
+
+---
+
+## Velocity Calibration
+
+Updated 2026-04-04 (METR 2025 research).
+
+**The Velocity Paradox (METR 2025)**: Developers with AI assistance feel ~20% faster but measure ~19% slower.
+Root cause: shifting to ~10% planning / ~90% implementation — AI makes coding cheap, so people skip planning.
+Fix: **50-70% planning / 30-50% implementation** → 50% fewer refactors, 3x overall velocity.
+
+Invest in:
+- Goal extraction and done-when criteria BEFORE any code
+- Generating 2-3 approaches and rejecting the first one
+- Writing or specifying test cases before implementation
+
+**Verification-first multiplier**: Providing tests, screenshots, or expected outputs BEFORE asking Claude to implement changes quality dramatically. State verification criteria at session START.
+
+**Adaptive thinking (Claude 4.6)**: Claude Opus/Sonnet 4.6 uses adaptive thinking, not `budget_tokens`. When spawning agents for deep reasoning:
+- Complex architecture/multi-file: `"After reviewing tool results, reflect carefully before proceeding"`
+- Standard implementation: no special instruction needed
+- Simple edits/validation: explicitly say `"This is straightforward, implement directly"`
+
+**Effort parameter (Opus 4.7)**: Opus 4.7 uses explicit `effort` parameter, not instruction-based guidance.
+- `xhigh`: production code, architecture decisions, deep multi-file reasoning
+- `high`: test generation, code review, moderate complexity tasks
+- `medium`: standard implementation (default if unspecified)
+- `low`: validation, linting, trivial edits — model does only what's asked, no elaboration
+
+Use `effort: xhigh` when spawning surgeon agents for tier 2+ work.
+
+**Explicit scope instructions (Opus 4.7 literal following)**: Opus 4.7 interprets instructions precisely — it won't auto-generalize.
+- Wrong: "Apply this validation pattern" (applies to first occurrence only)
+- Right: "Apply this validation pattern to EVERY endpoint in /src/api/"
+
+**CLAUDE.md signal-to-noise filter**: Keep root CLAUDE.md to 50–100 lines. For each line, ask: "Would removing this cause Claude to make mistakes?" If not, cut it. Use `@import` references to `_meta/reference/` for detailed sections.

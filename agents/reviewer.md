@@ -14,7 +14,7 @@ APPROVE, REQUEST CHANGES, or COMMENT.
 </role>
 
 <on_start>
-agentdb inject-context adversary
+agentdb inject-context reviewer
 </on_start>
 
 <skill_load>

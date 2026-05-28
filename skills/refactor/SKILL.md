@@ -6,12 +6,6 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 
 <skill id="refactor">
 
-<purpose>
-Refactoring changes structure, not behavior. If behavior changes, it's not refactoring.
-Tests must pass before AND after. If tests don't exist, write them FIRST.
-The goal is clarity, not cleverness. Three similar lines beats a premature abstraction.
-</purpose>
-
 <prerequisite>
 AgentDB read-start has run. Check for prior refactor attempts on same code.
 </prerequisite>
@@ -21,34 +15,31 @@ Skill-specific: skills/refactor/reference/refactor-research.md
 General: reference/architecture-research.md
 </reference>
 
-<core_principles>
-1. TESTS FIRST: Run tests before refactoring. Green → refactor → green. Red at any point = stop.
-2. SMALL STEPS: One transformation per commit. Easier to revert, easier to review.
-3. BEHAVIOR PRESERVATION: Observable behavior unchanged. Internal structure changes only.
-4. NO FEATURE WORK: Refactoring is separate from features. Never combine in same commit.
-5. SIMPLIFY, DON'T ABSTRACT: Remove complexity before adding abstraction. Delete > refactor > add.
-</core_principles>
+<flow>
 
-<common_refactors>
-- Extract function: repeated code → named function (only if 3+ repetitions).
-- Inline: wrapper that adds nothing → remove the indirection.
-- Rename: unclear name → intention-revealing name.
-- Move: code in wrong module → move to where it belongs.
-- Simplify conditional: nested if/else → guard clauses or early return.
-- Remove dead code: unused code → delete (no "just in case").
-</common_refactors>
+1. **Baseline** — run full test suite. (gate: all tests green before touching anything)
+2. **Scope audit** — grep/glob every instance of the target symbol/pattern across the codebase. List them ALL before changing ANY.
+3. **Count files** → determine tier. 1-2 files: execute directly. 3-5 files: write one-paragraph plan. 6+ files: CONFIRM handshake.
+4. **Define success** — write down EXACTLY what changes. Anything outside that list is scope creep → separate contract.
+5. **Check coverage** — if target code has no tests: generate JiT behavioral tests FIRST (see step 6), run them green, then proceed.
+6. **JiT tests (when needed)** — ask Claude to generate behavioral tests for current code (what it *does*, not how). Run green. These are disposable; delete after if not worth keeping. (gate: JiT tests pass before refactor starts)
+7. **Execute — one transformation per commit:**
+   - Extract function: only at 3+ repetitions (Rule of Three)
+   - Inline: wrapper with exactly one call site → inline it
+   - Rename: state full scope explicitly — ALL files, imports, tests, docs (Opus follows literally; ambiguous scope = partial refactor)
+   - Move: code in wrong module → move to correct location
+   - Simplify conditional: nested if/else → guard clauses / early return
+   - Remove dead code: unused code → delete (no "just in case")
+8. **Agentic safety checks** (after each transformation):
+   - Phantom abstraction: abstraction with one call site → inline, wait for second use
+   - Comment drift: audit every comment for accuracy — stale comments worse than none
+   - Parallel agent artifacts: if multiple agents touched the file, check `git log` for overlapping changes
+   - Scope creep: diff changes against the defined list from step 4; extras → revert + new task
+9. **Verify** — run full test suite. (gate: all tests green after each commit; red = stop, revert last change)
+10. **Metrics** — measure before/after: cyclomatic complexity, function length, duplication. Successful refactor reduces complexity 15-25%. No improvement = shuffled, not simplified.
+11. **Commit** — one logical change per commit. Format: `refactor(scope): description`. File must end shorter or justify growth in commit body.
 
-<ai_code_cleanup>
-AI-generated code has specific patterns that need cleanup (GitClear 2026):
-- Code cloning: 4x more duplication. Extract shared logic.
-- Unused constructs: Imports, variables, functions never called. Delete.
-- Hardcoded debugging: console.log, print statements left behind. Remove.
-- Missing modularization: Long functions doing multiple things. Extract.
-- Copy-paste over abstraction: Duplicate blocks that should be functions.
-
-The verification bottleneck: AI generates faster than humans can review.
-Refactoring must be reviewable—small, atomic, tested.
-</ai_code_cleanup>
+</flow>
 
 <anti_patterns>
 <block id="big_bang">Large refactors in one commit. Impossible to review or revert.</block>
@@ -57,70 +48,6 @@ Refactoring must be reviewable—small, atomic, tested.
 <block id="premature_abstraction">Abstracting before you have 3 concrete examples. Wait for patterns to emerge.</block>
 <block id="refactor_while_there">"While I'm here, I'll also..." No. Separate contract.</block>
 </anti_patterns>
-
-<vibe_coding_crisis>
-From research (2026): developers accept AI output without understanding.
-60% decline in refactored code—velocity over health.
-Copy-paste has overtaken abstraction for first time.
-
-Refactoring is the antidote: systematically improve what AI generates.
-But it requires understanding the code. No understanding = no safe refactor.
-</vibe_coding_crisis>
-
-<!-- Updated 2026-03-30: AI code review best practices, Claude Code best practices -->
-<agentic_refactor_safety>
-When refactoring AI-generated code, additional risks apply:
-
-**Phantom abstraction**: AI frequently creates abstractions that look useful but are used
-in only one place. Rule: if an abstraction has exactly one call site, inline it. Wait for
-a second use case before abstracting.
-
-**Comment drift**: AI comments often describe what the code WAS doing before an edit, not
-what it does now. Audit every comment for accuracy during refactor — stale comments are
-worse than no comments.
-
-**Parallel agent conflicts**: If multiple agents touched the same file, check git log for
-overlapping changes. The "final" file may be a merge artifact, not intentional code.
-
-**Scope creep detection**: Before starting, write down EXACTLY what you're changing.
-After finishing, diff your changes against that list. Any extras are scope creep — revert
-them and open a separate task.
-
-<!-- Updated 2026-04-19: Anthropic Opus 4.7 migration guide (literal instruction following) -->
-**Explicit scope for refactor agents (Opus 4.7)**: Opus 4.7 follows instructions literally — it won't
-generalize "rename this function" to all call sites. State full scope explicitly:
-- Wrong: "Rename `getUserData` to `fetchUser`"
-- Right: "Rename `getUserData` to `fetchUser` in ALL files across the codebase, including imports, tests, and docs"
-When spawning a surgeon for a refactor, enumerate the specific files in the contract. Ambiguous scope = partial refactor.
-</agentic_refactor_safety>
-
-<!-- Updated 2026-04-25: https://www.infoq.com/news/2026/04/meta-jit-testing-ai-detection/ -->
-<jit_refactor_verification>
-When the code being refactored lacks test coverage, use JiT (Just-in-Time) testing:
-1. Before starting: ask Claude to generate behavioral tests for the current code (what it *does*, not how).
-2. Run them: they should pass (green baseline).
-3. Refactor.
-4. Run them again: must still pass.
-
-These tests are disposable — they exist only to verify behavior preservation during this refactor.
-Delete them after if they're not worth keeping. The 4x bug-detection improvement from Meta's JiT research
-applies here: generating tests at the point of change catches regressions that pre-existing suites miss.
-</jit_refactor_verification>
-
-<!-- Updated 2026-05-06: https://getdx.com/blog/enterprise-ai-refactoring-best-practices/, https://www.augmentcode.com/tools/ai-code-refactoring-tools-tactics-and-best-practices -->
-<strategic_refactoring>
-**Target high-impact components**: Teams targeting critical high-ROI components see 4x better results than comprehensive refactoring sweeps. Identify by: change frequency, bug density, review time. Start there, not at the edges.
-
-**Atomic transformations under 200 lines**: Keeping each change under 200 lines reduces code review time by 60% and lowers regression risk. Anything larger is a separate task.
-
-**Document before refactoring**: Before starting, create an architectural diagram and document any complex business logic the AI is unlikely to understand. AI frequently mishandles domain-specific constraints and niche patterns. Organizations that prepare this context see 3x faster modernization cycles.
-
-**Success metrics**: A successful refactor measurably reduces cyclomatic complexity by 15-25%. If it doesn't, the refactor didn't simplify — it shuffled. Organizations with systematic pre/post testing see 70% fewer post-deployment issues.
-
-**Embed into regular development**: Refactoring as a periodic "cleanup project" fails from adoption friction. Integrate into normal PR workflow: every merge includes a small cleanup. Don't batch technical debt.
-
-**Rollback procedure required**: Establish a clear rollback path (git SHA or stash) before every refactor. Subtle behavioral changes hide in refactored code. Never merge without the ability to undo.
-</strategic_refactoring>
 
 <on_complete>
 agentdb write-end '{"skill":"refactor","type":"<extract|inline|rename|simplify>","files_touched":<N>,"tests_status":"green","behavior_changed":false}'

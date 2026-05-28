@@ -8,7 +8,7 @@ allowed-tools: Read, Bash, Grep, Glob
 <command id="help">
 
 <purpose>
-Quick reference for KERNEL v7.6.1.
+Quick reference for KERNEL v7.13.0.
 Commands, agents, workflows, philosophy — and current plugin status.
 </purpose>
 

@@ -374,3 +374,92 @@ Refactoring in KERNEL follows the standard flow with specific rules:
 - The "almost right" defense: after any AI-assisted refactoring,
   run the full 8-pass checklist above. AI refactoring introduces
   the same defect categories as AI generation.
+
+---
+
+## Moved from SKILL.md (2026-05-28)
+
+### Core Principles (background)
+
+Refactoring changes structure, not behavior. If behavior changes, it's not refactoring.
+The goal is clarity, not cleverness. Three similar lines beats a premature abstraction.
+
+### Vibe Coding Crisis (stats)
+
+From research (2026): developers accept AI output without understanding.
+60% decline in refactored code — velocity over health.
+Copy-paste has overtaken abstraction for first time.
+
+Refactoring is the antidote: systematically improve what AI generates.
+But it requires understanding the code. No understanding = no safe refactor.
+
+### AI Code Cleanup Patterns (GitClear 2026)
+
+AI-generated code has specific patterns that need cleanup:
+- Code cloning: 4x more duplication. Extract shared logic.
+- Unused constructs: Imports, variables, functions never called. Delete.
+- Hardcoded debugging: console.log, print statements left behind. Remove.
+- Missing modularization: Long functions doing multiple things. Extract.
+- Copy-paste over abstraction: Duplicate blocks that should be functions.
+
+The verification bottleneck: AI generates faster than humans can review.
+Refactoring must be reviewable — small, atomic, tested.
+
+### Agentic Refactor Safety (background context)
+
+**Phantom abstraction**: AI frequently creates abstractions used in only one place.
+Rule: if an abstraction has exactly one call site, inline it. Wait for a second use
+case before abstracting. (Executable rule retained in SKILL.md step 8.)
+
+**Comment drift**: AI comments often describe what the code WAS doing before an edit.
+Audit every comment for accuracy during refactor — stale comments are worse than none.
+(Executable rule retained in SKILL.md step 8.)
+
+**Parallel agent conflicts**: If multiple agents touched the same file, check git log
+for overlapping changes. The "final" file may be a merge artifact, not intentional code.
+(Executable rule retained in SKILL.md step 8.)
+
+**Scope creep detection**: Before starting, write down EXACTLY what you're changing.
+After finishing, diff changes against that list. Any extras are scope creep — revert
+and open a separate task. (Executable rule retained in SKILL.md step 8.)
+
+**Explicit scope for refactor agents (Opus 4.7)**: Opus 4.7 follows instructions literally.
+- Wrong: "Rename `getUserData` to `fetchUser`"
+- Right: "Rename `getUserData` to `fetchUser` in ALL files across the codebase, including imports, tests, and docs"
+When spawning a surgeon for a refactor, enumerate the specific files in the contract.
+Ambiguous scope = partial refactor. (Executable rule retained in SKILL.md step 7.)
+
+### JiT Refactor Verification (background)
+
+From Meta's JiT research: generating tests at the point of change catches regressions
+that pre-existing suites miss — 4x bug-detection improvement. Tests generated JiT are
+disposable; they exist only to verify behavior preservation during this refactor.
+Delete them after if they're not worth keeping. Source: infoq.com/news/2026/04/meta-jit-testing-ai-detection/
+
+### Strategic Refactoring (stats and context)
+
+**Target high-impact components**: Teams targeting critical high-ROI components see 4x
+better results than comprehensive refactoring sweeps. Identify by: change frequency, bug
+density, review time.
+
+**Atomic transformations under 200 lines**: Keeping each change under 200 lines reduces
+code review time by 60% and lowers regression risk. Anything larger is a separate task.
+
+**Document before refactoring**: Before starting, create an architectural diagram and
+document any complex business logic the AI is unlikely to understand. AI frequently
+mishandles domain-specific constraints. Organizations that prepare context see 3x faster
+modernization cycles.
+
+**Success metrics**: A successful refactor measurably reduces cyclomatic complexity by
+15-25%. Organizations with systematic pre/post testing see 70% fewer post-deployment
+issues.
+
+**Embed into regular development**: Refactoring as a periodic "cleanup project" fails
+from adoption friction. Integrate into normal PR workflow: every merge includes a small
+cleanup.
+
+**Rollback procedure required**: Establish a clear rollback path (git SHA or stash)
+before every refactor. Never merge without the ability to undo.
+
+Sources: getdx.com/blog/enterprise-ai-refactoring-best-practices/,
+augmentcode.com/tools/ai-code-refactoring-tools-tactics-and-best-practices (2026-05-06)

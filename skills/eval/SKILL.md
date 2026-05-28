@@ -6,14 +6,8 @@ allowed-tools: Read, Bash, Write, Edit, Grep, Glob
 
 <skill id="eval">
 
-<purpose>
-Evals are the unit tests of AI development. Define success BEFORE implementation.
-pass@k measures reliability: did it succeed within k attempts?
-Capability evals test new abilities. Regression evals prevent breakage.
-</purpose>
-
 <prerequisite>
-AgentDB read-start has run. Check for existing eval definitions.
+AgentDB read-start has run. Check for existing eval definitions in _meta/research/.
 Understand what behavior you're evaluating before writing evals.
 </prerequisite>
 
@@ -30,69 +24,26 @@ Skill-specific: skills/eval/reference/eval-research.md
 6. FAST EVALS GET RUN: Slow evals get skipped. Keep evaluation fast.
 </core_principles>
 
+<workflow>
+1. DEFINE: Write eval criteria before implementation. (gate: criteria exist in writing before any code)
+2. IMPLEMENT: Code to pass defined evals.
+3. EVALUATE: Run evals, record pass@k. (gate: pass@3 > 90% for capability; pass^3 = 100% for regression)
+4. REPORT: Document results in eval report format. See reference for template.
+</workflow>
+
 <blind_evaluation_protocol>
-For any eval where the implementing agent would otherwise score its own output:
+Use when implementing agent would otherwise score its own output (high-stakes: security, payments, agent quality):
 
 1. Spawn `agents/blind-evaluator.md` as a fresh agent.
-2. Pass it ONLY: problem statement, rubric (3-7 criteria with PASS conditions + weights), artifact path.
+2. Pass ONLY: problem statement, rubric (3-7 criteria with PASS conditions + weights), artifact path.
 3. Do NOT pass: implementer's checkpoint, summary, commit message, prompt, or expected solution.
-4. The blind evaluator runs a contamination check first; if it sees anything from the forbidden list, it returns `INVALID` and the eval is aborted until inputs are cleaned.
-5. Confidence < 0.7 from the blind evaluator = escalate to human grader.
+4. (gate: blind evaluator runs contamination check — if forbidden inputs detected, returns INVALID; clean inputs and retry)
+5. (gate: confidence < 0.7 from blind evaluator → escalate to human grader)
 
-Use a two-phase eval protocol when feasible:
-- Run 1: implementing agent solves cold, with no eval feedback. Blind evaluator scores. This is the real number.
-- Run 2: implementing agent gets the Run 1 score + rubric breakdown, then optimizes. Useful for iteration but Run 1 is what you report externally.
+Two-phase eval protocol:
+- Run 1: implementing agent solves cold, no eval feedback. Blind evaluator scores. This is the externally-reportable number.
+- Run 2: implementing agent gets Run 1 score + rubric breakdown, then optimizes. For iteration only.
 </blind_evaluation_protocol>
-
-<eval_types>
-<!-- Capability Eval: Can it do something new? -->
-```markdown
-[CAPABILITY EVAL: semantic-search]
-Task: Search markets using natural language
-Success Criteria:
-  - [ ] Returns relevant results for query
-  - [ ] Handles empty query gracefully
-  - [ ] Falls back when vector DB unavailable
-Expected: Top 5 results match query intent
-```
-
-<!-- Regression Eval: Does existing functionality still work? -->
-```markdown
-[REGRESSION EVAL: auth-flow]
-Baseline: commit abc123
-Tests:
-  - login-with-valid-creds: PASS
-  - login-with-invalid-creds: PASS
-  - session-persistence: PASS
-Result: 3/3 passed (unchanged)
-```
-</eval_types>
-
-<grader_types>
-<!-- Code-Based Grader (preferred) -->
-```bash
-grep -q "export function handleAuth" src/auth.ts && echo "PASS" || echo "FAIL"
-npm test -- --testPathPattern="auth" && echo "PASS" || echo "FAIL"
-npm run build && echo "PASS" || echo "FAIL"
-```
-
-<!-- Model-Based Grader (open-ended outputs) -->
-```markdown
-[MODEL GRADER]
-Evaluate: Does this code solve the stated problem?
-Criteria: correctness, structure, edge case handling
-Score: 1-5
-Reasoning: [required]
-```
-
-<!-- Human Grader (security, UX) -->
-```markdown
-[HUMAN REVIEW REQUIRED]
-Change: Added payment processing
-Reason: Security-critical, requires human verification
-Risk: HIGH
-```
-</grader_types>
 
 <metrics>
 pass@k: "At least one success in k attempts"
@@ -102,37 +53,17 @@ pass@k: "At least one success in k attempts"
 pass^k: "All k trials succeed"
 - pass^3: 3 consecutive successes
 - Use for critical paths (auth, payments)
+
+See reference for calculation formula and worked examples.
 </metrics>
 
-<workflow>
-1. DEFINE: Write eval criteria before implementation
-2. IMPLEMENT: Code to pass defined evals
-3. EVALUATE: Run evals, record pass@k
-4. REPORT: Document results, identify failures
-</workflow>
+<grader_selection>
+1. Code-based (preferred): grep, test suite, build, type-check — deterministic, fast.
+2. Model-based: for open-ended outputs that can't be checked deterministically. Run multiple times, take majority.
+3. Human: required for security-sensitive changes, UX evaluation, legal/compliance.
 
-<eval_report_format>
-```markdown
-EVAL REPORT: feature-xyz
-========================
-Capability Evals:
-  create-user:     PASS (pass@1)
-  validate-email:  PASS (pass@2)
-  hash-password:   PASS (pass@1)
-  Overall:         3/3
-
-Regression Evals:
-  login-flow:      PASS
-  session-mgmt:    PASS
-  Overall:         2/2
-
-Metrics:
-  pass@1: 67% (2/3)
-  pass@3: 100% (3/3)
-
-Status: READY FOR REVIEW
-```
-</eval_report_format>
+See reference for full grader templates and examples.
+</grader_selection>
 
 <anti_patterns>
 <block id="eval_after_code">Writing evals after implementation tests existing bugs, not requirements.</block>

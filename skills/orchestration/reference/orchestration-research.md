@@ -200,3 +200,86 @@ Every design decision maps to patterns above:
 - Anti-patterns: prevent scope creep and silent failure.
 - Adversary agent: implements adversarial verification pattern.
 - Parallel orchestration: implements fan-out/fan-in with merge.
+
+---
+
+## max_budget_usd Invariant (moved from SKILL.md 2026-05-28)
+
+`max_budget_usd` is mandatory infrastructure, not optional config. Treat it like a circuit
+breaker, not a preference. One stuck retry loop at $0.40-0.60/query × hundreds of retries
+becomes a silent four-figure invoice. The cap is the only thing standing between you and that.
+
+Required for:
+- Any /kernel:forge autonomous run (heat → hammer → quench → temper → anneal loops)
+- Any multi-agent spawn (tier 2+) where total cost is unbounded by the human in the loop
+- Any "run overnight" or "let it iterate until done" pattern
+- Any agentdb antibody-search-driven loop where match counts determine spawn counts
+
+Why this is an invariant, not a guideline: cost overruns are silent until billing fires.
+There is no in-session signal that something is going wrong. The cap is the signal.
+
+---
+
+## Entropy Adaptive — Detail (moved from SKILL.md 2026-05-28)
+
+entropy signals:
+- agentdb learning count in domain (high count = low entropy)
+- test coverage for affected files (high coverage = low entropy)
+- number of recent failures in domain (high failures = high entropy)
+- file co-change complexity (many co-changes = high entropy)
+- triage agent classification (low/medium/high/epic)
+
+adaptation detail:
+  low_entropy:
+    skip: researcher, scout
+    use: surgeon directly (tier 1 behavior even for tier 2 file counts)
+    rationale: known territory, don't waste tokens on research
+
+  medium_entropy:
+    standard: researcher → surgeon → validator
+    skip: adversary (unless security-sensitive)
+    rationale: some unknowns but manageable risk
+
+  high_entropy:
+    full: researcher + scout → triage → understudier → surgeon → adversary → reviewer
+    add: coroner on failure (automatic post-mortem)
+    rationale: maximum coverage, expect failures, learn from them
+
+integration:
+- triage agent outputs entropy estimate alongside complexity
+- forge heat phase measures entropy before choosing approach count
+- ingest classify step uses entropy to decide research depth
+
+rule: entropy decreases as learnings accumulate. Reward the system for learning.
+
+---
+
+## Checkpoint Schema (moved from SKILL.md 2026-05-28)
+
+checkpoint_schema:
+  agent_id: which agent was working
+  step: last completed step number
+  state: JSON blob of current progress
+  files_modified: list of files changed so far
+  tests_passing: count of passing tests at this point
+  timestamp: when checkpoint was written
+
+integration:
+- surgeon writes checkpoint after each file modification
+- forge checks for checkpoint before each heat cycle
+- orchestrator reads checkpoint to determine resume point
+
+---
+
+## Budget Tracking Detail (moved from SKILL.md 2026-05-28)
+
+tracking:
+- agentdb emit tracks token usage per agent per session
+- orchestrator monitors cumulative cost across spawned agents
+- budget injected into agent context: "Remaining budget: ~{N} tokens"
+
+self_regulation:
+- agent sees remaining budget in injected context
+- high budget: explore multiple approaches
+- low budget: pick simplest viable approach
+- exhausted: checkpoint and report to human

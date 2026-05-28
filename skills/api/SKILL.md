@@ -21,212 +21,81 @@ Identify API versioning strategy in use (URL path, header, none).
 Skill-specific: skills/api/reference/api-research.md
 </reference>
 
-<core_principles>
-1. RESOURCES ARE NOUNS: /users, /orders, /products. Not /getUsers, /createOrder.
-2. HTTP METHODS MATTER: GET reads, POST creates, PUT replaces, PATCH updates, DELETE removes.
-3. STATUS CODES ARE SEMANTIC: 200 OK, 201 Created, 400 Bad Request, 401 Unauthorized, 404 Not Found, 500 Internal Error.
-4. PAGINATION BY DEFAULT: Lists return paginated results. Cursor > offset for scale.
-5. VALIDATE BEFORE PROCESS: Schema validation (Zod, Pydantic) on all inputs.
-</core_principles>
+<methodology>
 
-<url_structure>
-```
-# Resource-based URLs
-GET    /api/v1/users              # List
-GET    /api/v1/users/:id          # Get one
-POST   /api/v1/users              # Create
-PUT    /api/v1/users/:id          # Replace
-PATCH  /api/v1/users/:id          # Update
-DELETE /api/v1/users/:id          # Delete
+1. **RESOURCE NAMING**
+   - URLs are nouns, plural, kebab-case: `/api/v1/users`, `/api/v1/team-members`
+   - HTTP methods are the verbs: GET/POST/PUT/PATCH/DELETE
+   - Sub-resources for relationships: `/api/v1/users/:id/orders`
+   - Actions (sparingly): `POST /api/v1/orders/:id/cancel`
+   - (gate: no verb in URL path, no singular resource names, no snake_case in URL)
 
-# Sub-resources for relationships
-GET    /api/v1/users/:id/orders   # User's orders
-POST   /api/v1/users/:id/orders   # Create order for user
+2. **STATUS CODES** — use semantically, never 200 for errors
+   ```
+   200 OK · 201 Created (+ Location header) · 204 No Content
+   400 Bad Request · 401 Unauthorized · 403 Forbidden · 404 Not Found
+   409 Conflict · 422 Unprocessable Entity · 429 Too Many Requests
+   500 Internal Server Error · 502 Bad Gateway · 503 Service Unavailable (+ Retry-After)
+   ```
+   (gate: POST returns 201, DELETE returns 204, errors never return 200)
 
-# Actions (use sparingly)
-POST   /api/v1/orders/:id/cancel  # Verb for non-CRUD action
-POST   /api/v1/auth/login         # Auth endpoints
-```
+3. **VALIDATE ALL INPUT** before any processing
+   - Schema validation with Zod (TS) or Pydantic (Python) on every endpoint
+   - Return 422 with structured field errors on validation failure
+   - (gate: no endpoint processes input without schema.safeParse / model.validate)
 
-```
-# GOOD: kebab-case, plural, no verbs
-/api/v1/team-members
-/api/v1/orders?status=active
+4. **RESPONSE SHAPE** — consistent envelope
+   - Single resource: `{ "data": { ... } }`
+   - Collection: `{ "data": [...], "meta": { total, page, per_page }, "links": { self, next, last } }`
+   - Error: `{ "error": { "code": "snake_case_code", "message": "...", "details": [...] } }`
+   - (gate: all responses use envelope; no bare objects; error.code is machine-readable)
 
-# BAD: verbs, singular, snake_case in URL
-/api/v1/getUser
-/api/v1/user
-/api/v1/team_members
-```
-</url_structure>
+5. **PAGINATION** — mandatory for all list endpoints
+   - Cursor (`?cursor=...&limit=20`): use for feeds, infinite scroll, >10K rows
+   - Offset (`?page=N&per_page=20`): use for admin dashboards, search with page jumps
+   - Return `next_cursor` as opaque string — agents must not compute it from math
+   - (gate: no list endpoint returns unbounded results)
 
-<status_codes>
-```
-# Success
-200 OK                    - GET, PUT, PATCH with response body
-201 Created               - POST (include Location header)
-204 No Content            - DELETE, PUT without response body
+6. **VERSIONING**
+   - URL path versioning: `/api/v1/`, `/api/v2/` (recommended)
+   - Max 2 active versions; add `Sunset` header before removal
+   - Non-breaking (no new version): add fields, add optional params, add endpoints
+   - Breaking (new version required): remove/rename fields, change types, change URL structure
+   - (gate: breaking change without version bump = blocked)
 
-# Client Errors
-400 Bad Request           - Malformed JSON, validation failure
-401 Unauthorized          - Missing or invalid auth token
-403 Forbidden             - Authenticated but not authorized
-404 Not Found             - Resource doesn't exist
-409 Conflict              - Duplicate entry, state conflict
-422 Unprocessable Entity  - Valid JSON but semantically invalid
-429 Too Many Requests     - Rate limit exceeded
+7. **RATE LIMITING** — expose via headers on every response
+   ```
+   X-RateLimit-Limit: 100
+   X-RateLimit-Remaining: 95
+   X-RateLimit-Reset: <unix-timestamp>
+   Retry-After: 60   # on 429 only
+   ```
+   (gate: 429 response always includes Retry-After)
 
-# Server Errors
-500 Internal Server Error - Unexpected failure (never expose details)
-502 Bad Gateway           - Upstream service failed
-503 Service Unavailable   - Overloaded, include Retry-After
-```
-</status_codes>
+8. **IDEMPOTENCY** — mandatory for state-changing ops in distributed/agentic contexts
+   - Accept `Idempotency-Key` header on POST/PATCH
+   - Cache result keyed by `idem:<key>` with 24h TTL; return cached on repeat
+   - Required for: payments, orders, bulk imports, any agent-called endpoint
+   - (gate: agent-facing POST endpoints either are idempotent by design OR support Idempotency-Key)
 
-<response_format>
-<!-- Success -->
-```json
-{
-  "data": {
-    "id": "abc-123",
-    "email": "user@example.com",
-    "name": "Alice"
-  }
-}
-```
+9. **HEALTH ENDPOINTS**
+   ```
+   GET /health          # Liveness: 200 if process alive
+   GET /health/ready    # Readiness: 200 if all dependencies up
+   GET /health/startup  # Startup: 200 once init complete
+   ```
+   - Response: `{ "status": "ok|degraded", "version": "...", "dependencies": { "db": "ok" } }`
+   - 503 if critical dependency down; 200 + "degraded" if non-critical
+   - (gate: every new service exposes /health and /health/ready)
 
-<!-- Collection with pagination -->
-```json
-{
-  "data": [
-    { "id": "abc-123", "name": "Alice" },
-    { "id": "def-456", "name": "Bob" }
-  ],
-  "meta": {
-    "total": 142,
-    "page": 1,
-    "per_page": 20,
-    "total_pages": 8
-  },
-  "links": {
-    "self": "/api/v1/users?page=1",
-    "next": "/api/v1/users?page=2",
-    "last": "/api/v1/users?page=8"
-  }
-}
-```
+10. **AGENTIC CLIENT DESIGN** — when API is called by AI agents
+    - Every state-changing endpoint: idempotent OR requires `Idempotency-Key` (document which)
+    - Distinct error codes per failure mode — agents parse codes to decide retry vs abort vs escalate
+    - Batch endpoints for high-frequency reads: `GET /api/v1/users/batch?ids=a,b,c`
+    - Return `next_cursor` as direct string, never derivable by offset math
+    - (gate: agent-facing APIs documented with retry-safety posture per endpoint)
 
-<!-- Error -->
-```json
-{
-  "error": {
-    "code": "validation_error",
-    "message": "Request validation failed",
-    "details": [
-      { "field": "email", "message": "Must be valid email", "code": "invalid_format" }
-    ]
-  }
-}
-```
-</response_format>
-
-<pagination>
-<!-- Offset-based (simple, small datasets) -->
-```
-GET /api/v1/users?page=2&per_page=20
-
-SELECT * FROM users ORDER BY created_at DESC LIMIT 20 OFFSET 20;
-```
-
-<!-- Cursor-based (scalable, large datasets) -->
-```
-GET /api/v1/users?cursor=eyJpZCI6MTIzfQ&limit=20
-
-SELECT * FROM users WHERE id > :cursor_id ORDER BY id LIMIT 21;
-```
-
-Use cursor for: infinite scroll, feeds, >10K rows.
-Use offset for: admin dashboards, search results with page numbers.
-</pagination>
-
-<implementation>
-```typescript
-import { z } from "zod"
-import { NextRequest, NextResponse } from "next/server"
-
-const createUserSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(1).max(100),
-})
-
-export async function POST(req: NextRequest) {
-  const body = await req.json()
-  const parsed = createUserSchema.safeParse(body)
-
-  if (!parsed.success) {
-    return NextResponse.json({
-      error: {
-        code: "validation_error",
-        message: "Request validation failed",
-        details: parsed.error.issues.map(i => ({
-          field: i.path.join("."),
-          message: i.message,
-          code: i.code,
-        })),
-      },
-    }, { status: 422 })
-  }
-
-  const user = await createUser(parsed.data)
-
-  return NextResponse.json(
-    { data: user },
-    {
-      status: 201,
-      headers: { Location: `/api/v1/users/${user.id}` },
-    },
-  )
-}
-```
-</implementation>
-
-<versioning>
-```
-# URL path versioning (recommended)
-/api/v1/users
-/api/v2/users
-
-# Rules
-1. Start with /api/v1/ - don't version until needed
-2. Max 2 active versions (current + previous)
-3. Non-breaking changes don't need new version:
-   - Adding new response fields
-   - Adding optional query params
-   - Adding new endpoints
-4. Breaking changes require new version:
-   - Removing/renaming fields
-   - Changing field types
-   - Changing URL structure
-```
-</versioning>
-
-<rate_limiting>
-```
-HTTP/1.1 200 OK
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1640000000
-
-HTTP/1.1 429 Too Many Requests
-Retry-After: 60
-{
-  "error": {
-    "code": "rate_limit_exceeded",
-    "message": "Rate limit exceeded. Try again in 60 seconds."
-  }
-}
-```
-</rate_limiting>
+</methodology>
 
 <anti_patterns>
 <block id="verbs_in_urls">/getUsers, /createOrder. Use HTTP methods for actions.</block>
@@ -235,86 +104,6 @@ Retry-After: 60
 <block id="leaking_details">Stack traces in error responses. Generic messages for users.</block>
 <block id="no_pagination">Returning all records. Pagination is mandatory for lists.</block>
 </anti_patterns>
-
-<!-- Updated 2026-03-30: Claude Code best practices, REST API 2026 patterns -->
-<idempotency>
-Idempotency is mandatory for state-changing operations in distributed and agentic contexts:
-
-```typescript
-// POST with idempotency key prevents duplicate operations
-export async function POST(req: NextRequest) {
-  const idempotencyKey = req.headers.get('Idempotency-Key')
-
-  if (idempotencyKey) {
-    const existing = await cache.get(`idem:${idempotencyKey}`)
-    if (existing) return NextResponse.json(existing, { status: 200 })
-  }
-
-  const result = await processRequest(req)
-
-  if (idempotencyKey) {
-    await cache.set(`idem:${idempotencyKey}`, result, { ttl: 86400 })
-  }
-
-  return NextResponse.json(result, { status: 201 })
-}
-```
-
-Idempotency keys are especially important for:
-- Payment and order endpoints (AI agent retries on timeout)
-- Bulk import operations
-- Any endpoint an agent might call in a retry loop
-</idempotency>
-
-<health_and_observability>
-Every API should expose health and observability endpoints:
-
-```
-GET /health          # Liveness: returns 200 if process is alive
-GET /health/ready    # Readiness: returns 200 if all dependencies are up
-GET /health/startup  # Startup probe: returns 200 once initialization complete
-```
-
-Health response format:
-```json
-{
-  "status": "ok",
-  "version": "1.2.3",
-  "dependencies": {
-    "database": "ok",
-    "cache": "ok",
-    "queue": "degraded"
-  }
-}
-```
-
-503 if any critical dependency is down. 200 with "degraded" if non-critical.
-</health_and_observability>
-
-<!-- Updated 2026-04-27: https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents, https://code.claude.com/docs/en/best-practices -->
-<agentic_client_design>
-When your API will be called by AI agents (not just browsers/mobile), additional design rules apply:
-
-**Retry-safe by default**: Agents retry on timeout and network error. Every state-changing endpoint
-must be idempotent OR require an Idempotency-Key header. Document which one. Agents that can't
-safely retry will corrupt state or lose operations.
-
-**Explicit error taxonomy**: Agents parse error responses to decide retry vs. abort. Use distinct
-error codes for distinct failure modes. "error: something went wrong" forces agents to guess.
-
-```json
-{ "error": { "code": "rate_limit_exceeded", "retry_after": 60 } }  // agent knows: wait 60s, retry
-{ "error": { "code": "validation_error", "field": "email" } }       // agent knows: fix input, don't retry
-{ "error": { "code": "insufficient_credits" } }                     // agent knows: abort, escalate to human
-```
-
-**Batch endpoints**: Agents calling N endpoints in a loop amplify latency. Offer bulk variants
-for high-frequency reads (GET /api/v1/users/batch?ids=a,b,c) for lists an agent might traverse.
-
-**Machine-readable pagination**: Always return `next_cursor` as a direct string, never compute
-it from `page + per_page`. Agents parsing offset arithmetic introduce off-by-one bugs.
-Cursor approach: return cursor string, agent passes it back verbatim — no math required.
-</agentic_client_design>
 
 <on_complete>
 agentdb write-end '{"skill":"api","endpoints_created":<N>,"validation":"zod|pydantic|none","pagination":"cursor|offset|none","versioning":"v1|none"}'

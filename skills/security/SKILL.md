@@ -29,217 +29,48 @@ Skill-specific: skills/security/reference/security-research.md
 5. FAIL SECURE: Errors should deny access, not grant it.
 </core_principles>
 
-<secrets_management>
-```typescript
-// BAD: Hardcoded secrets
-const apiKey = "sk-proj-xxxxx"  // NEVER
+<flow>
 
-// GOOD: Environment variables
-const apiKey = process.env.OPENAI_API_KEY
-if (!apiKey) throw new Error('OPENAI_API_KEY not configured')
-```
+  1. **Secrets check** — grep for hardcoded keys/passwords/tokens before any commit.
+     (gate: `git grep -E "(api_key|apiKey|password|secret|token)\s*=\s*['\"][^'\"]{8,}"` returns empty)
 
-Checklist before commit:
-- [ ] No API keys in code
-- [ ] No passwords in code
-- [ ] No connection strings with credentials
-- [ ] .env files in .gitignore
-- [ ] Secrets in environment variables or vault
-</secrets_management>
+  2. **Input validation** — all user input validated at API boundary with schema (Zod/Pydantic).
+     (gate: every public endpoint parses input through schema before use; see code patterns in reference)
 
-<input_validation>
-```typescript
-import { z } from 'zod'
+  3. **SQL injection** — all queries parameterized; no string concatenation with user data.
+     (gate: grep for template literal SQL with user variables returns empty)
 
-const CreateUserSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(1).max(100),
-  age: z.number().int().min(0).max(150)
-})
+  4. **XSS prevention** — user-provided HTML sanitized (DOMPurify); CSP headers configured.
+     (gate: `dangerouslySetInnerHTML` only appears with DOMPurify wrapping)
 
-export async function createUser(input: unknown) {
-  const validated = CreateUserSchema.parse(input)
-  return await db.users.create(validated)
-}
-```
+  5. **Authentication** — tokens in httpOnly cookies, not localStorage; auth checked per-request.
+     (gate: no `localStorage.setItem('token'`; every protected route has auth check)
 
-```typescript
-// File upload validation
-function validateFileUpload(file: File) {
-  const maxSize = 5 * 1024 * 1024  // 5MB
-  if (file.size > maxSize) throw new Error('File too large')
+  6. **Authorization** — role/ownership check before every sensitive operation.
+     (gate: no delete/update/admin endpoint without requester role verification)
 
-  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif']
-  if (!allowedTypes.includes(file.type)) throw new Error('Invalid file type')
+  7. **CSRF protection** — tokens on state-changing requests; SameSite=Strict on session cookies.
+     (gate: POST/PUT/DELETE endpoints verify X-CSRF-Token or use SameSite cookie)
 
-  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.gif']
-  const ext = file.name.toLowerCase().match(/\.[^.]+$/)?.[0]
-  if (!ext || !allowedExtensions.includes(ext)) throw new Error('Invalid extension')
-}
-```
-</input_validation>
+  8. **Rate limiting** — enabled on all public endpoints; stricter on expensive ops.
+     (gate: every `/api/` route has rate limit middleware)
 
-<sql_injection>
-```typescript
-// BAD: String concatenation
-const query = `SELECT * FROM users WHERE email = '${userEmail}'`  // NEVER
+  9. **Error handling** — generic messages in responses; stack traces only in server logs.
+     (gate: no `error.stack` or internal paths in HTTP response bodies)
 
-// GOOD: Parameterized queries
-const { data } = await supabase
-  .from('users')
-  .select('*')
-  .eq('email', userEmail)
+  10. **Dependency audit** — `npm audit` / `pip-audit` clean; lockfile committed.
+      (gate: audit exits 0 or all findings are acknowledged with justification)
 
-// Or with raw SQL
-await db.query('SELECT * FROM users WHERE email = $1', [userEmail])
-```
-</sql_injection>
+  11. **Supply chain** — verify package existence + download counts before installing AI-suggested packages.
+      (gate: no packages added without explicit npm/pypi verification; see supply chain patterns in reference)
 
-<xss_prevention>
-```typescript
-import DOMPurify from 'isomorphic-dompurify'
+  12. **Prompt injection** (AI-integrated features) — user text never interpolated into system prompts; LLM output validated before use.
+      (gate: no f-string/template system prompt with raw user input; see prompt injection patterns in reference)
 
-// ALWAYS sanitize user-provided HTML
-function renderUserContent(html: string) {
-  const clean = DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p'],
-    ALLOWED_ATTR: []
-  })
-  return <div dangerouslySetInnerHTML={{ __html: clean }} />
-}
-```
+  13. **Agent permissions** — every spawned agent has explicit tool allowlist + file scope; no admin-by-default.
+      (gate: spawn contract lists allowed tools ≤5; sensitive scopes named explicitly)
 
-```typescript
-// Content Security Policy
-const securityHeaders = [
-  {
-    key: 'Content-Security-Policy',
-    value: `
-      default-src 'self';
-      script-src 'self' 'unsafe-eval' 'unsafe-inline';
-      style-src 'self' 'unsafe-inline';
-      img-src 'self' data: https:;
-      connect-src 'self' https://api.example.com;
-    `.replace(/\s{2,}/g, ' ').trim()
-  }
-]
-```
-</xss_prevention>
-
-<authentication>
-```typescript
-// BAD: localStorage (vulnerable to XSS)
-localStorage.setItem('token', token)  // NEVER
-
-// GOOD: httpOnly cookies
-res.setHeader('Set-Cookie',
-  `token=${token}; HttpOnly; Secure; SameSite=Strict; Max-Age=3600`)
-```
-
-```typescript
-// Authorization check
-export async function deleteUser(userId: string, requesterId: string) {
-  const requester = await db.users.findUnique({ where: { id: requesterId } })
-
-  if (requester.role !== 'admin') {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-  }
-
-  await db.users.delete({ where: { id: userId } })
-}
-```
-
-```sql
--- Row Level Security (Supabase)
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Users view own data"
-  ON users FOR SELECT
-  USING (auth.uid() = id);
-```
-</authentication>
-
-<csrf_protection>
-```typescript
-import { csrf } from '@/lib/csrf'
-
-export async function POST(request: Request) {
-  const token = request.headers.get('X-CSRF-Token')
-
-  if (!csrf.verify(token)) {
-    return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 })
-  }
-
-  // Process request
-}
-```
-
-```typescript
-// SameSite cookies prevent CSRF
-res.setHeader('Set-Cookie',
-  `session=${sessionId}; HttpOnly; Secure; SameSite=Strict`)
-```
-</csrf_protection>
-
-<rate_limiting>
-```typescript
-import rateLimit from 'express-rate-limit'
-
-// General API rate limit
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: 100,                   // 100 requests per window
-  message: 'Too many requests'
-})
-
-// Stricter limit for expensive operations
-const searchLimiter = rateLimit({
-  windowMs: 60 * 1000,  // 1 minute
-  max: 10,              // 10 requests per minute
-})
-
-app.use('/api/', limiter)
-app.use('/api/search', searchLimiter)
-```
-</rate_limiting>
-
-<error_handling>
-```typescript
-// BAD: Exposing internals
-catch (error) {
-  return NextResponse.json({
-    error: error.message,
-    stack: error.stack  // NEVER
-  }, { status: 500 })
-}
-
-// GOOD: Generic messages
-catch (error) {
-  console.error('Internal error:', error)  // Log for debugging
-  return NextResponse.json({
-    error: 'An error occurred. Please try again.'
-  }, { status: 500 })
-}
-```
-
-```typescript
-// BAD: Logging sensitive data
-console.log('User login:', { email, password })  // NEVER
-
-// GOOD: Redact sensitive fields
-console.log('User login:', { email, userId })
-```
-</error_handling>
-
-<owasp_awareness>
-Top vulnerabilities to prevent:
-- Injection (SQL, command, LDAP) - parameterized queries, never string concat
-- Broken auth - secure session management, MFA where possible
-- Sensitive data exposure - encrypt at rest and in transit
-- XSS - output encoding, CSP headers
-- CSRF - tokens for state-changing requests
-- Security misconfiguration - secure defaults, minimal exposure
-</owasp_awareness>
+</flow>
 
 <pre_deployment_checklist>
 Before ANY production deployment:
@@ -259,67 +90,6 @@ Before ANY production deployment:
 - [ ] **File Uploads**: Validated (size, type, extension)
 </pre_deployment_checklist>
 
-<supply_chain>
-<!-- Updated 2026-03-30: Claude Code best practices, OWASP supply chain guidance -->
-AI-generated code introduces supply chain risks beyond traditional OWASP top 10:
-
-- **Hallucinated packages**: AI may reference packages that don't exist or have been
-  name-squatted. Always verify package existence and download counts before installing.
-- **Version pinning**: Pin exact versions in package.json/requirements.txt for production.
-  Floating versions allow silent breaking changes on redeploy.
-- **Dependency audit cadence**: Run `npm audit` / `pip audit` / `cargo audit` on every PR,
-  not just on release. CI gate should block merge on HIGH/CRITICAL findings.
-- **Lockfile integrity**: Commit lockfiles. Verify lockfile wasn't modified unexpectedly
-  before merging PRs (lockfile tampering is a supply chain attack vector).
-</supply_chain>
-
-<prompt_injection>
-<!-- Updated 2026-03-30: Anthropic prompt engineering guide, agentic security research -->
-When building AI-integrated features, prevent prompt injection:
-
-- **Untrusted content isolation**: Never interpolate user-provided text directly into
-  system prompts. Use structured data formats (JSON tool calls) instead of free-text.
-- **Output validation**: Treat LLM output as untrusted input. Validate and sanitize before
-  rendering or executing.
-- **Capability scoping**: AI agents should have only the permissions needed for their task.
-  An agent that reads files shouldn't be able to write to disk unless explicitly required.
-- **Indirect injection**: User-provided data can contain injections that activate when
-  processed by an AI (e.g., "Ignore previous instructions and..."). Sanitize on ingestion,
-  not just on display.
-</prompt_injection>
-
-<!-- Updated 2026-04-29: https://javaworldmag.com/evolving-code-reviews-with-ai-in-2026/, https://codeintelligently.com/blog/ai-code-quality-guide-2026 -->
-<cautionary_pattern_library>
-AI code reviewers miss security issues that require system context humans possess.
-Maintain a living doc at `_meta/security/cautionary-patterns.md` capturing:
-- AI hallucinations that produced plausible but insecure code (non-existent APIs called, wrong auth flows)
-- Patterns where AI bypassed validation "for simplicity" that later became vulnerabilities
-- Successful security prompts that caught real issues (promote to skills)
-
-Review this doc before any security-sensitive implementation. Institutional memory beats repeated audits.
-</cautionary_pattern_library>
-
-<!-- Updated 2026-05-12: https://www.coderabbit.ai/blog/claude-opus-4-7-for-ai-code-review -->
-<agentic_security_scanning>
-**In-agent dependency scanning**: Use Snyk MCP (or equivalent) to run vulnerability checks inside the agent rather than as a separate CI step. Agent sees results inline, can fix issues before committing. Install once, invoke via MCP tool calls.
-
-**Tool count limit**: Give each security-review agent ≤5 tools. Each tool adds context overhead; beyond 5, agents lose focus and tool selection degrades. For security review: Read + Grep + Bash (run audit) + one MCP scanner. That's it.
-
-**Agent permission audit**: Before spawning any agent that touches auth, payments, or PII, explicitly list its allowed tools and file scope in the contract. An agent scoped to read `src/api/` should never touch `src/auth/` or `.env`. Least-privilege applies to agents, not just users.
-</agentic_security_scanning>
-
-<!-- Updated 2026-05-17: web research — https://brightsec.com/blog/ai-code-review-best-practices-2-0-2026-toolchain/, https://www.kluster.ai/blog/best-code-review-practices -->
-<risk_based_review_config>
-Configure AI code review tools with risk-based rules — not blanket "review everything" settings. Default-enable scanning for:
-- Deleted input validations (highest risk: silent regression)
-- Auth flow changes (any modification to authentication/authorization logic)
-- Query changes touching user-scoped data (RLS bypass risk)
-- SQLi / XSS / unsafe API patterns
-- Functions exceeding complexity threshold (complexity correlates with audit misses)
-
-Turn off style and formatting rules in security scanning — noise drowns signal. Security reviewers should see zero false-positive noise to avoid alert fatigue.
-</risk_based_review_config>
-
 <anti_patterns>
 - "We'll add security later" (you won't)
 - Disabling security for development (gets shipped)
@@ -330,5 +100,9 @@ Turn off style and formatting rules in security scanning — noise drowns signal
 - Installing AI-suggested packages without verifying they exist and are legitimate
 - Giving agents more tools or file access than their task requires
 </anti_patterns>
+
+<on_complete>
+agentdb write-end '{"skill":"security","vectors_checked":["injection","xss","authz","secrets"],"findings":N}'
+</on_complete>
 
 </skill>

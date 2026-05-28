@@ -12,7 +12,7 @@ Save session state for seamless continuation.
 Context = decisions + artifacts + warnings + next steps.
 A good handoff lets the next session start working immediately.
 
-Reference: skills/context/SKILL.md
+Reference: skills/context-mgmt/SKILL.md
 </purpose>
 
 <on_start>

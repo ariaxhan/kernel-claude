@@ -264,3 +264,44 @@ For any design task, include these in order of importance:
 
 Skip: exact hex codes, exact font names, exact pixel values, implementation details.
 Those are execution decisions. Let the model make them within your constraints.
+
+---
+
+## Principles Rationale (moved from SKILL.md 2026-05-28)
+
+### Typography — expanded rules
+- Weight extremes: pair 300 with 700+. Avoid the 400–500 middle zone entirely.
+- Size contrast: headers 3x+ body minimum. Go bigger.
+- Tracking: tight on large text, relaxed on small. Never default.
+- CRITICAL: If you've used the same font in your last 3 outputs, pick a different one.
+
+### Color — expanded rules
+- One dominant + one sharp accent beats even distribution every time.
+- Dark modes need 5+ background shade layers. Single dark color = amateur.
+- Derive palette from variant mood. Never memorized hex values.
+- Warm text colors. Bone/cream tones on dark. Never pure white on dark.
+
+### Motion — expanded rules
+- One orchestrated entrance beats scattered micro-interactions.
+- Organic easing always: cubic-bezier curves, never linear.
+- Breathing > snapping. Drift > jump. Ease > instant.
+- Vary timing per project. Don't reuse same duration scale.
+
+### Layout — expanded rules
+- Whitespace as design element. Use aggressively where it creates tension.
+- Full-bleed mixed with contained sections creates rhythm.
+- Uniform section heights = amateur. Vary intentionally.
+- Let content dictate structure, not templates.
+
+### Surfaces — expanded rules
+- Layer: gradients, translucent surfaces, backdrop-blur, subtle noise.
+- Cards need visible depth: shadow, border, or background differentiation.
+- Dark backgrounds need hue tint. Never pure black or pure gray.
+- Light from within (glow, shadow-color) beats external illumination.
+
+### Core principles — rationale
+- Prompt for taste, not implementation: Describe WHAT the user should feel; let the model choose HOW. Intent over specification. Mood, constraints, and anti-patterns beat hex codes and font names.
+- Component-first builds pieces (nav, hero, cards), then composes. Never generate full pages in one shot.
+- Mobile-first as constraint, not afterthought. Specify column limits and touch targets upfront.
+- Functional color encodes meaning (status, priority, state) — always beats decorative color.
+- Accessibility is a design advantage. WCAG contrast ratios force better color decisions. 44px touch targets prevent cramped layouts.

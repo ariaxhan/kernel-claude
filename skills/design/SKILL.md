@@ -31,52 +31,46 @@ Each defines sensory direction and emotional target—not specs.
 <principles type="always-active">
 
 <typography>
-- Distinctive fonts only. NEVER: Inter, Roboto, Arial, Open Sans, system-ui, Helvetica, SF Pro
-- Weight extremes: pair 300 with 700+. Avoid the 400-500 middle zone entirely
-- Size contrast: headers 3x+ body minimum. Go bigger
-- Tracking: tight on large text, relaxed on small. Never default
-- CRITICAL: If you've used the same font in your last 3 outputs, pick a different one
+1. Distinctive fonts only — NEVER: Inter, Roboto, Arial, Open Sans, system-ui, Helvetica, SF Pro
+2. Pair weight extremes (300 + 700+). Avoid 400–500 middle zone entirely.
+3. Headers 3x+ body size minimum. Tight tracking on large, relaxed on small.
+4. (gate: if same font used in last 3 outputs → pick a different one)
 </typography>
 
 <color>
-- Commit to a cohesive mood. CSS custom properties for all colors
-- One dominant + one sharp accent beats even distribution every time
-- Dark modes need 5+ background shade layers. Single dark color = amateur
-- Derive palette from variant mood. Never memorized hex values
-- Warm text colors. Bone/cream tones on dark. Never pure white on dark
+1. CSS custom properties for all colors. One dominant + one sharp accent.
+2. Dark modes require 5+ background shade layers. Single dark color = amateur.
+3. Warm text on dark: bone/cream tones. Never pure white on dark.
+4. (gate: palette derives from variant mood, not memorized hex values)
 </color>
 
 <motion>
-- CSS-only first. JS only when CSS literally cannot achieve it
-- One orchestrated entrance beats scattered micro-interactions
-- Organic easing always: cubic-bezier curves, never linear
-- Breathing > snapping. Drift > jump. Ease > instant
-- Vary timing per project. Don't reuse same duration scale
+1. CSS-only first. JS only when CSS literally cannot achieve it.
+2. One orchestrated entrance beats scattered micro-interactions.
+3. Organic easing always: cubic-bezier curves, never linear. Breathing > snapping.
+4. (gate: vary timing per project — no reused duration scale)
 </motion>
 
 <layout>
-- Asymmetry over symmetry. Grid-break moments over uniform grids
-- Whitespace as design element. Use aggressively where it creates tension
-- Full-bleed mixed with contained sections creates rhythm
-- Uniform section heights = amateur. Vary intentionally
-- Let content dictate structure, not templates
+1. Asymmetry over symmetry. Grid-break moments over uniform grids.
+2. Whitespace is a design element. Use aggressively to create tension.
+3. Full-bleed mixed with contained sections creates rhythm.
+4. (gate: uniform section heights = amateur → vary intentionally)
 </layout>
 
 <surfaces>
-- NEVER flat single-color backgrounds
-- Layer: gradients, translucent surfaces, backdrop-blur, subtle noise
-- Cards need visible depth: shadow, border, or background differentiation
-- Dark backgrounds need hue tint. Never pure black or pure gray
-- Light from within (glow, shadow-color) beats external illumination
+1. NEVER flat single-color backgrounds.
+2. Layer: gradients, translucent surfaces, backdrop-blur, subtle noise.
+3. Cards need visible depth: shadow, border, or background differentiation.
+4. Dark backgrounds need hue tint. Light from within (glow) beats external illumination.
 </surfaces>
 
 <core>
-- Prompt for taste, not implementation. Describe WHAT the user should feel; let the model choose HOW
-- Intent over specification. Mood, constraints, and anti-patterns beat hex codes and font names
-- Component-first. Build pieces (nav, hero, cards), then compose. Never generate full pages in one shot
-- Mobile-first as constraint, not afterthought. Specify column limits and touch targets upfront
-- Functional color. Color that encodes meaning (status, priority, state) always beats decorative color
-- Accessibility is a design advantage. WCAG contrast ratios force better color decisions. 44px touch targets prevent cramped layouts
+1. Prompt for taste, not implementation. Describe WHAT the user should feel; model chooses HOW.
+2. Component-first. Build pieces (nav, hero, cards), then compose. Never full pages in one shot.
+3. Mobile-first as constraint: specify column limits and 44px touch targets upfront.
+4. Functional color (encodes meaning: status, priority, state) beats decorative color.
+5. Accessibility = design advantage. WCAG contrast forces better color decisions.
 </core>
 
 <reference>
