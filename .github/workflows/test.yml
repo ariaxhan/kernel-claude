@@ -42,19 +42,25 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Verify plugin.json and marketplace.json versions match
+      - name: Verify ALL canonical version declarations are in sync
         run: |
           set -euo pipefail
-          PLUGIN_V=$(jq -r '.version' .claude-plugin/plugin.json)
-          MARKET_V=$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)
-          echo "plugin.json:      $PLUGIN_V"
-          echo "marketplace.json: $MARKET_V"
-          if [ "$PLUGIN_V" != "$MARKET_V" ]; then
-            echo "FAIL: version mismatch — plugin.json ($PLUGIN_V) != marketplace.json ($MARKET_V)"
-            echo "Both files must be updated together on every release."
+          # plugin.json is the source of truth; every declaration must match it.
+          # Mirrors test_version_sync_all in tests/run-tests.sh. Bump via
+          # scripts/bump-version.sh, which updates all of these at once.
+          V=$(jq -r '.version' .claude-plugin/plugin.json)
+          echo "source of truth (plugin.json): $V"
+          fail=0
+          MV=$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)
+          [ "$MV" = "$V" ] || { echo "FAIL: marketplace.json ($MV) != $V"; fail=1; }
+          grep -qF "<kernel version=\"$V\">" CLAUDE.md           || { echo "FAIL: CLAUDE.md <kernel version> != $V"; fail=1; }
+          grep -qF "KERNEL v$V" commands/help.md                 || { echo "FAIL: commands/help.md KERNEL version != $V"; fail=1; }
+          grep -qF "kernel-marketplace/kernel/$V" README.md      || { echo "FAIL: README.md install-path version != $V"; fail=1; }
+          if [ "$fail" -ne 0 ]; then
+            echo "Version drift detected. Run: scripts/bump-version.sh $V"
             exit 1
           fi
-          echo "Version sync check passed: $PLUGIN_V"
+          echo "All canonical version declarations in sync: $V"
 
   schema-check:
     runs-on: ubuntu-latest
