@@ -2,6 +2,31 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.14.0] - 2026-05-28
+
+Correctness + consistency pass: hardened the AgentDB self-heal and the security
+hooks (real users depend on both), then converted the skill corpus from prose
+blobs to numbered executable flows. Source reports in `_meta/reports/`
+(adversary-agentdb-migration-drift, review-hooks, skill-flow-rewrite-audit) and
+plan in `_meta/plans/md-philosophy-enshrinement.md`.
+
+### Fixed
+- **AgentDB migration drift self-heal.** Existing DBs created on an older version never received later migrations (they only ran on fresh `init`). Preflight now applies pending migrations every session start, and force-re-reads idempotent migrations to restore a migration-created table (e.g. `events`) that drifted away while its `_migrations` marker stayed recorded — previously this looped forever on "missing_table" + phantom repairs. `find_project_root` gains an `AGENTDB_ROOT` override + loud fallback warning to stop orphan DBs.
+- **Migration 010 timestamp normalization** guarded with `strftime(...) IS NOT NULL` so empty/garbage `ts` are left intact instead of silently overwritten with NULL (data loss). Adversary-found.
+- **Secret scanner missed real Anthropic keys.** `sk-ant-[a-zA-Z0-9]{20,}` stopped at the first hyphen, so `sk-ant-api03-…` matched nothing. Broadened the `sk-` family; the scanner now also fails *closed* when `jq` is missing.
+- **Security guards could fail open.** Blocking guards (guard-bash, guard-config, detect-secrets) no longer source the circuit breaker — a tripped breaker made them `exit 0` (allow), disabling scanning for 10 min. A safety gate must always run (I0.15).
+- **Guard bypasses closed:** force-push `-f`/`--force-with-lease` in any position; `rm -fr`/`--no-preserve-root` flag orderings on root/home; `git status; rm -rf /` command chaining slipping past auto-approve.
+- **Lifecycle hooks** no longer auto-push `main` (I0.8), and escape the checkpoint payload so a contract goal containing `"`/`\` no longer drops the auto-handoff.
+
+### Changed
+- **18 over-cap skills rewritten** from prose "blobs to remember" into terse, numbered, ordered, gated executable flows; deep context relocated to each skill's `reference/<id>-research.md` (build 340→156L, api 325→114L, etc.). No information deleted — verified by an opus info-loss auditor reading surviving content per diff.
+- **`agentdb write-end` bookend enforced** across every skill flow that lacked one; `read-start` added to the analysis-entry commands (diagnose, dream).
+- **Consistency fixes:** `dreamer` agent name `kernel:dreamer`→`dreamer` (resolved a `kernel:kernel:dreamer` double-prefix registration); `ship`/`context-mgmt` frontmatter names normalized; `reviewer` inject-context slice corrected; stale `help.md` version + `handoff.md` dead path fixed.
+
+### Added
+- **`scripts/bump-version.sh`** — single-command version bump across every canonical declaration (plugin.json, marketplace.json, CLAUDE.md, help.md, README install path), pure-Python (macOS/Linux safe).
+- **`test_version_sync_all`** — fails the suite if any canonical version declaration drifts from `plugin.json`, replacing the narrower plugin↔marketplace check. Drift is now impossible to commit.
+
 ## [7.13.0] - 2026-05-14
 
 Six-week refresh after a research+audit pass synthesizing modelmind, cross-project, and dreams folder learnings. Source reports in `_meta/research/modelmind-mining-2026-05.md`, `_meta/research/cross-project-mining-2026-05.md`, `_meta/research/dreams-synthesis-2026-05.md`, and `_meta/audit/state-audit-2026-05.md`.

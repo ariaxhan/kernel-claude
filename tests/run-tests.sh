@@ -1331,14 +1331,19 @@ test_dream_command_registered_in_plugin_json() {
 
 # --- Version Sync Tests ---
 
-test_version_sync_plugin_marketplace() {
-  local plugin_v marketplace_v
-  plugin_v=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/.claude-plugin/plugin.json'))['version'])")
-  marketplace_v=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/.claude-plugin/marketplace.json'))['plugins'][0]['version'])")
-  [ "$plugin_v" = "$marketplace_v" ] || {
-    echo "FAIL: plugin.json ($plugin_v) != marketplace.json ($marketplace_v)"
-    return 1
-  }
+test_version_sync_all() {
+  # plugin.json is the source of truth; EVERY canonical declaration must match it.
+  # Drift here = a release that shipped a stale version somewhere. Bump via
+  # scripts/bump-version.sh, which updates all of these in one shot.
+  local v fail=0
+  v=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/.claude-plugin/plugin.json'))['version'])")
+  local mv
+  mv=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/.claude-plugin/marketplace.json'))['plugins'][0]['version'])")
+  [ "$mv" = "$v" ]                                                 || { echo "FAIL: marketplace.json ($mv) != plugin.json ($v)"; fail=1; }
+  grep -qF "<kernel version=\"$v\">" "$PLUGIN_ROOT/CLAUDE.md"      || { echo "FAIL: CLAUDE.md <kernel version> != $v"; fail=1; }
+  grep -qF "KERNEL v$v" "$PLUGIN_ROOT/commands/help.md"            || { echo "FAIL: commands/help.md KERNEL version != $v"; fail=1; }
+  grep -qF "kernel-marketplace/kernel/$v" "$PLUGIN_ROOT/README.md" || { echo "FAIL: README.md install-path version != $v"; fail=1; }
+  return $fail
 }
 
 test_dreamer_agent_exists_with_frontmatter() {
@@ -2428,7 +2433,7 @@ run_test_suite() {
       run_test "learn auto-populates domain from PWD" test_learn_auto_populates_domain
       ;;
     version_sync)
-      run_test "plugin.json and marketplace.json versions match" test_version_sync_plugin_marketplace
+      run_test "all canonical version declarations in sync" test_version_sync_all
       ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol

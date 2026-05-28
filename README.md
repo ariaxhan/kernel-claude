@@ -58,7 +58,7 @@ The experiment engine treats every rule as a hypothesis. It seeds them from your
 
 ### Skills That Load On-Demand
 
-19 skills (testing, security, debug, api, backend, architecture, etc.) load when relevant — not at startup. Each is a methodology: HOW to approach a problem, not just tools to use.
+20 skills (testing, security, debug, api, backend, architecture, etc.) load when relevant — not at startup. Each is a methodology: HOW to approach a problem, not just tools to use.
 
 ---
 
@@ -132,8 +132,8 @@ The experiment engine treats every rule as a hypothesis. It seeds them from your
 Symlink the cache to avoid stale copies:
 
 ```bash
-rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/7.12.1
-ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/7.12.1
+rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/7.14.0
+ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/7.14.0
 ```
 
 Edits take effect immediately — no version bumps or reinstalls needed. Claude Code [caches plugins](https://dev.to/wkusnierczyk/claude-code-plugin-cache-1dn) by version; the symlink bypasses this.
