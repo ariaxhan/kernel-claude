@@ -11,9 +11,9 @@
 -- sensitivity: data-handling classification
 --   low | medium | high
 
-ALTER TABLE learnings ADD COLUMN visibility TEXT DEFAULT 'agent';
-ALTER TABLE learnings ADD COLUMN sensitivity TEXT DEFAULT 'low';
-
-CREATE INDEX IF NOT EXISTS idx_learnings_visibility ON learnings(visibility);
-
-INSERT INTO _migrations (name) VALUES ('009_learning_visibility_sensitivity');
+-- Applied programmatically by cmd_preflight (see agentdb: Check 3), exactly like
+-- migration 004. Preflight detects-and-adds these columns idempotently, and
+-- schema.sql already defines them for fresh DBs — so a raw ALTER here fails with
+-- "duplicate column name" on any DB that already has them (which leaks the error
+-- into command output). Record the marker only; let preflight own the columns.
+INSERT OR IGNORE INTO _migrations (name) VALUES ('009_learning_visibility_sensitivity');
