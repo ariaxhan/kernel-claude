@@ -101,4 +101,8 @@ Before ANY production deployment:
 - Giving agents more tools or file access than their task requires
 </anti_patterns>
 
+<on_complete>
+agentdb write-end '{"skill":"security","vectors_checked":["injection","xss","authz","secrets"],"findings":N}'
+</on_complete>
+
 </skill>

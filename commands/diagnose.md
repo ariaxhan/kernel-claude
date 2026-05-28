@@ -11,6 +11,10 @@ Mixing diagnosis with implementation means the surgeon starts cutting before the
 /kernel:diagnose is the X-ray.
 </purpose>
 
+<on_start>
+agentdb read-start   # surface prior failures/gotchas first — a known bug class shortcuts the diagnosis
+</on_start>
+
 <skill_load>
 Load: skills/debug/SKILL.md, skills/testing/SKILL.md, skills/architecture/SKILL.md
 </skill_load>

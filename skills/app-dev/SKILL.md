@@ -37,3 +37,7 @@ allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Task
 
 Deep rationale, eas.json examples, environment config patterns, iOS/Android submission detail:
 `skills/app-dev/reference/app-dev-research.md`
+
+# ON COMPLETE
+
+agentdb write-end '{"skill":"app-dev","platform":"ios|android|both","gate":"submitted|built|blocked","store_ready":true}'

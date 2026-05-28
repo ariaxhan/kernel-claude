@@ -1,5 +1,5 @@
 ---
-name: kernel:ship
+name: ship
 description: "Release-gate sequence: validate → review → push → tag. Wraps kernel:git mechanics with the pre-ship safety chain. Triggers: ship, release, push to main, ready to merge, deploy."
 allowed-tools: Read, Bash, Task, Edit
 ---

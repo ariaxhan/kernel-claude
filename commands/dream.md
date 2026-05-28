@@ -18,6 +18,10 @@ The winning approach is the one that SURVIVES attack, not the one that sounds be
 Use before any non-trivial decision. Use when the obvious answer feels too easy.
 </purpose>
 
+<on_start>
+agentdb read-start   # prior dreams + learnings seed the perspectives; don't re-explore killed approaches
+</on_start>
+
 <skill_load>
 always: skills/quality/SKILL.md, skills/architecture/SKILL.md
 on_domain:

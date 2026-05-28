@@ -97,4 +97,8 @@ Profile-gated workflow:
 - Parallelize AI + human review (humans see noisy diff, duplicate feedback)
 </anti_patterns>
 
+<on_complete>
+agentdb write-end '{"skill":"git","commits":N,"atomic":true,"convention":"pass"}'
+</on_complete>
+
 </skill>

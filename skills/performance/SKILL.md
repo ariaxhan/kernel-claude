@@ -60,4 +60,8 @@ After optimizing:
 - Premature parallelization
 </anti_patterns>
 
+<on_complete>
+agentdb write-end '{"skill":"performance","bottleneck":"X","measured_before":true,"improvement":"Xms|none"}'
+</on_complete>
+
 </skill>

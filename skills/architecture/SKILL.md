@@ -55,4 +55,8 @@ Before adding AI to a codebase:
 - Feature envy (methods that use another class more than their own)
 </anti_patterns>
 
+<on_complete>
+agentdb write-end '{"skill":"architecture","decision":"X","coupling_reduced":true,"adr":"path|none"}'
+</on_complete>
+
 </skill>

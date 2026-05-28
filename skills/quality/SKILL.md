@@ -96,4 +96,8 @@ Fix before commit. No exceptions.
   reference: skills/quality/reference/quality-research.md (baselines, integration points)
 </adsr>
 
+<on_complete>
+agentdb write-end '{"skill":"quality","big5_checked":true,"violations":N,"r_factor":0.00}'
+</on_complete>
+
 </skill>

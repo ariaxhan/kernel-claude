@@ -1,5 +1,5 @@
 ---
-name: kernel:dreamer
+name: dreamer
 description: "Multi-perspective debate agent. Generates minimalist, maximalist, and pragmatist approaches grounded in actual codebase context."
 allowed-tools: Read, Grep, Glob, Bash, Write
 ---

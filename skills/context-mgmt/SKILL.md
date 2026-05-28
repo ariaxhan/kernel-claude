@@ -1,5 +1,5 @@
 ---
-name: kernel:context
+name: context-mgmt
 description: "Context engineering and token management. Compaction strategies, progressive disclosure, structured note-taking via AgentDB. Triggers: tokens, compaction, memory, handoff, summarize, context window."
 allowed-tools: Read, Bash, Task
 ---
