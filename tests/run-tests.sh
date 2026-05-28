@@ -198,9 +198,10 @@ test_agentdb_read_start_empty() {
   agentdb init >/dev/null
   local output
   output=$(agentdb read-start)
+  # weighted-75 format (H078): structural headings always present, even empty.
   assert_contains "$output" "AgentDB Context"
-  assert_contains "$output" "Recent Failures"
-  assert_contains "$output" "Active Patterns"
+  assert_contains "$output" "Recent Errors"
+  assert_contains "$output" "Active Contract"
 }
 
 test_agentdb_read_start_with_data() {
@@ -1648,7 +1649,8 @@ test_read_start_outputs_gotchas() {
   agentdb learn gotcha "always escape SQL inputs" "injection risk" >/dev/null
   local output
   output=$(agentdb read-start)
-  assert_contains "$output" "Known Gotchas"
+  # weighted-75 format (H078): gotchas surface tagged in the ranked list.
+  assert_contains "$output" "[gotcha] always escape SQL inputs"
 }
 
 test_read_start_bumps_hit_count() {
