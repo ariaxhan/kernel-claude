@@ -11,11 +11,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 mkdir -p "$AGENTDB_DIR"
 
-if [ ! -f "$DB" ]; then
-    sqlite3 "$DB" < "$SCRIPT_DIR/schema.sql"
-    echo "AgentDB initialized at $DB"
+# Delegate to `agentdb init` so the base schema AND every migration are applied
+# in order. Running schema.sql alone left bootstrapped DBs stuck at 001, missing
+# migrations 002-current. AGENTDB_ROOT pins the location regardless of PWD.
+if [ -x "$SCRIPT_DIR/agentdb" ]; then
+    AGENTDB_ROOT="$PROJECT" "$SCRIPT_DIR/agentdb" init
 else
-    echo "AgentDB already exists at $DB"
+    echo "Error: agentdb script not found at $SCRIPT_DIR/agentdb" >&2
+    exit 1
 fi
 
 sqlite3 "$DB" "SELECT count(*) FROM learnings;" >/dev/null 2>&1 && \

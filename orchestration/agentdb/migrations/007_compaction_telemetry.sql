@@ -16,4 +16,4 @@ CREATE TABLE IF NOT EXISTS compaction_events (
   created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 
-INSERT INTO _migrations (name) VALUES ('007_compaction_telemetry');
+INSERT OR IGNORE INTO _migrations (name) VALUES ('007_compaction_telemetry');

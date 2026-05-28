@@ -47,7 +47,8 @@ CREATE TABLE IF NOT EXISTS errors (
   tool TEXT NOT NULL,
   error TEXT NOT NULL,
   file TEXT,
-  context TEXT
+  context TEXT,
+  domain TEXT  -- migration 008; marker-only there, column lives here for fresh DBs
 );
 
 -- Migration tracking

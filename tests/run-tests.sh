@@ -1200,6 +1200,48 @@ test_inline_schema_includes_events() {
   assert_equals "events" "$RESULT" "events table should exist from inline schema"
 }
 
+# Regression: a migration-created table (events, from 003) can drift away while
+# its _migrations marker stays recorded. The marker-gated migration pass would
+# skip the migration that recreates it, so preflight must force-re-read
+# migrations on table loss. Before the force-repair fix this looped forever on
+# "missing_table" + phantom repairs and never restored events.
+test_preflight_restores_dropped_migration_table() {
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  agentdb init >/dev/null
+  # Drop the table but KEEP its migration marker — the drift state.
+  sqlite3 "$db" "DROP TABLE events;"
+  assert_equals "1" "$(sqlite3 "$db" "SELECT COUNT(*) FROM _migrations WHERE name='003_telemetry';")" "003 marker must still be present (drift precondition)"
+  agentdb preflight >/dev/null 2>&1
+  RESULT=$(sqlite3 "$db" "SELECT name FROM sqlite_master WHERE type='table' AND name='events';")
+  assert_equals "events" "$RESULT" "preflight must recreate the dropped events table despite marker"
+}
+
+test_preflight_idempotent_after_table_drift() {
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  agentdb init >/dev/null
+  sqlite3 "$db" "DROP TABLE events;"
+  agentdb preflight >/dev/null 2>&1          # run 1 heals
+  local second
+  second=$(agentdb preflight 2>&1)            # run 2 must be clean — no phantom repair
+  assert_contains "$second" "preflight:ok" "second preflight after drift repair must be clean (no phantom repairs)"
+}
+
+# Regression: migration 010 must normalize parseable legacy timestamps WITHOUT
+# nulling empty/garbage/NULL ts (strftime returns NULL on those, and the bare
+# NOT LIKE '%Z' filter matched them — silent data loss before the IS NOT NULL guard).
+test_migration_010_preserves_unparseable_ts() {
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  agentdb init >/dev/null
+  sqlite3 "$db" "INSERT INTO errors(ts,tool,error) VALUES ('2026-03-26 21:56:21','Bash','legacy-valid');"
+  sqlite3 "$db" "INSERT INTO errors(ts,tool,error) VALUES ('','Bash','empty-ts');"
+  sqlite3 "$db" "INSERT INTO errors(ts,tool,error) VALUES ('garbage-ts','Bash','garbage');"
+  # Re-run 010 directly (it is already applied on a fresh DB; re-reading is idempotent).
+  sqlite3 "$db" ".read $PLUGIN_ROOT/orchestration/agentdb/migrations/010_normalize_timestamps.sql"
+  assert_equals "1" "$(sqlite3 "$db" "SELECT ts LIKE '%Z' FROM errors WHERE error='legacy-valid';")" "parseable legacy ts must normalize to ...Z"
+  assert_equals "1" "$(sqlite3 "$db" "SELECT ts IS NOT NULL FROM errors WHERE error='empty-ts';")" "empty ts must NOT be nulled"
+  assert_equals "1" "$(sqlite3 "$db" "SELECT ts IS NOT NULL FROM errors WHERE error='garbage';")" "garbage ts must NOT be nulled"
+}
+
 # === Dreamer Tests ===
 
 test_dream_command_exists_with_frontmatter() {
@@ -2198,6 +2240,9 @@ run_test_suite() {
       ;;
     migration_003)
       run_test "migration 003 creates events table" test_migration_003_creates_events
+      run_test "preflight restores dropped migration table" test_preflight_restores_dropped_migration_table
+      run_test "preflight idempotent after table drift" test_preflight_idempotent_after_table_drift
+      run_test "migration 010 preserves unparseable ts" test_migration_010_preserves_unparseable_ts
       run_test "inline schema includes events table" test_inline_schema_includes_events
       ;;
     input_validation)

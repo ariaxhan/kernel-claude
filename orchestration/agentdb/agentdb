@@ -27,6 +27,12 @@ command -v sqlite3 >/dev/null 2>&1 || { echo "Error: sqlite3 required but not fo
 
 # Find project root (where .claude/ or _meta/ exists)
 find_project_root() {
+  # Explicit override wins — pin the DB location to dodge the PWD-walk foot-gun
+  # when agents run from sub-dirs or temp dirs (D9/R7).
+  if [ -n "${AGENTDB_ROOT:-}" ]; then
+    echo "$AGENTDB_ROOT"
+    return
+  fi
   local dir="$PWD"
   while [ "$dir" != "/" ]; do
     if [ -d "$dir/_meta" ] || [ -d "$dir/.claude" ]; then
@@ -35,7 +41,10 @@ find_project_root() {
     fi
     dir=$(dirname "$dir")
   done
-  echo "$PWD"  # fallback
+  # Fallback: nothing found on the walk up. Warn — this is how orphan DBs get
+  # created in whatever PWD happened to be (the "VaultsS" typo orphan, etc.).
+  echo "agentdb: warning — no _meta/ or .claude/ above $PWD; using PWD (set AGENTDB_ROOT to pin)" >&2
+  echo "$PWD"
 }
 
 PROJECT_ROOT=$(find_project_root)
@@ -82,6 +91,49 @@ EOF
 
 # === COMMANDS ===
 
+# Apply every migration not yet recorded in _migrations, in filename order.
+# Idempotent on two levels: the marker check skips already-applied migrations,
+# and each migration file is itself written to be safe to re-run (CREATE TABLE
+# IF NOT EXISTS / INSERT OR IGNORE / column-adds delegated to preflight).
+# Shared by cmd_init (fresh DBs) AND cmd_preflight (existing DBs self-heal every
+# session start) — this is the one place migrations are applied.
+# Echoes "<label>: <name>" per applied migration. Sets MIGRATIONS_APPLIED count.
+#
+# Arg 2 "force": re-read EVERY migration regardless of its _migrations marker.
+# Used by the table-loss repair path (Check 2): a table created by a migration
+# (e.g. `events` from 003) can drift away while its marker stays recorded, and a
+# marker-gated pass would skip the migration that recreates it — looping forever
+# on "missing_table" + phantom repairs. Force-reading is safe because every
+# migration file is idempotent (verified: IF NOT EXISTS / INSERT OR IGNORE /
+# delegated column-adds). Force mode is silent and does not touch
+# MIGRATIONS_APPLIED — it is recovery, not new-migration application.
+run_pending_migrations() {
+  local label="${1:-Applied migration}"
+  local force="${2:-}"
+  MIGRATIONS_APPLIED=0
+  [ -d "$SCHEMA_DIR/migrations" ] || return 0
+  for migration in "$SCHEMA_DIR/migrations"/*.sql; do
+    [ -f "$migration" ] || continue
+    [[ "$migration" == *.down.sql ]] && continue
+    local name
+    name=$(basename "$migration" .sql)
+    if [ "$force" != "force" ]; then
+      local applied
+      applied=$(db_exec "SELECT 1 FROM _migrations WHERE name='$name' LIMIT 1;" 2>/dev/null || echo "")
+      [ -n "$applied" ] && continue
+    fi
+    if sqlite3 "$DB" ".timeout 5000" ".read $migration" 2>/dev/null; then
+      if [ "$force" != "force" ]; then
+        echo "$label: $name"
+        MIGRATIONS_APPLIED=$((MIGRATIONS_APPLIED + 1))
+      fi
+    else
+      echo "$label: $name FAILED (see migration file)" >&2
+    fi
+  done
+  return 0
+}
+
 cmd_init() {
   mkdir -p "$DB_DIR"
 
@@ -99,22 +151,7 @@ cmd_init() {
     fi
   fi
 
-  # Apply any pending migrations
-  if [ -d "$SCHEMA_DIR/migrations" ]; then
-    for migration in "$SCHEMA_DIR/migrations"/*.sql; do
-      [ -f "$migration" ] || continue
-      # Skip rollback files
-      [[ "$migration" == *.down.sql ]] && continue
-      local name
-      name=$(basename "$migration" .sql)
-      local applied
-      applied=$(db_exec "SELECT 1 FROM _migrations WHERE name='$name' LIMIT 1;" 2>/dev/null || echo "")
-      if [ -z "$applied" ]; then
-        sqlite3 "$DB" ".timeout 5000" ".read $migration"
-        echo "Applied migration: $name"
-      fi
-    done
-  fi
+  run_pending_migrations "Applied migration"
 
   if [ "$created_new" = true ]; then
     echo "Initialized: $DB"
@@ -150,19 +187,13 @@ cmd_preflight() {
       # Re-run migrations only if _migrations table exists (avoid circular dep)
       local has_migrations
       has_migrations=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='_migrations' LIMIT 1;" 2>/dev/null || echo "")
-      if [ -n "$has_migrations" ] && [ -d "$SCHEMA_DIR/migrations" ]; then
-        for m in "$SCHEMA_DIR/migrations"/*.sql; do
-          [ -f "$m" ] || continue
-          [[ "$m" == *.down.sql ]] && continue
-          local mname
-          mname=$(basename "$m" .sql)
-          local mapplied
-          mapplied=$(db_exec "SELECT 1 FROM _migrations WHERE name='$mname' LIMIT 1;" 2>/dev/null || echo "")
-          [ -z "$mapplied" ] && sqlite3 "$DB" ".timeout 5000" ".read $m" 2>/dev/null || true
-        done
+      if [ -n "$has_migrations" ]; then
+        # force: a dropped migration-table keeps its marker, so re-read every
+        # migration to recreate it (idempotent). Marker-gated pass would skip it.
+        run_pending_migrations "preflight:applied_migration" force >/dev/null
       fi
       repairs=$((repairs + 1))
-      break
+      # no break — repair every missing table, not just the first
     fi
   done
 
@@ -186,20 +217,23 @@ cmd_preflight() {
     fi
   done
 
-  # Check 4: All migrations applied
-  if [ -d "$SCHEMA_DIR/migrations" ]; then
-    for migration in "$SCHEMA_DIR/migrations"/*.sql; do
-      [ -f "$migration" ] || continue
-      [[ "$migration" == *.down.sql ]] && continue
-      local name
-      name=$(basename "$migration" .sql)
-      local applied
-      applied=$(db_exec "SELECT 1 FROM _migrations WHERE name='$name' LIMIT 1;" 2>/dev/null || echo "")
-      if [ -z "$applied" ]; then
-        echo "preflight:pending_migration — $name not applied"
-        warnings=$((warnings + 1))
-      fi
-    done
+  # Check 3b: errors schema has domain column (migration 008, delegated here —
+  # SQLite has no ADD COLUMN IF NOT EXISTS, so we PRAGMA-gate the add).
+  local has_errors_domain
+  has_errors_domain=$(db_exec "SELECT 1 FROM pragma_table_info('errors') WHERE name='domain' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has_errors_domain" ]; then
+    echo "preflight:missing_column — errors.domain not found, adding"
+    db_exec "ALTER TABLE errors ADD COLUMN domain TEXT;" 2>/dev/null || true
+    repairs=$((repairs + 1))
+  fi
+
+  # Check 4: Apply any pending migrations (not just warn). This is the self-heal
+  # path for every existing DB — migrations only ran on fresh init before, so DBs
+  # created on an older version never received later migrations. Idempotency is
+  # guaranteed by run_pending_migrations + per-file re-run safety.
+  run_pending_migrations "preflight:applied_migration"
+  if [ "${MIGRATIONS_APPLIED:-0}" -gt 0 ]; then
+    repairs=$((repairs + MIGRATIONS_APPLIED))
   fi
 
   # Check 5: DB is writable (not corrupted or locked)
@@ -644,7 +678,10 @@ cmd_error() {
   safe_file=$(sql_escape "$file")
   safe_domain=$(sql_escape "$domain")
 
-  db_exec "INSERT INTO errors (tool, error, file, domain) VALUES ('$safe_tool', '$safe_error', '$safe_file', '$safe_domain');"
+  # Write ts explicitly: legacy DBs created the errors table with a
+  # CURRENT_TIMESTAMP default (space-separated, no Z), which breaks ISO-8601
+  # sorts. strftime here keeps new rows consistent regardless of column default.
+  db_exec "INSERT INTO errors (tool, error, file, domain, ts) VALUES ('$safe_tool', '$safe_error', '$safe_file', '$safe_domain', strftime('%Y-%m-%dT%H:%M:%fZ','now'));"
 }
 
 cmd_query() {
