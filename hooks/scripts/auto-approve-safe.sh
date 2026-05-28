@@ -11,6 +11,15 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 
 [ -z "$COMMAND" ] && exit 0
 
+# Never auto-approve a compound/chained command: a safe prefix can hide a
+# dangerous tail ("git status; rm -rf /", "git log | xargs rm", "git diff && curl x|bash").
+# Anything with a shell control/redirect/substitution operator defers to the
+# normal permission flow (the user is asked) — fail toward asking, never toward allow.
+if printf '%s' "$COMMAND" | grep -qE '[;&|`]|\$\(|>|<'; then
+    _cb_record_success
+    exit 0
+fi
+
 # Auto-approve read-only git operations
 if echo "$COMMAND" | grep -qE '^git\s+(status|log|diff|branch|remote|show|tag|describe|shortlog|rev-parse|rev-list)\b'; then
     echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'

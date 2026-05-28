@@ -3,9 +3,17 @@
 # Allows config edits, blocks generated content
 # Events: PreToolUse (matcher: Write|Edit)
 
-source "$(dirname "$0")/circuit-breaker.sh"
+# Does NOT source circuit-breaker.sh: a blocking safety guard must always run
+# and must never auto-disable itself (I0.15). Narrow guard, so on a jq failure
+# it warns and allows rather than blocking every write (which would brick the session).
 
 INPUT=$(cat)
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "guard-config: warning -- jq not found, .claude/ write guard is degraded (install jq)." >&2
+  exit 0
+fi
+
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
 
 [ -z "$FILE_PATH" ] && exit 0

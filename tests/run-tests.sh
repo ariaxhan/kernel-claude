@@ -731,6 +731,61 @@ test_auto_approve_rejects_rm_rf() {
   fi
 }
 
+# Regression: real Anthropic keys (sk-ant-api03-...) contain hyphens; the old
+# 'sk-ant-[a-zA-Z0-9]{20,}' stopped at the first hyphen and missed them entirely.
+test_detect_secrets_blocks_anthropic_key() {
+  local akey="s"; akey+="k-ant-api03-"; akey+=$(printf 'A%.0s' {1..40}); akey+="_-xyz"
+  local json
+  json=$(printf '{"tool_input":{"content":"ANTHROPIC_API_KEY=%s"}}' "$akey")
+  echo "$json" | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  assert_exit_code 2 "$?" "Anthropic sk-ant-api03 key must be blocked"
+}
+
+# Regression: secret scanner must fail CLOSED when its parser is unavailable.
+test_detect_secrets_fail_closed_without_jq() {
+  local bin; bin=$(mktemp -d)
+  ln -s "$(command -v bash)" "$bin/bash"
+  ln -s "$(command -v grep)" "$bin/grep"
+  ln -s "$(command -v cat)"  "$bin/cat"   # deliberately no jq
+  local ec=0
+  printf '{"tool_input":{"content":"x"}}' \
+    | env -i PATH="$bin" "$bin/bash" "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1 || ec=$?
+  rm -rf "$bin"
+  assert_exit_code 2 "$ec" "scanner must BLOCK when jq is missing (fail-closed)"
+}
+
+# Regression: -f shorthand force push to main was bypassing the guard.
+test_guard_bash_blocks_force_push_shorthand() {
+  echo '{"tool_input":{"command":"git push -f origin main"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
+  assert_exit_code 2 "$?" "git push -f origin main must be blocked"
+}
+
+# Regression: -fr flag ordering bypassed the rm-root guard.
+test_guard_bash_blocks_rm_fr_root() {
+  echo '{"tool_input":{"command":"rm -fr /"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
+  assert_exit_code 2 "$?" "rm -fr / must be blocked"
+}
+
+# Guard must NOT false-positive on legitimate subdir deletes.
+test_guard_bash_allows_subdir_rm() {
+  echo '{"tool_input":{"command":"rm -rf ~/Documents/old-cache"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
+  assert_exit_code 0 "$?" "rm -rf of a home subdir must be allowed"
+}
+
+# Regression: a safe prefix must not auto-approve a chained dangerous tail.
+test_auto_approve_defers_chained_command() {
+  local output
+  output=$(echo '{"tool_input":{"command":"git status; rm -rf /tmp/x"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/auto-approve-safe.sh" 2>&1)
+  if [[ "$output" == *"allow"* ]]; then
+    echo "FAIL: chained command must not be auto-approved"
+    return 1
+  fi
+}
+
 # === Graph Tracking Tests ===
 
 # Helper: ensure graph tracking migration is applied
@@ -1325,11 +1380,20 @@ test_circuit_breaker_exists() {
   [ -x "$PLUGIN_ROOT/hooks/scripts/circuit-breaker.sh" ]
 }
 
-test_guards_source_circuit_breaker() {
-  grep -q "circuit-breaker.sh" "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" &&
-  grep -q "circuit-breaker.sh" "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" &&
-  grep -q "circuit-breaker.sh" "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" &&
-  grep -q "circuit-breaker.sh" "$PLUGIN_ROOT/hooks/scripts/auto-approve-safe.sh"
+test_blocking_guards_do_not_source_breaker() {
+  # I0.15: a blocking safety gate must run on every invocation and must never
+  # auto-disable itself. So guard-bash/guard-config/detect-secrets must NOT
+  # `source` the circuit breaker (a tripped breaker would fail OPEN = allow).
+  # Match an active source directive only, not the explanatory comment.
+  local g
+  for g in guard-bash guard-config detect-secrets; do
+    if grep -qE '^[[:space:]]*(source|\.)[[:space:]]+.*circuit-breaker\.sh' "$PLUGIN_ROOT/hooks/scripts/$g.sh"; then
+      echo "FAIL: $g.sh sources circuit-breaker.sh — a blocking guard must always run"
+      return 1
+    fi
+  done
+  # The breaker itself still exists for non-blocking hooks (e.g. auto-approve, telemetry).
+  [ -f "$PLUGIN_ROOT/hooks/scripts/circuit-breaker.sh" ]
 }
 
 test_breaker_trips() {
@@ -2208,6 +2272,12 @@ run_test_suite() {
       run_test "auto-approve allows git status" test_auto_approve_allows_git_status
       run_test "auto-approve allows npm test" test_auto_approve_allows_npm_test
       run_test "auto-approve rejects rm -rf" test_auto_approve_rejects_rm_rf
+      run_test "detect-secrets blocks Anthropic key" test_detect_secrets_blocks_anthropic_key
+      run_test "detect-secrets fail-closed without jq" test_detect_secrets_fail_closed_without_jq
+      run_test "guard-bash blocks force-push -f shorthand" test_guard_bash_blocks_force_push_shorthand
+      run_test "guard-bash blocks rm -fr /" test_guard_bash_blocks_rm_fr_root
+      run_test "guard-bash allows subdir rm" test_guard_bash_allows_subdir_rm
+      run_test "auto-approve defers chained command" test_auto_approve_defers_chained_command
       ;;
     graph_tracking)
       run_test "session-start creates session" test_session_start_creates_session
@@ -2266,7 +2336,7 @@ run_test_suite() {
       ;;
     circuit_breaker)
       run_test "circuit-breaker.sh exists and is executable" test_circuit_breaker_exists
-      run_test "guard hooks source circuit breaker" test_guards_source_circuit_breaker
+      run_test "blocking guards do NOT source circuit breaker" test_blocking_guards_do_not_source_breaker
       run_test "breaker trips after 3 failures" test_breaker_trips
       run_test "breaker resets after cooldown" test_breaker_resets
       ;;
