@@ -503,6 +503,27 @@ test_pre_compact_writes_checkpoint() {
   assert_contains "$output" "pre-compact"
 }
 
+# Regression: a contract goal containing a double-quote must survive into the
+# write-end payload as valid JSON (was interpolated raw -> malformed -> dropped).
+test_pre_compact_payload_survives_quotes() {
+  agentdb init >/dev/null
+  local goal='fix the "auth" bug \ here'
+  # Mirror the script's escaper, then prove the payload is valid JSON and round-trips.
+  local esc; esc=$(printf '%s' "$goal" | tr -d '\r\n' | sed 's/\\/\\\\/g; s/"/\\"/g')
+  local payload; payload=$(printf '{"event":"pre-compact","goal":"%s"}' "$esc")
+  agentdb write-end "$payload" >/dev/null 2>&1
+  echo "$payload" | jq -e . >/dev/null 2>&1
+  assert_exit_code 0 "$?" "escaped pre-compact payload must be valid JSON"
+}
+
+# Regression: lifecycle hooks must NOT auto-push main/master (I0.8).
+test_lifecycle_hooks_guard_main_push() {
+  grep -q 'not auto-pushing' "$PLUGIN_ROOT/hooks/scripts/session-end.sh" || {
+    echo "FAIL: session-end.sh missing main-push guard"; return 1; }
+  grep -qE '_pc_branch.*!=.*main' "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh" || {
+    echo "FAIL: pre-compact-commit.sh missing main-push guard"; return 1; }
+}
+
 test_session_start_shows_checkpoint_after_compact() {
   agentdb init >/dev/null
   # Create a pre-compact checkpoint
@@ -2213,6 +2234,8 @@ run_test_suite() {
       run_test "session-start has workflow" test_session_start_workflow_present
       run_test "session-start has testing philosophy" test_session_start_testing_philosophy
       run_test "pre-compact writes checkpoint" test_pre_compact_writes_checkpoint
+      run_test "pre-compact payload survives quotes" test_pre_compact_payload_survives_quotes
+      run_test "lifecycle hooks guard main push" test_lifecycle_hooks_guard_main_push
       run_test "session-start shows checkpoint after compact" test_session_start_shows_checkpoint_after_compact
       ;;
     security)

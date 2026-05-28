@@ -86,7 +86,12 @@ REPO_NAME=$(basename "$PROJECT_ROOT")
 # This hook fires inside SessionEnd; leaving verify enabled creates an infinite hook chain.
 # Carve-out is limited to this script + pre-compact-commit.sh. Do NOT reuse elsewhere.
 git commit -m "chore(session-end): $REPO_NAME [$AGENT] ($FILES_CHANGED files) $TIMESTAMP" --no-verify 2>/dev/null
-if ! git push 2>/dev/null; then
+# Do not auto-push main/master (I0.8: push to main needs explicit say-so).
+# Feature branches push freely; main commits stay local until the user pushes.
+_se_branch=$(git branch --show-current 2>/dev/null || echo "")
+if [ "$_se_branch" = "main" ] || [ "$_se_branch" = "master" ]; then
+    echo "session-end: committed locally on $_se_branch; not auto-pushing (I0.8 — push to main needs explicit say-so)." >&2
+elif ! git push 2>/dev/null; then
     echo "WARNING: git push failed. Changes committed locally but not pushed." >&2
     echo "Run 'git push' manually or check for rebase conflicts." >&2
 fi

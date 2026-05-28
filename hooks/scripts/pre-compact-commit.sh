@@ -108,7 +108,12 @@ REPO_NAME=$(basename "$PROJECT_ROOT")
 # This hook fires inside PreCompact; leaving verify enabled creates an infinite hook chain.
 # Carve-out is limited to this script + session-end.sh. Do NOT reuse elsewhere.
 git commit -m "chore(checkpoint): $REPO_NAME pre-compact [$AGENT] ($TRIGGER, $FILES_CHANGED files) $TIMESTAMP_SHORT" --no-verify 2>/dev/null
-git push 2>/dev/null || true
+# Do not auto-push main/master (I0.8: push to main needs explicit say-so).
+# Feature branches push freely.
+_pc_branch=$(git branch --show-current 2>/dev/null || echo "")
+if [ "$_pc_branch" != "main" ] && [ "$_pc_branch" != "master" ]; then
+    git push 2>/dev/null || true
+fi
 
 # === STEP 4: AUTO-CHECKPOINT TO AGENTDB ===
 # This replaces manual handoff - auto-save context before compaction
@@ -124,8 +129,19 @@ if [ -f "$AGENTDB_PATH" ]; then
     # Get recent files changed
     RECENT_FILES=$(cd "$PROJECT_ROOT" && git diff --name-only HEAD~3 2>/dev/null | head -10 | tr '\n' ',' | sed 's/,$//')
 
+    # Escape for safe embedding in the write-end JSON arg: a contract goal or
+    # filename containing " or \ would otherwise produce malformed JSON and the
+    # checkpoint would be silently dropped (write-end fails, || true swallows it).
+    # Backslash must be escaped before the double-quote.
+    _json_esc() { printf '%s' "$1" | tr -d '\r\n' | sed 's/\\/\\\\/g; s/"/\\"/g'; }
+    _AGENT_J=$(_json_esc "$AGENT")
+    _TRIGGER_J=$(_json_esc "$TRIGGER")
+    _BRANCH_J=$(_json_esc "$BRANCH")
+    _GOAL_J=$(_json_esc "$ACTIVE_GOAL")
+    _FILES_J=$(_json_esc "$RECENT_FILES")
+
     # Write checkpoint (this is the auto-handoff)
-    "$AGENTDB" write-end "{\"event\":\"pre-compact\",\"agent\":\"$AGENT\",\"trigger\":\"$TRIGGER\",\"branch\":\"$BRANCH\",\"goal\":\"$ACTIVE_GOAL\",\"uncommitted_files\":$UNCOMMITTED,\"files_committed\":${FILES_CHANGED:-0},\"recent_files\":\"$RECENT_FILES\"}" 2>/dev/null || true
+    "$AGENTDB" write-end "{\"event\":\"pre-compact\",\"agent\":\"$_AGENT_J\",\"trigger\":\"$_TRIGGER_J\",\"branch\":\"$_BRANCH_J\",\"goal\":\"$_GOAL_J\",\"uncommitted_files\":$UNCOMMITTED,\"files_committed\":${FILES_CHANGED:-0},\"recent_files\":\"$_FILES_J\"}" 2>/dev/null || true
 
     # Also record compaction pattern for analysis
     # Escape single quotes in all variables to prevent SQL injection
