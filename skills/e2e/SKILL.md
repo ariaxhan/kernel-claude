@@ -6,188 +6,47 @@ allowed-tools: Read, Bash, Write, Edit, Grep, Glob
 
 <skill id="e2e">
 
-<purpose>
-E2E tests verify critical user paths in real browsers. Use sparingly - they're slow.
-Page Object Model separates selectors from test logic. Update selectors in one place.
-Flaky tests are broken tests. Fix or delete, never ignore.
-</purpose>
-
-<prerequisite>
-AgentDB read-start has run. Check for existing Page Objects.
-Verify Playwright is configured (playwright.config.ts exists).
-</prerequisite>
+<on_start>
+agentdb read-start
+Grep for existing Page Objects (pages/*.ts). Check playwright.config.ts exists.
+</on_start>
 
 <reference>
 Skill-specific: skills/e2e/reference/e2e-research.md
 </reference>
 
-<core_principles>
-1. CRITICAL PATHS ONLY: E2E tests are expensive. Test checkout, auth, core workflows. Not everything.
-2. PAGE OBJECT MODEL: Selectors in one place. Tests read like specifications.
-3. NO ARBITRARY WAITS: waitForTimeout is flaky. Wait for specific conditions.
-4. SEMANTIC SELECTORS: data-testid, role, text. Never CSS classes.
-5. QUARANTINE FLAKY: Mark flaky tests with test.fixme(). Never skip silently.
-</core_principles>
+## Steps
 
-<page_object_pattern>
-```typescript
-import { Page, Locator } from '@playwright/test'
+1. **Scope** — identify critical user paths only (auth, checkout, core workflows). E2E tests are slow; reject requests to test everything.
+   (gate: list of paths defined, count ≤ what team can maintain)
 
-export class LoginPage {
-  readonly page: Page
-  readonly emailInput: Locator
-  readonly passwordInput: Locator
-  readonly submitButton: Locator
-  readonly errorMessage: Locator
+2. **Check existing Page Objects** — `grep -r "class.*Page" tests/pages/` or equivalent. Extend existing POM before creating new.
+   (gate: no duplicate selector sets)
 
-  constructor(page: Page) {
-    this.page = page
-    this.emailInput = page.locator('[data-testid="email-input"]')
-    this.passwordInput = page.locator('[data-testid="password-input"]')
-    this.submitButton = page.locator('[data-testid="submit-btn"]')
-    this.errorMessage = page.locator('[data-testid="error-msg"]')
-  }
+3. **Create/update Page Objects** — one file per page/component. Locators use `data-testid` > role > text > CSS (last resort). Selectors in constructor; actions and assertions as methods.
+   (gate: no inline selectors in test files)
 
-  async goto() {
-    await this.page.goto('/login')
-    await this.page.waitForLoadState('networkidle')
-  }
+4. **Write tests** — `test.describe` blocks per feature. `beforeEach` for setup via POM. Each test asserts one outcome.
+   (gate: no `waitForTimeout` in any test)
 
-  async login(email: string, password: string) {
-    await this.emailInput.fill(email)
-    await this.passwordInput.fill(password)
-    await this.submitButton.click()
-    await this.page.waitForLoadState('networkidle')
-  }
-}
-```
-</page_object_pattern>
+5. **Async correctness** — replace all arbitrary timeouts with condition waits:
+   - network: `waitForResponse(r => r.url().includes('/api/...'))`
+   - visibility: `locator(...).waitFor({ state: 'visible' })`
+   - navigation: `waitForURL(/pattern/)`
+   - load: `waitForLoadState('networkidle')`
+   (gate: `grep -r "waitForTimeout" tests/` returns nothing)
 
-<test_structure>
-```typescript
-import { test, expect } from '@playwright/test'
-import { LoginPage } from '../pages/LoginPage'
+6. **Handle flaky tests** — detect with `--repeat-each=10`. Fix root cause (race condition, animation timing, network timing). If fix deferred: `test.fixme(true, 'Flaky - Issue #NNN')`. Never silent-skip.
+   (gate: no `test.skip()` without issue reference)
 
-test.describe('Authentication', () => {
-  let loginPage: LoginPage
+7. **Configure Playwright** — verify `playwright.config.ts` has: `retries: CI ? 2 : 0`, `forbidOnly: !!CI`, `trace: 'on-first-retry'`, `screenshot: 'only-on-failure'`. See reference for full config template.
+   (gate: config file present, CI retries ≥ 2)
 
-  test.beforeEach(async ({ page }) => {
-    loginPage = new LoginPage(page)
-    await loginPage.goto()
-  })
+8. **CI integration** — add/verify GitHub Actions workflow: install with `--with-deps`, upload `playwright-report/` as artifact `if: always()`. See reference for full YAML.
+   (gate: artifact upload step present)
 
-  test('successful login redirects to dashboard', async ({ page }) => {
-    await loginPage.login('user@example.com', 'password123')
-    await expect(page).toHaveURL(/\/dashboard/)
-  })
-
-  test('invalid credentials show error', async () => {
-    await loginPage.login('wrong@example.com', 'wrongpassword')
-    await expect(loginPage.errorMessage).toBeVisible()
-    await expect(loginPage.errorMessage).toContainText('Invalid credentials')
-  })
-})
-```
-</test_structure>
-
-<flaky_test_patterns>
-<!-- Quarantine flaky tests -->
-```typescript
-test('flaky: complex async flow', async ({ page }) => {
-  test.fixme(true, 'Flaky - Issue #123')
-  // test code...
-})
-
-test('skip in CI only', async ({ page }) => {
-  test.skip(process.env.CI === 'true', 'Flaky in CI - Issue #456')
-  // test code...
-})
-```
-
-<!-- Fix common causes -->
-```typescript
-// BAD: arbitrary timeout
-await page.waitForTimeout(5000)
-
-// GOOD: wait for specific condition
-await page.waitForResponse(resp => resp.url().includes('/api/data'))
-
-// BAD: race condition
-await page.click('[data-testid="menu"]')
-
-// GOOD: wait for visibility first
-await page.locator('[data-testid="menu"]').waitFor({ state: 'visible' })
-await page.locator('[data-testid="menu"]').click()
-```
-
-<!-- Identify flakiness -->
-```bash
-npx playwright test tests/auth.spec.ts --repeat-each=10
-```
-</flaky_test_patterns>
-
-<playwright_config>
-```typescript
-import { defineConfig, devices } from '@playwright/test'
-
-export default defineConfig({
-  testDir: './tests/e2e',
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: [
-    ['html', { outputFolder: 'playwright-report' }],
-    ['junit', { outputFile: 'test-results.xml' }]
-  ],
-  use: {
-    baseURL: process.env.BASE_URL || 'http://localhost:3000',
-    trace: 'on-first-retry',
-    screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
-    actionTimeout: 10000,
-    navigationTimeout: 30000,
-  },
-  projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-  ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
-})
-```
-</playwright_config>
-
-<ci_integration>
-```yaml
-# .github/workflows/e2e.yml
-name: E2E Tests
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-      - run: npx playwright install --with-deps
-      - run: npx playwright test
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
-```
-</ci_integration>
+9. **Run suite** — `npx playwright test`. All tests pass or are explicitly quarantined with issue refs.
+   (gate: exit 0, or all failures are `test.fixme`)
 
 <anti_patterns>
 <block id="test_everything">E2E tests are slow. Test critical paths, not every feature.</block>

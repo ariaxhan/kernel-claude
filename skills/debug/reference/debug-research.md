@@ -348,3 +348,123 @@ points:
   orchestrator escalation. The surgeon should not spiral.
 - **2026**: Consider ChatDBG or debug-gym methodology for initial hypothesis
   generation, but verify all AI-suggested root causes with evidence.
+
+---
+
+## Parallel Debug Strategy (Competing Hypothesis Agents)
+
+For bugs with multiple plausible causes, spawn separate agents per hypothesis.
+Each investigates independently with a fresh, unpolluted context window.
+Agents with fresh context catch what a single long session anchors past.
+
+```
+Agent A: Hypothesis — race condition in cache layer
+Agent B: Hypothesis — API contract mismatch on response shape
+Agent C: Hypothesis — off-by-one in pagination cursor
+
+Each reports: evidence_for | evidence_against | confidence (0-1)
+Coroner agent synthesizes findings.
+```
+
+**Fresh context advantage**: Long debugging sessions accumulate cognitive anchoring.
+A fresh agent given only the minimal reproduction case (not 200 lines of chat history)
+reasons more clearly. When stuck >30 min, spawn a fresh agent with only:
+- The exact input that triggers the bug
+- The expected vs actual output
+- The relevant code section (not the whole file)
+
+**AgentDB as debug log**: Write each hypothesis and its test result to AgentDB before
+abandoning it. Prevents the same hypothesis being re-investigated in the next session.
+
+<!-- Source: parallel_debug_strategy section, 2026-05-28 -->
+
+---
+
+## Persistent Investigation File Template
+
+Create `_meta/context/DEBUG.md` at session start. Update throughout.
+Achieves ~95% first-time fix rate vs ~40% for ad-hoc debugging (structured persistent
+investigation prevents circular re-investigation across context compression boundaries).
+<!-- Evidence: https://allierays.com/posts/5-techniques-to-debug-claude-code/ -->
+
+Instruct Claude: "Read _meta/context/DEBUG.md before each attempt. Update it after each attempt."
+
+```markdown
+# Debugging Session: [Issue Title]
+
+## Problem Statement
+[Concise problem + exact error message]
+
+## What We Know
+- [confirmed fact 1]
+- [confirmed fact 2]
+
+## Approaches Tried
+- [ ] Approach A: [description] → Failed because [reason]
+- [ ] Approach B: [description] → Failed because [reason]
+- [x] Approach C: [description] → Partially works, need to [next step]
+
+## Current Hypothesis
+[Best current theory of root cause]
+
+## Next Steps
+1. [specific action]
+```
+
+<!-- Source: persistent_truth_file section, 2026-05-28 -->
+
+---
+
+## 2026 Tooling Landscape
+
+### Plan Mode
+Use for complex or multi-file bugs before touching code.
+Paste stack traces and error messages. Scope exploration, form hypotheses, get
+approval — then switch to Act mode for fixes.
+
+### Auto-Compaction
+Auto-manages context window limits in 2026. No longer need to manually `/compact`
+during debug sessions. But instruct compaction to preserve `_meta/context/DEBUG.md`
+so investigation state survives.
+
+### Agent Tool for Parallel Exploration
+Spawn competing-hypothesis agents without polluting the main context.
+Each agent gets only the minimal reproduction, not 200 lines of chat history.
+
+**Root cause over fast fix**: Claude solves the immediate problem by finding the fastest
+path to making the error go away. The fastest fix is frequently wrong — it patches the
+symptom and breaks something downstream. When a fix "works" but you can't explain
+*why the bug occurred*, you haven't fixed it.
+
+<!-- Source: tooling_2026 section, Updated 2026-05-14 — https://gitnation.com/contents/advanced-claude-code-techniques-for-2026 -->
+
+---
+
+## MCP Debugger Integration
+
+MCP debugger tools let Claude Code set breakpoints, step through code, and evaluate
+expressions at runtime — rather than relying solely on print-based logging.
+
+**When to use**: binary search isolation isn't sufficient, or the bug only manifests
+under specific runtime state that's hard to reproduce via logging alone.
+
+Reference implementation: github.com/AlmogBaku/debug-skill
+
+**Advantage over logging**: Claude sees exact variable state at each execution step.
+Faster convergence on root cause for state-mutation bugs, closure bugs, and async
+timing issues where print-based debugging distorts timing.
+
+<!-- Source: debugger_mcp_integration section, Updated 2026-05-17 -->
+
+---
+
+## --verbose Flag
+
+Use `--verbose` when running Claude Code during active debugging sessions to see tool
+calls, file reads, and intermediate reasoning in real time. Turn it off in production
+or CI runs — the overhead is significant and the output is for human diagnosis only.
+
+When a debugging session produces an unexpected fix or Claude explains reasoning you
+can't follow, `--verbose` output is the receipt. Read it before accepting the fix.
+
+<!-- Source: verbose_flag section, Updated 2026-05-17 -->

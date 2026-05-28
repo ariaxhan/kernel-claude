@@ -28,6 +28,51 @@ Skill-specific: skills/git/reference/git-research.md
 5. COMMIT OFTEN: Every working state gets a commit. Max 30 min between commits.
 </core_principles>
 
+<workflow>
+
+  <step id="1" name="preflight">
+    1. `git status` — note branch, dirty files, untracked.
+    2. Dirty at task start? Stop. Commit, stash, or discard prior state first.
+    3. Tier 2+: confirm you are NOT on main. Create branch: `git checkout -b {type}/{name}`.
+    (gate: clean working tree OR explicit decision made)
+  </step>
+
+  <step id="2" name="snapshot">
+    4. Record HEAD sha to AgentDB before any work: `git rev-parse HEAD`.
+    (gate: sha written to AgentDB — rollback target exists)
+  </step>
+
+  <step id="3" name="commit">
+    5. Stage specific files only: `git add {file}` — never `git add -A` or `git add .`.
+    6. Write message: `{type}({scope}): {description}` in imperative mood.
+       — Forbidden: wip, update, misc, auto commit, Co-Authored-By, "Generated with"
+    7. Commit. Never `--no-verify` (fix the gate instead; see hook carve-outs in CLAUDE.md).
+    (gate: `git log --oneline -1` shows correct message; no forbidden strings)
+  </step>
+
+  <step id="4" name="scope_check">
+    8. `git diff --stat {base}..HEAD` — only contracted files changed.
+    9. No leaked secrets: `git diff HEAD~1 | grep -i "key\|token\|secret\|password"`.
+    (gate: diff matches contract scope; zero secret leaks)
+  </step>
+
+  <step id="5" name="push">
+    10. Feature branch: push freely after gates pass.
+    11. main / master: STOP — requires explicit user say-so (I0.8).
+    12. Never bare `--force`. If needed: `--force-with-lease` only.
+    (gate: user confirmed OR branch is not main)
+  </step>
+
+  <step id="6" name="pr_review">
+    13. Keep diffs ≤500 lines. >500 lines: split the PR first.
+    14. AI review before human review (sequence: AI → fix → human). Never parallelize.
+    15. PR description for AI-assisted work must answer: AI role / prompt / human contribution.
+    16. "Nit:" prefix for optional style comments.
+    (gate: diff ≤500 lines; review sequence followed)
+  </step>
+
+</workflow>
+
 <branch_strategy>
 - main: Always deployable. Never commit directly for tier 2+.
 - feature/{name}: New functionality
@@ -41,18 +86,6 @@ Profile-gated workflow:
   github-production: feature branches always, PRs REQUIRED, review REQUIRED
 </branch_strategy>
 
-<commit_messages>
-Good:
-- feat: add user authentication endpoint
-- fix: resolve race condition in cache invalidation
-- refactor: extract validation logic to separate module
-
-Bad:
-- fixed stuff
-- WIP
-- updates
-</commit_messages>
-
 <anti_patterns>
 - Committing to main directly for multi-file changes
 - "WIP" commits that never get squashed
@@ -60,101 +93,8 @@ Bad:
 - Force pushing to shared branches
 - Skipping commit messages
 - Including AI tool attribution in commit messages (Co-Authored-By, "Generated with Claude Code", etc.)
+- git add -A / git add . (catches unintended files)
+- Parallelize AI + human review (humans see noisy diff, duplicate feedback)
 </anti_patterns>
-
-<!-- Updated 2026-03-30: Claude Code best practices, Anthropic prompt engineering guide -->
-<agentic_git_discipline>
-Agentic workflows introduce new git failure modes. Mitigate them:
-
-**Pre-task snapshot**: Before any agent starts work, record the HEAD commit SHA in AgentDB.
-If the task needs rollback, you know exactly where to return.
-
-```bash
-# Record before agent work
-git rev-parse HEAD  # save this to AgentDB
-
-# Rollback if needed
-git reset --hard <saved-sha>
-```
-
-**Dirty-state check**: If `git status` shows uncommitted changes at task start, stop.
-Prior agent left state. Commit, stash, or discard before proceeding — never silently overwrite.
-
-**Branch-per-agent for tier 2+**: Each agent working on distinct features gets its own
-branch. Merging branches (not rebasing) preserves intent and makes conflicts explicit.
-
-**Squash before merge**: Agent commits tend to be fine-grained and mechanical.
-Squash to one meaningful commit per feature before merging to main. Message should
-describe the feature, not the implementation steps.
-
-**No force-push to shared branches**: An agent force-pushing destroys another agent's
-or human's commits silently. Use `--force-with-lease` only, never bare `--force`.
-</agentic_git_discipline>
-
-<!-- Updated 2026-04-04: AI code review best practices, https://collinwilkins.com/articles/ai-code-review-best-practices-approaches-tools.html -->
-<diff_sizing>
-Diff size is the single biggest lever for AI code review quality:
-
-- **50-200 lines**: optimal — AI catches logic errors, security issues, edge cases
-- **200-500 lines**: acceptable — AI catches obvious issues, misses subtle interactions
-- **500+ lines**: degraded — AI overwhelmed, misses important context, feedback generic
-- **1000+ lines**: near-useless — context saturation, review becomes superficial
-
-Rule: if a diff exceeds 500 lines, split the PR before requesting AI review.
-
-<!-- Updated 2026-05-10: https://www.codeant.ai/blogs/good-code-review-practices-guide, https://codeintelligently.com/blog/ai-code-quality-guide-2026 -->
-**Team-level PR size target**: Set P50 PR size < 300 LOC as a team metric (median PR, not max). Teams that track this and enforce it see 40-60% reduction in review time. Track with: `git log --oneline -20 --shortstat | grep -E "changed"`. The 500-line hard cap is the ceiling; 300-line P50 is the steady-state goal.
-
-**AI review before human review**: Run AI review (~90 seconds) before requesting human review.
-Developer fixes cheap issues first, humans see a cleaner diff and focus on intent and design.
-Sequence: AI review → fix → human review. Not parallel.
-</diff_sizing>
-
-
-<!-- Updated 2026-04-14: https://javaworldmag.com/evolving-code-reviews-with-ai-in-2026/ -->
-<ai_pr_transparency>
-When merging AI-assisted work, PR descriptions should answer three questions:
-
-1. **What was the AI's role?** (generated scaffold, wrote tests, suggested approach, full implementation)
-2. **What prompt or instructions drove it?** (as important as a commit message — reviewers evaluate the generation process, not just the output)
-3. **What was the human contribution?** (reviewed, modified, architecture decisions, requirements)
-
-Reviewers then focus on: design decisions, architecture fit, business logic correctness — not line-by-line syntax the AI already handled.
-
-This is not ceremony — it's the minimum for a meaningful review of AI-assisted code. Without it, reviewers are auditing output with no context on how it was generated.
-</ai_pr_transparency>
-
-<!-- Updated 2026-04-23: https://stackoverflow.blog/2026/03/26/coding-guidelines-for-ai-agents-and-people-too/, https://javaworldmag.com/evolving-code-reviews-with-ai-in-2026/ -->
-<review_conventions>
-**"Nit:" prefix for optional comments**: Prefix style-only feedback with "Nit:" to signal it's optional.
-Prevents authors from treating cosmetic suggestions as blockers.
-
-```
-# Required (no prefix)
-"Line 24: userId could be null here — add validation before the DB call"
-
-# Optional (Nit prefix)
-"Nit: 'x' would be clearer as 'userCount'"
-```
-
-Without the prefix, reviewers and authors waste cycles on non-critical changes.
-
-**AI-first review sequence**: AI review catches style/logic issues BEFORE human review.
-Sequence: AI review (90s) → author fixes cheap issues → human reviews cleaner diff.
-Humans then focus on architecture, business logic, and intent — not nitpicks the AI already caught.
-Never parallelize AI + human review: humans see a noisier diff and duplicate AI feedback.
-</review_conventions>
-
-<!-- Updated 2026-05-14: https://www.codeant.ai/blogs/good-code-review-practices-guide, https://codeintelligently.com/blog/ai-code-quality-guide-2026 -->
-<tiered_review_risk>
-Not all changes warrant the same review depth. Route by tier to capture the 40-60% review time reduction without sacrificing judgment on critical changes:
-
-- **Tier 1 — AI handles completely**: style, formatting, naming, simple logic, boilerplate, test assertions
-- **Tier 2 — AI + quick human skim**: error handling, input validation, moderate business logic
-- **Tier 3 — human required**: architecture decisions, security-sensitive paths, auth/payments/PII, anything affecting critical systems
-
-The review time savings come from AI absorbing Tier 1 entirely — not from replacing Tier 3 judgment.
-Complex architectural decisions and business logic in critical flows always need a human eye.
-</tiered_review_risk>
 
 </skill>

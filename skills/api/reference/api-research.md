@@ -349,3 +349,132 @@ X-API-Key: sk_live_abc123
 - Microsoft REST API Guidelines
 - JSON:API specification
 - RFC 7807 (Problem Details)
+
+---
+<!-- Migrated from SKILL.md 2026-05-28 -->
+
+## URL Structure Reference
+
+```
+# Resource CRUD
+GET    /api/v1/users              # List
+GET    /api/v1/users/:id          # Get one
+POST   /api/v1/users              # Create
+PUT    /api/v1/users/:id          # Replace
+PATCH  /api/v1/users/:id          # Update
+DELETE /api/v1/users/:id          # Delete
+
+# Sub-resources for relationships
+GET    /api/v1/users/:id/orders   # User's orders
+POST   /api/v1/users/:id/orders   # Create order for user
+
+# Actions (use sparingly)
+POST   /api/v1/orders/:id/cancel  # Verb for non-CRUD action
+POST   /api/v1/auth/login         # Auth endpoints
+```
+
+Good vs bad:
+```
+# GOOD: kebab-case, plural, no verbs
+/api/v1/team-members
+/api/v1/orders?status=active
+
+# BAD: verbs, singular, snake_case in URL
+/api/v1/getUser
+/api/v1/user
+/api/v1/team_members
+```
+
+## TypeScript Implementation Example (Next.js + Zod)
+
+```typescript
+import { z } from "zod"
+import { NextRequest, NextResponse } from "next/server"
+
+const createUserSchema = z.object({
+  email: z.string().email(),
+  name: z.string().min(1).max(100),
+})
+
+export async function POST(req: NextRequest) {
+  const body = await req.json()
+  const parsed = createUserSchema.safeParse(body)
+
+  if (!parsed.success) {
+    return NextResponse.json({
+      error: {
+        code: "validation_error",
+        message: "Request validation failed",
+        details: parsed.error.issues.map(i => ({
+          field: i.path.join("."),
+          message: i.message,
+          code: i.code,
+        })),
+      },
+    }, { status: 422 })
+  }
+
+  const user = await createUser(parsed.data)
+
+  return NextResponse.json(
+    { data: user },
+    {
+      status: 201,
+      headers: { Location: `/api/v1/users/${user.id}` },
+    },
+  )
+}
+```
+
+## Idempotency Implementation
+
+```typescript
+// POST with idempotency key prevents duplicate operations
+export async function POST(req: NextRequest) {
+  const idempotencyKey = req.headers.get('Idempotency-Key')
+
+  if (idempotencyKey) {
+    const existing = await cache.get(`idem:${idempotencyKey}`)
+    if (existing) return NextResponse.json(existing, { status: 200 })
+  }
+
+  const result = await processRequest(req)
+
+  if (idempotencyKey) {
+    await cache.set(`idem:${idempotencyKey}`, result, { ttl: 86400 })
+  }
+
+  return NextResponse.json(result, { status: 201 })
+}
+```
+
+Idempotency keys are especially important for:
+- Payment and order endpoints (AI agent retries on timeout)
+- Bulk import operations
+- Any endpoint an agent might call in a retry loop
+
+## Agentic Client Design — Deep Reference
+
+When your API will be called by AI agents (not just browsers/mobile), additional design rules apply.
+
+**Retry-safe by default**: Agents retry on timeout and network error. Every state-changing endpoint
+must be idempotent OR require an Idempotency-Key header. Document which one. Agents that can't
+safely retry will corrupt state or lose operations.
+
+**Explicit error taxonomy**: Agents parse error responses to decide retry vs. abort. Use distinct
+error codes for distinct failure modes.
+
+```json
+{ "error": { "code": "rate_limit_exceeded", "retry_after": 60 } }  // agent knows: wait 60s, retry
+{ "error": { "code": "validation_error", "field": "email" } }       // agent knows: fix input, don't retry
+{ "error": { "code": "insufficient_credits" } }                     // agent knows: abort, escalate to human
+```
+
+**Batch endpoints**: Agents calling N endpoints in a loop amplify latency. Offer bulk variants
+for high-frequency reads (GET /api/v1/users/batch?ids=a,b,c) for lists an agent might traverse.
+
+**Machine-readable pagination**: Always return `next_cursor` as a direct string, never compute
+it from `page + per_page`. Agents parsing offset arithmetic introduce off-by-one bugs.
+Cursor approach: return cursor string, agent passes it back verbatim — no math required.
+
+Sources: https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents (2026-04-27)

@@ -419,3 +419,251 @@ function errorHandler(error: unknown, req: Request, res: Response) {
 - Martin Fowler, "Patterns of Enterprise Application Architecture"
 - Redis docs on caching patterns
 - AWS Well-Architected Framework
+
+---
+
+## Inline Examples Moved from SKILL.md (2026-05-28)
+
+### Repository Pattern — Supabase Implementation
+```typescript
+interface UserRepository {
+  findAll(filters?: UserFilters): Promise<User[]>
+  findById(id: string): Promise<User | null>
+  create(data: CreateUserDto): Promise<User>
+  update(id: string, data: UpdateUserDto): Promise<User>
+  delete(id: string): Promise<void>
+}
+
+class SupabaseUserRepository implements UserRepository {
+  async findAll(filters?: UserFilters): Promise<User[]> {
+    let query = supabase.from('users').select('id, name, email')
+
+    if (filters?.role) {
+      query = query.eq('role', filters.role)
+    }
+
+    const { data, error } = await query
+    if (error) throw new Error(error.message)
+    return data
+  }
+}
+```
+
+### Service Layer — Constructor Injection
+```typescript
+class UserService {
+  constructor(
+    private userRepo: UserRepository,
+    private emailService: EmailService
+  ) {}
+
+  async createUser(data: CreateUserDto): Promise<User> {
+    // Business logic: validate, transform, orchestrate
+    const existing = await this.userRepo.findByEmail(data.email)
+    if (existing) throw new ConflictError('Email already registered')
+
+    const user = await this.userRepo.create(data)
+    await this.emailService.sendWelcome(user.email)
+
+    return user
+  }
+}
+```
+
+### N+1 Prevention — Batch Fetch Pattern
+```typescript
+// BAD: N+1 queries
+const orders = await getOrders()
+for (const order of orders) {
+  order.customer = await getCustomer(order.customer_id)  // N queries!
+}
+
+// GOOD: Batch fetch
+const orders = await getOrders()
+const customerIds = [...new Set(orders.map(o => o.customer_id))]
+const customers = await getCustomersByIds(customerIds)  // 1 query
+const customerMap = new Map(customers.map(c => [c.id, c]))
+
+orders.forEach(order => {
+  order.customer = customerMap.get(order.customer_id)
+})
+```
+
+```typescript
+// GOOD: Select only needed columns
+const { data } = await supabase
+  .from('orders')
+  .select('id, total, status, customer:customers(id, name)')
+  .eq('status', 'active')
+  .limit(10)
+```
+
+### Caching — Cache-Aside with Invalidation
+```typescript
+// Cache-aside pattern
+class CachedUserRepository implements UserRepository {
+  constructor(
+    private baseRepo: UserRepository,
+    private redis: RedisClient
+  ) {}
+
+  async findById(id: string): Promise<User | null> {
+    const cacheKey = `user:${id}`
+
+    // Check cache
+    const cached = await this.redis.get(cacheKey)
+    if (cached) return JSON.parse(cached)
+
+    // Cache miss - fetch from DB
+    const user = await this.baseRepo.findById(id)
+
+    if (user) {
+      // Cache for 5 minutes
+      await this.redis.setex(cacheKey, 300, JSON.stringify(user))
+    }
+
+    return user
+  }
+
+  async update(id: string, data: UpdateUserDto): Promise<User> {
+    const user = await this.baseRepo.update(id, data)
+    // Invalidate cache on mutation
+    await this.redis.del(`user:${id}`)
+    return user
+  }
+}
+```
+
+### Transactions — Supabase RPC
+```typescript
+// Supabase RPC for atomic operations
+async function transferFunds(fromId: string, toId: string, amount: number) {
+  const { data, error } = await supabase.rpc('transfer_funds', {
+    from_id: fromId,
+    to_id: toId,
+    amount: amount
+  })
+
+  if (error) throw new Error('Transfer failed')
+  return data
+}
+```
+
+```sql
+-- SQL function with automatic rollback
+CREATE OR REPLACE FUNCTION transfer_funds(
+  from_id uuid,
+  to_id uuid,
+  amount decimal
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  -- Deduct from sender
+  UPDATE accounts SET balance = balance - amount WHERE id = from_id;
+  -- Add to receiver
+  UPDATE accounts SET balance = balance + amount WHERE id = to_id;
+  RETURN jsonb_build_object('success', true);
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Automatic rollback
+    RETURN jsonb_build_object('success', false, 'error', SQLERRM);
+END;
+$$;
+```
+
+### Error Handling — ApiError + Global Handler
+```typescript
+class ApiError extends Error {
+  constructor(
+    public statusCode: number,
+    public message: string,
+    public code: string
+  ) {
+    super(message)
+  }
+}
+
+export function errorHandler(error: unknown): Response {
+  if (error instanceof ApiError) {
+    return NextResponse.json({
+      error: { code: error.code, message: error.message }
+    }, { status: error.statusCode })
+  }
+
+  if (error instanceof z.ZodError) {
+    return NextResponse.json({
+      error: {
+        code: 'validation_error',
+        message: 'Validation failed',
+        details: error.errors
+      }
+    }, { status: 400 })
+  }
+
+  // Log unexpected errors, don't expose details
+  console.error('Unexpected error:', error)
+  return NextResponse.json({
+    error: { code: 'internal_error', message: 'Internal server error' }
+  }, { status: 500 })
+}
+```
+
+### Retry Pattern — Exponential Backoff
+```typescript
+async function fetchWithRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3
+): Promise<T> {
+  let lastError: Error
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn()
+    } catch (error) {
+      lastError = error as Error
+      if (i < maxRetries - 1) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, i) * 1000
+        await new Promise(r => setTimeout(r, delay))
+      }
+    }
+  }
+
+  throw lastError!
+}
+```
+
+### Queue Pattern — Basic Job Queue
+```typescript
+class JobQueue<T> {
+  private queue: T[] = []
+  private processing = false
+
+  async add(job: T): Promise<void> {
+    this.queue.push(job)
+    if (!this.processing) this.process()
+  }
+
+  private async process(): Promise<void> {
+    this.processing = true
+
+    while (this.queue.length > 0) {
+      const job = this.queue.shift()!
+      try {
+        await this.execute(job)
+      } catch (error) {
+        console.error('Job failed:', error)
+        // Optionally: retry, dead-letter queue
+      }
+    }
+
+    this.processing = false
+  }
+
+  private async execute(job: T): Promise<void> {
+    // Implement job execution
+  }
+}
+```
