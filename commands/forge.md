@@ -93,7 +93,18 @@ See `skills/orchestration/SKILL.md` <max_budget_usd_invariant>.
   <phase id="hammer" name="HAMMER — Red-Green-Refactor Until Solid">
     Select the strongest approach. Beat it into shape.
 
-    1. Write failing tests FIRST (red). Edge cases before happy paths.
+    1. **[D2 — edge-case enumeration, mandatory before code]** Write failing tests FIRST (red).
+       Do NOT rely on the model to "think of" edge cases. Explicitly walk the standard classes
+       and write a failing test for EACH that applies to this contract, before any happy path:
+         - **null** — None/nil/missing field where a value is expected
+         - **empty** — empty list/string/set; zero-count results
+         - **boundary** — off-by-one, first/last, min/max, page-beyond-range, midnight/timezone edges
+         - **concurrent** — two callers mutating shared state (race conditions; the invariant must
+           hold under threads, not just sequentially)
+         - **timeout / retry** — duplicate/idempotent calls, partial completion, re-entry
+       A class that genuinely doesn't apply gets one line saying why. Skipping the enumeration is
+       the failure mode (Urvil's $50 refund race: the human had to think of concurrency — the forge
+       must enumerate it instead of hoping).
     2. Implement minimal code to pass (green).
     3. Refactor while green.
     4. Run full suite: tests + lint + types.
@@ -102,7 +113,17 @@ See `skills/orchestration/SKILL.md` <max_budget_usd_invariant>.
     Inner loop (max 5 strikes per approach):
       - failing → fix implementation, not tests
       - passing → proceed to quench
-      - stuck after 3 strikes → switch to next candidate approach from heat phase
+      - **stuck after 3 strikes → [D1 — non-repair classifier] CLASSIFY before re-trying:**
+        - **APPROACH-GAP** (the strategy is wrong, but the correct behavior is knowable) →
+          switch to next candidate approach from heat phase (existing behavior).
+        - **CONTRACT-GAP** (the spec is genuinely ambiguous / the correct behavior is
+          undeterminable, OR the same failure survives a tactic that should have fixed it —
+          the model cannot conceptually repair it) → **STOP. Do NOT burn anneals.** Escalate:
+          name the exact ambiguous/un-fixable criterion and hand to the human (or flag the
+          contract for redesign). Switching approaches cannot fix a contract/concept gap.
+        Why: detection ≠ repair (Ayoob, n=30 — a gate detected every failure but retries kept
+        the wrong action when the model couldn't grasp the distinction). Re-annealing a
+        contract-gap wastes 3 full cycles on something no approach repairs.
 
     ```bash
     agentdb emit command "forge-hammer" "" '{"approach":"X","strikes":N,"tests_passing":N,"metrics":{}}'
