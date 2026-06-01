@@ -93,18 +93,7 @@ See `skills/orchestration/SKILL.md` <max_budget_usd_invariant>.
   <phase id="hammer" name="HAMMER — Red-Green-Refactor Until Solid">
     Select the strongest approach. Beat it into shape.
 
-    1. **[D2 — edge-case enumeration, mandatory before code]** Write failing tests FIRST (red).
-       Do NOT rely on the model to "think of" edge cases. Explicitly walk the standard classes
-       and write a failing test for EACH that applies to this contract, before any happy path:
-         - **null** — None/nil/missing field where a value is expected
-         - **empty** — empty list/string/set; zero-count results
-         - **boundary** — off-by-one, first/last, min/max, page-beyond-range, midnight/timezone edges
-         - **concurrent** — two callers mutating shared state (race conditions; the invariant must
-           hold under threads, not just sequentially)
-         - **timeout / retry** — duplicate/idempotent calls, partial completion, re-entry
-       A class that genuinely doesn't apply gets one line saying why. Skipping the enumeration is
-       the failure mode (Urvil's $50 refund race: the human had to think of concurrency — the forge
-       must enumerate it instead of hoping).
+    1. Write failing tests FIRST (red). Edge cases before happy paths.
     2. Implement minimal code to pass (green).
     3. Refactor while green.
     4. Run full suite: tests + lint + types.
