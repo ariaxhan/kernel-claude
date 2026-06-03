@@ -104,7 +104,7 @@ Plans under 50 lines. Longer = overthinking.
 
 Context discipline:
 - State DONE-WHEN criteria at session START, not end
-- Compact at ~70% context usage — signal: shorter responses, earlier instructions ignored
+- Compact at ~60% context usage — degradation begins at 20-40% fill; don't wait for signals
 - Scope sessions by task, not time — one session = one feature or one bug
 - Two-failure reset: same mistake twice → `/clear` and restart with refined prompt
 

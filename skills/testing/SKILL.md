@@ -75,6 +75,7 @@ Before accepting any AI-generated test, verify:
 - **Parallel per module**: when coverage gaps span multiple modules, spawn one agent per module boundary.
 - **Surgeon done-when**: acceptance criteria = runnable tests passing, not "code written."
 - **Effort level**: use `effort: high` for test-generation agents; default under-generates edge cases.
+- **BQ testing (agent output)**: AI agent output is non-deterministic — validate action patterns and behavioral invariants, not exact text. Test WHAT the agent did, not how it phrased it.
 
 ### Step 8 — Grader pattern (complex features)
 1. Define success rubric (expected behaviors, edge handling, perf bounds) BEFORE tests or code.
@@ -86,6 +87,7 @@ Before accepting any AI-generated test, verify:
 Generate tests during code review, not into the static suite, when:
 - Code changes faster than test suites can track
 - Refactoring: generate behavioral tests BEFORE changes, run AFTER to confirm preservation
+Meta 2026: JiT generates ~4x more bug-catching tests than static suite additions for AI-generated code.
 (reference: testing-research.md § Just-in-Time Testing)
 
 ---
