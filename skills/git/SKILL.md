@@ -68,6 +68,7 @@ Skill-specific: skills/git/reference/git-research.md
     14. AI review before human review (sequence: AI → fix → human). Never parallelize.
     15. PR description for AI-assisted work must answer: AI role / prompt / human contribution.
     16. "Nit:" prefix for optional style comments.
+    17. Reviewer context matters: reviewer with diff-only context → diff-quality findings; reviewer with full-codebase context → codebase-quality findings. Spawn reviewers with repo access. <!-- Updated 2026-06-04: https://sourcegraph.com/blog/ai-code-review -->
     (gate: diff ≤500 lines; review sequence followed)
   </step>
 

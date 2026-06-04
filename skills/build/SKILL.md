@@ -107,6 +107,7 @@ Context discipline:
 - Compact at ~60% context usage — degradation begins at 20-40% fill; don't wait for signals
 - Scope sessions by task, not time — one session = one feature or one bug
 - Two-failure reset: same mistake twice → `/clear` and restart with refined prompt
+- Plan Mode for features with >5 decision points: plan first, then implement in a fresh session. A feature with 20 decision points at 80% per-decision accuracy has a 1.2% chance all land correctly without an upfront plan. <!-- Updated 2026-06-04: https://code.claude.com/docs/en/best-practices -->
 
 (gate: each logical unit committed before moving to next)
 
