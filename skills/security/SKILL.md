@@ -70,6 +70,8 @@ Skill-specific: skills/security/reference/security-research.md
   13. **Agent permissions** — every spawned agent has explicit tool allowlist + file scope; no admin-by-default.
       (gate: spawn contract lists allowed tools ≤5; sensitive scopes named explicitly)
 
+  14. **Risk-based review priority** — when doing a full security review pass, prioritize in order: logic changes → deleted validations → auth flows → query changes → areas with prior security incidents. Start where impact is highest. <!-- Updated 2026-06-05: https://sourcegraph.com/blog/ai-code-review -->
+
 </flow>
 
 <pre_deployment_checklist>

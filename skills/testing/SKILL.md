@@ -76,6 +76,8 @@ Before accepting any AI-generated test, verify:
 - **Surgeon done-when**: acceptance criteria = runnable tests passing, not "code written."
 - **Effort level**: use `effort: high` for test-generation agents; default under-generates edge cases.
 - **BQ testing (agent output)**: AI agent output is non-deterministic — validate action patterns and behavioral invariants, not exact text. Test WHAT the agent did, not how it phrased it.
+- **Subagent scope reviewer**: after implementation, spawn a reviewer agent to verify: every requirement is implemented, listed edge cases have tests, nothing outside task scope changed. <!-- Updated 2026-06-05: https://code.claude.com/docs/en/best-practices -->
+- **Context-aware verification rigor**: solo dev → verify logic + edge cases; team → systematic peer review; production → mandatory gating tests. Match rigor to deployment stakes. <!-- Updated 2026-06-05: https://levelup.gitconnected.com/claude-code-best-practices-12-patterns-agentic-engineers-use-65264e3eb919 -->
 
 ### Step 8 — Grader pattern (complex features)
 1. Define success rubric (expected behaviors, edge handling, perf bounds) BEFORE tests or code.

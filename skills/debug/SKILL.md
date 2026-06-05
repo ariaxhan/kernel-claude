@@ -82,6 +82,7 @@ Skill-specific: skills/debug/reference/debug-research.md
 7. **Plan Mode**: Paste stack traces in Plan Mode first. Analyze, form hypotheses, get approval — then switch to Act mode for fixes.
 8. **Rewind**: `Esc+Esc` or `/rewind` restores code to a pre-bug checkpoint without losing conversation context. Checkpoints survive terminal closes.
 9. **Visibility-first**: Paste raw terminal output / error logs / screenshots directly. Raw data beats your interpretation.
+10. **Evidence-first, not assertion**: Show the actual evidence (test output, exact command + result, screenshot) rather than stating "it works." Reviewing evidence is faster than re-running verification, and catches cases where "seems to work" masks a different failure path. <!-- Updated 2026-06-05: https://code.claude.com/docs/en/best-practices -->
 </when_stuck>
 
 <escalation>

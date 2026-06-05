@@ -69,6 +69,7 @@ Skill-specific: skills/git/reference/git-research.md
     15. PR description for AI-assisted work must answer: AI role / prompt / human contribution.
     16. "Nit:" prefix for optional style comments.
     17. Reviewer context matters: reviewer with diff-only context → diff-quality findings; reviewer with full-codebase context → codebase-quality findings. Spawn reviewers with repo access. <!-- Updated 2026-06-04: https://sourcegraph.com/blog/ai-code-review -->
+    18. Pre-PR validation for AI-generated code: before raising the PR, verify the implementation against the original spec/intent (not just "does it run?"). Catch intent drift — AI correctly implemented what it inferred, not what was actually needed — before a human reviewer sees it. <!-- Updated 2026-06-05: https://sourcegraph.com/blog/ai-code-review -->
     (gate: diff ≤500 lines; review sequence followed)
   </step>
 
