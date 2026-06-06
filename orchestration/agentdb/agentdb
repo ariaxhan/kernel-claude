@@ -199,7 +199,7 @@ cmd_preflight() {
   done
 
   # Check 3: learnings schema has all expected columns
-  local expected_cols="id ts type insight evidence domain hit_count last_hit visibility sensitivity"
+  local expected_cols="id ts type insight evidence domain hit_count load_count last_hit visibility sensitivity"
   for col in $expected_cols; do
     local has_col
     has_col=$(db_exec "SELECT 1 FROM pragma_table_info('learnings') WHERE name='$col' LIMIT 1;" 2>/dev/null || echo "")
@@ -208,6 +208,7 @@ cmd_preflight() {
       # Determine type for the missing column
       case "$col" in
         hit_count)   db_exec "ALTER TABLE learnings ADD COLUMN hit_count INTEGER DEFAULT 0;" 2>/dev/null || true ;;
+        load_count)  db_exec "ALTER TABLE learnings ADD COLUMN load_count INTEGER DEFAULT 0;" 2>/dev/null || true ;;
         last_hit)    db_exec "ALTER TABLE learnings ADD COLUMN last_hit TEXT;" 2>/dev/null || true ;;
         domain)      db_exec "ALTER TABLE learnings ADD COLUMN domain TEXT;" 2>/dev/null || true ;;
         visibility)  db_exec "ALTER TABLE learnings ADD COLUMN visibility TEXT DEFAULT 'agent';" 2>/dev/null || true ;;
@@ -317,8 +318,9 @@ cmd_read_start() {
       echo ""
       echo "## Preferences"
       db_exec "SELECT '- ' || insight FROM learnings WHERE type='preference' ORDER BY ts DESC;" 2>/dev/null || echo "None"
-      # Update hit counts for all loaded
-      db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now');" 2>/dev/null
+      # Telemetry only: bump load_count (NOT hit_count — read-start dumps are not
+      # relevance feedback; only recall earns a hit_count bump). See migration 013.
+      db_exec "UPDATE learnings SET load_count = load_count + 1;" 2>/dev/null
       ;;
 
     --summary)
@@ -336,7 +338,7 @@ cmd_read_start() {
           FROM learnings ORDER BY score DESC LIMIT 10
         );
       " 2>/dev/null || echo "None"
-      db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (
+      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE id IN (
         SELECT id FROM (
           SELECT id,
             (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
@@ -359,8 +361,8 @@ cmd_read_start() {
       echo ""
       echo "### Cold (last 7 days)"
       db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count <= 5 AND type NOT IN ('failure','gotcha') AND julianday('now') - julianday(ts) < 7 ORDER BY ts DESC;" 2>/dev/null || echo "None"
-      # Update hits for tiered set
-      db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7;" 2>/dev/null
+      # Telemetry only: bump load_count for the dumped tier set (see migration 013).
+      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7;" 2>/dev/null
       ;;
 
     --weighted|*)
@@ -379,8 +381,8 @@ cmd_read_start() {
           FROM learnings ORDER BY score DESC LIMIT 75
         );
       " 2>/dev/null || echo "None"
-      # Update hit counts for loaded learnings
-      db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id IN (
+      # Telemetry only: bump load_count for the dumped set (see migration 013).
+      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE id IN (
         SELECT id FROM (
           SELECT id,
             (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
@@ -1432,9 +1434,19 @@ cmd_recall() {
 
   # Lowercase, keep only [a-z0-9], quote each term as an FTS phrase, OR them together.
   # Phrase-quoting makes arbitrary input safe from FTS5 syntax + SQL (no quotes survive).
+  # Query hygiene: drop 1-char tokens and common stopwords so the OR'd query isn't
+  # dominated by noise words ("the bug in auth" → "bug" OR "auth"). bm25 already
+  # downweights frequent terms, but dropping them keeps the candidate set tight.
   local fts_query
   fts_query=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' \
-    | awk '{for(i=1;i<=NF;i++) printf (i>1?" OR ":"") "\"" $i "\""}')
+    | awk 'BEGIN{split("the a an is it to of in on for and or but with this that was are be by at as from not no if then else do does did has have had will would can could should",s," ");for(k in s)stop[s[k]]=1}
+           {n=0;for(i=1;i<=NF;i++){t=$i;if(length(t)>=2&&!(t in stop))out[++n]=t};for(j=1;j<=n;j++)printf (j>1?" OR ":"")"\""out[j]"\""}')
+  # Fallback: if hygiene stripped everything (e.g. query was all stopwords), keep the
+  # raw terms rather than failing — a loose match beats no match.
+  if [ -z "$fts_query" ]; then
+    fts_query=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' \
+      | awk '{for(i=1;i<=NF;i++) printf (i>1?" OR ":"") "\"" $i "\""}')
+  fi
   [ -z "$fts_query" ] && { echo "No searchable terms in: $query"; exit 1; }
 
   local has_fts
@@ -1454,40 +1466,65 @@ cmd_recall() {
     db_exec "INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');" 2>/dev/null || true
     # bm25() lower = more relevant. Subtract boosts so failures/gotchas, frequently-
     # recalled, and recent learnings sort earlier. Show a snippet of evidence too.
+    # Ranking: bm25() leads (lower = more relevant); small boosts nudge failures/
+    # gotchas, recently-recalled, and recent learnings earlier WITHOUT overriding
+    # relevance. Weights are calibrated against bm25's range for these short docs
+    # (~ -0.5 to -8): failure -1.5 (a nudge, not the old -5 sledgehammer), hit_count
+    # capped at 20 so popular rows can't run away (rich-get-richer), recency -0.5.
+    #   - visibility filter: never surface human_only/operational rows to an agent
+    #     (migration 009). NULL visibility (pre-009 rows) is treated as 'agent'.
+    #   - Dedup: the DBs carry many near-duplicate insights; without dedup recall
+    #     returns the same lesson N times. bm25() can't live inside GROUP BY/an
+    #     aggregate ("unable to use function bm25 in the requested context" — the
+    #     optimizer flattens the subquery), so we over-fetch ranked rows and dedup
+    #     by insight-prefix in awk (US char \037 delimiter — absent from real text),
+    #     keeping the first (best-ranked) of each. Then cut to the limit. The key is
+    #     a 200-char prefix: long enough that two genuinely distinct lessons won't
+    #     collide, short enough to still collapse exact clones (the dominant case).
     local out
     out=$(db_exec "
-      SELECT '- [' || l.type || '] ' || l.insight ||
+      SELECT lower(substr(l.insight,1,200)) || char(31) ||
+             '- [' || l.type || '] ' || l.insight ||
              CASE WHEN l.evidence IS NOT NULL AND l.evidence != ''
                   THEN '  ↳ ' || substr(l.evidence,1,90) ELSE '' END
       FROM learnings l JOIN learnings_fts f ON f.rowid = l.rowid
       WHERE learnings_fts MATCH '$fts_query'
+        AND (l.visibility = 'agent' OR l.visibility IS NULL)
       ORDER BY (
         bm25(learnings_fts)
-        - (CASE WHEN l.type IN ('failure','gotcha') THEN 5 ELSE 0 END)
-        - (l.hit_count * 0.1)
-        - (CASE WHEN julianday('now') - julianday(l.ts) < 14 THEN 1 ELSE 0 END)
+        - (CASE WHEN l.type IN ('failure','gotcha') THEN 1.5 ELSE 0 END)
+        - (MIN(l.hit_count,20) * 0.05)
+        - (CASE WHEN julianday('now') - julianday(l.ts) < 14 THEN 0.5 ELSE 0 END)
       ) ASC
-      LIMIT $limit;
-    " 2>/dev/null || echo "")
+      LIMIT $((limit * 5));
+    " 2>/dev/null | awk -F'\037' '!seen[$1]++{print $2}' | head -n "$limit" || echo "")
     if [ -n "$out" ]; then
       echo "$out"
-      # Real relevance feedback: bump only the rows this query surfaced.
+      # Real relevance feedback: bump only the (agent-visible) rows this query
+      # surfaced. hit_count is now exclusively recall-earned (read-start uses
+      # load_count) — so it's a trustworthy "answered a real task" signal.
       db_exec "UPDATE learnings SET hit_count = hit_count + 1,
                  last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now')
                WHERE rowid IN (
                  SELECT f.rowid FROM learnings_fts f
-                 WHERE learnings_fts MATCH '$fts_query' LIMIT $limit
+                 JOIN learnings l ON l.rowid = f.rowid
+                 WHERE learnings_fts MATCH '$fts_query'
+                   AND (l.visibility = 'agent' OR l.visibility IS NULL)
+                 LIMIT $limit
                );" 2>/dev/null
     else
       echo "(no matching learnings)"
     fi
   else
-    # Fallback: LIKE on the first term (pre-FTS DBs).
+    # Fallback: LIKE on the first searchable term (pre-FTS DBs). Same visibility
+    # filter + dedup as the FTS path so behavior is consistent across DB states.
     local first safe
-    first=$(printf '%s' "$query" | awk '{print $1}')
+    first=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' | awk '{print $1}')
     safe=$(sql_escape "$first")
     db_exec "SELECT '- [' || type || '] ' || insight FROM learnings
-             WHERE insight LIKE '%$safe%' OR domain LIKE '%$safe%'
+             WHERE (insight LIKE '%$safe%' OR domain LIKE '%$safe%')
+               AND (visibility = 'agent' OR visibility IS NULL)
+             GROUP BY lower(substr(insight,1,200))
              ORDER BY hit_count DESC, ts DESC LIMIT $limit;" 2>/dev/null || echo "None"
     echo ""
     echo "_(LIKE fallback — run 'agentdb init' to build the FTS index for better recall)_"

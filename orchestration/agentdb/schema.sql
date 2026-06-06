@@ -15,7 +15,8 @@ CREATE TABLE IF NOT EXISTS learnings (
   insight TEXT NOT NULL,
   evidence TEXT,
   domain TEXT,  -- e.g., 'auth', 'database', 'frontend'
-  hit_count INTEGER DEFAULT 0,
+  hit_count INTEGER DEFAULT 0,         -- bumped by recall (real relevance feedback)
+  load_count INTEGER DEFAULT 0,        -- bumped by read-start (session-open telemetry, never ranked)
   last_hit TEXT,
   visibility TEXT DEFAULT 'agent',     -- agent | human_only | operational
   sensitivity TEXT DEFAULT 'low'       -- low | medium | high

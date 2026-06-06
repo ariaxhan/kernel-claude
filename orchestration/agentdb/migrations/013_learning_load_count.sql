@@ -1,0 +1,21 @@
+-- Migration 013: separate load_count from hit_count on learnings.
+--
+-- WHY: `read-start` blanket-bumps hit_count on every row it dumps at session
+-- open (~once per session, often the whole top-N). That made hit_count a
+-- session-open counter, not a relevance signal — yet `recall` ranks on it and
+-- read-start's own score multiplies it (hit_count * 10). Result: rows float to
+-- the top because the DB has been opened often, not because they were ever the
+-- right answer to a real task query.
+--
+-- FIX: introduce `load_count` for the session-open bump. From now on:
+--   hit_count  — incremented ONLY by `recall` (and learn-time reinforce), i.e.
+--                "this learning was the answer to an actual task query." Real
+--                relevance feedback.
+--   load_count — incremented by `read-start`, i.e. "this row was dumped into a
+--                session preamble." Telemetry only; never used for ranking.
+--
+-- Like migrations 004/009, the column is added idempotently by cmd_preflight
+-- (Check 3) and defined in schema.sql for fresh DBs — a raw ALTER here would
+-- throw "duplicate column name" on DBs that already have it. Record the marker
+-- only; let preflight own the column.
+INSERT OR IGNORE INTO _migrations (name) VALUES ('013_learning_load_count');

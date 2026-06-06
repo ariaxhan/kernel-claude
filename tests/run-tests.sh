@@ -1786,13 +1786,50 @@ test_read_start_outputs_gotchas() {
   assert_contains "$output" "[gotcha] always escape SQL inputs"
 }
 
-test_read_start_bumps_hit_count() {
+test_read_start_bumps_load_count_not_hit_count() {
+  # Migration 013: read-start bumps load_count (session-open telemetry), and must
+  # NOT touch hit_count — hit_count is relevance feedback, earned only via recall.
   agentdb init >/dev/null
   agentdb learn failure "never skip validation" "broke prod" >/dev/null
   agentdb read-start >/dev/null
-  local hit
+  local hit load
   hit=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT hit_count FROM learnings WHERE type='failure' LIMIT 1;")
-  [ "$hit" -ge 1 ] || { echo "Expected hit_count >= 1, got $hit"; return 1; }
+  load=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT load_count FROM learnings WHERE type='failure' LIMIT 1;")
+  [ "$load" -ge 1 ] || { echo "Expected load_count >= 1, got $load"; return 1; }
+  [ "$hit" -eq 0 ] || { echo "Expected hit_count to stay 0 (recall-only), got $hit"; return 1; }
+}
+
+# --- Recall Tests (FTS5 relevance retrieval, v7.15 quality pass) ---
+
+test_recall_dedups_identical_insights() {
+  agentdb init >/dev/null
+  # Three identical insights (the clone problem). recall must return exactly one.
+  agentdb learn pattern "kettlebell swing hinge mechanics matter" "e1" >/dev/null
+  agentdb learn pattern "kettlebell swing hinge mechanics matter" "e2" >/dev/null
+  agentdb learn pattern "kettlebell swing hinge mechanics matter" "e3" >/dev/null
+  local count
+  count=$(agentdb recall "kettlebell hinge" | grep -c "kettlebell swing hinge mechanics matter")
+  [ "$count" -eq 1 ] || { echo "Expected 1 deduped result, got $count"; return 1; }
+}
+
+test_recall_hides_human_only() {
+  agentdb init >/dev/null
+  agentdb learn gotcha "zzqmarker visible agent note" "ev" --visibility agent >/dev/null
+  agentdb learn gotcha "zzqmarker hidden human note" "ev" --visibility human_only >/dev/null
+  local out
+  out=$(agentdb recall "zzqmarker" | grep '^- ')
+  echo "$out" | grep -q "visible agent note" || { echo "agent-visible row should surface"; return 1; }
+  if echo "$out" | grep -q "hidden human note"; then echo "human_only row leaked to agent recall"; return 1; fi
+}
+
+test_recall_bumps_hit_count() {
+  # The other half of the load_count split: recall (and only recall) earns hit_count.
+  agentdb init >/dev/null
+  agentdb learn failure "quokka deploy never verified live" "broke" >/dev/null
+  agentdb recall "quokka deploy" >/dev/null
+  local hit
+  hit=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT hit_count FROM learnings WHERE insight LIKE '%quokka%' LIMIT 1;")
+  [ "$hit" -ge 1 ] || { echo "Expected recall to bump hit_count >= 1, got $hit"; return 1; }
 }
 
 # --- Learn Domain Auto-Population Tests ---
@@ -2427,7 +2464,12 @@ run_test_suite() {
       ;;
     read_start)
       run_test "read-start outputs Known Gotchas section" test_read_start_outputs_gotchas
-      run_test "read-start bumps hit_count on surfaced learnings" test_read_start_bumps_hit_count
+      run_test "read-start bumps load_count not hit_count" test_read_start_bumps_load_count_not_hit_count
+      ;;
+    recall)
+      run_test "recall dedups identical insights" test_recall_dedups_identical_insights
+      run_test "recall hides human_only learnings" test_recall_hides_human_only
+      run_test "recall bumps hit_count on surfaced rows" test_recall_bumps_hit_count
       ;;
     learn)
       run_test "learn auto-populates domain from PWD" test_learn_auto_populates_domain
@@ -2581,6 +2623,7 @@ main() {
     run_test_suite "pre_ship_app"
     run_test_suite "entropy_adaptive"
     run_test_suite "read_start"
+    run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"
   else
