@@ -4,7 +4,8 @@
 #
 # USAGE:
 #   agentdb init                    # Initialize per-project DB
-#   agentdb read-start              # What to know before working
+#   agentdb read-start              # Generic top-N learnings (session start)
+#   agentdb recall <keywords>       # RELEVANCE search — the right learning for THIS task (FTS5)
 #   agentdb write-end <json>        # Checkpoint before stopping
 #   agentdb learn <type> <insight>  # Record learning
 #   agentdb contract <json>         # Create contract
@@ -1417,6 +1418,82 @@ cmd_antibody() {
     LIMIT 10;"
 }
 
+# Relevance recall — surface the learnings that match the CURRENT task, ranked by
+# text relevance (FTS5 bm25), not the age-biased session-start score. This is the
+# just-in-time retrieval read-start can't do: call it at task-classify with the task
+# keywords + touched file names. Bumps hit_count on returned rows only, so hit_count
+# becomes a REAL usefulness signal (vs read-start's blanket bump). Falls back to LIKE
+# if the FTS index isn't present (DB predates migration 012).
+cmd_recall() {
+  local query="$*"
+  [ -z "$query" ] && { echo "Usage: agentdb recall <keywords>"; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  local limit="${RECALL_LIMIT:-8}"
+
+  # Lowercase, keep only [a-z0-9], quote each term as an FTS phrase, OR them together.
+  # Phrase-quoting makes arbitrary input safe from FTS5 syntax + SQL (no quotes survive).
+  local fts_query
+  fts_query=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' \
+    | awk '{for(i=1;i<=NF;i++) printf (i>1?" OR ":"") "\"" $i "\""}')
+  [ -z "$fts_query" ] && { echo "No searchable terms in: $query"; exit 1; }
+
+  local has_fts
+  has_fts=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
+  # Self-heal: a DB that predates migration 012 (or hasn't run preflight this session)
+  # has no FTS index. Build it on first recall so the index is never a hard dependency.
+  if [ -z "$has_fts" ]; then
+    run_pending_migrations "recall:applied_migration" >/dev/null 2>&1 || true
+    has_fts=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
+  fi
+
+  echo "## Recall: $query"
+  echo ""
+  if [ -n "$has_fts" ]; then
+    # Freshen the index from the content table (no sync triggers — they abort the learn
+    # write path on SQLite 3.43). 'rebuild' is O(N) but a few ms for hundreds of rows.
+    db_exec "INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');" 2>/dev/null || true
+    # bm25() lower = more relevant. Subtract boosts so failures/gotchas, frequently-
+    # recalled, and recent learnings sort earlier. Show a snippet of evidence too.
+    local out
+    out=$(db_exec "
+      SELECT '- [' || l.type || '] ' || l.insight ||
+             CASE WHEN l.evidence IS NOT NULL AND l.evidence != ''
+                  THEN '  ↳ ' || substr(l.evidence,1,90) ELSE '' END
+      FROM learnings l JOIN learnings_fts f ON f.rowid = l.rowid
+      WHERE learnings_fts MATCH '$fts_query'
+      ORDER BY (
+        bm25(learnings_fts)
+        - (CASE WHEN l.type IN ('failure','gotcha') THEN 5 ELSE 0 END)
+        - (l.hit_count * 0.1)
+        - (CASE WHEN julianday('now') - julianday(l.ts) < 14 THEN 1 ELSE 0 END)
+      ) ASC
+      LIMIT $limit;
+    " 2>/dev/null || echo "")
+    if [ -n "$out" ]; then
+      echo "$out"
+      # Real relevance feedback: bump only the rows this query surfaced.
+      db_exec "UPDATE learnings SET hit_count = hit_count + 1,
+                 last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+               WHERE rowid IN (
+                 SELECT f.rowid FROM learnings_fts f
+                 WHERE learnings_fts MATCH '$fts_query' LIMIT $limit
+               );" 2>/dev/null
+    else
+      echo "(no matching learnings)"
+    fi
+  else
+    # Fallback: LIKE on the first term (pre-FTS DBs).
+    local first safe
+    first=$(printf '%s' "$query" | awk '{print $1}')
+    safe=$(sql_escape "$first")
+    db_exec "SELECT '- [' || type || '] ' || insight FROM learnings
+             WHERE insight LIKE '%$safe%' OR domain LIKE '%$safe%'
+             ORDER BY hit_count DESC, ts DESC LIMIT $limit;" 2>/dev/null || echo "None"
+    echo ""
+    echo "_(LIKE fallback — run 'agentdb init' to build the FTS index for better recall)_"
+  fi
+}
+
 # === HYPOTHESIS TESTING ===
 
 cmd_hypothesis() {
@@ -1773,6 +1850,7 @@ case "${1:-help}" in
   trace)       shift; cmd_trace "$@" ;;
   decay)       cmd_decay ;;
   antibody)    shift; cmd_antibody "$@" ;;
+  recall)      shift; cmd_recall "$@" ;;
   export)      cmd_export ;;
   recent)      shift; cmd_recent "$@" ;;
   co-change)   shift; cmd_co_change "$@" ;;
