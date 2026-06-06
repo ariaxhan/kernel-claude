@@ -1378,13 +1378,18 @@ cmd_trace() {
 cmd_decay() {
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
 
-  # Archive learnings with 0 hits and >46 days old (freshness < 0.1)
+  # Delete learnings that are TRULY untouched: never recalled (hit_count=0) AND
+  # never even loaded into a session preamble (load_count=0) AND >46 days old.
+  # Since v7.15, hit_count is recall-only — a still-loaded-but-never-recalled
+  # learning keeps hit_count=0, so requiring load_count=0 too prevents deleting
+  # learnings that read-start is actively surfacing. COALESCE handles pre-013 DBs.
+  local cond="hit_count = 0 AND COALESCE(load_count,0) = 0 AND ts < datetime('now', '-46 days')"
   local archived
-  archived=$(db_exec "SELECT COUNT(*) FROM learnings WHERE hit_count = 0 AND ts < datetime('now', '-46 days');")
+  archived=$(db_exec "SELECT COUNT(*) FROM learnings WHERE $cond;")
 
   if [ "$archived" -gt 0 ]; then
-    db_exec "DELETE FROM learnings WHERE hit_count = 0 AND ts < datetime('now', '-46 days');"
-    echo "Archived $archived stale learnings (0 hits, >46 days)"
+    db_exec "DELETE FROM learnings WHERE $cond;"
+    echo "Archived $archived stale learnings (0 hits, 0 loads, >46 days)"
   else
     echo "No stale learnings to archive"
   fi

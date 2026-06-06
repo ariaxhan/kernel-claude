@@ -2,6 +2,32 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.17.0] - 2026-06-06
+
+Cross-project retrieval. `agentdb recall` learns to reach beyond one project.
+
+### Added
+- **`agentdb recall --global`** — unions local FTS results with a cross-project
+  **global brain** (a metabrain-native `global.db`, located via `$AGENTDB_GLOBAL`
+  or by walking up to a vault root), tagged `[global]`. Read-only on the global
+  brain (never rebuilds its FTS or writes — an external consolidation job owns it);
+  LIKE fallback when the brain has no FTS index. A shared `_recall_emit` helper
+  (FTS-or-LIKE, always visibility-filtered) drives both local + global; dedup keeps
+  the local copy of any lesson present in both. Local-only `recall` is unchanged.
+
+### Fixed
+- **`agentdb decay` no longer deletes still-used learnings.** Since 7.15 `hit_count`
+  is recall-only, so a learning that read-start surfaces every session but that was
+  never recalled keeps `hit_count=0` — the old `decay` (delete `hit_count=0 AND >46d`)
+  would wrongly delete it. Now requires `load_count=0` too: only truly untouched
+  learnings (never recalled AND never loaded, >46d) are removed.
+
+### Notes
+- `recall --global` degrades silently to local-only when no global brain exists, so
+  it's safe for every plugin user. The global-brain builder (cross-project importer
+  + nightly consolidation) is environment-specific infrastructure, not shipped in the
+  plugin; the plugin ships only the retrieval side.
+
 ## [7.16.0] - 2026-06-06
 
 Zero-touch auto-push. A commit that isn't pushed is incomplete work (stranded,

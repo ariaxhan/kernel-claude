@@ -102,6 +102,7 @@ cat << 'KERNEL_CONTEXT'
 <protocol>
   <agentdb>
     on_start: agentdb read-start
+    on_task:  agentdb recall "<task keywords>" [--global]   # relevance lookup; --global adds the cross-project brain
     on_end:   agentdb write-end '{"did":"X","learned":["Y"]}'
     on_learn: agentdb learn failure|pattern|gotcha "what" "evidence"
     confused: agentdb wtf

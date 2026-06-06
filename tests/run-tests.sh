@@ -1873,6 +1873,22 @@ test_recall_global_no_human_leak() {
     echo "human_only leaked from global brain"; return 1; fi
 }
 
+test_decay_spares_loaded_learnings() {
+  # v7.15: hit_count is recall-only. decay must NOT delete an old, never-recalled
+  # learning that read-start is still loading (load_count>0) — only truly untouched
+  # ones (hit_count=0 AND load_count=0 AND >46d).
+  agentdb init >/dev/null
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  sqlite3 "$db" "INSERT INTO learnings (id,ts,type,insight,hit_count,load_count) VALUES ('OLD-LOADED','2020-01-01T00:00:00Z','pattern','old but still loaded lesson',0,3);"
+  sqlite3 "$db" "INSERT INTO learnings (id,ts,type,insight,hit_count,load_count) VALUES ('OLD-DEAD','2020-01-01T00:00:00Z','pattern','old and truly untouched lesson',0,0);"
+  agentdb decay >/dev/null
+  local loaded dead
+  loaded=$(sqlite3 "$db" "SELECT count(*) FROM learnings WHERE id='OLD-LOADED';")
+  dead=$(sqlite3 "$db" "SELECT count(*) FROM learnings WHERE id='OLD-DEAD';")
+  [ "$loaded" -eq 1 ] || { echo "decay wrongly deleted a loaded learning"; return 1; }
+  [ "$dead" -eq 0 ] || { echo "decay failed to remove a truly-untouched learning"; return 1; }
+}
+
 # --- Learn Domain Auto-Population Tests ---
 
 test_learn_auto_populates_domain() {
@@ -2514,6 +2530,7 @@ run_test_suite() {
       run_test "recall --global unions + tags global hits" test_recall_global_unions_and_tags
       run_test "recall --global graceful when global absent" test_recall_global_graceful_when_absent
       run_test "recall --global never leaks human_only" test_recall_global_no_human_leak
+      run_test "decay spares loaded (load_count>0) learnings" test_decay_spares_loaded_learnings
       ;;
     learn)
       run_test "learn auto-populates domain from PWD" test_learn_auto_populates_domain
