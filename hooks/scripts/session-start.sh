@@ -148,6 +148,10 @@ cat << 'KERNEL_CONTEXT'
        → load: /kernel:git — atomic commits, profile-gated workflow
        → local: commit to main
        → github-oss/production: feature branch → PR → review
+       → VERIFY LIVE: "done" = verified live, not committed. Committed ≠ pushed ≠
+         deployed ≠ working. Run a command that confirms the real state (deploy
+         check, curl the served asset, the passing test, the exercised path) before
+         claiming done. Can't check headlessly → "deployed — your check," not "it works."
 
     8. LEARN
        → agentdb learn pattern|failure "what" "evidence"
@@ -166,6 +170,7 @@ cat << 'KERNEL_CONTEXT'
   <rule>Load the relevant skill BEFORE acting. Skills ARE the methodology.</rule>
   <rule>Research anti-patterns BEFORE solutions. Tests BEFORE code.</rule>
   <rule>Built-in beats library. Library beats custom. Prove you need complexity.</rule>
+  <rule>"Done" = verified live, not committed. Run a verification command before claiming done.</rule>
 </protocol>
 KERNEL_CONTEXT
 

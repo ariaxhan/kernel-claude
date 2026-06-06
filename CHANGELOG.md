@@ -2,6 +2,49 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.15.0] - 2026-06-06
+
+Retrieval quality pass: `agentdb recall` (FTS5 relevance search, added in 7.14)
+was returning duplicate and human-only learnings and ranking on a poisoned
+signal. Five additive fixes, all verified on scratch copies of live DBs (our4cuts
+546-row + modelmind 854-row), zero live data touched. Source analysis in
+`_meta/reports/` (retro-agentdbs, retrieval-deepdive, dream-retrieval).
+
+### Fixed
+- **recall returned duplicate insights.** The learning DBs carry many near-identical
+  rows; recall returned the same lesson N times. Now over-fetches ranked rows and
+  dedups by a 200-char insight-prefix key in awk, keeping the best-ranked of each.
+  (bm25() can't live inside `GROUP BY`/an aggregate — the optimizer flattens the
+  subquery and throws "unable to use function bm25 in the requested context" — so
+  dedup is done post-query, not in SQL.)
+- **recall leaked human-only learnings to agents.** It never applied the migration-009
+  visibility filter, so `human_only`/`operational` rows were fed into agent context.
+  Both the FTS path and the LIKE fallback now filter `visibility='agent'` (NULL =
+  agent for pre-009 rows); the relevance-feedback bump filters too.
+- **Ranking was uncalibrated.** The failure boost (−5) was a sledgehammer next to
+  bm25's ~−0.5..−8 range — a barely-relevant failure beat a near-perfect pattern.
+  Recalibrated: failure/gotcha −1.5, `MIN(hit_count,20)*0.05` (capped so popular
+  rows can't run away), recency −0.5. Relevance leads; boosts nudge.
+
+### Changed
+- **hit_count is now relevance-only; read-start uses `load_count`.** read-start
+  blanket-bumped hit_count on every dumped row each session, making it a
+  session-open counter that both its own score and recall ranked on. New
+  `load_count` column (added idempotently by preflight, like 009) takes the
+  session-open telemetry; `hit_count` is now incremented ONLY by recall (and
+  learn-time reinforce) — a trustworthy "answered a real task query" signal.
+  Migration `013_learnings_load_count` (marker-only; preflight owns the column).
+- **Query hygiene in recall.** Strips 1-char tokens and common stopwords before
+  building the OR'd FTS query, with a raw-terms fallback if hygiene empties it.
+
+### Notes
+- Existing per-project DBs self-heal on next session start (preflight runs before
+  read-start) — no manual migration needed. No FTS sync triggers (they abort the
+  learn path on SQLite 3.43); rebuild-on-recall remains the design.
+- Promoted the universal **"Done = verified live, not committed"** rule into the
+  shared layer (session-start.sh delivery + CLAUDE.md anti-pattern), generalized
+  from our4cuts' deploy-verification bruise.
+
 ## [7.14.0] - 2026-05-28
 
 Correctness + consistency pass: hardened the AgentDB self-heal and the security

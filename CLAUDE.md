@@ -1,4 +1,4 @@
-<kernel version="7.14.0">
+<kernel version="7.15.0">
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->
@@ -267,6 +267,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <block action="write_code_tier_2+">You orchestrate, not implement.</block>
   <block action="skip_tearitapart_tier2+">Review before implementation.</block>
   <block action="new_dependency_without_justification">Built-in beats library. Prove you need it.</block>
+  <block action="report_done_off_commit">"Done" = verified live, not committed. Committed ≠ pushed ≠ deployed ≠ working. Run a verification command (deploy check, curl the served asset, the passing test, the exercised path) before claiming done. Un-headless-verifiable → "deployed — your check," never "it works."</block>
   <block action="trust_agent_summary">Receipts describe intent. Files describe reality. Read the file before approving the checkpoint.</block>
   <block action="self_score_high_stakes_eval">Spawn blind-evaluator for any user-facing or high-stakes eval. Self-scoring inflates ~36% structurally.</block>
   <block action="autonomous_loop_without_budget_cap">/kernel:forge and tier 2+ multi-agent spawns require max_budget_usd. Stuck retries silently burn 3-4 figures.</block>
