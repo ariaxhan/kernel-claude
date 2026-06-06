@@ -10,6 +10,12 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
             "timeout": 30,
             "statusMessage": "Loading AgentDB context..."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autopush.sh install",
+            "timeout": 15,
+            "async": true
           }
         ]
       }
@@ -131,6 +137,12 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-end.sh",
             "timeout": 30,
             "statusMessage": "Cleaning up session..."
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autopush.sh sweep",
+            "timeout": 60,
+            "statusMessage": "Pushing any unpushed commits..."
           }
         ]
       }

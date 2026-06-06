@@ -2,6 +2,18 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.16.0] - 2026-06-06
+
+Zero-touch auto-push. A commit that isn't pushed is incomplete work (stranded,
+undeployed, invisible to the next clone). The plugin now guarantees pushing with no
+command and no per-machine setup: `autopush.sh install` (SessionStart) drops a
+per-commit auto-push `post-commit` hook into every repo in the current project's tree
+(walks to the outermost superproject — covers the whole vault from anywhere inside it),
+so every commit pushes itself the instant it's made; `autopush.sh sweep` (SessionEnd)
+pushes any straggler whose push failed. Ships via the marketplace, so every machine with
+the plugin gets it automatically — nothing to paste into settings.json. Origin-only,
+skips detached/mid-rebase, non-fatal; `AUTOPUSH_OFF=1` to disable, `DRY_RUN=1` previews.
+
 ## [7.15.0] - 2026-06-06
 
 Retrieval quality pass: `agentdb recall` (FTS5 relevance search, added in 7.14)
