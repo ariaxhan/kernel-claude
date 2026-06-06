@@ -108,6 +108,7 @@ Context discipline:
 - Scope sessions by task, not time — one session = one feature or one bug
 - Two-failure reset: same mistake twice → `/clear` and restart with refined prompt
 - Plan Mode for features with >5 decision points: plan first, then implement in a fresh session. A feature with 20 decision points at 80% per-decision accuracy has a 1.2% chance all land correctly without an upfront plan. <!-- Updated 2026-06-04: https://code.claude.com/docs/en/best-practices -->
+- Explore-Plan-Act loop: Phase 1 (read-only codebase exploration) → Phase 2 (propose strategy, confirm) → Phase 3 (full tool access, implement, run tests, iterate). Canonical three-phase sequence for non-trivial features. <!-- Updated 2026-06-06: https://code.claude.com/docs/en/best-practices -->
 
 (gate: each logical unit committed before moving to next)
 
