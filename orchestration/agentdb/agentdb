@@ -1496,7 +1496,7 @@ cmd_recall() {
   for a in "$@"; do
     if [ "$a" = "--global" ]; then use_global=1; else qargs+=("$a"); fi
   done
-  local query="${qargs[*]}"
+  local query="${qargs[*]:-}"  # :- guards empty array under set -u on bash 3.2 (macOS)
   [ -z "$query" ] && { echo "Usage: agentdb recall <keywords> [--global]"; exit 1; }
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
   local limit="${RECALL_LIMIT:-8}"
