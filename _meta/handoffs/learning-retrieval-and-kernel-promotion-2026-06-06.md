@@ -1,60 +1,54 @@
-# CONTEXT HANDOFF — kernel-claude wrap-up + cascade
-Generated: 2026-06-06
+# CONTEXT HANDOFF — kernel-claude retrieval pass + cascade (COMPLETE)
+Generated: 2026-06-06 · Updated: 2026-06-06 (session 2 — shipped)
 
-**Summary**: Learning-retrieval upgrade (`agentdb recall`, FTS5) is built and live locally but unpushed; next window pushes it + promotes the session's universal lessons from our4cuts-specific config into the kernel/NEXUS shared layer so they cascade to every project.
-
-**Goal**: The kernel plugin is used everywhere (installed via symlink → `kernel-claude/orchestration/agentdb/agentdb`). Put the cross-project improvements IN the plugin / NEXUS layer, push them, so all repos inherit them — instead of re-encoding per project.
-
-**Current state**: Work done + committed locally across 3 repos, NOT pushed (I0.8 needs say-so for non-our4cuts main; Aria now wants them pushed per this handoff's request).
-
-**Branches** (all `main`):
-- `our4cuts` — clean, **fully pushed** (origin even). Nothing to do.
-- `kernel-claude` — **5 commits ahead of origin**, unpushed. Head = `13685c4` (the recall feature).
-- `Vaults` — **29 commits ahead of origin**, unpushed. Head = `e13f0a5` (NEXUS ingest wiring).
-
-**Tier**: 2–3 (shared infra, cross-repo).
+**Status: DONE.** v7.15.0 shipped, all three repos pushed + synced (0/0), plugin cache symlinked to source, 245/245 tests green, adversary PASS. This file now records what shipped + the deferred work for a future session.
 
 ---
 
-## What shipped this session (context)
+## What shipped this session (v7.15.0)
 
-**our4cuts (all live + verified on prod):** church→event revert (migration 0020) + admin venue/event toggle (`/api/admin/client-type`); venues get an admin-only board; admin frame-card thumbnails; iPad pixel-bake filters; Spanish booth i18n (es.json); consent links to Terms/Privacy; two new global frames Hearts+Clouds (portrait staggered); `validate-frames.sh` pre-commit hook; CLAUDE.md rules encoded.
+**Retrieval quality pass** — `agentdb recall` (FTS5, added 7.14) had correctness + ranking holes, all fixed additively (verified on scratch copies of live DBs, no live data touched):
+1. **Dedup** — recall returned duplicate insights (DBs carry many clones). Now over-fetches `LIMIT*5` ranked rows and dedups by 200-char insight key in awk. *bm25() cannot live inside GROUP BY/an aggregate — the optimizer flattens the subquery → "unable to use function bm25 in the requested context" — so dedup is post-query, not SQL.*
+2. **Visibility filter** — recall leaked `human_only`/`operational` learnings to agents. Both FTS + LIKE paths now filter `visibility='agent'` (NULL=agent for pre-009 rows); feedback bump too.
+3. **Recalibrated ranking** — failure boost was a −5 sledgehammer vs bm25's ~−0.5..−8 range. Now failure/gotcha −1.5, `MIN(hit_count,20)*0.05` (capped), recency −0.5. Relevance leads.
+4. **hit_count split** — read-start blanket-bumped hit_count on every dumped row each session, poisoning the signal recall ranks on. New `load_count` column (migration 013, preflight-owned like 009) takes the session-open telemetry. **hit_count is now earned only via recall** = trustworthy "answered a real task" signal.
+5. **Query hygiene** — strip 1-char tokens + stopwords, raw-terms fallback.
 
-**Cross-project (the cascade work — THIS is the focus):**
-- `kernel-claude` `13685c4`: **`agentdb recall <keywords>`** — FTS5 relevance retrieval. Migration `012_learnings_fts.sql` (external-content FTS, **no triggers**), `cmd_recall` (bm25 + failure/recency/hit boosts, self-heals index, rebuild-on-query, bumps hit_count only on matched rows). Tested pos+neg on a scratch copy of a 544-learning DB. Applied to our4cuts' live DB already (544 rows indexed).
-- `Vaults` `e13f0a5`: NEXUS ambient-ingest step **1b** now calls `agentdb recall` per task.
+**Rule promotion** — universal **"Done = verified live, not committed"** rule promoted to the shared layer:
+- NEXUS: `Vaults/.claude/rules/invariants.md` → new **Verification** invariant (committed + pushed in Vaults repo).
+- KERNEL plugin: `hooks/scripts/session-start.sh` SHIP step + `<rule>` (the ONLY delivery path for plugin users — CLAUDE.md is not loaded for them), plus a CLAUDE.md anti-pattern for source-of-truth.
+- The "always push immediately" half was independently hardened in I0.8 + NEXUS session-flow (linter/user edit this session).
 
-## Decisions made (+ rejected alternatives)
-- **Relevance recall over fixing read-start** — read-start can't be task-aware (no task at session start); `recall` is the just-in-time lookup. Kept read-start as the generic startup dump.
-- **No FTS sync triggers** (REJECTED, critical): SQLite 3.43 throws "unsafe use of virtual table" on trigger writes to an FTS vtab and **ABORTS the `learn` insert** — would break the core learn path everywhere. Chose `rebuild`-on-recall instead (O(N), few ms). *Verified the abort on scratch before any live DB touched.*
-- **hit_count blanket-bump in read-start left in place** (deferred): minimized blast radius. recall now provides the real relevance signal (ranks bm25-first), so stale hit_count no longer dominates. Cleanup is optional, see next steps.
-- Purely additive to agentdb — existing commands unchanged/retested.
+**Version + distribution**
+- 7.14.0 → 7.15.0 across all canonical declarations (`scripts/bump-version.sh`; `test_version_sync_all` green) + AGENTS.md (manual) + description highlight + CHANGELOG.
+- Plugin cache synced: `~/.claude/plugins/cache/kernel-marketplace/kernel/7.15.0` → symlink to source, `current` → 7.15.0 (7.14.0 real dir kept as backup). `agentdb` CLI was already symlinked via `~/.local/bin` so retrieval fixes were live immediately.
 
-## Artifacts
-- `kernel-claude/orchestration/agentdb/agentdb` — `cmd_recall` + dispatch + usage.
-- `kernel-claude/orchestration/agentdb/migrations/012_learnings_fts.sql`
-- `Vaults/.claude/CLAUDE.md` — ingest step 1b.
-- `our4cuts/.claude/hooks/{validate-frames,pre-commit}.sh`, `our4cuts/.claude/CLAUDE.md` (our4cuts-only, already pushed).
+## Source analysis (in `_meta/reports/`)
+- `retro-agentdbs.md` — cross-DB retrospective (5 live DBs). **The headline rot: 73% of distinct insights (328/452) are clones across ALL 5 project DBs** (ariacam stores FunJoin camp rules). hit_count poisoned. FTS in only 1 of 5 DBs (self-heals on preflight).
+- `retrieval-deepdive.md` — recall code analysis + ranked fixes.
+- `dream-retrieval.md` — minimalist/maximalist/pragmatist + council; the ship/offer/defer split below.
 
-## Big 5
-- Input validation ✓ (recall sanitizes query → phrase-quoted FTS terms, injection-safe)
-- Edge cases ✓ (empty query, no-FTS DB self-heal, LIKE fallback, no matches)
-- Error handling ✓ (`|| true` on rebuild, graceful fallback)
-- Duplication ✓ (recall reuses run_pending_migrations; no copy)
-- Complexity ✓ (additive, ~60 lines)
+## Medium content (Aria's own writing) that backed the design
+`structured-metadata-beats-rag.md` (Vercel 100% vs 53% RAG), `stop-writing-markdown-start-writing-memory.md` (ambient > retrieval), `self-learning-agentic-system.md` (evidence-gating, hit-count signal), `knowledge-base-decay.md` (consistency linting). NOTE: a draft idea to "deprecate multi-agent orchestration" was **explicitly NOT acted on** — speculative + would regress core kernel functionality.
 
-## Next steps (for the new window)
-1. **Push** `kernel-claude` (origin/main, 5 ahead) and `Vaults` (origin/main, 29 ahead). This is the cascade — other machines + plugin marketplace get recall.
-2. **Promote universal lessons into the shared layer** (currently only in `our4cuts/.claude/CLAUDE.md`, but they apply to EVERY project):
-   - **"Done = LIVE, not committed"** (verify-deploy + curl live URL before claiming done) → belongs in NEXUS (`Vaults/.claude/CLAUDE.md`) or KERNEL invariants.
-   - Consider an invariant: "report 'done' only after a verification command, not a commit."
-3. **Optional**: fix the `read-start` blanket `hit_count` bump (4 modes in `cmd_read_start`) now that recall is the real signal — makes hit_count purely recall-driven. Test on a scratch DB first.
-4. The plugin cache copy (`~/.claude/plugins/.../7.14.0/orchestration/agentdb/agentdb`) is a separate distribution from the symlinked source — confirm whether the marketplace version needs a version bump/sync after push.
+---
 
-## Warnings
-- **NEVER add FTS sync triggers** to learnings — aborts `learn` on SQLite 3.43. rebuild-on-recall is the chosen design.
-- agentdb is shared infra — keep changes additive; test on a scratch copy (`AGENTDB_ROOT=/tmp/x`) before any live DB.
-- our4cuts auto-pushes (Cloudflare); kernel-claude/Vaults do NOT — they need explicit push.
+## DEFERRED — next session (the structural unlock, intentionally not shipped)
 
-## Continuation prompt
-> /kernel:ingest push kernel-claude + Vaults to origin/main, then promote the "Done = LIVE not committed" rule + relevance-recall from our4cuts-specific config into the NEXUS/kernel shared layer so all projects inherit them. Read kernel-claude/_meta/handoffs/learning-retrieval-and-kernel-promotion-2026-06-06.md first. Don't re-add FTS triggers.
+The dream's verdict: code that cascades safely ships now; anything touching live rows is opt-in with a dry-run or human gate; irreversible fleet surgery waits until the cheap unlock proves the global brain is worth it. Deferred, in order:
+
+1. **`scope` column** (project | global) — additive, safe. Backfill only the unambiguous `[GLOBAL]`-prefixed rows. Makes cross-project filtering queryable instead of a string prefix.
+2. **`recall --global`** — unions local + a shared brain DB (`~/Documents/Vaults/_meta/agentdb/agent.db`, confirmed exists), off by default, silent local-only fallback. The real structural unlock for the siloing problem. *Wire the `--global` flag into NEXUS step-1b in the SAME change so it isn't dark.* Caveat: only 7 GLOBAL learnings exist today → would ship near-empty until the brain is populated. Populate first (via #1 promote), then enable.
+3. **`agentdb promote <id>`** — manual, one-at-a-time, human-confirmed lift of a generic lesson to the global brain.
+4. **`agentdb decontaminate --dry-run`** — writes nothing; reports the 328 clones. The destructive `--apply` is a separate W8 ritual (backup + rollback) and **must not be built until `--global` proves the global brain carries signal.**
+5. **Porter tokenizer** (isolated migration: drop+recreate FTS, lossless since external-content) — fixes stemming (deploy≠deploys). Own PR.
+6. **Capture-side quality**: failures/gotchas are 0.2–1.2% of rows (93–99% is "pattern") — the high-value bucket is nearly empty. Worth nudging the `learn` flow to capture more failures/gotchas.
+
+## Dormant bugs (adversary-found, zero current incidence — note only)
+- recall dedup key is a 200-char prefix; two genuinely distinct lessons sharing a 200-char head would false-merge (0 real cases today; was 60 chars, hardened to 200).
+- A literal 0x1F (US char) inside an insight would corrupt the awk-split output line (0 real rows contain it).
+
+## Warnings (still apply)
+- **NEVER add FTS sync triggers** to learnings — aborts `learn` on SQLite 3.43. rebuild-on-recall is the design.
+- agentdb is shared infra — keep additive; test on a scratch copy (`AGENTDB_ROOT=/tmp/x`) before any live DB.
+- 9 GitHub dependabot alerts on kernel-claude (2 high, 6 moderate, 1 low) — surfaced on push, unrelated to this work; worth a look.
