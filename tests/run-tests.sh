@@ -1832,6 +1832,47 @@ test_recall_bumps_hit_count() {
   [ "$hit" -ge 1 ] || { echo "Expected recall to bump hit_count >= 1, got $hit"; return 1; }
 }
 
+_mk_global_db() {  # $1=path  $2..=rows "id|type|insight|visibility"
+  local g="$1"; shift
+  sqlite3 "$g" "CREATE TABLE learnings (id TEXT PRIMARY KEY, ts TEXT DEFAULT '2026-06-01T00:00:00Z', type TEXT, insight TEXT, evidence TEXT, domain TEXT, hit_count INT DEFAULT 1, visibility TEXT DEFAULT 'agent', sensitivity TEXT DEFAULT 'low');"
+  local row
+  for row in "$@"; do
+    IFS='|' read -r id typ ins vis <<< "$row"
+    sqlite3 "$g" "INSERT INTO learnings (id,type,insight,evidence,domain,visibility) VALUES ('$id','$typ','$ins','ev','shared','$vis');"
+  done
+}
+
+test_recall_global_unions_and_tags() {
+  agentdb init >/dev/null
+  agentdb learn pattern "local widget rendering tip" "ev" >/dev/null
+  local gdb="$TEST_DIR/global.db"
+  _mk_global_db "$gdb" "G1|pattern|quokka cross project lesson|agent"
+  local out
+  out=$(AGENTDB_GLOBAL="$gdb" agentdb recall "quokka" --global)
+  echo "$out" | grep -q "quokka cross project lesson" || { echo "global lesson not surfaced"; return 1; }
+  echo "$out" | grep -q "\[global\]" || { echo "[global] tag missing"; return 1; }
+}
+
+test_recall_global_graceful_when_absent() {
+  agentdb init >/dev/null
+  agentdb learn pattern "local only kangaroo lesson" "ev" >/dev/null
+  local out
+  out=$(AGENTDB_GLOBAL="$TEST_DIR/nope.db" agentdb recall "kangaroo" --global) || {
+    echo "recall --global errored when global absent"; return 1; }
+  echo "$out" | grep -q "local only kangaroo lesson" || { echo "local lost when global absent"; return 1; }
+}
+
+test_recall_global_no_human_leak() {
+  agentdb init >/dev/null
+  agentdb learn pattern "local platypus lesson" "ev" >/dev/null
+  local gdb="$TEST_DIR/global2.db"
+  _mk_global_db "$gdb" "GH|gotcha|platypus secret human only note|human_only"
+  local out
+  out=$(AGENTDB_GLOBAL="$gdb" agentdb recall "platypus" --global)
+  if echo "$out" | grep '^- ' | grep -q "secret human only"; then
+    echo "human_only leaked from global brain"; return 1; fi
+}
+
 # --- Learn Domain Auto-Population Tests ---
 
 test_learn_auto_populates_domain() {
@@ -2470,6 +2511,9 @@ run_test_suite() {
       run_test "recall dedups identical insights" test_recall_dedups_identical_insights
       run_test "recall hides human_only learnings" test_recall_hides_human_only
       run_test "recall bumps hit_count on surfaced rows" test_recall_bumps_hit_count
+      run_test "recall --global unions + tags global hits" test_recall_global_unions_and_tags
+      run_test "recall --global graceful when global absent" test_recall_global_graceful_when_absent
+      run_test "recall --global never leaks human_only" test_recall_global_no_human_leak
       ;;
     learn)
       run_test "learn auto-populates domain from PWD" test_learn_auto_populates_domain

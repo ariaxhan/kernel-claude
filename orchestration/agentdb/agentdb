@@ -1426,65 +1426,42 @@ cmd_antibody() {
 # keywords + touched file names. Bumps hit_count on returned rows only, so hit_count
 # becomes a REAL usefulness signal (vs read-start's blanket bump). Falls back to LIKE
 # if the FTS index isn't present (DB predates migration 012).
-cmd_recall() {
-  local query="$*"
-  [ -z "$query" ] && { echo "Usage: agentdb recall <keywords>"; exit 1; }
-  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
-  local limit="${RECALL_LIMIT:-8}"
-
-  # Lowercase, keep only [a-z0-9], quote each term as an FTS phrase, OR them together.
-  # Phrase-quoting makes arbitrary input safe from FTS5 syntax + SQL (no quotes survive).
-  # Query hygiene: drop 1-char tokens and common stopwords so the OR'd query isn't
-  # dominated by noise words ("the bug in auth" → "bug" OR "auth"). bm25 already
-  # downweights frequent terms, but dropping them keeps the candidate set tight.
-  local fts_query
-  fts_query=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' \
-    | awk 'BEGIN{split("the a an is it to of in on for and or but with this that was are be by at as from not no if then else do does did has have had will would can could should",s," ");for(k in s)stop[s[k]]=1}
-           {n=0;for(i=1;i<=NF;i++){t=$i;if(length(t)>=2&&!(t in stop))out[++n]=t};for(j=1;j<=n;j++)printf (j>1?" OR ":"")"\""out[j]"\""}')
-  # Fallback: if hygiene stripped everything (e.g. query was all stopwords), keep the
-  # raw terms rather than failing — a loose match beats no match.
-  if [ -z "$fts_query" ]; then
-    fts_query=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' \
-      | awk '{for(i=1;i<=NF;i++) printf (i>1?" OR ":"") "\"" $i "\""}')
+# Locate the cross-project global brain (a metabrain-native DB). Resolution order:
+#   1. $AGENTDB_GLOBAL if set.
+#   2. Walk up from the project root for an ancestor holding _meta/agentdb/global.db
+#      (Aria's layout: project → CodingVault → Vaults/_meta/agentdb/global.db).
+# Echoes the path if found+readable, else empty (recall --global degrades to local).
+find_global_db() {
+  if [ -n "${AGENTDB_GLOBAL:-}" ]; then
+    [ -f "$AGENTDB_GLOBAL" ] && echo "$AGENTDB_GLOBAL"
+    return 0
   fi
-  [ -z "$fts_query" ] && { echo "No searchable terms in: $query"; exit 1; }
+  local d="$PROJECT_ROOT"
+  while [ -n "$d" ] && [ "$d" != "/" ]; do
+    if [ -f "$d/_meta/agentdb/global.db" ] && [ "$d/_meta/agentdb/global.db" != "$DB" ]; then
+      echo "$d/_meta/agentdb/global.db"; return 0
+    fi
+    d=$(dirname "$d")
+  done
+  return 0
+}
 
+# Emit ranked "<key>\037<line>" rows for a recall query from an arbitrary DB.
+# Uses FTS5 (bm25 + boosts) when the DB has a learnings_fts index, else a LIKE
+# scan. <tag> is appended to each displayed line (e.g. " [global]"). <writable>=1
+# permits an FTS 'rebuild' (local DB only); 0 keeps it strictly read-only (the
+# global brain — its FTS is refreshed by the nightly consolidation job, never here).
+# Always visibility-filtered (never surfaces human_only/operational to an agent).
+_recall_emit() {
+  local db="$1" fts_query="$2" like_clause="$3" tag="$4" limit="$5" writable="$6"
+  [ -f "$db" ] || return 0
   local has_fts
-  has_fts=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
-  # Self-heal: a DB that predates migration 012 (or hasn't run preflight this session)
-  # has no FTS index. Build it on first recall so the index is never a hard dependency.
-  if [ -z "$has_fts" ]; then
-    run_pending_migrations "recall:applied_migration" >/dev/null 2>&1 || true
-    has_fts=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
-  fi
-
-  echo "## Recall: $query"
-  echo ""
+  has_fts=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
   if [ -n "$has_fts" ]; then
-    # Freshen the index from the content table (no sync triggers — they abort the learn
-    # write path on SQLite 3.43). 'rebuild' is O(N) but a few ms for hundreds of rows.
-    db_exec "INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');" 2>/dev/null || true
-    # bm25() lower = more relevant. Subtract boosts so failures/gotchas, frequently-
-    # recalled, and recent learnings sort earlier. Show a snippet of evidence too.
-    # Ranking: bm25() leads (lower = more relevant); small boosts nudge failures/
-    # gotchas, recently-recalled, and recent learnings earlier WITHOUT overriding
-    # relevance. Weights are calibrated against bm25's range for these short docs
-    # (~ -0.5 to -8): failure -1.5 (a nudge, not the old -5 sledgehammer), hit_count
-    # capped at 20 so popular rows can't run away (rich-get-richer), recency -0.5.
-    #   - visibility filter: never surface human_only/operational rows to an agent
-    #     (migration 009). NULL visibility (pre-009 rows) is treated as 'agent'.
-    #   - Dedup: the DBs carry many near-duplicate insights; without dedup recall
-    #     returns the same lesson N times. bm25() can't live inside GROUP BY/an
-    #     aggregate ("unable to use function bm25 in the requested context" — the
-    #     optimizer flattens the subquery), so we over-fetch ranked rows and dedup
-    #     by insight-prefix in awk (US char \037 delimiter — absent from real text),
-    #     keeping the first (best-ranked) of each. Then cut to the limit. The key is
-    #     a 200-char prefix: long enough that two genuinely distinct lessons won't
-    #     collide, short enough to still collapse exact clones (the dominant case).
-    local out
-    out=$(db_exec "
+    [ "$writable" = "1" ] && sqlite3 "$db" "INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');" 2>/dev/null || true
+    sqlite3 "$db" "
       SELECT lower(substr(l.insight,1,200)) || char(31) ||
-             '- [' || l.type || '] ' || l.insight ||
+             '- [' || l.type || '] ' || l.insight || '$tag' ||
              CASE WHEN l.evidence IS NOT NULL AND l.evidence != ''
                   THEN '  ↳ ' || substr(l.evidence,1,90) ELSE '' END
       FROM learnings l JOIN learnings_fts f ON f.rowid = l.rowid
@@ -1496,13 +1473,91 @@ cmd_recall() {
         - (MIN(l.hit_count,20) * 0.05)
         - (CASE WHEN julianday('now') - julianday(l.ts) < 14 THEN 0.5 ELSE 0 END)
       ) ASC
-      LIMIT $((limit * 5));
-    " 2>/dev/null | awk -F'\037' '!seen[$1]++{print $2}' | head -n "$limit" || echo "")
-    if [ -n "$out" ]; then
-      echo "$out"
-      # Real relevance feedback: bump only the (agent-visible) rows this query
-      # surfaced. hit_count is now exclusively recall-earned (read-start uses
-      # load_count) — so it's a trustworthy "answered a real task" signal.
+      LIMIT $((limit * 5));" 2>/dev/null || true
+  elif [ -n "$like_clause" ]; then
+    sqlite3 "$db" "
+      SELECT lower(substr(insight,1,200)) || char(31) ||
+             '- [' || type || '] ' || insight || '$tag' ||
+             CASE WHEN evidence IS NOT NULL AND evidence != ''
+                  THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END
+      FROM learnings
+      WHERE ($like_clause)
+        AND (visibility = 'agent' OR visibility IS NULL)
+      ORDER BY hit_count DESC, ts DESC
+      LIMIT $((limit * 5));" 2>/dev/null || true
+  fi
+}
+
+cmd_recall() {
+  # Parse --global (cross-project) out of the args; the rest is the query.
+  local use_global=0
+  local -a qargs=()
+  local a
+  for a in "$@"; do
+    if [ "$a" = "--global" ]; then use_global=1; else qargs+=("$a"); fi
+  done
+  local query="${qargs[*]}"
+  [ -z "$query" ] && { echo "Usage: agentdb recall <keywords> [--global]"; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  local limit="${RECALL_LIMIT:-8}"
+
+  # Lowercase, keep only [a-z0-9]; drop 1-char tokens + common stopwords so the
+  # OR'd query isn't dominated by noise words ("the bug in auth" → bug, auth).
+  local terms
+  terms=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' \
+    | awk 'BEGIN{split("the a an is it to of in on for and or but with this that was are be by at as from not no if then else do does did has have had will would can could should",s," ");for(k in s)stop[s[k]]=1}
+           {for(i=1;i<=NF;i++){t=$i;if(length(t)>=2&&!(t in stop))print t}}')
+  # Fallback: if hygiene stripped everything (all stopwords), keep raw alnum terms.
+  [ -z "$terms" ] && terms=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' | tr ' ' '\n' | awk 'NF')
+  [ -z "$terms" ] && { echo "No searchable terms in: $query"; exit 1; }
+
+  # Build the FTS query (phrase-quoted OR — injection-safe, no quotes survive) and a
+  # LIKE clause (for DBs without an FTS index). Terms are [a-z0-9] only → quote-safe.
+  local fts_query like_clause
+  fts_query=$(printf '%s\n' "$terms" | awk 'NF{printf (n++?" OR ":"")"\""$1"\""}')
+  like_clause=""
+  while IFS= read -r t; do
+    [ -z "$t" ] && continue
+    like_clause="${like_clause:+$like_clause OR }insight LIKE '%$t%' OR evidence LIKE '%$t%' OR domain LIKE '%$t%'"
+  done <<< "$terms"
+
+  # Self-heal local FTS (build it if this DB predates migration 012 / hasn't run
+  # preflight this session) so the local path uses bm25 ranking, not LIKE.
+  local has_fts
+  has_fts=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has_fts" ]; then
+    run_pending_migrations "recall:applied_migration" >/dev/null 2>&1 || true
+  fi
+
+  # Resolve the global brain only if requested.
+  local global_db=""
+  if [ "$use_global" = "1" ]; then
+    global_db=$(find_global_db || true)
+  fi
+
+  echo "## Recall: $query"
+  [ -n "$global_db" ] && echo "_(+ global brain: $global_db)_"
+  echo ""
+
+  # Collect local first (so a lesson present in both wins as the local copy), then
+  # global, then dedup by 200-char insight key and cut to the limit. bm25() can't
+  # live inside GROUP BY/an aggregate (the optimizer flattens the subquery →
+  # "unable to use function bm25 in the requested context"), so dedup is post-query
+  # in awk (US char \037 delimiter — absent from real text).
+  local raw_local raw_global out
+  raw_local=$(_recall_emit "$DB" "$fts_query" "$like_clause" "" "$limit" 1)
+  raw_global=""
+  [ -n "$global_db" ] && raw_global=$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0)
+  out=$(printf '%s\n%s\n' "$raw_local" "$raw_global" | grep -v '^[[:space:]]*$' \
+        | awk -F'\037' '!seen[$1]++{print $2}' | head -n "$limit")
+
+  if [ -n "$out" ]; then
+    echo "$out"
+    # Relevance feedback: bump only the (agent-visible) LOCAL rows this query
+    # surfaced. hit_count is exclusively recall-earned (read-start uses load_count),
+    # so it's a trustworthy "answered a real task" signal. Never write to the global
+    # brain from recall (the consolidation job owns it).
+    if [ -n "$has_fts" ] || db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null | grep -q 1; then
       db_exec "UPDATE learnings SET hit_count = hit_count + 1,
                  last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now')
                WHERE rowid IN (
@@ -1512,22 +1567,9 @@ cmd_recall() {
                    AND (l.visibility = 'agent' OR l.visibility IS NULL)
                  LIMIT $limit
                );" 2>/dev/null
-    else
-      echo "(no matching learnings)"
     fi
   else
-    # Fallback: LIKE on the first searchable term (pre-FTS DBs). Same visibility
-    # filter + dedup as the FTS path so behavior is consistent across DB states.
-    local first safe
-    first=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' | awk '{print $1}')
-    safe=$(sql_escape "$first")
-    db_exec "SELECT '- [' || type || '] ' || insight FROM learnings
-             WHERE (insight LIKE '%$safe%' OR domain LIKE '%$safe%')
-               AND (visibility = 'agent' OR visibility IS NULL)
-             GROUP BY lower(substr(insight,1,200))
-             ORDER BY hit_count DESC, ts DESC LIMIT $limit;" 2>/dev/null || echo "None"
-    echo ""
-    echo "_(LIKE fallback — run 'agentdb init' to build the FTS index for better recall)_"
+    echo "(no matching learnings)"
   fi
 }
 
