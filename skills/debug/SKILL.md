@@ -84,6 +84,7 @@ Skill-specific: skills/debug/reference/debug-research.md
 9. **Visibility-first**: Paste raw terminal output / error logs / screenshots directly. Raw data beats your interpretation.
 10. **Evidence-first, not assertion**: Show the actual evidence (test output, exact command + result, screenshot) rather than stating "it works." Reviewing evidence is faster than re-running verification, and catches cases where "seems to work" masks a different failure path. <!-- Updated 2026-06-05: https://code.claude.com/docs/en/best-practices -->
 11. **Extended thinking**: for complex bugs with no clear hypothesis after all above, request deep analysis using extended thinking. Deliberate multi-step reasoning before output catches subtle root causes that fast responses miss. <!-- Updated 2026-06-06: https://gitnation.com/contents/advanced-claude-code-techniques-for-2026 -->
+12. **--verbose mode**: run `claude --verbose` for hard-to-reproduce bugs — shows tool calls, thinking steps, and execution paths in real time. Catches silent failures and misparsed outputs. <!-- Updated 2026-06-07: https://claudify.tech/blog/claude-code-debugging-guide -->
 </when_stuck>
 
 <escalation>

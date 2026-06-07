@@ -64,7 +64,7 @@ Skill-specific: skills/git/reference/git-research.md
   </step>
 
   <step id="6" name="pr_review">
-    13. Keep diffs ≤500 lines. >500 lines: split the PR first.
+    13. Keep diffs ≤400 lines. >400 lines: split the PR first — AI review accuracy drops significantly above this threshold. <!-- Updated 2026-06-07: https://blog.exceeds.ai/ai-code-review-best-practices/ -->
     14. AI review before human review (sequence: AI → fix → human). Never parallelize.
     15. PR description for AI-assisted work must answer: AI role / prompt / human contribution.
     16. "Nit:" prefix for optional style comments.

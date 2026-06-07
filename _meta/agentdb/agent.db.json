@@ -1,0 +1,1786 @@
+{
+  "format": 1,
+  "migrations": [
+    "001_init",
+    "002_graph_tracking",
+    "003_telemetry",
+    "004_fix_learnings_schema",
+    "005_learning_system",
+    "006_hypotheses",
+    "007_compaction_telemetry",
+    "008_error_domain",
+    "009_learning_visibility_sensitivity",
+    "010_normalize_timestamps",
+    "011_drop_sync_log",
+    "012_learnings_fts",
+    "013_learning_load_count"
+  ],
+  "tables": {
+    "compaction_events": [],
+    "context": [
+      {
+        "agent": "adversary",
+        "content": "{\n  \"result\": \"pass\",\n  \"evidence\": \"{\\\"tested\\\":[\\\"injection-13-payloads\\\",\\\"awk-dedup-falsemerge\\\",\\\"awk-dedup-USchar\\\",\\\"visibility-leak-FTS\\\",\\\"visibility-leak-LIKE\\\",\\\"visibility-feedback-UPDATE\\\",\\\"load_count-migration-idempotent\\\",\\\"read-start-4-modes\\\",\\\"read-start-bumps-loadcount-not-hitcount\\\",\\\"learn-no-abort\\\",\\\"learn-reinforce\\\",\\\"empty-DB-recall\\\",\\\"ranking-sanity\\\",\\\"limit-boundary\\\",\\\"performance\\\",\\\"zero-triggers\\\",\\\"integrity-check\\\"],\\\"evidence\\\":\\\"recall 0.02-0.03s/854rows; 0 SQL leaks across 13 injection payloads; phrase-quoting yields 0 single-quotes; visibility filter blocks human_only/operational in both FTS+LIKE+feedback paths; load_count added idempotently across 3 preflight runs no duplicate-column; hit_count frozen during read-start; learn no-abort confirmed 0 triggers all DBs integrity ok\\\",\\\"issues\\\":[\\\"FALSE-MERGE(theoretical,0 real incidence): dedup key lower(substr(insight,1,60)) merges distinct insights sharing first 60 chars - 0/161 real collisions are truly-distinct\\\",\\\"US-CHAR(theoretical,0 real incidence): literal 0x1F in insight body breaks awk -F037 split, $2 truncates output - 0 real rows contain 0x1F/tab in first 60ch\\\"]}\"\n}",
+        "contract_id": "",
+        "id": "VD-20260606101011-4020-9516",
+        "ts": "2026-06-06T17:10:11.357Z",
+        "type": "verdict"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"did\":\"Shipped kernel v7.15.0 retrieval quality pass (recall dedup + visibility filter + recalibrated ranking + load_count/hit_count split, migration 013), promoted done=verified-live rule to NEXUS+plugin shared layer, bumped version, synced plugin cache symlink to source, pushed kernel-claude+Vaults to origin/main\",\"next\":\"Deferred: scope column, recall --global (global brain empty), promote, decontaminate --dry-run, porter tokenizer, capture more failures/gotchas. See handoff.\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260606102634-40714-5137",
+        "ts": "2026-06-06T17:26:34.514Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"did\":\"Shipped cross-project self-learning: WS1 killed the contaminating push, WS2 metabrain global brain + UP-only importer (958 distinct, 158 graduated), WS3 recall --global (adversary PASS, 249 tests), WS4 nightly learning-consolidation launchd job @22:00 (live), WS5 decontaminate dry-run (4791 clones removable, 310 kept) AWAITING REVIEW, WS6 agent-db->metabrain rename, WS7 v7.17.0 + decay safety fix\",\"next\":\"GATED: run decontaminate.py --apply after Aria reviews the dry-run report (backs up every DB first)\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260606120717-57794-7918",
+        "ts": "2026-06-06T19:07:17.701Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"did\":\"Decontamination APPLIED: 4791 clones removed across project DBs (ariacam 486->2, modelmind 854->165, our4cuts 551->60), 315 unique kept, all backed up to _meta/agentdb/backups/, verified non-lossy via recall --global. Tracked DBs committed+pushed; our4cuts cleaned locally but blocked by its server-side branch protection (needs PR/its own deploy flow)\",\"next\":\"our4cuts agent.db cleanup awaits its own deploy/PR flow (server-side protection blocks direct push). All WS1-7 complete + live.\",\"blocked\":\"our4cuts main is protected — DB cleanup committed there must go through its normal flow\"}",
+        "contract_id": null,
+        "id": "CP-20260606123927-74558-13809",
+        "ts": "2026-06-06T19:39:27.060Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"did\":\"kernel-skills-sync\",\"skill\":\"git,debug,testing\",\"learned\":[\"PR diff limit for AI review: 400 lines not 500\",\"claude --verbose shows real-time tool calls and thinking for debugging\",\"Stop hooks enforce test gates mechanically (not honor-system)\"]}",
+        "contract_id": null,
+        "id": "CP-20260607080335-46233-19988",
+        "ts": "2026-06-07T15:03:35.772Z",
+        "type": "checkpoint"
+      }
+    ],
+    "context_sessions": [],
+    "edges": [],
+    "errors": [],
+    "events": [
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 1,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/commands/forge.md\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:21:40.224Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 2,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/solution.py\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:21:42.084Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 3,
+        "metadata": "{\"exit_code\":0,\"file\":\"/tmp/ledger_work/solution.py\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:21:44.390Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 4,
+        "metadata": "{\"exit_code\":0,\"file\":\"/tmp/solution.py\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:21:49.826Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 5,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/commands/forge.md\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:21:50.752Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 6,
+        "metadata": "{\"exit_code\":0,\"file\":\"/tmp/ledger_work/solution.py\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:21:56.297Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 7,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/solution.py\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:21:59.368Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 45,
+        "event": "capture-error",
+        "id": 8,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260601101723-4597",
+        "ts": "2026-06-01T18:21:59.666Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 9,
+        "metadata": "{\"exit_code\":0,\"file\":\"/tmp/ledger_sol_xyz.py\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:22:04.043Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 10,
+        "metadata": "{\"exit_code\":0,\"file\":\"/tmp/solution.py\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:22:16.598Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 11,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/solution.py\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:22:18.463Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 43,
+        "event": "capture-error",
+        "id": 12,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260601101723-4597",
+        "ts": "2026-06-01T18:23:05.184Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 39,
+        "event": "capture-error",
+        "id": 13,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260601101723-4597",
+        "ts": "2026-06-01T18:23:28.806Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 36,
+        "event": "capture-error",
+        "id": 14,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260601101723-4597",
+        "ts": "2026-06-01T18:23:57.081Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 36,
+        "event": "post-compact-restore",
+        "id": 15,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260601101723-4597",
+        "ts": "2026-06-01T18:24:33.874Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 38,
+        "event": "capture-error",
+        "id": 16,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260601101723-4597",
+        "ts": "2026-06-01T18:25:02.109Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 33,
+        "event": "log-write",
+        "id": 17,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CollabVault/research/idsd-forge/run1-results-INVALID.md\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:27:40.660Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 31,
+        "event": "log-write",
+        "id": 18,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CollabVault/handoffs/forge-gates-experiment-2026-06-01.md\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:28:59.158Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 19,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CollabVault/research/idsd-forge/run2-results.md\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:37:52.000Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 31,
+        "event": "log-write",
+        "id": 20,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CollabVault/handoffs/forge-gates-experiment-2026-06-01.md\"}",
+        "session_id": "",
+        "ts": "2026-06-01T18:38:05.511Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 21,
+        "metadata": "{\"branch\":\"main\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260603080005-77573",
+        "ts": "2026-06-03T15:00:09.191Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 3622,
+        "event": "session-start",
+        "id": 22,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260603080005-77573",
+        "ts": "2026-06-03T15:00:09.202Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 23,
+        "event": "post-compact-restore",
+        "id": 23,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260603080005-77573",
+        "ts": "2026-06-03T15:00:09.275Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 24,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/build/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-03T15:02:22.773Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 24,
+        "event": "log-write",
+        "id": 25,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/testing/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-03T15:02:26.019Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 24,
+        "event": "log-write",
+        "id": 26,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/testing/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-03T15:02:32.619Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 23,
+        "event": "log-write",
+        "id": 27,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/reports/2026-06-03-kernel-sync.md\"}",
+        "session_id": "",
+        "ts": "2026-06-03T15:02:46.531Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": 166000,
+        "event": "session:end",
+        "id": 28,
+        "metadata": "{\"branch\":\"\",\"files_changed\":,\"agent\":\"main-77573\",\"duration_s\":166}",
+        "session_id": "",
+        "ts": "2026-06-03T15:02:51.867Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 619,
+        "event": "session-end",
+        "id": 29,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260603080005-77573",
+        "ts": "2026-06-03T15:02:52.470Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 30,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/distillations/raw/2026-06-04-activity.md\"}",
+        "session_id": "",
+        "ts": "2026-06-04T13:38:03.433Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": 117000,
+        "event": "session:end",
+        "id": 31,
+        "metadata": "{\"branch\":\"\",\"files_changed\":,\"agent\":\"main-85854\",\"duration_s\":117}",
+        "session_id": "",
+        "ts": "2026-06-04T13:38:15.039Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 1425,
+        "event": "session-end",
+        "id": 32,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260604063618-85854",
+        "ts": "2026-06-04T13:38:16.444Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 33,
+        "metadata": "{\"branch\":\"main\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260604080005-96288",
+        "ts": "2026-06-04T15:00:09.084Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 3611,
+        "event": "session-start",
+        "id": 34,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260604080005-96288",
+        "ts": "2026-06-04T15:00:09.095Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 24,
+        "event": "post-compact-restore",
+        "id": 35,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260604080005-96288",
+        "ts": "2026-06-04T15:00:09.170Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 36,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/build/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-04T15:01:19.587Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 37,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/git/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-04T15:01:25.543Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": 129000,
+        "event": "session:end",
+        "id": 38,
+        "metadata": "{\"branch\":\"\",\"files_changed\":,\"agent\":\"main-96288\",\"duration_s\":129}",
+        "session_id": "",
+        "ts": "2026-06-04T15:02:14.915Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 519,
+        "event": "session-end",
+        "id": 39,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260604080005-96288",
+        "ts": "2026-06-04T15:02:15.417Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 46,
+        "event": "post-compact-restore",
+        "id": 40,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260604160323-20893",
+        "ts": "2026-06-04T23:18:45.650Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 41,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/agent-db/src/agentdb/schema.py\"}",
+        "session_id": "",
+        "ts": "2026-06-04T23:20:10.513Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 42,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/agent-db/src/agentdb/models.py\"}",
+        "session_id": "",
+        "ts": "2026-06-04T23:20:22.703Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 36,
+        "event": "log-write",
+        "id": 43,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/agent-db/src/agentdb/db.py\"}",
+        "session_id": "",
+        "ts": "2026-06-04T23:21:11.090Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 44,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/agent-db/src/agentdb/__init__.py\"}",
+        "session_id": "",
+        "ts": "2026-06-04T23:21:16.503Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 45,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/agent-db/pyproject.toml\"}",
+        "session_id": "",
+        "ts": "2026-06-04T23:21:23.550Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 39,
+        "event": "log-write",
+        "id": 46,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/agent-db/tests/test_agentdb.py\"}",
+        "session_id": "",
+        "ts": "2026-06-04T23:21:47.538Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 30,
+        "event": "log-write",
+        "id": 47,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/agent-db/LICENSE\"}",
+        "session_id": "",
+        "ts": "2026-06-04T23:21:53.836Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 48,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/agent-db/README.md\"}",
+        "session_id": "",
+        "ts": "2026-06-04T23:22:13.745Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 30,
+        "event": "log-write",
+        "id": 49,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/agent-db/.gitignore\"}",
+        "session_id": "",
+        "ts": "2026-06-04T23:22:17.504Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 50,
+        "metadata": "{\"branch\":\"main\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260605085155-67273",
+        "ts": "2026-06-05T15:51:59.750Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 4142,
+        "event": "session-start",
+        "id": 51,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260605085155-67273",
+        "ts": "2026-06-05T15:51:59.764Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 30,
+        "event": "post-compact-restore",
+        "id": 52,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260605085155-67273",
+        "ts": "2026-06-05T15:51:59.856Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 53,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/testing/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-05T15:53:31.327Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 54,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/security/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-05T15:53:38.205Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 55,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/git/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-05T15:53:43.186Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 56,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/debug/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-05T15:53:55.557Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 32,
+        "event": "log-write",
+        "id": 57,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/reports/2026-06-05-kernel-sync.md\"}",
+        "session_id": "",
+        "ts": "2026-06-05T15:54:14.311Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": 143000,
+        "event": "session:end",
+        "id": 58,
+        "metadata": "{\"branch\":\"\",\"files_changed\":,\"agent\":\"main-67683\",\"duration_s\":143}",
+        "session_id": "",
+        "ts": "2026-06-05T15:54:19.648Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 723,
+        "event": "session-end",
+        "id": 59,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260605085155-67273",
+        "ts": "2026-06-05T15:54:20.353Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 60,
+        "metadata": "{\"branch\":\"main\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260606080005-59030",
+        "ts": "2026-06-06T15:00:09.094Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 3121,
+        "event": "session-start",
+        "id": 61,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606080005-59030",
+        "ts": "2026-06-06T15:00:09.106Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 22,
+        "event": "post-compact-restore",
+        "id": 62,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606080005-59030",
+        "ts": "2026-06-06T15:00:09.177Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 23,
+        "event": "log-write",
+        "id": 63,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/build/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T15:01:51.388Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 24,
+        "event": "log-write",
+        "id": 64,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/debug/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T15:01:55.277Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 23,
+        "event": "log-write",
+        "id": 65,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/reports/2026-06-06-kernel-sync.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T15:02:13.604Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": 134000,
+        "event": "session:end",
+        "id": 66,
+        "metadata": "{\"branch\":\"\",\"files_changed\":,\"agent\":\"main-59030\",\"duration_s\":134}",
+        "session_id": "",
+        "ts": "2026-06-06T15:02:19.029Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 508,
+        "event": "session-end",
+        "id": 67,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606080005-59030",
+        "ts": "2026-06-06T15:02:19.519Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 68,
+        "metadata": "{\"branch\":\"main\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260606094527-89003",
+        "ts": "2026-06-06T16:45:30.227Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 3004,
+        "event": "session-start",
+        "id": 69,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606094527-89003",
+        "ts": "2026-06-06T16:45:30.244Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 45,
+        "event": "post-compact-restore",
+        "id": 70,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606094527-89003",
+        "ts": "2026-06-06T16:46:33.891Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 71,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/_meta/reports/retro-agentdbs.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:51:56.546Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 72,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/_meta/reports/retrieval-deepdive.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:52:17.556Z"
+      },
+      {
+        "agent": "",
+        "category": "command",
+        "duration_ms": null,
+        "event": "dream",
+        "id": 73,
+        "metadata": "{\"topic\":\"retrieval-fix\",\"perspectives\":3}",
+        "session_id": "",
+        "ts": "2026-06-06T16:54:30.280Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 74,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/_meta/reports/dream-retrieval.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:56:02.127Z"
+      },
+      {
+        "agent": "",
+        "category": "command",
+        "duration_ms": null,
+        "event": "dream-selected",
+        "id": 75,
+        "metadata": "{\"topic\":\"retrieval-fix\",\"chosen\":\"pragmatist-hardened\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:56:13.831Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 76,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/migrations/013_learning_load_count.sql\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:59:02.088Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 77,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:59:10.797Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 78,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:59:13.587Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 79,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/schema.sql\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:59:23.258Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 80,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:59:38.715Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 81,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:59:46.645Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 82,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T16:59:53.739Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 83,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:00:01.434Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 84,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:00:21.045Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 85,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:00:35.986Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 30,
+        "event": "log-write",
+        "id": 86,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:00:49.243Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 87,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:01:04.776Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 88,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:03:50.391Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 89,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:11:12.185Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 90,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:11:17.109Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 91,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/.claude/rules/invariants.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:11:48.321Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 92,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/hooks/scripts/session-start.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:12:38.434Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 93,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/hooks/scripts/session-start.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:12:46.603Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 94,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/CLAUDE.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:12:52.862Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 95,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/.claude-plugin/plugin.json\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:13:18.984Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 96,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/.claude-plugin/marketplace.json\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:13:36.430Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 97,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/CHANGELOG.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:13:56.633Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 98,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:14:52.477Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 99,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:14:58.008Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 34,
+        "event": "log-write",
+        "id": 100,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:16:05.653Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 101,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:16:12.755Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 102,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:16:18.182Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 103,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/_meta/handoffs/learning-retrieval-and-kernel-promotion-2026-06-06.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T17:26:19.365Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 59,
+        "event": "capture-error",
+        "id": 104,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606094527-89003",
+        "ts": "2026-06-06T17:26:45.284Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 39,
+        "event": "post-compact-restore",
+        "id": 105,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606094527-89003",
+        "ts": "2026-06-06T17:50:49.588Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 30,
+        "event": "post-compact-restore",
+        "id": 106,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606094527-89003",
+        "ts": "2026-06-06T17:54:24.342Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 46,
+        "event": "capture-error",
+        "id": 107,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606094527-89003",
+        "ts": "2026-06-06T17:54:53.612Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 108,
+        "metadata": "{\"branch\":\"main\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260606110111-54908",
+        "ts": "2026-06-06T18:01:14.730Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 3071,
+        "event": "session-start",
+        "id": 109,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606110111-54908",
+        "ts": "2026-06-06T18:01:14.745Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 3142,
+        "event": "post-compact-restore",
+        "id": 110,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606110111-54908",
+        "ts": "2026-06-06T18:01:14.767Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 111,
+        "metadata": "{\"branch\":\"main\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260606110207-55371",
+        "ts": "2026-06-06T18:02:08.602Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 710,
+        "event": "session-start",
+        "id": 112,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606110207-55371",
+        "ts": "2026-06-06T18:02:08.616Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 769,
+        "event": "post-compact-restore",
+        "id": 113,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606110207-55371",
+        "ts": "2026-06-06T18:02:08.638Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 47,
+        "event": "capture-error",
+        "id": 114,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606110207-55371",
+        "ts": "2026-06-06T18:03:56.739Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 34,
+        "event": "capture-error",
+        "id": 115,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606110207-55371",
+        "ts": "2026-06-06T18:03:59.759Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 116,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/agentdb-sync.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:32:47.454Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 117,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/daily-maintenance.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:33:05.891Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 118,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/metabrain-import.py\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:36:10.650Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 31,
+        "event": "log-write",
+        "id": 119,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:41:12.909Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 120,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:43:59.699Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 121,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:44:04.989Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 122,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:46:00.189Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 123,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:46:07.509Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 32,
+        "event": "log-write",
+        "id": 124,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:47:13.616Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 125,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:47:20.241Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 126,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/.claude/CLAUDE.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:48:18.927Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 44,
+        "event": "capture-error",
+        "id": 127,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260606110207-55371",
+        "ts": "2026-06-06T18:53:16.732Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 128,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:53:50.562Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 129,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/learning-consolidation.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:56:20.781Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 130,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/plist-templates/active/com.nexus.learning-consolidation.plist\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:56:38.928Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 131,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/plist-templates/README.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:57:35.223Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 132,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/decontaminate.py\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:59:09.231Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 29,
+        "event": "log-write",
+        "id": 133,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/decontaminate.py\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:59:38.114Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 134,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/decontaminate.py\"}",
+        "session_id": "",
+        "ts": "2026-06-06T18:59:47.258Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 135,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/decontaminate.py\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:00:02.796Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 30,
+        "event": "log-write",
+        "id": 136,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/decontaminate.py\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:00:09.150Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 30,
+        "event": "log-write",
+        "id": 137,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/.gitmodules\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:01:56.594Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 138,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/orchestration/agentdb/agentdb\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:03:48.834Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 31,
+        "event": "log-write",
+        "id": 139,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:04:08.461Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 32,
+        "event": "log-write",
+        "id": 140,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:04:13.545Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 28,
+        "event": "log-write",
+        "id": 141,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/CHANGELOG.md\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:05:19.732Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 142,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/hooks/scripts/session-start.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:05:42.748Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 143,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/decontaminate.py\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:35:30.455Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 144,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/decontaminate.py\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:35:48.218Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 27,
+        "event": "log-write",
+        "id": 145,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/services/decontaminate.py\"}",
+        "session_id": "",
+        "ts": "2026-06-06T19:36:00.584Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 146,
+        "metadata": "{\"branch\":\"main\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260607080005-43597",
+        "ts": "2026-06-07T15:00:08.767Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 3318,
+        "event": "session-start",
+        "id": 147,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260607080005-43597",
+        "ts": "2026-06-07T15:00:08.779Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 24,
+        "event": "post-compact-restore",
+        "id": 148,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260607080005-43597",
+        "ts": "2026-06-07T15:00:08.856Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 24,
+        "event": "log-write",
+        "id": 149,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/git/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-07T15:02:38.749Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 26,
+        "event": "log-write",
+        "id": 150,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/debug/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-07T15:02:42.978Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 151,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/testing/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-06-07T15:03:03.452Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 25,
+        "event": "log-write",
+        "id": 152,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/_meta/reports/2026-06-07-kernel-sync.md\"}",
+        "session_id": "",
+        "ts": "2026-06-07T15:03:30.225Z"
+      }
+    ],
+    "execution_traces": [],
+    "experiments": [],
+    "hypotheses": [],
+    "learnings": [
+      {
+        "domain": "kernel-claude",
+        "evidence": "experiment-design-FINAL A1 vs A0",
+        "hit_count": 0,
+        "id": "LRN-20260601111826-29343-24933",
+        "insight": "HYPOTHESIS H-FORGE-METHOD [status:unproven conf:0.0]: forge method layer beats bare /goal+auto-mode on escaped-defects at fixed false-alarm",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-01T18:18:26.820Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "kernel-claude",
+        "evidence": "FINAL D1; Ayoob detection!=repair n=30",
+        "hit_count": 0,
+        "id": "LRN-20260601111826-29380-25358",
+        "insight": "HYPOTHESIS H-FORGE-NONREPAIR [status:unproven conf:0.0]: non-repair classifier (escalate contract-gaps at first stuck vs burning 3 anneals) cuts wasted tokens, no catch loss",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-01T18:18:26.871Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "kernel-claude",
+        "evidence": "FINAL D2; Urvil refund race",
+        "hit_count": 0,
+        "id": "LRN-20260601111826-29415-24875",
+        "insight": "HYPOTHESIS H-FORGE-FRONTGATE [status:unproven conf:0.0]: mandatory edge-case enumeration before HAMMER catches defects bare define-done misses",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-01T18:18:26.911Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "kernel-claude",
+        "evidence": "task w5p3ioq0j; partial_refund self._orders vs test r.orders; due_today kwarg vs positional sig mismatch",
+        "hit_count": 0,
+        "id": "LRN-20260601112617-41693-507",
+        "insight": "forge-gates run-1 INVALID: builder-test vs implementer-code interface drift (attr names, param signatures) confounded 2/5 solvable fixtures; all 3 arms scored identically 3/5 -> zero discriminating power. Underspecified fixture contract = the exact IDSD failure the experiment studies.",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-01T18:26:17.557Z",
+        "type": "failure",
+        "visibility": "agent"
+      },
+      {
+        "domain": "kernel-claude",
+        "evidence": "all arms escalated=false on ambiguous_discount; escalation flag is independent of the interface bug",
+        "hit_count": 0,
+        "id": "LRN-20260601112617-41729-16862",
+        "insight": "forge-gates run-1 WEAK SIGNAL (less-confounded, n=1): A2 (forge+D1) did NOT escalate the ambiguous_discount fixture — D1 escalation under-fired on the one case designed to trigger it. Consistent with models defaulting to act/guess over flag-ambiguity. Needs re-run with >1 ambiguous fixture + sharper escalation prompt.",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-01T18:26:17.598Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "kernel-claude",
+        "evidence": "task w2eovhhtz; escalation reasons all correct & specific",
+        "hit_count": 0,
+        "id": "LRN-20260601113720-56078-21165",
+        "insight": "H-FORGE-NONREPAIR (D1) SUPPORTED [status:testing conf:0.25, run-2 valid n~8]: A2 forge+D1 escalated 3/3 genuine ambiguities with correct reasons + 0 false-escalations; A0 bare-/goal 0/3 (guesses all); A1 forge-no-D1 noisy (1/3 true + 1 false on charge_once, incoherent reason). D1 is forge's real differentiator over /goal. Needs real-code replication before graduating.",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-01T18:37:20.409Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "kernel-claude",
+        "evidence": "task w2eovhhtz",
+        "hit_count": 0,
+        "id": "LRN-20260601113720-56113-20681",
+        "insight": "H-FORGE-FRONTGATE (D2) NOT SUPPORTED [status:refuted-lite conf:~0]: edge-case enumeration gave A2 NO catch advantage — all 3 arms 4/5; the 4 clean solvable fixtures passed in every arm (strong models already handled edges), charge_once escaped everywhere due to latent contract ambiguity (charged-on-retry semantics), not an enumeration gap. Reverted from variant. Revisit only on weaker models / sloppier contracts.",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-01T18:37:20.451Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "kernel-claude",
+        "evidence": "task w2eovhhtz",
+        "hit_count": 0,
+        "id": "LRN-20260601113720-56148-20198",
+        "insight": "H-FORGE-METHOD (forge-as-is > bare /goal) NOT SUPPORTED on catch [conf:down]: A1 tied A0 at 4/5 AND was noisier on escalation (false-escalated a solvable). Forge's value over /goal showed up SPECIFICALLY in the D1 delta, not in the method broadly. Build-vs-rent: rent /goal's loop, add D1.",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-01T18:37:20.490Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "email-content",
+        "evidence": "Emails use: \"Tony Hoare died (Quicksort inventor)\", \"84 commits (7 days)\", \"289.6K stars\". Never generic \"recent commits\".",
+        "hit_count": 98,
+        "id": null,
+        "insight": "Email design principles: specificity (names/numbers/attributions), grid layouts for metrics, cross-domain collision detection, night questions for subconscious processing. Pre-scraped intelligence + live WebSearch combined.",
+        "last_hit": "2026-04-20T13:30:16.997Z",
+        "sensitivity": "low",
+        "ts": "2026-03-11T23:15:16.000Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "architecture",
+        "evidence": "_meta/plans/ai-engineering-team.md + dream analysis",
+        "hit_count": 9,
+        "id": null,
+        "insight": "Worktree parallelism dangerous on shared files: agents contaminate each other's working tree. Sequential execution safer when branches share files like tests/. Always commit/stash ALL pending work before creating worktrees.",
+        "last_hit": "2026-04-09T13:30:12.911Z",
+        "sensitivity": "low",
+        "ts": "2026-03-26T03:55:55.733Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "kernel-claude",
+        "evidence": "dream-retrieval.md — Pragmatist-hardened design survived council. A5 load_count is the non-negotiable add over pure-minimalist (hit_count poisoned by read-start blanket bump otherwise).",
+        "hit_count": 1,
+        "id": "LRN-20260606095613-95225-21898",
+        "insight": "Retrieval fix split: ship recall dedup+visibility+recalibrate+load_count now (cascades safe); offer scope/recall --global/promote as opt-in tools; defer decontaminate --apply until --global proves the global brain earns the W8 risk",
+        "last_hit": "2026-06-06T17:26:53.719Z",
+        "sensitivity": "low",
+        "ts": "2026-06-06T16:56:13.866Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "agentdb",
+        "evidence": "agentdb cmd_recall v7.15; verified on sqlite 3.43.2 scratch DBs",
+        "hit_count": 1,
+        "id": "LRN-20260606101828-39006-24196",
+        "insight": "bm25() cannot be used inside an aggregate or GROUP BY in SQLite FTS5 — the optimizer flattens the subquery and throws 'unable to use function bm25 in the requested context'. Dedup ranked FTS results in awk (post-query), not in SQL.",
+        "last_hit": "2026-06-06T17:26:53.719Z",
+        "sensitivity": "low",
+        "ts": "2026-06-06T17:18:28.385Z",
+        "type": "gotcha",
+        "visibility": "agent"
+      },
+      {
+        "domain": "agentdb",
+        "evidence": "_meta/reports/retro-agentdbs.md, dream-retrieval.md",
+        "hit_count": 1,
+        "id": "LRN-20260606101828-39039-22805",
+        "insight": "AgentDB retrieval rot: per-project learning DBs were 73% identical clones (328/452 distinct insights in all 5 DBs), hit_count was poisoned by read-start blanket-bumping every row each session, and FTS existed in only 1 of 5 DBs. Fix shipped: dedup + visibility filter + recalibrated ranking + load_count split (v7.15). Deferred: scope column + cross-project recall --global (global brain empty, would ship dead).",
+        "last_hit": "2026-06-06T17:26:53.719Z",
+        "sensitivity": "low",
+        "ts": "2026-06-06T17:18:28.416Z",
+        "type": "pattern",
+        "visibility": "agent"
+      },
+      {
+        "domain": "agentdb",
+        "evidence": "recall --global _recall_emit bug: .timeout 5000 prefix made every query return nothing",
+        "hit_count": 0,
+        "id": "LRN-20260606120717-57698-29841",
+        "insight": "sqlite3 dot-commands (.timeout, .mode) only run via stdin/heredoc, NOT as a command-line SQL argument — passed as an arg they're treated as invalid SQL and the whole query silently errors. Use a heredoc (like db_exec) or omit them.",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-06T19:07:17.618Z",
+        "type": "gotcha",
+        "visibility": "agent"
+      },
+      {
+        "domain": "metabrain",
+        "evidence": "global brain importer + decontaminate.py",
+        "hit_count": 0,
+        "id": "LRN-20260606120717-57730-11611",
+        "insight": "metabrain refuses to OPEN an existing kernel agentdb DB (IncompatibleDatabaseError — its events/hypotheses/experiments tables differ). Use metabrain ONLY on its own native DB; read project DBs as plain sqlite and replay via learn(). And metabrain assigns its OWN learning ids, so cross-DB ops (decontamination) must match by insight CONTENT, not id.",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-06T19:07:17.654Z",
+        "type": "gotcha",
+        "visibility": "agent"
+      },
+      {
+        "domain": "agentdb",
+        "evidence": "v7.17 + Vaults _meta/services",
+        "hit_count": 0,
+        "id": "LRN-20260606120717-57762-26149",
+        "insight": "Cross-project agent memory: per-project DBs (FTS recall) + one metabrain global brain (graduation loop). Lessons flow UP nightly (learning-consolidation.sh, dedup by source id so clones collapse), projects pull DOWN via 'recall --global' (read-only ATTACH). Never push patterns sideways into project DBs — that was the 73% clone bug.",
+        "last_hit": null,
+        "sensitivity": "low",
+        "ts": "2026-06-06T19:07:17.684Z",
+        "type": "pattern",
+        "visibility": "agent"
+      }
+    ],
+    "nodes": []
+  }
+}
