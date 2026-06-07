@@ -138,6 +138,14 @@ run_pending_migrations() {
 cmd_init() {
   mkdir -p "$DB_DIR"
 
+  # Fresh clone with a committed JSON snapshot but no live .db → rehydrate the brain
+  # from it instead of starting empty. Guard against the import-json → cmd_init recursion.
+  if [ ! -f "$DB" ] && [ -f "$DB_DIR/agent.db.json" ] && [ -z "${_AGENTDB_IMPORTING:-}" ]; then
+    echo "init: rehydrating from snapshot agent.db.json" >&2
+    cmd_import_json "$DB_DIR/agent.db.json" >&2 2>&1 || true
+    [ -f "$DB" ] && { echo "DB exists: $DB"; return 0; }
+  fi
+
   local created_new=false
 
   # Apply base schema if DB doesn't exist
@@ -441,6 +449,12 @@ cmd_write_end() {
   local id="CP-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
   db_exec "INSERT INTO context (id, type, agent, content) VALUES ('$id', 'checkpoint', '$safe_agent', '$safe_content');"
   echo "Checkpoint: $id"
+
+  # Refresh the committable JSON snapshot so the session-end / pre-compact commit picks
+  # up text, never the raw binary .db. Best-effort: never let it fail a checkpoint.
+  if command -v jq >/dev/null 2>&1; then
+    cmd_export_json >/dev/null 2>&1 || true
+  fi
 }
 
 cmd_learn() {
@@ -929,6 +943,108 @@ cmd_schema() {
     echo "Views:"
     db_exec "SELECT '  ' || name FROM sqlite_master WHERE type='view' ORDER BY name;" 2>/dev/null
   fi
+}
+
+# Tables to exclude from JSON snapshots: FTS5 virtual + shadow tables (rebuilt on
+# import from external content), sqlite internals, and migration bookkeeping (init
+# repopulates _migrations). Used by both export-json and import-json.
+_is_snapshot_table() {
+  case "$1" in
+    *_fts|*_fts_*|sqlite_*|_migrations) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+# Faithful, deterministic JSON snapshot of agentdb → text file that git can diff/merge.
+# Replaces committing the raw binary .db (+ -wal/-shm). Deterministic so identical data
+# yields an identical file (sorted keys, rows by rowid, no embedded timestamp).
+cmd_export_json() {
+  [ ! -f "$DB" ] && { echo "No DB at $DB" >&2; exit 1; }
+  command -v jq >/dev/null 2>&1 || { echo "Error: jq required for export-json" >&2; exit 1; }
+
+  local out_file="${1:-$DB_DIR/agent.db.json}"
+  local tdir; tdir=$(mktemp -d)
+  local acc="$tdir/.acc.json"
+
+  # Migration names only (sorted, no applied_at timestamps → deterministic).
+  local migs_json
+  migs_json=$(db_exec_opts "-json" "SELECT name FROM _migrations ORDER BY name;" 2>/dev/null \
+              | jq -c 'map(.name)' 2>/dev/null) || migs_json=''
+  [ -z "$migs_json" ] && migs_json='[]'
+
+  local tables t count=0
+  tables=$(db_exec "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;" 2>/dev/null)
+
+  echo '{}' > "$acc"
+  for t in $tables; do
+    _is_snapshot_table "$t" || continue
+    db_exec_opts "-json" "SELECT * FROM \"$t\" ORDER BY rowid;" > "$tdir/$t.json" 2>/dev/null
+    [ -s "$tdir/$t.json" ] || echo '[]' > "$tdir/$t.json"
+    jq -S --arg t "$t" --slurpfile rows "$tdir/$t.json" '. + {($t): $rows[0]}' "$acc" \
+      > "$acc.tmp" && mv "$acc.tmp" "$acc"
+    count=$((count + 1))
+  done
+
+  jq -S -n --argjson migs "$migs_json" --slurpfile tbl "$acc" \
+     '{format:1, migrations:$migs, tables:$tbl[0]}' > "$out_file"
+  rm -rf "$tdir"
+  echo "Exported agentdb → $out_file ($count tables)"
+}
+
+# Rebuild a fresh DB from a JSON snapshot: init (migrations recreate schema + FTS) →
+# load rows via json_each(readfile()) → rebuild the external-content FTS index.
+# Refuses to overwrite a live, non-empty DB unless --force is given.
+cmd_import_json() {
+  command -v jq >/dev/null 2>&1 || { echo "Error: jq required for import-json" >&2; exit 1; }
+
+  local in_file="$DB_DIR/agent.db.json" force=""
+  local a
+  for a in "$@"; do
+    case "$a" in
+      --force) force=1 ;;
+      *) in_file="$a" ;;
+    esac
+  done
+  [ ! -f "$in_file" ] && { echo "No snapshot at $in_file" >&2; exit 1; }
+
+  if [ -f "$DB" ]; then
+    local n; n=$(db_exec "SELECT count(*) FROM learnings;" 2>/dev/null || echo 0)
+    if [ "${n:-0}" -gt 0 ] && [ -z "$force" ]; then
+      echo "Refusing: $DB already holds $n learnings. Re-run with --force to overwrite." >&2
+      exit 1
+    fi
+  fi
+
+  # Guard passed (DB absent, empty, or --force) → rebuild from a clean slate so a stale
+  # or partially-created .db file can't make cmd_init skip schema creation.
+  rm -f "$DB" "$DB-wal" "$DB-shm"
+  mkdir -p "$DB_DIR"
+  _AGENTDB_IMPORTING=1 cmd_init >/dev/null 2>&1 || true
+
+  local tables t cols c collist sellist tmpf
+  tables=$(jq -r '.tables | keys[]' "$in_file" 2>/dev/null)
+  for t in $tables; do
+    _is_snapshot_table "$t" || continue
+    cols=$(db_exec "PRAGMA table_info(\"$t\");" 2>/dev/null | awk -F'|' 'NF>1{print $2}')
+    [ -z "$cols" ] && { echo "  skip $t (not in schema)" >&2; continue; }
+    tmpf=$(mktemp)
+    jq -c --arg t "$t" '.tables[$t] // []' "$in_file" > "$tmpf"
+    collist=""; sellist=""
+    for c in $cols; do
+      collist="${collist:+$collist,}\"$c\""
+      sellist="${sellist:+$sellist,}json_extract(value,'\$.$c')"
+    done
+    sqlite3 "$DB" ".timeout 5000" \
+      "PRAGMA foreign_keys=OFF; INSERT INTO \"$t\" ($collist) SELECT $sellist FROM json_each(CAST(readfile('$tmpf') AS TEXT));" \
+      2>/dev/null || echo "  warn: failed to load $t" >&2
+    rm -f "$tmpf"
+  done
+
+  # External-content FTS5 (content='learnings') — repopulate the index.
+  db_exec "INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');" 2>/dev/null || true
+
+  echo "Imported $in_file → $DB"
+  db_exec "SELECT 'learnings: ' || count(*) FROM learnings;" 2>/dev/null || true
 }
 
 cmd_export() {
@@ -1936,6 +2052,8 @@ case "${1:-help}" in
   antibody)    shift; cmd_antibody "$@" ;;
   recall)      shift; cmd_recall "$@" ;;
   export)      cmd_export ;;
+  export-json) shift; cmd_export_json "$@" ;;
+  import-json) shift; cmd_import_json "$@" ;;
   recent)      shift; cmd_recent "$@" ;;
   co-change)   shift; cmd_co_change "$@" ;;
   hypothesis)  shift; cmd_hypothesis "$@" ;;
@@ -1993,6 +2111,8 @@ case "${1:-help}" in
     echo "  schema [table]          Show tables + row counts, or table columns"
     echo "  prune <target> [N]      Prune: checkpoints|errors|contracts|all"
     echo "  export                  Dump learnings to markdown"
+    echo "  export-json [path]      Deterministic JSON snapshot (commit this, not the .db)"
+    echo "  import-json [path] [--force]  Rebuild DB from a JSON snapshot"
     echo "  recent [N]              Show last N checkpoints"
     echo "  query <sql>             Raw query"
     ;;
