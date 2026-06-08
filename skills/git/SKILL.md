@@ -70,6 +70,8 @@ Skill-specific: skills/git/reference/git-research.md
     16. "Nit:" prefix for optional style comments.
     17. Reviewer context matters: reviewer with diff-only context → diff-quality findings; reviewer with full-codebase context → codebase-quality findings. Spawn reviewers with repo access. <!-- Updated 2026-06-04: https://sourcegraph.com/blog/ai-code-review -->
     18. Pre-PR validation for AI-generated code: before raising the PR, verify the implementation against the original spec/intent (not just "does it run?"). Catch intent drift — AI correctly implemented what it inferred, not what was actually needed — before a human reviewer sees it. <!-- Updated 2026-06-05: https://sourcegraph.com/blog/ai-code-review -->
+    19. Track AI review acceptance rate: ≥50% of comments accepted = signal of trusted, actionable feedback. Below 50% → tool is misconfigured, noisy, or poorly scoped. <!-- Updated 2026-06-08: https://blog.exceeds.ai/ai-code-review-best-practices/ -->
+    20. Small PRs (≤400 lines) + multi-tool guidelines = 30–40% shorter review cycle times. The size rule has measurable throughput impact, not just reviewer comfort. <!-- Updated 2026-06-08: https://blog.exceeds.ai/ai-code-review-best-practices/ -->
     (gate: diff ≤500 lines; review sequence followed)
   </step>
 

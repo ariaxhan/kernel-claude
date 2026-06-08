@@ -25,6 +25,7 @@
 <philosophy>
 Every AI-written line is a liability. Research proves solutions before coding.
 AgentDB-first. Read at start, write at end. Continuity depends on it.
+Stable governance lives here. Fast-changing run state lives in AgentDB and `_meta/`, not in governance docs.
 Most SWE work is solved problems. Find the solution, don't invent it.
 Orchestrate, don't implement (tier 2+). Agents write code, you coordinate.
 Slow down to speed up. Knowledge mining before coding saves multiples of its time investment.

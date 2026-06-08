@@ -79,6 +79,7 @@ Before accepting any AI-generated test, verify:
 - **Subagent scope reviewer**: after implementation, spawn a reviewer agent to verify: every requirement is implemented, listed edge cases have tests, nothing outside task scope changed. <!-- Updated 2026-06-05: https://code.claude.com/docs/en/best-practices -->
 - **Context-aware verification rigor**: solo dev → verify logic + edge cases; team → systematic peer review; production → mandatory gating tests. Match rigor to deployment stakes. <!-- Updated 2026-06-05: https://levelup.gitconnected.com/claude-code-best-practices-12-patterns-agentic-engineers-use-65264e3eb919 -->
 - **Stop hook gates**: configure `Stop` hooks in `hooks/scripts/` to run tests/lint checks mechanically after each turn — moves quality gates from agent honor-system to enforcement (I0.15). <!-- Updated 2026-06-07: https://popularaitools.ai/blog/claude-code-workflow-patterns-agentic-guide-2026 -->
+- **Five agentic workflow patterns** (match to test scope): sequential (one agent, ordered steps) · operator (supervisor routes to specialists) · split-and-merge (parallel execution + synthesis) · agent teams (specialist groups per module) · headless (no-UI CI-style automated). <!-- Updated 2026-06-08: https://www.mindstudio.ai/blog/claude-code-agentic-workflow-patterns -->
 
 ### Step 8 — Grader pattern (complex features)
 1. Define success rubric (expected behaviors, edge handling, perf bounds) BEFORE tests or code.
