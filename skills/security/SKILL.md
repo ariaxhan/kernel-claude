@@ -72,6 +72,8 @@ Skill-specific: skills/security/reference/security-research.md
 
   14. **Risk-based review priority** — when doing a full security review pass, prioritize in order: logic changes → deleted validations → auth flows → query changes → areas with prior security incidents. Start where impact is highest. <!-- Updated 2026-06-05: https://sourcegraph.com/blog/ai-code-review -->
 
+  15. **Automated coverage baseline** — automated checks (ESLint + AI linters + security scanners) catch 70–80% of common issues. Wire Snyk MCP into the dev loop to let Claude scan for vulnerabilities and dependency CVEs inline, without a separate review step. <!-- Updated 2026-06-09: https://sourcegraph.com/blog/ai-code-review https://code.claude.com/docs/en/best-practices -->
+
 </flow>
 
 <pre_deployment_checklist>

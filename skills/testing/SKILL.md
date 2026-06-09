@@ -62,6 +62,9 @@ Pattern for file/function naming: `test_{function}_{scenario}_{expected}`
 3. E2E / browser — critical user-visible flows only, slow, few.
 (gate: E2E count stays low; flaky tests fixed or deleted immediately)
 
+### Step 5b — Test signal flexibility
+Any deterministic output Claude can read counts as a gate: test suite exit code, linter report, build failure, fixture diff, browser screenshot delta. Don't limit "testing" to unit test runners — if it produces a signal, it can gate a decision. <!-- Updated 2026-06-09: https://code.claude.com/docs/en/best-practices -->
+
 ### Step 6 — Review AI-generated tests
 Before accepting any AI-generated test, verify:
 1. Does the assertion verify the RIGHT thing? (not just `.toBe(true)`)

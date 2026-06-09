@@ -11,6 +11,7 @@ Debugging is forming and testing a THEORY that explains the bug.
 Not random changes. Not guessing. Scientific method applied to code.
 DEFECT (in code) → INFECTION (in state) → FAILURE (visible symptom).
 The failure you see is NOT where the bug is. Binary search upstream.
+Systematic methodology achieves ~95% first-time fix rate vs ~40% ad-hoc. The process is the multiplier. <!-- Updated 2026-06-09: https://claudify.tech/blog/claude-code-debugging-guide -->
 </purpose>
 
 <prerequisite>

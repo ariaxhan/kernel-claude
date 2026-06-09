@@ -111,6 +111,8 @@ Context discipline:
 - Explore-Plan-Act loop: Phase 1 (read-only codebase exploration) → Phase 2 (propose strategy, confirm) → Phase 3 (full tool access, implement, run tests, iterate). Canonical three-phase sequence for non-trivial features. <!-- Updated 2026-06-06: https://code.claude.com/docs/en/best-practices -->
 - Context engineering: the field has moved beyond "prompt engineering" — optimize everything Claude sees: system prompt, tools list, examples, conversation history, CLAUDE.md. The full context is the prompt. <!-- Updated 2026-06-08: https://docs.anthropic.com/en/docs/build-with-claude/prompt-engineering/overview -->
 - Tool sprawl: each tool added is context overhead. Keep the active set small and high-signal. More than ~8-10 tools degrades context quality and Claude's tool-selection accuracy. <!-- Updated 2026-06-08: https://code.claude.com/docs/en/best-practices -->
+- Hooks vs CLAUDE.md: behaviors that must fire every time → hook (deterministic, 100%); guidance Claude should consider → CLAUDE.md (~80% adherence). Never rely on CLAUDE.md for safety-critical enforcement. <!-- Updated 2026-06-09: https://code.claude.com/docs/en/best-practices -->
+- Subagent isolation for exploration: use subagents for investigation/research tasks to avoid polluting the main session context. Only the summary returns — keeps the working context clean. <!-- Updated 2026-06-09: https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ -->
 
 (gate: each logical unit committed before moving to next)
 
