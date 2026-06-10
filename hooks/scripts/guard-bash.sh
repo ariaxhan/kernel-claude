@@ -53,4 +53,48 @@ if rm_recursive_force && rm_targets_root_home; then
     exit 2
 fi
 
+# --- Investigation gate: rm/rmdir of git submodules or tracked directories ---
+# NOT a hard block. Surfaces what the target actually IS and requires a conscious
+# CONFIRM_DELETE=1 re-issue, so an uninitialized submodule (an empty folder is
+# uninitialized, NOT junk) or a whole tracked directory can't be removed on a
+# tidy-up reflex. Scope is deliberately narrow -- submodules always; tracked
+# paths only when it's a directory or a recursive rm -- so routine single-file
+# `rm file.ts` (recoverable from git history) is never nagged.
+# (vault rule: Vaults/.claude/rules/invariants.md -> "Destructive & structural ops")
+if echo "$COMMAND" | grep -qE '(^|[^[:alnum:]_./-])(rm|rmdir)([[:space:]]|$)' \
+   && ! echo "$COMMAND" | grep -qE '(^|[[:space:]])CONFIRM_DELETE=1([[:space:]]|$)'; then
+  _recursive=0
+  echo "$COMMAND" | grep -qE '\brm\b[^;&|]*(-[a-zA-Z]*[rR]|--recursive)' && _recursive=1
+  echo "$COMMAND" | grep -qE '\brmdir\b' && _recursive=1
+  # Candidate path tokens: per rm/rmdir segment, drop the command word + flags.
+  _paths=$(echo "$COMMAND" | tr ';|&' '\n' \
+    | grep -E '(^|[^[:alnum:]_./-])(rm|rmdir)([[:space:]])' \
+    | sed -E 's/.*\b(rm|rmdir)[[:space:]]+//' \
+    | tr ' \t' '\n' \
+    | grep -vE '^(-|$)' \
+    | sed -E "s/^[\"']//; s/[\"']$//")
+  for _p in $_paths; do
+    case "$_p" in /tmp/*|/var/folders/*|/private/var/*) continue;; esac
+    [ -n "$_p" ] || continue
+    # Submodule? mode 160000 is present in the index even for an uninitialized,
+    # empty submodule folder -- the exact case that broke modelmind.
+    if git ls-files --stage -- "$_p" 2>/dev/null | grep -q '^160000'; then
+      echo "HALT -- investigate before deleting: '$_p' is a GIT SUBMODULE." >&2
+      echo "  An empty submodule folder is UNINITIALIZED, not junk; deleting it breaks the parent repo." >&2
+      echo "  Look:     git ls-files --stage -- '$_p'   (160000 = submodule)   |   cat .gitmodules" >&2
+      echo "  Restore:  git submodule update --init -- '$_p'   (populate it in place -- do NOT re-clone elsewhere)" >&2
+      echo "  If you have verified and truly intend to remove it, re-run with:  CONFIRM_DELETE=1 <cmd>" >&2
+      exit 2
+    fi
+    # Tracked directory, or recursive rm of tracked content?
+    if [ -n "$(git ls-files -- "$_p" 2>/dev/null | head -1)" ] && { [ -d "$_p" ] || [ "$_recursive" = 1 ]; }; then
+      echo "HALT -- investigate before deleting: '$_p' is TRACKED in git (directory / recursive rm)." >&2
+      echo "  Confirm it's safe:  git ls-files -- '$_p' | head   |   grep -rn '$(basename "$_p")' --include='*.sh' --include='*.ts' --include='*.js' --include='*.json' ." >&2
+      echo "  Prefer:  git rm -r '$_p'  (keeps history)  -- or  git restore  if you meant to undo working changes." >&2
+      echo "  If verified and intended, re-run with:  CONFIRM_DELETE=1 <cmd>" >&2
+      exit 2
+    fi
+  done
+fi
+
 exit 0
