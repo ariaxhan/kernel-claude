@@ -110,6 +110,7 @@ Meta 2026: JiT generates ~4x more bug-catching tests than static suite additions
 | `flaky_tolerance` | Flaky test = broken test. Fix or delete. Never ignore. |
 | `skip_or_only` | `.skip()` / `.only()` become permanent. Fix or delete. |
 | `print_over_assert` | Print statements are not assertions. Require formal `expect`/`assert` calls. |
+| `snapshot_relaxation` | Never update snapshots to make failing tests pass. Snapshots are the source of truth — if they fail, the code changed unexpectedly. Fix the code, not the snapshot. <!-- Updated 2026-06-10: https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ --> |
 
 ---
 
