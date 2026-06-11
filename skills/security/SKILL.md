@@ -70,7 +70,7 @@ Skill-specific: skills/security/reference/security-research.md
   13. **Agent permissions** — every spawned agent has explicit tool allowlist + file scope; no admin-by-default.
       (gate: spawn contract lists allowed tools ≤5; sensitive scopes named explicitly)
 
-  14. **Risk-based review priority** — when doing a full security review pass, prioritize in order: logic changes → deleted validations → auth flows → query changes → areas with prior security incidents. Start where impact is highest. <!-- Updated 2026-06-05: https://sourcegraph.com/blog/ai-code-review -->
+  14. **Risk-based review priority** — when doing a full security review pass, prioritize in order: logic changes → deleted validations → auth flows → query changes → areas with prior security incidents. Start where impact is highest. Highest-risk categories (auth, cryptography, payment flows, secrets/credential handling) require human sign-off regardless of AI review confidence — never delegate final approval to automation alone. <!-- Updated 2026-06-11: https://blog.exceeds.ai/ai-code-review-best-practices/ -->
 
   15. **Automated coverage baseline** — automated checks (ESLint + AI linters + security scanners) catch 70–80% of common issues. Wire Snyk MCP into the dev loop to let Claude scan for vulnerabilities and dependency CVEs inline, without a separate review step. <!-- Updated 2026-06-09: https://sourcegraph.com/blog/ai-code-review https://code.claude.com/docs/en/best-practices -->
 

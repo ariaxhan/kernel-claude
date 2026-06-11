@@ -29,6 +29,8 @@ Load: skills/testing/reference/testing-research.md on demand.
 2. For AI-generated code: provide spec, then ask for tests, then ask for implementation.
    (gate: spec exists as comments or descriptions before any test code is written)
 3. If a test name cannot be written in GIVEN/WHEN/SHOULD form, the test is ambiguous — clarify first.
+4. Explicitly declare TDD before requesting tests: state "We are using Test-Driven Development." Without this signal, Claude defaults to implementation-first and writes tests that validate existing code rather than define requirements. <!-- Updated 2026-06-11: https://dev.to/spyrae/tdd-with-ai-claude-writes-tests-first-then-the-implementation-27hm -->
+5. Vague test detection gate: if Claude cannot pass tests on first generation, the spec is underspecified — not the implementation. Stop and clarify before iterating. <!-- Updated 2026-06-11: https://docs.bswen.com/blog/2026-03-25-tdd-skill-claude-code/ -->
 
 ### Step 2 — Prioritize by risk
 Order of testing priority:
