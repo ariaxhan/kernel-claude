@@ -114,6 +114,7 @@ Context discipline:
 - Hooks vs CLAUDE.md: behaviors that must fire every time → hook (deterministic, 100%); guidance Claude should consider → CLAUDE.md (~80% adherence). Never rely on CLAUDE.md for safety-critical enforcement. <!-- Updated 2026-06-09: https://code.claude.com/docs/en/best-practices -->
 - Subagent isolation for exploration: use subagents for investigation/research tasks to avoid polluting the main session context. Only the summary returns — keeps the working context clean. <!-- Updated 2026-06-09: https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ -->
 - Model tier selection: Opus-grade for planning and architecture decisions (>5 unknowns, unfamiliar territory, system design choices); Sonnet for code generation and mechanical execution. Switch at the plan→code boundary — Opus reasoning where it matters, Sonnet cost everywhere else. <!-- Updated 2026-06-11: https://buildtolaunch.substack.com/p/claude-code-token-optimization -->
+- Supervisor-first delegation: one-level supervisor pattern (orchestrator → workers) is the 2026 production default for subagent work. Swarm/peer-mesh patterns require custom code and are less mature — don't reach for them without explicit justification. <!-- Updated 2026-06-12: https://www.digitalapplied.com/blog/multi-agent-orchestration-5-patterns-that-work -->
 
 (gate: each logical unit committed before moving to next)
 

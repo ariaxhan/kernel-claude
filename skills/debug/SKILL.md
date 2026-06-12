@@ -102,6 +102,7 @@ Competing hypothesis agents: for bugs with 3+ plausible causes, spawn one agent 
 Each reports: evidence_for | evidence_against | confidence (0-1). Coroner agent synthesizes.
 Fresh context catches what a long session anchors past.
 When stuck >30 min, spawn fresh agent with ONLY: exact input, expected vs actual, relevant code section.
+Trial segmentation: when debugging multi-agent or long-running systems, break the execution trace into segments and analyze each independently. Shorter segments → cleaner causal attribution. Full traces cause spurious correlations that obscure root cause. One segment = one causal claim. <!-- Updated 2026-06-12: https://arxiv.org/pdf/2512.06749 -->
 See: skills/debug/reference/debug-research.md — Parallel Debug Strategy.
 </parallel_debug_strategy>
 
