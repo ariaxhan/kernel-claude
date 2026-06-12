@@ -1873,6 +1873,25 @@ test_recall_global_no_human_leak() {
     echo "human_only leaked from global brain"; return 1; fi
 }
 
+test_recall_survives_sqlite_control_char_escaping() {
+  # Regression: sqlite3 >= ~3.45 escapes control characters in shell output, so a
+  # char(31) field delimiter arrives as literal "^_" and the awk split yields empty
+  # rows -> "(no matching learnings)" on perfectly good data. The delimiter must be
+  # printable. Run against the NEWEST sqlite on the machine (homebrew first), since
+  # /usr/bin/sqlite3 is too old to escape and masks the bug.
+  local new_sqlite
+  new_sqlite=$(ls /opt/homebrew/bin/sqlite3 /usr/local/bin/sqlite3 2>/dev/null | head -1)
+  [ -n "$new_sqlite" ] || new_sqlite=$(command -v sqlite3)
+  agentdb init >/dev/null
+  agentdb learn gotcha "wombat delimiter survives escaping" "ev" >/dev/null
+  local out
+  out=$(PATH="$(dirname "$new_sqlite"):$PATH" agentdb recall "wombat")
+  echo "$out" | grep -q "wombat delimiter survives escaping" || {
+    echo "recall returned nothing under $($new_sqlite --version | cut -d' ' -f1)"; return 1; }
+  if echo "$out" | grep -q '\^_'; then
+    echo "escaped control-char artifact (^_) leaked into recall output"; return 1; fi
+}
+
 test_decay_spares_loaded_learnings() {
   # v7.15: hit_count is recall-only. decay must NOT delete an old, never-recalled
   # learning that read-start is still loading (load_count>0) — only truly untouched
@@ -2530,6 +2549,7 @@ run_test_suite() {
       run_test "recall --global unions + tags global hits" test_recall_global_unions_and_tags
       run_test "recall --global graceful when global absent" test_recall_global_graceful_when_absent
       run_test "recall --global never leaks human_only" test_recall_global_no_human_leak
+      run_test "recall survives sqlite control-char escaping" test_recall_survives_sqlite_control_char_escaping
       run_test "decay spares loaded (load_count>0) learnings" test_decay_spares_loaded_learnings
       ;;
     learn)

@@ -1567,7 +1567,10 @@ find_global_db() {
   return 0
 }
 
-# Emit ranked "<key>\037<line>" rows for a recall query from an arbitrary DB.
+# Emit ranked "<key>@@US@@<line>" rows for a recall query from an arbitrary DB.
+# NOTE: the delimiter must be PRINTABLE — sqlite3 >= ~3.45 escapes control chars
+# in shell output (char(31) arrives as the two-char string "^_"), which silently
+# broke the old \037 delimiter and made every recall return "(no matching learnings)".
 # Uses FTS5 (bm25 + boosts) when the DB has a learnings_fts index, else a LIKE
 # scan. <tag> is appended to each displayed line (e.g. " [global]"). <writable>=1
 # permits an FTS 'rebuild' (local DB only); 0 keeps it strictly read-only (the
@@ -1581,7 +1584,7 @@ _recall_emit() {
   if [ -n "$has_fts" ]; then
     [ "$writable" = "1" ] && sqlite3 "$db" "INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');" 2>/dev/null || true
     sqlite3 "$db" "
-      SELECT lower(substr(l.insight,1,200)) || char(31) ||
+      SELECT lower(substr(l.insight,1,200)) || '@@US@@' ||
              '- [' || l.type || '] ' || l.insight || '$tag' ||
              CASE WHEN l.evidence IS NOT NULL AND l.evidence != ''
                   THEN '  ↳ ' || substr(l.evidence,1,90) ELSE '' END
@@ -1597,7 +1600,7 @@ _recall_emit() {
       LIMIT $((limit * 5));" 2>/dev/null || true
   elif [ -n "$like_clause" ]; then
     sqlite3 "$db" "
-      SELECT lower(substr(insight,1,200)) || char(31) ||
+      SELECT lower(substr(insight,1,200)) || '@@US@@' ||
              '- [' || type || '] ' || insight || '$tag' ||
              CASE WHEN evidence IS NOT NULL AND evidence != ''
                   THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END
@@ -1664,13 +1667,14 @@ cmd_recall() {
   # global, then dedup by 200-char insight key and cut to the limit. bm25() can't
   # live inside GROUP BY/an aggregate (the optimizer flattens the subquery →
   # "unable to use function bm25 in the requested context"), so dedup is post-query
-  # in awk (US char \037 delimiter — absent from real text).
+  # in awk (printable @@US@@ delimiter — sqlite3 escapes control chars on output,
+  # so a raw \037 byte never survives the shell; see _recall_emit note).
   local raw_local raw_global out
   raw_local=$(_recall_emit "$DB" "$fts_query" "$like_clause" "" "$limit" 1)
   raw_global=""
   [ -n "$global_db" ] && raw_global=$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0)
   out=$(printf '%s\n%s\n' "$raw_local" "$raw_global" | grep -v '^[[:space:]]*$' \
-        | awk -F'\037' '!seen[$1]++{print $2}' | head -n "$limit")
+        | awk -F'@@US@@' '!seen[$1]++{print $2}' | head -n "$limit")
 
   if [ -n "$out" ]; then
     echo "$out"
