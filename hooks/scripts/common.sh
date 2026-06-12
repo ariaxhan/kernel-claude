@@ -52,12 +52,18 @@ detect_vaults() {
   # Explicit override always wins (for testing + custom setups)
   if [ -n "${KERNEL_VAULTS:-}" ] && [ -d "${KERNEL_VAULTS:-}" ]; then
     echo "$KERNEL_VAULTS"
+  elif [ -f "$HOME/Documents/Vaults/_meta/agentdb/agent.db" ]; then
+    echo "$HOME/Documents/Vaults"
   elif [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ]; then
     echo "$HOME/Vaults"
   elif [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
     echo "$HOME/Downloads/Vaults"
   else
-    echo "$HOME/Vaults"
+    # Canonical default. The fallback must point at the real vault: a bare
+    # "$HOME/Vaults" default silently grew a stray tree of orphaned agent
+    # registrations after the machine migration moved the vault to
+    # ~/Documents/Vaults (and broke session identity + checkpoints for weeks).
+    echo "$HOME/Documents/Vaults"
   fi
 }
 

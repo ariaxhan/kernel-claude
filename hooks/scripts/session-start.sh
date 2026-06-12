@@ -23,10 +23,19 @@ KERNEL_SESSION_ID="sess-$(date +%Y%m%d%H%M%S)-$$"
 echo "$KERNEL_SESSION_ID" > "$PROJECT_ROOT/_meta/.session_id" 2>/dev/null || true
 export KERNEL_SESSION_ID
 
-# Generate agent name and persist for other hooks
+# Generate agent name and persist for other hooks.
+# Keyed by Claude's session_id (hook stdin JSON): the shared .current file is a
+# race under concurrent sessions — any parallel SessionStart overwrites it and any
+# SessionEnd deletes it, which is how ~43% of commits ended up tagged "unknown-*".
 AGENT_NAME="main-$$"
 AGENTS_DIR="$VAULTS/_meta/agents"
-mkdir -p "$AGENTS_DIR"
+mkdir -p "$AGENTS_DIR/by-session"
+if [ ! -t 0 ]; then
+    CLAUDE_SESSION_ID=$(cat 2>/dev/null | jq -r '.session_id // empty' 2>/dev/null || true)
+fi
+if [ -n "${CLAUDE_SESSION_ID:-}" ]; then
+    echo "$AGENT_NAME" > "$AGENTS_DIR/by-session/$CLAUDE_SESSION_ID"
+fi
 echo "$AGENT_NAME" > "$AGENTS_DIR/.current"
 
 cat > "$AGENTS_DIR/${AGENT_NAME}.json" << EOF

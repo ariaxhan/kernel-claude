@@ -14,13 +14,18 @@ PROJECT_ROOT=$(get_project_root)
 AGENTS_DIR="$VAULTS/_meta/agents"
 TIMESTAMP=$(date +"%Y-%m-%d %H:%M")
 
-# Agent name from file (set by SessionStart)
-AGENT_FILE="$AGENTS_DIR/.current"
-if [ -f "$AGENT_FILE" ]; then
-    AGENT=$(cat "$AGENT_FILE")
-else
-    AGENT="unknown-$$"
+# Agent name: prefer the session-keyed file (immune to concurrent-session races),
+# fall back to the legacy shared .current, then unknown.
+if [ ! -t 0 ]; then
+    CLAUDE_SESSION_ID=$(cat 2>/dev/null | jq -r '.session_id // empty' 2>/dev/null || true)
 fi
+AGENT=""
+if [ -n "${CLAUDE_SESSION_ID:-}" ] && [ -f "$AGENTS_DIR/by-session/$CLAUDE_SESSION_ID" ]; then
+    AGENT=$(cat "$AGENTS_DIR/by-session/$CLAUDE_SESSION_ID")
+elif [ -f "$AGENTS_DIR/.current" ]; then
+    AGENT=$(cat "$AGENTS_DIR/.current")
+fi
+[ -n "$AGENT" ] || AGENT="unknown-$$"
 
 # === STEP 0: WRITE AGENTDB CHECKPOINT ===
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
@@ -52,7 +57,16 @@ fi
 _kernel_hook_end "session-end" 0
 
 # === STEP 1: DEREGISTER THIS AGENT ===
-rm -f "$AGENTS_DIR/${AGENT}.json" "$AGENTS_DIR/${AGENT}-snapshot.md" "$AGENTS_DIR/.current" 2>/dev/null
+rm -f "$AGENTS_DIR/${AGENT}.json" "$AGENTS_DIR/${AGENT}-snapshot.md" 2>/dev/null
+if [ -n "${CLAUDE_SESSION_ID:-}" ]; then
+    rm -f "$AGENTS_DIR/by-session/$CLAUDE_SESSION_ID" 2>/dev/null
+else
+    # Only the legacy path may remove the shared file (a session-keyed end must not
+    # delete another live session's fallback).
+    rm -f "$AGENTS_DIR/.current" 2>/dev/null
+fi
+# Prune orphaned session-key files (sessions that died without a SessionEnd)
+find "$AGENTS_DIR/by-session" -type f -mtime +7 -delete 2>/dev/null || true
 
 # Also clean any stale agents while we're at it
 for f in "$AGENTS_DIR"/*.json; do
