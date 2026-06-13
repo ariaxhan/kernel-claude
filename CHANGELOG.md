@@ -2,6 +2,29 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.18.0] - 2026-06-13
+
+Hooks enforce the tradition. An institutional layer becomes part of every session instead of
+a sentence that gets ignored under load.
+
+### Added
+- **Institutional-layer surfacing in `session-start.sh`.** When a vault carries an
+  institutional layer (`_meta/ethos.md` present — alongside `telos.md`, `doctrine.md`,
+  `canon/`, `chronicles/`, `rites/`), the SessionStart hook injects a compact **Tradition**
+  block into every session: read ethos/doctrine + skim canon before MAJOR autonomous work,
+  write a chronicle after, treat big delegated work as a commission. Keyed on file existence,
+  so it is silent and zero-cost in vaults without the layer. Enforcement-by-presence per
+  invariant **I0.15** (hooks, not honor-system) — the prior CLAUDE.md pointer was prose that
+  load pressure ignored.
+
+### Fixed
+- **Post-migration vault detection now ships by default.** `detect_vaults()` checks
+  `~/Documents/Vaults` before the legacy `~/Vaults`, so the "KERNEL NOT INITIALIZED" banner no
+  longer fires on machines whose vault moved to `~/Documents/Vaults` (and agentdb / agent-identity
+  paths resolve correctly). Present in source since 7.17; this release guarantees it reaches
+  installs still pinned to an older cached version. `KERNEL_VAULTS` remains the explicit override
+  for non-standard locations.
+
 ## [7.17.0] - 2026-06-06
 
 Cross-project retrieval. `agentdb recall` learns to reach beyond one project.

@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "7.17.0",
-  "description": "Claude Code learns from itself. KERNEL gives your agent persistent memory (AgentDB), multi-agent orchestration (15 agents, tiered routing), and a scientific experiment engine that proves which rules actually work. Your agent remembers failures across sessions, coordinates parallel work without merge conflicts, and evolves its own methodology through hypothesis testing. 20 skills, 14 commands, auto-adapting project profiles. v7.17: cross-project retrieval — `agentdb recall --global` reaches a shared global brain so a lesson learned in one repo surfaces in another.",
+  "version": "7.18.0",
+  "description": "Claude Code learns from itself. KERNEL gives your agent persistent memory (AgentDB), multi-agent orchestration (15 agents, tiered routing), and a scientific experiment engine that proves which rules actually work. Your agent remembers failures across sessions, coordinates parallel work without merge conflicts, and evolves its own methodology through hypothesis testing. 20 skills, 14 commands, auto-adapting project profiles. v7.18: hook-enforced institutional layer — when a vault carries telos/ethos/doctrine/canon under _meta/, the tradition is surfaced into every session via the SessionStart hook (presence, not an ignorable CLAUDE.md sentence); ships the post-migration vault-detection fix so ~/Documents/Vaults is found without manual config.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"

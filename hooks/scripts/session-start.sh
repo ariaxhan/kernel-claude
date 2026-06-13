@@ -185,6 +185,22 @@ cat << 'KERNEL_CONTEXT'
 KERNEL_CONTEXT
 
 # =============================================================================
+# INSTITUTIONAL LAYER (tradition) — surfaced every session when a vault carries one
+# =============================================================================
+# A vault with telos/ethos/doctrine/canon under _meta/ should be operated from inside
+# that tradition for MAJOR work. Enforcement-by-presence (I0.15: hooks, not honor-system):
+# injected into context every session so it survives load, not a CLAUDE.md sentence that
+# gets ignored. Pointer only (content read on demand); silent + zero-cost where absent.
+if [ -f "$VAULTS/_meta/ethos.md" ]; then
+  echo "## Tradition (read before MAJOR autonomous work — skip for tiny tasks)"
+  echo "Major = multi-hour · cross-repo · restructuring · security · research synthesis · experiments."
+  echo "- Read \`_meta/ethos.md\` + \`_meta/doctrine.md\`; skim \`_meta/canon/index.md\` for a similar story."
+  echo "- After: write a chronicle (\`_meta/chronicles/<year>/\`). Big delegated work = a commission"
+  echo "  (\`_meta/rites/commission-template.md\`), not a recipe. Extract phronesis only on a real, repeated lesson."
+  echo ""
+fi
+
+# =============================================================================
 # AGENTDB CONTEXT (if initialized)
 # =============================================================================
 # Preflight: validate schema integrity, apply pending migrations, auto-repair drift
