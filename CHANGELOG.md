@@ -2,6 +2,26 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.19.0] - 2026-06-13
+
+Keep the plugin general. Reverts the institutional-layer coupling that 7.18 added to
+`session-start.sh`.
+
+### Changed
+- **Removed the "Tradition" block from `session-start.sh`.** 7.18 made the hook reference a
+  specific institutional vocabulary (telos / ethos / doctrine / canon / chronicles / rites /
+  phronesis / commission). That is a *consuming repo's* overlay, not something a general,
+  standalone plugin should know about — even keyed on file existence, it leaked bespoke
+  concepts into a product other people install. Such session overlays belong in the consuming
+  repo's own vault-level `settings.json` SessionStart hook, which Claude Code runs alongside
+  the plugin's. The plugin again knows a "vault" only as its agentdb data home.
+
+### Kept (from 7.18)
+- The post-migration **vault-detection fix** stands: `detect_vaults()` checks
+  `~/Documents/Vaults` before legacy `~/Vaults`; `KERNEL_VAULTS` overrides for non-standard
+  locations. This release re-publishes it cleanly so it reaches installs pinned to older
+  cached versions.
+
 ## [7.18.0] - 2026-06-13
 
 Hooks enforce the tradition. An institutional layer becomes part of every session instead of
