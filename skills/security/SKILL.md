@@ -74,6 +74,8 @@ Skill-specific: skills/security/reference/security-research.md
 
   15. **Automated coverage baseline** — automated checks (ESLint + AI linters + security scanners) catch 70–80% of common issues. Wire Snyk MCP into the dev loop to let Claude scan for vulnerabilities and dependency CVEs inline, without a separate review step. <!-- Updated 2026-06-09: https://sourcegraph.com/blog/ai-code-review https://code.claude.com/docs/en/best-practices -->
 
+  16. **Deny-first permissions** — configure deny rules for sensitive directories (`migrations/`, `secrets/`, `.env*`) BEFORE allow/ask rules in `.claude/settings.json`. Files invisible via deny can't be accessed even if Claude generates a path to them — stronger than a hook because it acts at the permissions layer, not the script layer. <!-- Updated 2026-06-14: https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ -->
+
 </flow>
 
 <pre_deployment_checklist>

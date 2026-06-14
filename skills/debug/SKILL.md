@@ -71,6 +71,7 @@ Skill-specific: skills/debug/reference/debug-research.md
 <block id="symptom_fixing">Null check at crash instead of asking why null. Real defect is upstream.</block>
 <block id="printf_flooding">Logging everywhere. Use binary search first, then targeted logging.</block>
 <block id="blame_framework">It's almost never the library. Check your usage first.</block>
+<block id="infinite_exploration">Asking Claude to "investigate" without scope. Claude reads hundreds of files, filling context before doing anything useful. Scope investigations narrowly ("look at src/auth only") or use a subagent — the summary returns, the file reads don't.</block>
 </anti_patterns>
 
 <when_stuck>
@@ -87,6 +88,7 @@ Skill-specific: skills/debug/reference/debug-research.md
 11. **Extended thinking**: for complex bugs with no clear hypothesis after all above, request deep analysis using extended thinking. Deliberate multi-step reasoning before output catches subtle root causes that fast responses miss. <!-- Updated 2026-06-06: https://gitnation.com/contents/advanced-claude-code-techniques-for-2026 -->
 12. **--verbose mode**: run `claude --verbose` for hard-to-reproduce bugs — shows tool calls, thinking steps, and execution paths in real time. Catches silent failures and misparsed outputs. <!-- Updated 2026-06-07: https://claudify.tech/blog/claude-code-debugging-guide -->
 13. **Native debugger**: when an IDE or runtime debugger is available (VS Code, Xcode LLDB, Chrome DevTools), prefer it over print-statement flooding — set a breakpoint at the suspected boundary, inspect locals at the failure point, evaluate expressions mid-run without re-running from scratch. The call stack tells you the execution path that led to the state. <!-- Updated 2026-06-13: https://claudecode-lab.com/en/blog/claude-code-debugging-techniques/ -->
+14. **Pipe raw data**: `cat error.log | claude` or `npm run build 2>&1 | claude` — pipe terminal output directly instead of copy-pasting. Claude receives full fidelity output without truncation or formatting artifacts. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
 </when_stuck>
 
 <escalation>

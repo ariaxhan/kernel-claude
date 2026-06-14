@@ -73,6 +73,7 @@ Skill-specific: skills/git/reference/git-research.md
     19. Track AI review acceptance rate: ≥50% of comments accepted = signal of trusted, actionable feedback. Below 50% → tool is misconfigured, noisy, or poorly scoped. <!-- Updated 2026-06-08: https://blog.exceeds.ai/ai-code-review-best-practices/ -->
     20. Small PRs (≤400 lines) + multi-tool guidelines = 30–40% shorter review cycle times. The size rule has measurable throughput impact, not just reviewer comfort. <!-- Updated 2026-06-08: https://blog.exceeds.ai/ai-code-review-best-practices/ -->
     21. Risk hotspot prioritization: use review analytics (change frequency × defect rate per file/subsystem) to identify hotspots. Invest deeper human review at hotspots; lighter AI-only review at low-churn, low-defect areas. <!-- Updated 2026-06-13: https://blog.exceeds.ai/ai-code-review-best-practices/ -->
+    22. Non-interactive review in CI/hooks: `claude -p "Review this diff for security issues" --output-format json --allowedTools Read,Bash` runs Claude as a script in pre-commit or pipelines. Scope tools with `--allowedTools` to prevent unintended writes during automated runs. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
     (gate: diff ≤500 lines; review sequence followed)
   </step>
 
