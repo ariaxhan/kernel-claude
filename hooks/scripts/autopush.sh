@@ -47,6 +47,17 @@ while IFS= read -r gitpath; do
       [ -e "$local_gd/$m" ] && skip=1; done; [ "$skip" = 1 ] && continue
     br="$(git -C "$repo" symbolic-ref --short HEAD 2>/dev/null)" || continue
     [ -n "$br" ] || continue
+    # Hard gate (I0.15: hooks, not honor-system). If the test gate recorded a red verdict
+    # for this repo, refuse to push it — red must never reach the remote. Clears itself when
+    # the suite goes green (test-gate rewrites .test-status to PASS).
+    if [ -f "$repo/_meta/.test-status" ]; then
+      ts_status="$(cut -d'|' -f1 "$repo/_meta/.test-status" 2>/dev/null)"
+      if [ "$ts_status" = "FAIL" ]; then
+        name="${repo#"$root"/}"; [ "$name" = "$repo" ] && name="(root)"
+        echo "[autopush-sweep] $name: ⚠️ tests RED → push BLOCKED (fix suite; see _meta/plans/tests-red.md)" >&2
+        continue
+      fi
+    fi
     git -C "$repo" remote get-url origin >/dev/null 2>&1 || continue
     git -C "$repo" fetch origin "$br" --quiet 2>/dev/null || true
     ahead="$(git -C "$repo" rev-list --count "origin/$br..HEAD" 2>/dev/null || echo 0)"

@@ -13,7 +13,8 @@ _meta/agentdb/errors.log
 # Logs
 _meta/logs/
 
-# Ephemeral state (circuit breaker, compaction markers)
+# Ephemeral state (circuit breaker, compaction markers, test-gate verdict)
 _meta/.breakers/
 _meta/.compact-marker
 _meta/.cache/
+_meta/.test-status

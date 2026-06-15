@@ -109,9 +109,16 @@ REPO_NAME=$(basename "$PROJECT_ROOT")
 # Carve-out is limited to this script + session-end.sh. Do NOT reuse elsewhere.
 git commit -m "chore(checkpoint): $REPO_NAME pre-compact [$AGENT] ($TRIGGER, $FILES_CHANGED files) $TIMESTAMP_SHORT" --no-verify 2>/dev/null
 # Do not auto-push main/master (I0.8: push to main needs explicit say-so).
-# Feature branches push freely.
+# Feature branches push freely — UNLESS the last test-gate verdict was red (I0.15: never
+# push red, even a mid-session checkpoint). Self-clears when the suite goes green.
 _pc_branch=$(git branch --show-current 2>/dev/null || echo "")
-if [ "$_pc_branch" != "main" ] && [ "$_pc_branch" != "master" ]; then
+_pc_red=0
+if [ -f "$PROJECT_ROOT/_meta/.test-status" ]; then
+    case "$(cut -d'|' -f1 "$PROJECT_ROOT/_meta/.test-status" 2>/dev/null)" in
+        FAIL) _pc_red=1 ;;
+    esac
+fi
+if [ "$_pc_branch" != "main" ] && [ "$_pc_branch" != "master" ] && [ "$_pc_red" = "0" ]; then
     git push 2>/dev/null || true
 fi
 

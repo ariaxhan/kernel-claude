@@ -10,6 +10,13 @@ for m in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD BISECT_LOG; do
 done
 br="$(git symbolic-ref --short HEAD 2>/dev/null)" || exit 0
 [ -n "$br" ] || exit 0
+# Hard gate (I0.15): never push a repo the test gate marked red. Clears when suite goes green.
+root="$(git rev-parse --show-toplevel 2>/dev/null)"
+if [ -n "$root" ] && [ -f "$root/_meta/.test-status" ]; then
+  case "$(cut -d'|' -f1 "$root/_meta/.test-status" 2>/dev/null)" in
+    FAIL) echo "[autopush] ⚠️ tests RED → push BLOCKED until green (see _meta/plans/tests-red.md)"; exit 0 ;;
+  esac
+fi
 git remote get-url origin >/dev/null 2>&1 || exit 0
 sha="$(git rev-parse --short HEAD 2>/dev/null)"
 echo "[autopush] $br ($sha) → origin…"

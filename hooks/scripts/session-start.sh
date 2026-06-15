@@ -92,6 +92,18 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   echo ""
 fi
 
+# Test gate verdict — surface red FIRST so it's addressed before any new work.
+if [ -f "$PROJECT_ROOT/_meta/.test-status" ]; then
+  TS_STATUS=$(cut -d'|' -f1 "$PROJECT_ROOT/_meta/.test-status" 2>/dev/null)
+  if [ "$TS_STATUS" = "FAIL" ]; then
+    TS_SUMMARY=$(cut -d'|' -f4 "$PROJECT_ROOT/_meta/.test-status" 2>/dev/null)
+    echo "## ⚠️ TESTS RED — auto-push is BLOCKED"
+    echo "**${TS_SUMMARY:-test suite failing}**"
+    echo "**ASK USER:** The test suite is red and pushes are withheld until it's green. Fix the suite first? (details: _meta/plans/tests-red.md)"
+    echo ""
+  fi
+fi
+
 # === SYSTEM HEALTH ===
 HEALTH_WARNINGS=""
 # Check dependencies

@@ -2,6 +2,42 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.20.0] - 2026-06-15
+
+The auto-commit / auto-push path now refuses to ship a red test suite. Previously the
+SessionEnd auto-commit (and the PreCompact checkpoint) committed with `--no-verify` — a
+documented carve-out to avoid an infinite hook chain — which meant those `chore(session-end)`
+commits *never ran the tests*. A red suite rode onto `main` for days until CI caught it.
+
+### Added
+- **`hooks/scripts/test-gate.sh`** — reusable, generic test runner. Detects the project's
+  nearest configured test command (`_meta/.test-cmd` override → `npm test` → `tests/run-tests.sh`
+  → `make test` / `just test` → `pytest`), runs it with a timeout, and records a verdict to
+  `_meta/.test-status` (`PASS|FAIL|NONE`). On red it also `agentdb learn`s the failure so the
+  next session is pre-loaded with it. Exit 0 = green or no suite; exit 1 = red.
+- **Test-gate suite** in `tests/run-tests.sh` (9 tests): detection, pass/fail verdicts,
+  no-suite-is-green, red→green self-heal, `.test-cmd` override, and wiring assertions for all
+  four consumers below.
+
+### Changed
+- **`session-end.sh`** runs the test gate before the auto-commit (only when real files
+  changed — pure `_meta/logs|agentdb` churn is skipped). On red it still commits locally
+  (never lose work) but tags the message `[TESTS RED]`, writes `_meta/plans/tests-red.md`,
+  and withholds the push.
+- **`autopush.sh` (sweep) + `autopush-postcommit`** are now hard gates (I0.15): either refuses
+  to push any repo whose `_meta/.test-status` is `FAIL`. Red never reaches the remote, and the
+  block self-clears the moment the suite goes green.
+- **`session-start.sh`** surfaces a red verdict first thing (`## ⚠️ TESTS RED`) with an ASK USER
+  prompt, so the next session fixes the suite before new work.
+- **`hooks.json`** SessionEnd timeout `30s → 210s` (the gate runs the suite inline).
+- `_meta/.test-status` added to `.gitignore` (transient run-state, like `.compact-marker`).
+
+### Fixed
+- **`test_detect_vaults_default`** was failing in CI. Two drifts: its skip-guard didn't probe
+  `~/Documents/Vaults` (so it ran where it should have skipped), and its assertion still
+  expected the old `~/Vaults` default after the canonical default moved to `~/Documents/Vaults`.
+  Guard now mirrors `detect_vaults()` exactly; assertion matches the real default.
+
 ## [7.19.0] - 2026-06-13
 
 Keep the plugin general. Reverts the institutional-layer coupling that 7.18 added to

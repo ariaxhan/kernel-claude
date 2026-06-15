@@ -546,15 +546,19 @@ test_common_sh_exists() {
 
 test_detect_vaults_default() {
   # With no agent.db anywhere, should return default or env override
-  # Skip if real Vaults exists (can't test default in that case)
-  if [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ] || [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
+  # Skip if a real Vaults exists at ANY location detect_vaults probes
+  # (can't observe the default branch when a real db short-circuits it).
+  # Must mirror detect_vaults() in common.sh exactly, or the guard drifts.
+  if [ -f "$HOME/Documents/Vaults/_meta/agentdb/agent.db" ] || \
+     [ -f "$HOME/Vaults/_meta/agentdb/agent.db" ] || \
+     [ -f "$HOME/Downloads/Vaults/_meta/agentdb/agent.db" ]; then
     echo "  (skipped - real Vaults exists)"
     return 0
   fi
   source "$PLUGIN_ROOT/hooks/scripts/common.sh"
   local result
   result=$(detect_vaults)
-  assert_equals "$HOME/Vaults" "$result" "default should be ~/Vaults"
+  assert_equals "$HOME/Documents/Vaults" "$result" "default should be ~/Documents/Vaults"
 }
 
 test_detect_vaults_env_override() {
@@ -2312,12 +2316,108 @@ test_entropy_adaptive_has_security_override() {
 
 # === Run Tests ===
 
+# === Test Gate (auto-commit/auto-push never ships red) ===
+
+# Build a throwaway fake project with a controllable test command.
+_tg_make_project() {
+  local dir="$1" verdict="$2"  # verdict: pass|fail
+  mkdir -p "$dir/_meta/plans" "$dir/tests"
+  if [ "$verdict" = "pass" ]; then
+    printf '#!/usr/bin/env bash\necho "Results: 3 passed, 0 failed"\nexit 0\n' > "$dir/tests/run-tests.sh"
+  else
+    printf '#!/usr/bin/env bash\necho "Results: 2 passed, 1 failed"\nexit 1\n' > "$dir/tests/run-tests.sh"
+  fi
+  chmod +x "$dir/tests/run-tests.sh"
+}
+
+test_test_gate_detects_and_passes() {
+  local d; d=$(mktemp -d)
+  _tg_make_project "$d" pass
+  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
+  local rc=$?
+  assert_exit_code 0 "$rc" "green suite should exit 0"
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "PASS"
+  rm -rf "$d"
+}
+
+test_test_gate_detects_and_fails() {
+  local d; d=$(mktemp -d)
+  _tg_make_project "$d" fail
+  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
+  local rc=$?
+  assert_exit_code 1 "$rc" "red suite should exit 1"
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "FAIL"
+  rm -rf "$d"
+}
+
+test_test_gate_no_suite_is_green() {
+  local d; d=$(mktemp -d)
+  mkdir -p "$d/_meta"
+  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
+  assert_exit_code 0 "$?" "no suite detected should not block (exit 0)"
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "NONE"
+  rm -rf "$d"
+}
+
+test_test_gate_status_recovers_to_pass() {
+  # A red verdict must clear when the suite goes green (so the block self-heals).
+  local d; d=$(mktemp -d)
+  _tg_make_project "$d" fail
+  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "FAIL"
+  _tg_make_project "$d" pass
+  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "PASS"
+  rm -rf "$d"
+}
+
+test_test_gate_honors_override_file() {
+  local d; d=$(mktemp -d)
+  mkdir -p "$d/_meta"
+  echo "exit 0" > "$d/_meta/.test-cmd"
+  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
+  assert_exit_code 0 "$?" ".test-cmd override should be used"
+  rm -rf "$d"
+}
+
+test_autopush_postcommit_has_red_gate() {
+  assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")" "BLOCKED"
+}
+
+test_autopush_sweep_has_red_gate() {
+  assert_contains "$(grep -A1 'tests RED' "$PLUGIN_ROOT/hooks/scripts/autopush.sh")" "continue"
+}
+
+test_session_end_runs_test_gate() {
+  assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/session-end.sh")" "test-gate.sh"
+}
+
+test_session_start_surfaces_red() {
+  assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/session-start.sh")" "TESTS RED"
+}
+
+test_pre_compact_has_red_gate() {
+  assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh")" ".test-status"
+}
+
 run_test_suite() {
   local suite="$1"
   echo ""
   echo -e "${YELLOW}=== $suite ===${NC}"
 
   case "$suite" in
+    test_gate)
+      run_test "test-gate detects + passes" test_test_gate_detects_and_passes
+      run_test "test-gate detects + fails" test_test_gate_detects_and_fails
+      run_test "test-gate no suite is green" test_test_gate_no_suite_is_green
+      run_test "test-gate red recovers to pass" test_test_gate_status_recovers_to_pass
+      run_test "test-gate honors override file" test_test_gate_honors_override_file
+      run_test "autopush postcommit has red gate" test_autopush_postcommit_has_red_gate
+      run_test "autopush sweep has red gate" test_autopush_sweep_has_red_gate
+      run_test "session-end runs test gate" test_session_end_runs_test_gate
+      run_test "session-start surfaces red" test_session_start_surfaces_red
+      run_test "pre-compact has red gate" test_pre_compact_has_red_gate
+      ;;
     agentdb)
       run_test "init creates db" test_agentdb_init
       run_test "init is idempotent" test_agentdb_init_idempotent
@@ -2707,6 +2807,7 @@ main() {
     run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"
+    run_test_suite "test_gate"
   else
     run_test_suite "$target"
   fi
