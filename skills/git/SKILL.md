@@ -74,6 +74,7 @@ Skill-specific: skills/git/reference/git-research.md
     20. Small PRs (≤400 lines) + multi-tool guidelines = 30–40% shorter review cycle times. The size rule has measurable throughput impact, not just reviewer comfort. <!-- Updated 2026-06-08: https://blog.exceeds.ai/ai-code-review-best-practices/ -->
     21. Risk hotspot prioritization: use review analytics (change frequency × defect rate per file/subsystem) to identify hotspots. Invest deeper human review at hotspots; lighter AI-only review at low-churn, low-defect areas. <!-- Updated 2026-06-13: https://blog.exceeds.ai/ai-code-review-best-practices/ -->
     22. Non-interactive review in CI/hooks: `claude -p "Review this diff for security issues" --output-format json --allowedTools Read,Bash` runs Claude as a script in pre-commit or pipelines. Scope tools with `--allowedTools` to prevent unintended writes during automated runs. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
+    23. Framework-specific review checks: React → hooks violations (stale closures, missing dependency arrays, conditional hooks); Go → unchecked errors and goroutine leaks; Python → mutable default args and bare except clauses. Generic review misses these; name the framework in the review prompt. <!-- Updated 2026-06-15: https://blog.exceeds.ai/ai-code-review-best-practices/ https://sourcegraph.com/blog/ai-code-review -->
     (gate: diff ≤500 lines; review sequence followed)
   </step>
 
