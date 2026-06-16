@@ -1,24 +1,10 @@
 #!/usr/bin/env bash
-# Auto-push post-commit hook. Installed into every repo by autopush.sh (kernel plugin,
-# SessionStart) so every commit pushes to origin the instant it's made — never solely
-# local, no command needed. Safe + non-fatal; a failed push is swept at session end.
-set -u
-gd="$(git rev-parse --git-dir 2>/dev/null)" || exit 0
-case "$gd" in /*) : ;; *) gd="$PWD/$gd" ;; esac
-for m in rebase-merge rebase-apply MERGE_HEAD CHERRY_PICK_HEAD BISECT_LOG; do
-  [ -e "$gd/$m" ] && exit 0
-done
-br="$(git symbolic-ref --short HEAD 2>/dev/null)" || exit 0
-[ -n "$br" ] || exit 0
-# Hard gate (I0.15): never push a repo the test gate marked red. Clears when suite goes green.
-root="$(git rev-parse --show-toplevel 2>/dev/null)"
-if [ -n "$root" ] && [ -f "$root/_meta/.test-status" ]; then
-  case "$(cut -d'|' -f1 "$root/_meta/.test-status" 2>/dev/null)" in
-    FAIL) echo "[autopush] ⚠️ tests RED → push BLOCKED until green (see _meta/plans/tests-red.md)"; exit 0 ;;
-  esac
-fi
-git remote get-url origin >/dev/null 2>&1 || exit 0
-sha="$(git rev-parse --short HEAD 2>/dev/null)"
-echo "[autopush] $br ($sha) → origin…"
-git push origin "$br" 2>&1 | sed 's/^/  /' || echo "[autopush] ✗ push failed — session-end sweep will retry"
+# post-commit hook — AUTO-PUSH DISABLED (Aria directive 2026-06-15).
+#
+# History: per-commit auto-push to a shared `main` across multiple windows caused years of
+# rebase/push storms. The fix is not a smarter push — it's NO auto-push. Commits stay LOCAL.
+# Pushing is explicit (a human/sweep decision), and work belongs on session branches, never main.
+#
+# Auto-branching lives in the SessionStart hook (autobranch), not here.
+# To push deliberately: `git push` yourself, or run _meta/services/vault-autopush.sh (manual).
 exit 0
