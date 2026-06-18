@@ -95,6 +95,12 @@ Skill-specific: skills/api/reference/api-research.md
     - Return `next_cursor` as direct string, never derivable by offset math
     - (gate: agent-facing APIs documented with retry-safety posture per endpoint)
 
+11. **SCHEMA-FIRST FOR AI CONSUMERS** — when the API will be called by AI agents or code-generated clients, define the OpenAPI spec before the implementation.
+    - Generate TypeScript types from the spec (`openapi-typescript`), not from the implementation; AI clients hallucinate field names from training data — a machine-readable spec is the authoritative correction mechanism
+    - Every breaking change shows as a spec diff before it hits a consumer
+    - AI agents parse error codes (step 10) more reliably when they are documented in the spec alongside the schema
+    - (gate: AI-facing endpoints have an OpenAPI spec entry before the route handler is written) <!-- Updated 2026-06-18: https://code.claude.com/docs/en/best-practices -->
+
 </methodology>
 
 <anti_patterns>

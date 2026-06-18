@@ -35,6 +35,7 @@ General: reference/architecture-research.md
    - Comment drift: audit every comment for accuracy — stale comments worse than none
    - Parallel agent artifacts: if multiple agents touched the file, check `git log` for overlapping changes
    - Scope creep: diff changes against the defined list from step 4; extras → revert + new task
+   - AI behavior drift: AI rewrites change edge-case behavior even when asked to preserve it. After any AI-assisted refactor, run the original input set (or quick property tests) against both versions. Functional equivalence on happy paths does not imply equivalence on edges. <!-- Updated 2026-06-18: https://www.sitepoint.com/debugging-ai-claude-code-vs-traditional-methods/ -->
 9. **Verify** — run full test suite. (gate: all tests green after each commit; red = stop, revert last change)
 10. **Metrics** — measure before/after: cyclomatic complexity, function length, duplication. Successful refactor reduces complexity 15-25%. No improvement = shuffled, not simplified.
 11. **Commit** — one logical change per commit. Format: `refactor(scope): description`. File must end shorter or justify growth in commit body.

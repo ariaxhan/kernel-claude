@@ -76,6 +76,8 @@ Skill-specific: skills/security/reference/security-research.md
 
   16. **Deny-first permissions** — configure deny rules for sensitive directories (`migrations/`, `secrets/`, `.env*`) BEFORE allow/ask rules in `.claude/settings.json`. Files invisible via deny can't be accessed even if Claude generates a path to them — stronger than a hook because it acts at the permissions layer, not the script layer. <!-- Updated 2026-06-14: https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ -->
 
+  17. **AI-generated code defect rate** — AI-generated PRs contain 1.7× more defects than human-only PRs. Apply proportionally stricter review to AI-generated changes: security linter + human sign-off on auth/payment/secrets paths, regardless of AI review confidence. "45% of AI-generated code contains security vulnerabilities" compounds this — never waive the security checklist for AI-authored code. <!-- Updated 2026-06-18: https://blog.exceeds.ai/ai-code-review-best-practices/ https://www.verdent.ai/guides/best-ai-for-code-review-2026 -->
+
 </flow>
 
 <pre_deployment_checklist>
