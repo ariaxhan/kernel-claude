@@ -1,0 +1,60 @@
+name: Test Auto-Fix
+# The real "auto-fix pipeline": react when the Tests & Quality run goes RED on main.
+#
+# Why this exists: self-improve.yml only fires on PR-merge / weekly cron, and claude.yml
+# only on @claude mentions. Session-end auto-commits land straight on main (no PR), so a red
+# suite rode onto main for days with NOTHING watching it. workflow_run fills that gap — it is
+# the only trigger that fires on a failed CI run.
+on:
+  workflow_run:
+    workflows: ["Tests & Quality"]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  autofix:
+    # Only on genuine failure of the main-branch run. Ignore success / cancelled / PR runs.
+    if: >
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: main
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            The "Tests & Quality" workflow failed on main (run ${{ github.event.workflow_run.id }}).
+            Failing commit: ${{ github.event.workflow_run.head_sha }}.
+
+            TASK: get main green again. Treat the test as authority on intended behavior unless
+            the test itself is stale relative to a DELIBERATE change.
+
+            1. Run `./tests/run-tests.sh` and read the FAIL block(s). Reproduce exactly.
+            2. Root-cause the CLASS, not just the symptom (grep siblings — other tests asserting
+               the same file/string/behavior). A common cause here: a deliberate behavior change
+               (e.g. a disabled hook) shipped via a `chore(session-end)` auto-commit without
+               updating the matching test.
+            3. Decide direction:
+               - Code regressed  → fix the code.
+               - Test went stale vs. an intentional change (check git log + the file's header
+                 comments / Aria directives) → update the test to match documented intent.
+            4. Make the MINIMAL fix. Re-run the suite to 260/260 (0 failed) locally.
+            5. Open a PR from branch `fix/ci-red-${{ github.event.workflow_run.head_sha }}`
+               titled `fix(ci): main went red — <one-line cause>`, label it `auto-fix`.
+               In the body: root cause, why the chosen direction, before/after suite counts.
+
+            CONSTRAINTS:
+            - Never edit CLAUDE.md to make a test pass.
+            - Never use --no-verify. No AI attribution on commits.
+            - If you cannot confidently fix it, open an ISSUE titled
+              `CI red on main: <cause>` (label `auto-fix`, `claude`) with the failure block and
+              your best hypothesis instead of guessing.
