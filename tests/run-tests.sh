@@ -2380,8 +2380,14 @@ test_test_gate_honors_override_file() {
   rm -rf "$d"
 }
 
-test_autopush_postcommit_has_red_gate() {
-  assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")" "BLOCKED"
+test_autopush_postcommit_is_disabled() {
+  # Per Aria directive 2026-06-15: per-commit auto-push to a shared `main` is OFF.
+  # The hook is intentionally a no-op (commits stay local; pushing is explicit). Guard
+  # that intent so nobody silently re-enables per-commit push. The red-gate now lives on
+  # the paths that actually push (autopush.sh sweep) — covered by test_autopush_sweep_has_red_gate.
+  local hook; hook="$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")"
+  assert_contains "$hook" "AUTO-PUSH DISABLED"
+  assert_contains "$hook" "exit 0"
 }
 
 test_autopush_sweep_has_red_gate() {
@@ -2412,7 +2418,7 @@ run_test_suite() {
       run_test "test-gate no suite is green" test_test_gate_no_suite_is_green
       run_test "test-gate red recovers to pass" test_test_gate_status_recovers_to_pass
       run_test "test-gate honors override file" test_test_gate_honors_override_file
-      run_test "autopush postcommit has red gate" test_autopush_postcommit_has_red_gate
+      run_test "autopush postcommit is disabled" test_autopush_postcommit_is_disabled
       run_test "autopush sweep has red gate" test_autopush_sweep_has_red_gate
       run_test "session-end runs test gate" test_session_end_runs_test_gate
       run_test "session-start surfaces red" test_session_start_surfaces_red
