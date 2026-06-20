@@ -120,6 +120,9 @@ Context discipline:
 - `/goal` for unattended verification: set a `/goal` condition and a separate evaluator re-checks it after every turn, keeping Claude working until it holds — no human in the loop required. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
 - Session persistence: `claude --continue` resumes the most recent session; `claude --resume` picks from a list. `/rename` names sessions so multi-sitting workstreams stay findable. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
 - Kitchen sink anti-pattern: mixing unrelated tasks in one session pollutes context for all of them. `/clear` between tasks is context hygiene, not optional. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
+- CLAUDE.md line budget: frontier models reliably follow ~150–200 instructions; Claude Code's own system prompt already consumes ~50 of them. Past ~200 CLAUDE.md lines, adherence drops quietly ("context rot"). Shorter CLAUDE.md = higher compliance. <!-- Updated 2026-06-20: https://dev.to/nishilbhave/claudemd-best-practices-the-complete-2026-guide-435j -->
+- Lead with commands in CLAUDE.md: the exact test/build/lint/run invocations are the highest-ROI section. Put them first; everything else is lower priority. <!-- Updated 2026-06-20: https://dev.to/nishilbhave/claudemd-best-practices-the-complete-2026-guide-435j -->
+- Anthropic prompt improver: auto-enhances prompts in 4 steps: identifies examples → adds XML structure → refines chain of thought → enhances examples with step-by-step reasoning. Use it on complex system prompts before deploying. <!-- Updated 2026-06-20: https://www.aiwithgrant.com/guides/anthropic-prompt-engineering-overview -->
 
 (gate: each logical unit committed before moving to next)
 
