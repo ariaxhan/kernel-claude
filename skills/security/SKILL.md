@@ -80,6 +80,8 @@ Skill-specific: skills/security/reference/security-research.md
 
   18. **Difference-aware PR scanning** — scan against the PR diff, not the full codebase. Scoping to changed lines produces focused, change-contextual findings rather than codebase-wide noise that reviewers learn to ignore. Pair with two-stage refutation: first pass generates candidate findings; second pass asks Claude to refute each one ("what evidence would disprove this vulnerability?"), filtering false positives before surfacing to human reviewers. <!-- Updated 2026-06-21: https://www.anthropic.com/news/claude-code-security -->
 
+  19. **NIST SP 800-218A for AI-assisted development** — the three essential security frameworks in 2026 are: OWASP Top 10 (traditional app vulnerabilities), OWASP Top 10 for LLM Applications (prompt injection, insecure output handling, training data poisoning), and **NIST SP 800-218A** (extends the NIST SSDF to the AI code generation pipeline). SP 800-218A requirements: document AI tool usage in the SBOM, apply the same secure coding standards to AI-generated code as hand-written code, and require human sign-off on AI-authored components touching safety-critical paths. Treat the AI generation pipeline as part of the supply chain — not a trusted internal tool. <!-- Updated 2026-06-22: https://www.metacto.com/blogs/establishing-code-review-standards-for-ai-generated-code -->
+
 </flow>
 
 <pre_deployment_checklist>

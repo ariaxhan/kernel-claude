@@ -137,6 +137,7 @@ Automated (run what exists):
 
 Manual: walk through done-when criteria. Document how verified.
 Edge cases (at least 3): empty/null, boundary, error/failure path.
+- Evidence-first: require the actual command output, test results, or screenshot — not an assertion that it works. "Seems to work" is not evidence. Paste raw output; reviewing it is faster than re-running and catches cases where "success" masks a different failure path. <!-- Updated 2026-06-22: https://www.anthropic.com/engineering/claude-code-best-practices -->
 
 (gate: all automated checks green, ≥3 edge cases covered)
 
