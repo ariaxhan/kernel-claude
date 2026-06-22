@@ -16,6 +16,7 @@ Systematic methodology achieves ~95% first-time fix rate vs ~40% ad-hoc. The pro
 
 <prerequisite>
 AgentDB read-start has run. Check past failures—you may have seen this pattern.
+Debuggability setup (run once per project, not per session): ensure the test suite runs headlessly (`npm test` / `pytest -x` / `cargo test`), add structured logging at service/module boundaries, and document known failure modes in `_meta/context/DEBUG.md`. These three give Claude the foundation to trace and verify without blind file exploration. Without them, debugging sessions spend the first third just establishing a reproduction path. <!-- Updated 2026-06-21: https://claudify.tech/blog/claude-code-debugging-guide -->
 </prerequisite>
 
 <reference>

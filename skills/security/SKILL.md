@@ -78,6 +78,8 @@ Skill-specific: skills/security/reference/security-research.md
 
   17. **AI-generated code defect rate** — AI-generated PRs contain 1.7× more defects than human-only PRs. Apply proportionally stricter review to AI-generated changes: security linter + human sign-off on auth/payment/secrets paths, regardless of AI review confidence. "45% of AI-generated code contains security vulnerabilities" compounds this — never waive the security checklist for AI-authored code. <!-- Updated 2026-06-18: https://blog.exceeds.ai/ai-code-review-best-practices/ https://www.verdent.ai/guides/best-ai-for-code-review-2026 -->
 
+  18. **Difference-aware PR scanning** — scan against the PR diff, not the full codebase. Scoping to changed lines produces focused, change-contextual findings rather than codebase-wide noise that reviewers learn to ignore. Pair with two-stage refutation: first pass generates candidate findings; second pass asks Claude to refute each one ("what evidence would disprove this vulnerability?"), filtering false positives before surfacing to human reviewers. <!-- Updated 2026-06-21: https://www.anthropic.com/news/claude-code-security -->
+
 </flow>
 
 <pre_deployment_checklist>
