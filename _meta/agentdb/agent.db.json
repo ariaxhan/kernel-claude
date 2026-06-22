@@ -153,6 +153,14 @@
         "id": "CP-20260621223823-17971-25567",
         "ts": "2026-06-22T05:38:23.813Z",
         "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"agent\":\"main-16332\",\"event\":\"session-end\",\"branch\":\"main\",\"uncommitted_files\":1}",
+        "contract_id": null,
+        "id": "CP-20260621223832-18959-3375",
+        "ts": "2026-06-22T05:38:32.227Z",
+        "type": "checkpoint"
       }
     ],
     "context_sessions": [],
@@ -3388,6 +3396,36 @@
         "metadata": "{\"exit_code\":0}",
         "session_id": "sess-20260621223753-16332",
         "ts": "2026-06-22T05:38:09.119Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:end",
+        "id": 324,
+        "metadata": "{\"branch\":\"main\",\"files_changed\":2,\"agent\":\"main-43428\",\"duration_s\":}",
+        "session_id": "",
+        "ts": "2026-06-22T05:38:24.017Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 750,
+        "event": "session-end",
+        "id": 325,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260621223753-16332",
+        "ts": "2026-06-22T05:38:24.498Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 32,
+        "event": "log-write",
+        "id": 326,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/run-tests.sh\"}",
+        "session_id": "",
+        "ts": "2026-06-22T05:38:25.565Z"
       }
     ],
     "execution_traces": [],

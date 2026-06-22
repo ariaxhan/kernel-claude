@@ -516,12 +516,17 @@ test_pre_compact_payload_survives_quotes() {
   assert_exit_code 0 "$?" "escaped pre-compact payload must be valid JSON"
 }
 
-# Regression: lifecycle hooks must NOT auto-push main/master (I0.8).
-test_lifecycle_hooks_guard_main_push() {
-  grep -q 'not auto-pushing' "$PLUGIN_ROOT/hooks/scripts/session-end.sh" || {
-    echo "FAIL: session-end.sh missing main-push guard"; return 1; }
-  grep -qE '_pc_branch.*!=.*main' "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh" || {
-    echo "FAIL: pre-compact-commit.sh missing main-push guard"; return 1; }
+# Regression: lifecycle hooks must NEVER auto-commit (disabled plugin-wide). A `git add -A`
+# + `--no-verify` auto-commit here historically swept untested source onto main, where a red
+# suite rode for days. Commits are now exclusively deliberate + fully verified.
+test_lifecycle_hooks_never_autocommit() {
+  for h in session-end.sh pre-compact-commit.sh; do
+    grep -qE '^[[:space:]]*git[[:space:]]+commit' "$PLUGIN_ROOT/hooks/scripts/$h" && {
+      echo "FAIL: $h must NOT auto-commit (found 'git commit')"; return 1; }
+    grep -qE '^[[:space:]]*git[[:space:]]+add' "$PLUGIN_ROOT/hooks/scripts/$h" && {
+      echo "FAIL: $h must NOT 'git add' (auto-commit disabled plugin-wide)"; return 1; }
+  done
+  return 0
 }
 
 test_session_start_shows_checkpoint_after_compact() {
