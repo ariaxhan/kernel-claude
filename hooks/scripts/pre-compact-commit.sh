@@ -86,41 +86,13 @@ if [ -f "$REG_FILE" ]; then
         "$REG_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$REG_FILE"
 fi
 
-# === STEP 3: COMMIT CHECKPOINT ===
+# === STEP 3: (REMOVED) AUTO-COMMIT / AUTO-PUSH CHECKPOINT ===
+# Auto-commit before compaction was removed per user directive 2026-06-23.
+# The context snapshot (STEP 1), registry update (STEP 2), AgentDB checkpoint (STEP 4),
+# and compaction marker (STEP 5) all still run — only the git mutation is gone. Uncommitted
+# work is preserved in the working tree, not written to history. FILES_CHANGED is left unset
+# (treated as 0 by the checkpoint below) since nothing is committed here.
 cd "$PROJECT_ROOT" 2>/dev/null || exit 0
-
-if ! git status --porcelain 2>/dev/null | grep -q .; then
-    exit 0
-fi
-
-git add -A 2>/dev/null
-git reset HEAD -- '*.zip' '*.tar.gz' '*.tar.bz2' '**/.DS_Store' \
-    '.env*' '*.pem' '*.key' '*.p12' 'credentials*' 'secrets*' '*.secret' \
-    'node_modules/' 2>/dev/null
-
-if git diff --cached --quiet 2>/dev/null; then
-    exit 0
-fi
-
-FILES_CHANGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
-REPO_NAME=$(basename "$PROJECT_ROOT")
-# --no-verify: intentional carve-out documented in CLAUDE.md <git><hook_carve_outs>.
-# This hook fires inside PreCompact; leaving verify enabled creates an infinite hook chain.
-# Carve-out is limited to this script + session-end.sh. Do NOT reuse elsewhere.
-git commit -m "chore(checkpoint): $REPO_NAME pre-compact [$AGENT] ($TRIGGER, $FILES_CHANGED files) $TIMESTAMP_SHORT" --no-verify 2>/dev/null
-# Do not auto-push main/master (I0.8: push to main needs explicit say-so).
-# Feature branches push freely — UNLESS the last test-gate verdict was red (I0.15: never
-# push red, even a mid-session checkpoint). Self-clears when the suite goes green.
-_pc_branch=$(git branch --show-current 2>/dev/null || echo "")
-_pc_red=0
-if [ -f "$PROJECT_ROOT/_meta/.test-status" ]; then
-    case "$(cut -d'|' -f1 "$PROJECT_ROOT/_meta/.test-status" 2>/dev/null)" in
-        FAIL) _pc_red=1 ;;
-    esac
-fi
-if [ "$_pc_branch" != "main" ] && [ "$_pc_branch" != "master" ] && [ "$_pc_red" = "0" ]; then
-    git push 2>/dev/null || true
-fi
 
 # === STEP 4: AUTO-CHECKPOINT TO AGENTDB ===
 # This replaces manual handoff - auto-save context before compaction

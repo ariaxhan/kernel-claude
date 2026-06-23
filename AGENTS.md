@@ -143,18 +143,18 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <rule>No AI attribution. Never: Co-Authored-By, Generated with Codex, or tool signatures.</rule>
   <rule>Tier 2+: feature branch. Format: {type}/{name} (feature/auth, fix/timeout).</rule>
   <rule>Atomic commits. One logical change per commit. Imperative mood: "feat: add rate limiting".</rule>
-  <rule>Commit every working state. Push before session end or handoff.</rule>
+  <rule>Commit every working state yourself. Lifecycle hooks no longer auto-commit — committing and pushing is an explicit, human/agent decision. Push before session end or handoff.</rule>
   <rule>Never commit broken code to main. Never auto-resolve merge conflicts silently.</rule>
   <rule>Stash before risky ops. Tag milestones.</rule>
-  <rule>Agent-authored and user-authored commits NEVER use --no-verify. If a gate fails, fix the gate or the change.</rule>
-  <hook_carve_outs>
-    Two automated hooks call `git commit --no-verify` intentionally:
-    - hooks/scripts/session-end.sh (SessionEnd batch commit)
-    - hooks/scripts/pre-compact-commit.sh (PreCompact checkpoint)
-    Reason: these hooks run inside the hook chain that --verify would re-invoke, so leaving verify
-    enabled creates an infinite loop. The carve-out is machine-only and limited to these two
-    scripts. If you find yourself reaching for --no-verify anywhere else, stop and fix the gate.
-  </hook_carve_outs>
+  <rule>Agent-authored and user-authored commits NEVER use --no-verify. If a gate fails, fix the gate or the change. No carve-outs remain.</rule>
+  <no_autocommit>
+    Removed 2026-06-23 (user directive): session-end.sh and pre-compact-commit.sh no longer run
+    `git add` / `git commit` / `git push`. They still write AgentDB checkpoints and context
+    snapshots — only the git mutation is gone. This eliminated the two `--no-verify` carve-outs
+    that previously existed. Uncommitted work is left in the working tree for explicit review;
+    nothing is auto-committed to history. NOTE: in ephemeral/remote environments, uncommitted
+    work is lost when the container is reclaimed — commit deliberately before ending a session.
+  </no_autocommit>
 </git>
 
 <!-- ============================================ -->
@@ -303,7 +303,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     is enforced by external hooks, not by agent honor-system instructions. The agent cannot
     reliably bypass its own rules — but the hook can. If a safety property matters, encode it
     as a PreToolUse / PreCommit hook in `hooks/scripts/`, not as a AGENTS.md sentence.
-    Hook carve-outs are documented in <git><hook_carve_outs>.
+    Lifecycle hooks no longer auto-commit (see <git><no_autocommit>); no --no-verify carve-outs remain.
   </invariant>
 </invariants>
 

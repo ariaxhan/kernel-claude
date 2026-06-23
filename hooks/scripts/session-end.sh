@@ -78,72 +78,11 @@ for f in "$AGENTS_DIR"/*.json; do
     fi
 done
 
-# === STEP 2: BATCH COMMIT AND PUSH ===
-cd "$PROJECT_ROOT" 2>/dev/null || exit 0
-
-if ! git status --porcelain 2>/dev/null | grep -q .; then
-    exit 0
-fi
-
-git add -A 2>/dev/null
-git reset HEAD -- '*.zip' '*.tar.gz' '*.tar.bz2' '**/.DS_Store' \
-    '.env*' '*.pem' '*.key' '*.p12' 'credentials*' 'secrets*' '*.secret' \
-    'node_modules/' 2>/dev/null
-
-if git diff --cached --quiet 2>/dev/null; then
-    exit 0
-fi
-
-FILES_CHANGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
-REPO_NAME=$(basename "$PROJECT_ROOT")
-
-# === TEST GATE ===
-# --no-verify (below) skips the pre-commit verify chain — a documented carve-out to avoid an
-# infinite hook loop. That carve-out historically let a RED suite ride onto main via these
-# auto-commits. Close the hole: run the suite out-of-band here. Only when real files changed
-# (skip pure log/agentdb churn so doc-free sessions don't pay 30s). On red we still commit
-# (never lose work) but tag the message + leave a breadcrumb; the .test-status file then
-# blocks autopush so red never reaches the remote.
-TEST_TAG=""
-CODE_CHANGED=$(git diff --cached --name-only 2>/dev/null \
-    | grep -vE '^_meta/(logs/|agentdb/|\.)' | head -1)
-if [ -n "$CODE_CHANGED" ] && [ -f "$(dirname "$0")/test-gate.sh" ]; then
-    if ! bash "$(dirname "$0")/test-gate.sh" "$PROJECT_ROOT" >/dev/null 2>&1; then
-        TEST_TAG=" [TESTS RED]"
-        _ts_summary=$(cut -d'|' -f4 "$PROJECT_ROOT/_meta/.test-status" 2>/dev/null)
-        mkdir -p "$PROJECT_ROOT/_meta/plans" 2>/dev/null
-        {
-            echo "# ⚠️ Tests are RED — fix before shipping"
-            echo ""
-            echo "Detected at session-end $TIMESTAMP by the kernel test gate."
-            echo "Auto-commit was made locally but **autopush is blocked** until green."
-            echo ""
-            echo "**Failure:** ${_ts_summary:-see test output}"
-            echo ""
-            echo "Run the suite, drive it to zero, then commit the fix (autopush unblocks automatically)."
-        } > "$PROJECT_ROOT/_meta/plans/tests-red.md" 2>/dev/null
-        echo "session-end: ⚠️ TESTS RED — committing locally but NOT pushing. See _meta/plans/tests-red.md" >&2
-    else
-        # Green (or no suite): clear any stale breadcrumb.
-        rm -f "$PROJECT_ROOT/_meta/plans/tests-red.md" 2>/dev/null
-    fi
-fi
-
-# --no-verify: intentional carve-out documented in CLAUDE.md <git><hook_carve_outs>.
-# This hook fires inside SessionEnd; leaving verify enabled creates an infinite hook chain.
-# Carve-out is limited to this script + pre-compact-commit.sh. Do NOT reuse elsewhere.
-git commit -m "chore(session-end): $REPO_NAME [$AGENT] ($FILES_CHANGED files) $TIMESTAMP$TEST_TAG" --no-verify 2>/dev/null
-# Do not auto-push main/master (I0.8: push to main needs explicit say-so).
-# Feature branches push freely; main commits stay local until the user pushes.
-# Red suite → never push (autopush.sh also enforces this independently via .test-status).
-_se_branch=$(git branch --show-current 2>/dev/null || echo "")
-if [ -n "$TEST_TAG" ]; then
-    echo "session-end: red suite — push withheld until tests are green." >&2
-elif [ "$_se_branch" = "main" ] || [ "$_se_branch" = "master" ]; then
-    echo "session-end: committed locally on $_se_branch; not auto-pushing (I0.8 — push to main needs explicit say-so)." >&2
-elif ! git push 2>/dev/null; then
-    echo "WARNING: git push failed. Changes committed locally but not pushed." >&2
-    echo "Run 'git push' manually or check for rebase conflicts." >&2
-fi
+# === STEP 2: (REMOVED) AUTO-COMMIT / AUTO-PUSH ===
+# Auto-commit at session end was removed per user directive 2026-06-23.
+# The hook no longer runs `git add -A` / `git commit` / `git push`. It still writes the
+# AgentDB checkpoint and cleans up agent registration above — only the git mutation is gone.
+# Committing and pushing is now an explicit, human-driven decision. Uncommitted work is left
+# in place for the user to review and commit; nothing is staged or written to history here.
 
 exit 0
