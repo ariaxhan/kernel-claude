@@ -2,6 +2,34 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.21.0] - 2026-06-23
+
+Lifecycle hooks no longer auto-commit. The SessionEnd batch commit (the daily
+`chore(session-end)` commits) and the PreCompact checkpoint commit have been removed.
+Committing and pushing is now an explicit, human/agent decision — the hooks never mutate
+git history.
+
+### Removed
+- **`session-end.sh`** — dropped STEP 2 (the `git add -A` / `git commit --no-verify` /
+  `git push` batch). The hook still writes the AgentDB session-end checkpoint and cleans up
+  agent registration; only the git mutation is gone. The session-end test gate (which existed
+  solely to vet that auto-commit) went with it.
+- **`pre-compact-commit.sh`** — dropped STEP 3 (the `git commit --no-verify` / `git push`
+  checkpoint). The context snapshot, registry update, AgentDB checkpoint, and compaction
+  marker all still run.
+- Both `--no-verify` carve-outs documented in `CLAUDE.md <git><hook_carve_outs>` are gone;
+  that block is replaced by `<no_autocommit>`.
+
+### Changed
+- **`tests/run-tests.sh`** — replaced `test_lifecycle_hooks_guard_main_push` with
+  `test_lifecycle_hooks_no_autocommit` (regression guard: neither hook may run
+  `git add|commit|push`). Removed `test_session_end_runs_test_gate` and
+  `test_pre_compact_has_red_gate`, which asserted now-deleted behavior.
+
+### Note
+- In ephemeral/remote environments, uncommitted work is lost when the container is reclaimed.
+  Commit deliberately before ending a session — the hook will no longer do it for you.
+
 ## [7.20.0] - 2026-06-15
 
 The auto-commit / auto-push path now refuses to ship a red test suite. Previously the

@@ -516,12 +516,15 @@ test_pre_compact_payload_survives_quotes() {
   assert_exit_code 0 "$?" "escaped pre-compact payload must be valid JSON"
 }
 
-# Regression: lifecycle hooks must NOT auto-push main/master (I0.8).
-test_lifecycle_hooks_guard_main_push() {
-  grep -q 'not auto-pushing' "$PLUGIN_ROOT/hooks/scripts/session-end.sh" || {
-    echo "FAIL: session-end.sh missing main-push guard"; return 1; }
-  grep -qE '_pc_branch.*!=.*main' "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh" || {
-    echo "FAIL: pre-compact-commit.sh missing main-push guard"; return 1; }
+# Regression: lifecycle hooks must NOT auto-commit or auto-push (user directive 2026-06-23).
+# session-end.sh and pre-compact-commit.sh write AgentDB checkpoints + context snapshots,
+# but must never mutate git history. Guard against a `git commit` creeping back in.
+test_lifecycle_hooks_no_autocommit() {
+  grep -qE '^[[:space:]]*git (add|commit|push)' "$PLUGIN_ROOT/hooks/scripts/session-end.sh" && {
+    echo "FAIL: session-end.sh must not auto-commit/push"; return 1; }
+  grep -qE '^[[:space:]]*git (add|commit|push)' "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh" && {
+    echo "FAIL: pre-compact-commit.sh must not auto-commit/push"; return 1; }
+  return 0
 }
 
 test_session_start_shows_checkpoint_after_compact() {
@@ -2394,16 +2397,8 @@ test_autopush_sweep_has_red_gate() {
   assert_contains "$(grep -A1 'tests RED' "$PLUGIN_ROOT/hooks/scripts/autopush.sh")" "continue"
 }
 
-test_session_end_runs_test_gate() {
-  assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/session-end.sh")" "test-gate.sh"
-}
-
 test_session_start_surfaces_red() {
   assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/session-start.sh")" "TESTS RED"
-}
-
-test_pre_compact_has_red_gate() {
-  assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh")" ".test-status"
 }
 
 run_test_suite() {
@@ -2420,9 +2415,7 @@ run_test_suite() {
       run_test "test-gate honors override file" test_test_gate_honors_override_file
       run_test "autopush postcommit is disabled" test_autopush_postcommit_is_disabled
       run_test "autopush sweep has red gate" test_autopush_sweep_has_red_gate
-      run_test "session-end runs test gate" test_session_end_runs_test_gate
       run_test "session-start surfaces red" test_session_start_surfaces_red
-      run_test "pre-compact has red gate" test_pre_compact_has_red_gate
       ;;
     agentdb)
       run_test "init creates db" test_agentdb_init
@@ -2459,7 +2452,7 @@ run_test_suite() {
       run_test "session-start has testing philosophy" test_session_start_testing_philosophy
       run_test "pre-compact writes checkpoint" test_pre_compact_writes_checkpoint
       run_test "pre-compact payload survives quotes" test_pre_compact_payload_survives_quotes
-      run_test "lifecycle hooks guard main push" test_lifecycle_hooks_guard_main_push
+      run_test "lifecycle hooks do not auto-commit" test_lifecycle_hooks_no_autocommit
       run_test "session-start shows checkpoint after compact" test_session_start_shows_checkpoint_after_compact
       ;;
     security)
