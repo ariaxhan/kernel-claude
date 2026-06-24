@@ -73,6 +73,7 @@ Before accepting any AI-generated test, verify:
 2. Is the test coupled to implementation? (mocks of internals → brittle)
 3. Is state shared between tests? (order-dependent failures)
 4. Does it test requirements or does it mirror code that may be buggy?
+5. Do the Arrange / Act / Assert sections have clear separation? Tests that blur setup and assertion are hard to diagnose on failure — the failure location is ambiguous. Require explicit three-section structure in review. <!-- Updated 2026-06-24: https://www.aiforanything.io/blog/claude-for-automated-testing-tutorial-2026 -->
 (gate: at least one negative/rejection case per test file)
 
 ### Step 7 — Multi-agent test patterns (tier 2+)
