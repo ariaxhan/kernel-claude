@@ -19,7 +19,7 @@
 		"@tailwindcss/vite": "^4.2.2",
 		"@types/better-sqlite3": "^7.6.13",
 		"@types/d3": "^7.4.3",
-		"svelte": "^5.54.0",
+		"svelte": "^5.55.10",
 		"svelte-check": "^4.4.2",
 		"tailwindcss": "^4.2.2",
 		"typescript": "^5.9.3",
