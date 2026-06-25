@@ -16,6 +16,7 @@ Systematic methodology achieves ~95% first-time fix rate vs ~40% ad-hoc. The pro
 
 <prerequisite>
 AgentDB read-start has run. Check past failures—you may have seen this pattern.
+Debuggability setup (run once per project, not per session): ensure the test suite runs headlessly (`npm test` / `pytest -x` / `cargo test`), add structured logging at service/module boundaries, and document known failure modes in `_meta/context/DEBUG.md`. These three give Claude the foundation to trace and verify without blind file exploration. Without them, debugging sessions spend the first third just establishing a reproduction path. <!-- Updated 2026-06-21: https://claudify.tech/blog/claude-code-debugging-guide -->
 </prerequisite>
 
 <reference>
@@ -90,6 +91,7 @@ Skill-specific: skills/debug/reference/debug-research.md
 13. **Native debugger**: when an IDE or runtime debugger is available (VS Code, Xcode LLDB, Chrome DevTools), prefer it over print-statement flooding — set a breakpoint at the suspected boundary, inspect locals at the failure point, evaluate expressions mid-run without re-running from scratch. The call stack tells you the execution path that led to the state. <!-- Updated 2026-06-13: https://claudecode-lab.com/en/blog/claude-code-debugging-techniques/ -->
 14. **Pipe raw data**: `cat error.log | claude` or `npm run build 2>&1 | claude` — pipe terminal output directly instead of copy-pasting. Claude receives full fidelity output without truncation or formatting artifacts. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
 15. **Test-driven debugging**: when failing behavior is covered by a test suite, run the tests first — failing test names + assertions mark the exact defect entry point. Trace backwards from the failing assertion rather than reading code cold; the test already has the failure isolated to a function boundary. `npm test -- --watch <file>` or `pytest -x` stops on first failure. Lets the test suite do the reproduction work. <!-- Updated 2026-06-17: https://www.sitepoint.com/debugging-ai-claude-code-vs-traditional-methods/ -->
+16. **Domain context injection for business logic bugs**: before asking Claude to debug a business-rule violation, state the rule in plain English ("the discount should apply before tax, not after"). Claude cannot infer invisible business invariants from code alone — naming the violated rule converts an opaque logic mystery into a targeted search. Works especially well for pricing/calculation bugs, multi-step workflows, and permission logic where the correct behavior isn't encoded anywhere in the code. <!-- Updated 2026-06-20: https://claude-world.com/articles/debugging-techniques/ -->
 </when_stuck>
 
 <escalation>
@@ -116,6 +118,7 @@ See: skills/debug/reference/debug-research.md — Parallel Debug Strategy.
 - Distinguish tool-call failure (environment/permissions) from logic failure (code) — different fixes.
 - Check `git status` / `git diff` for interrupted-state partial writes before assuming canonical version.
 - Reduce to minimal reproduction BEFORE spawning agents. Agents given vague reproductions reproduce the wrong thing.
+- Verify AI's understanding before accepting a fix: ask "What does this function currently do?" before applying a suggested change. Catches hallucinated APIs, misread variable names, and wrong architecture assumptions — catching these before the edit is faster than reverting after. <!-- Updated 2026-06-25: https://claudify.tech/blog/claude-code-debugging-guide -->
 </agentic_debugging>
 
 <persistent_truth_file>

@@ -78,6 +78,10 @@ Skill-specific: skills/security/reference/security-research.md
 
   17. **AI-generated code defect rate** — AI-generated PRs contain 1.7× more defects than human-only PRs. Apply proportionally stricter review to AI-generated changes: security linter + human sign-off on auth/payment/secrets paths, regardless of AI review confidence. "45% of AI-generated code contains security vulnerabilities" compounds this — never waive the security checklist for AI-authored code. <!-- Updated 2026-06-18: https://blog.exceeds.ai/ai-code-review-best-practices/ https://www.verdent.ai/guides/best-ai-for-code-review-2026 -->
 
+  18. **Difference-aware PR scanning** — scan against the PR diff, not the full codebase. Scoping to changed lines produces focused, change-contextual findings rather than codebase-wide noise that reviewers learn to ignore. Pair with two-stage refutation: first pass generates candidate findings; second pass asks Claude to refute each one ("what evidence would disprove this vulnerability?"), filtering false positives before surfacing to human reviewers. <!-- Updated 2026-06-21: https://www.anthropic.com/news/claude-code-security -->
+
+  19. **NIST SP 800-218A for AI-assisted development** — the three essential security frameworks in 2026 are: OWASP Top 10 (traditional app vulnerabilities), OWASP Top 10 for LLM Applications (prompt injection, insecure output handling, training data poisoning), and **NIST SP 800-218A** (extends the NIST SSDF to the AI code generation pipeline). SP 800-218A requirements: document AI tool usage in the SBOM, apply the same secure coding standards to AI-generated code as hand-written code, and require human sign-off on AI-authored components touching safety-critical paths. Treat the AI generation pipeline as part of the supply chain — not a trusted internal tool. <!-- Updated 2026-06-22: https://www.metacto.com/blogs/establishing-code-review-standards-for-ai-generated-code -->
+
 </flow>
 
 <pre_deployment_checklist>

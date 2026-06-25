@@ -1,6 +1,7 @@
 #!/bin/bash
 set -eo pipefail
-# PreCompact hook: Save agent context + commit before compaction
+# PreCompact hook: Save agent context (snapshot + AgentDB checkpoint) before compaction.
+# NEVER auto-commits (disabled plugin-wide) — files persist on disk; commits are deliberate.
 
 # Load shared functions
 source "$(dirname "$0")/common.sh"
@@ -86,41 +87,14 @@ if [ -f "$REG_FILE" ]; then
         "$REG_FILE" > "$TMP" 2>/dev/null && mv "$TMP" "$REG_FILE"
 fi
 
-# === STEP 3: COMMIT CHECKPOINT ===
+# === STEP 3: NO AUTO-COMMIT (disabled plugin-wide) ===
+# PreCompact must NEVER create a commit. Context is preserved by the AgentDB checkpoint
+# (STEP 4) + the snapshot above — NOT by committing files. Files persist on disk through
+# compaction regardless; SessionStart flags anything uncommitted. History: a `git add -A` +
+# `--no-verify` auto-commit here (and in session-end.sh) swept untested source onto main.
 cd "$PROJECT_ROOT" 2>/dev/null || exit 0
-
-if ! git status --porcelain 2>/dev/null | grep -q .; then
-    exit 0
-fi
-
-git add -A 2>/dev/null
-git reset HEAD -- '*.zip' '*.tar.gz' '*.tar.bz2' '**/.DS_Store' \
-    '.env*' '*.pem' '*.key' '*.p12' 'credentials*' 'secrets*' '*.secret' \
-    'node_modules/' 2>/dev/null
-
-if git diff --cached --quiet 2>/dev/null; then
-    exit 0
-fi
-
-FILES_CHANGED=$(git diff --cached --numstat 2>/dev/null | wc -l | tr -d ' ')
+FILES_CHANGED=0
 REPO_NAME=$(basename "$PROJECT_ROOT")
-# --no-verify: intentional carve-out documented in CLAUDE.md <git><hook_carve_outs>.
-# This hook fires inside PreCompact; leaving verify enabled creates an infinite hook chain.
-# Carve-out is limited to this script + session-end.sh. Do NOT reuse elsewhere.
-git commit -m "chore(checkpoint): $REPO_NAME pre-compact [$AGENT] ($TRIGGER, $FILES_CHANGED files) $TIMESTAMP_SHORT" --no-verify 2>/dev/null
-# Do not auto-push main/master (I0.8: push to main needs explicit say-so).
-# Feature branches push freely — UNLESS the last test-gate verdict was red (I0.15: never
-# push red, even a mid-session checkpoint). Self-clears when the suite goes green.
-_pc_branch=$(git branch --show-current 2>/dev/null || echo "")
-_pc_red=0
-if [ -f "$PROJECT_ROOT/_meta/.test-status" ]; then
-    case "$(cut -d'|' -f1 "$PROJECT_ROOT/_meta/.test-status" 2>/dev/null)" in
-        FAIL) _pc_red=1 ;;
-    esac
-fi
-if [ "$_pc_branch" != "main" ] && [ "$_pc_branch" != "master" ] && [ "$_pc_red" = "0" ]; then
-    git push 2>/dev/null || true
-fi
 
 # === STEP 4: AUTO-CHECKPOINT TO AGENTDB ===
 # This replaces manual handoff - auto-save context before compaction

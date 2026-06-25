@@ -120,6 +120,13 @@ Context discipline:
 - `/goal` for unattended verification: set a `/goal` condition and a separate evaluator re-checks it after every turn, keeping Claude working until it holds — no human in the loop required. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
 - Session persistence: `claude --continue` resumes the most recent session; `claude --resume` picks from a list. `/rename` names sessions so multi-sitting workstreams stay findable. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
 - Kitchen sink anti-pattern: mixing unrelated tasks in one session pollutes context for all of them. `/clear` between tasks is context hygiene, not optional. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
+- CLAUDE.md line budget: frontier models reliably follow ~150–200 instructions; Claude Code's own system prompt already consumes ~50 of them. Past ~200 CLAUDE.md lines, adherence drops quietly ("context rot"). Shorter CLAUDE.md = higher compliance. <!-- Updated 2026-06-20: https://dev.to/nishilbhave/claudemd-best-practices-the-complete-2026-guide-435j -->
+- Lead with commands in CLAUDE.md: the exact test/build/lint/run invocations are the highest-ROI section. Put them first; everything else is lower priority. <!-- Updated 2026-06-20: https://dev.to/nishilbhave/claudemd-best-practices-the-complete-2026-guide-435j -->
+- Anthropic prompt improver: auto-enhances prompts in 4 steps: identifies examples → adds XML structure → refines chain of thought → enhances examples with step-by-step reasoning. Use it on complex system prompts before deploying. <!-- Updated 2026-06-20: https://www.aiwithgrant.com/guides/anthropic-prompt-engineering-overview -->
+- Tool schema deferred loading: `defer_loading: true` on rarely-used tools exposes the tool name to Claude while deferring full schema loading — 85% token reduction on large tool libraries without sacrificing access. Load schemas on demand when Claude selects the tool. <!-- Updated 2026-06-24: https://www.anthropic.com/engineering/advanced-tool-use -->
+- Programmatic tool orchestration: when a task requires calling many tools in sequence and filtering outputs, Claude can write Python in a sandbox to orchestrate the flow — ~37% token reduction vs. conversational round-tripping. Opt-in pattern for complex multi-tool workflows only. <!-- Updated 2026-06-24: https://www.anthropic.com/engineering/advanced-tool-use -->
+- Tool definition examples beat schemas alone: JSON schema defines structure but not usage patterns or parameter correlations. Include 1–2 sample tool calls in the definition. Internal testing: 72% → 90% accuracy on complex tool-use tasks. <!-- Updated 2026-06-24: https://www.anthropic.com/engineering/advanced-tool-use -->
+- Settings allowlist for read-only ops: build a prioritized allowlist of common read-only bash/MCP commands in `.claude/settings.json` using the `fewer-permission-prompts` skill. Removes permission friction from repeated operations (git status, grep, ls, find) without lowering security — only pre-approved read-only calls bypass the prompt. <!-- Updated 2026-06-25: https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ -->
 
 (gate: each logical unit committed before moving to next)
 
@@ -134,6 +141,7 @@ Automated (run what exists):
 
 Manual: walk through done-when criteria. Document how verified.
 Edge cases (at least 3): empty/null, boundary, error/failure path.
+- Evidence-first: require the actual command output, test results, or screenshot — not an assertion that it works. "Seems to work" is not evidence. Paste raw output; reviewing it is faster than re-running and catches cases where "success" masks a different failure path. <!-- Updated 2026-06-22: https://www.anthropic.com/engineering/claude-code-best-practices -->
 
 (gate: all automated checks green, ≥3 edge cases covered)
 
