@@ -120,6 +120,7 @@ See: skills/debug/reference/debug-research.md — Parallel Debug Strategy.
 - Check `git status` / `git diff` for interrupted-state partial writes before assuming canonical version.
 - Reduce to minimal reproduction BEFORE spawning agents. Agents given vague reproductions reproduce the wrong thing.
 - Verify AI's understanding before accepting a fix: ask "What does this function currently do?" before applying a suggested change. Catches hallucinated APIs, misread variable names, and wrong architecture assumptions — catching these before the edit is faster than reverting after. <!-- Updated 2026-06-25: https://claudify.tech/blog/claude-code-debugging-guide -->
+- **Rate-limit and timeout as dominant agentic failure modes**: in agentic systems, 429 (rate-limit) and ETIMEOUT account for the majority of production errors. Classify failure type first — transient (retry with exponential backoff) vs. permanent (abort, escalate) — before investigating code logic. Automate retry handling for these two classes rather than debugging each instance manually. <!-- Updated 2026-06-27: https://institute.sfeir.com/en/claude-code/claude-code-advanced-best-practices/debugging/ -->
 </agentic_debugging>
 
 <persistent_truth_file>

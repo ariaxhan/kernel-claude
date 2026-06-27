@@ -31,6 +31,7 @@ Load: skills/testing/reference/testing-research.md on demand.
 3. If a test name cannot be written in GIVEN/WHEN/SHOULD form, the test is ambiguous — clarify first.
 4. Explicitly declare TDD before requesting tests: state "We are using Test-Driven Development." Without this signal, Claude defaults to implementation-first and writes tests that validate existing code rather than define requirements. <!-- Updated 2026-06-11: https://dev.to/spyrae/tdd-with-ai-claude-writes-tests-first-then-the-implementation-27hm -->
 5. Vague test detection gate: if Claude cannot pass tests on first generation, the spec is underspecified — not the implementation. Stop and clarify before iterating. <!-- Updated 2026-06-11: https://docs.bswen.com/blog/2026-03-25-tdd-skill-claude-code/ -->
+6. Plan Mode for test strategy: before generating tests at scale, switch to plan mode to outline which behaviors to test, edge cases to cover, and framework conventions — without writing any code. Review and approve the plan before implementation. Prevents ad-hoc generation that fills coverage gaps in the wrong priority order. <!-- Updated 2026-06-27: https://testquality.com/agentic-testing-qa-claude-code/ -->
 
 ### Step 2 — Prioritize by risk
 Order of testing priority:
