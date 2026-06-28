@@ -21,13 +21,21 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 [ -z "$COMMAND" ] && exit 0
 
 # --- Block force push to main/master (any flag form, any position) ---
-# Catches: --force, -f, --force-with-lease, before or after the refspec.
-if echo "$COMMAND" | grep -qE 'git[[:space:]].*\bpush\b' \
-   && echo "$COMMAND" | grep -qE '(^|[[:space:]])(-f|--force|--force-with-lease)([[:space:]]|=|$)' \
-   && echo "$COMMAND" | grep -qE '\b(main|master)\b'; then
-    echo "BLOCKED: Force push to main/master not allowed." >&2
-    exit 2
-fi
+# Catches: --force, -f, --force-with-lease, +refspec, before or after the refspec.
+# The force flag AND the main/master target must appear in the SAME `git push`
+# segment. Segmenting on shell separators (;|&, matching the rm-gate style below)
+# is what stops a force flag elsewhere in a compound command from false-tripping
+# -- e.g. `rm -f x && git push origin main` or `git push origin HEAD:main && rm -f y`
+# are NOT force pushes and must pass.
+while IFS= read -r _seg; do
+  echo "$_seg" | grep -qE 'git[[:space:]].*\bpush\b' || continue
+  echo "$_seg" | grep -qE '\b(main|master)\b'        || continue
+  if echo "$_seg" | grep -qE '(^|[[:space:]])(-f|--force|--force-with-lease)([[:space:]]|=|$)' \
+     || echo "$_seg" | grep -qE '[[:space:]]\+[^[:space:]]*(main|master)'; then
+      echo "BLOCKED: Force push to main/master not allowed." >&2
+      exit 2
+  fi
+done < <(echo "$COMMAND" | tr ';|&' '\n')
 
 # --- Block recursive+forced rm of root or home (common flag orderings) ---
 # recursive+force in one token (-rf/-fr/-Rf), as separate flags, long flags,

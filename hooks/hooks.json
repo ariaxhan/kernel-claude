@@ -16,27 +16,11 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autopush.sh install",
             "timeout": 15,
             "async": true
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/killswitch-init.sh",
-            "timeout": 10,
-            "async": true
           }
         ]
       }
     ],
     "PreToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/killswitch.sh",
-            "timeout": 5
-          }
-        ]
-      },
       {
         "matcher": "Bash",
         "hooks": [
