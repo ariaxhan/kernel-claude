@@ -393,6 +393,7 @@ cmd_preflight() {
 cmd_read_start() {
   local mode="${1:---weighted}"
   [ ! -f "$DB" ] && cmd_init >/dev/null
+  _ensure_softdelete_cols  # guarantee the archived_at filter below is valid (design 3.7)
   # D9 fix (design 5.1): the ids this preamble surfaces + a label, captured per
   # mode below and emitted as `surfaced` observations after the case.
   local loaded_ids="" sf_mode=""
@@ -405,17 +406,17 @@ cmd_read_start() {
       echo "## Mode: full (all learnings)"
       echo ""
       echo "## Failures (AVOID THESE)"
-      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') AND archived_at IS NULL ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
       echo ""
       echo "## Patterns"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' AND archived_at IS NULL ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
       echo ""
       echo "## Preferences"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE type='preference' ORDER BY ts DESC;" 2>/dev/null || echo "None"
-      # Telemetry only: bump load_count (NOT hit_count — read-start dumps are not
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type='preference' AND archived_at IS NULL ORDER BY ts DESC;" 2>/dev/null || echo "None"
+      # Telemetry only: bump load_count (NOT hit_count: read-start dumps are not
       # relevance feedback; only recall earns a hit_count bump). See migration 013.
-      db_exec "UPDATE learnings SET load_count = load_count + 1;" 2>/dev/null
-      loaded_ids=$(db_exec "SELECT id FROM learnings;" 2>/dev/null); sf_mode="full"
+      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE archived_at IS NULL;" 2>/dev/null
+      loaded_ids=$(db_exec "SELECT id FROM learnings WHERE archived_at IS NULL;" 2>/dev/null); sf_mode="full"
       ;;
 
     --summary)
@@ -430,7 +431,7 @@ cmd_read_start() {
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END)
             AS score
-          FROM learnings ORDER BY score DESC LIMIT 10
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 10
         );
       " 2>/dev/null || echo "None"
       db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE id IN (
@@ -439,7 +440,7 @@ cmd_read_start() {
             (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings ORDER BY score DESC LIMIT 10
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 10
         )
       );" 2>/dev/null
       loaded_ids=$(db_exec "SELECT id FROM (
@@ -447,7 +448,7 @@ cmd_read_start() {
             (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings ORDER BY score DESC LIMIT 10
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 10
         );" 2>/dev/null); sf_mode="summary"
       ;;
 
@@ -456,16 +457,16 @@ cmd_read_start() {
       echo "## Mode: tiered (hot + warm + cold)"
       echo ""
       echo "### Hot (high-hit, proven valuable)"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count > 5 ORDER BY hit_count DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count > 5 AND archived_at IS NULL ORDER BY hit_count DESC;" 2>/dev/null || echo "None"
       echo ""
       echo "### Warm (all failures + gotchas)"
-      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') AND hit_count <= 5 ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') AND hit_count <= 5 AND archived_at IS NULL ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
       echo ""
       echo "### Cold (last 7 days)"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count <= 5 AND type NOT IN ('failure','gotcha') AND julianday('now') - julianday(ts) < 7 ORDER BY ts DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count <= 5 AND type NOT IN ('failure','gotcha') AND julianday('now') - julianday(ts) < 7 AND archived_at IS NULL ORDER BY ts DESC;" 2>/dev/null || echo "None"
       # Telemetry only: bump load_count for the dumped tier set (see migration 013).
-      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7;" 2>/dev/null
-      loaded_ids=$(db_exec "SELECT id FROM learnings WHERE hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7;" 2>/dev/null); sf_mode="tiered"
+      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE (hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7) AND archived_at IS NULL;" 2>/dev/null
+      loaded_ids=$(db_exec "SELECT id FROM learnings WHERE (hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7) AND archived_at IS NULL;" 2>/dev/null); sf_mode="tiered"
       ;;
 
     --weighted|*)
@@ -481,7 +482,7 @@ cmd_read_start() {
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END)
             AS score
-          FROM learnings ORDER BY score DESC LIMIT 75
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 75
         );
       " 2>/dev/null || echo "None"
       # Telemetry only: bump load_count for the dumped set (see migration 013).
@@ -491,7 +492,7 @@ cmd_read_start() {
             (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings ORDER BY score DESC LIMIT 75
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 75
         )
       );" 2>/dev/null
       loaded_ids=$(db_exec "SELECT id FROM (
@@ -499,7 +500,7 @@ cmd_read_start() {
             (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings ORDER BY score DESC LIMIT 75
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 75
         );" 2>/dev/null); sf_mode="weighted-75"
       ;;
   esac
@@ -1628,24 +1629,39 @@ cmd_trace() {
 
 cmd_decay() {
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  _ensure_softdelete_cols  # archived_at/archived_reason are the soft-delete cache (design 3.10)
 
-  # Delete learnings that are TRULY untouched: never recalled (hit_count=0) AND
-  # never even loaded into a session preamble (load_count=0) AND >46 days old.
-  # Since v7.15, hit_count is recall-only — a still-loaded-but-never-recalled
-  # learning keeps hit_count=0, so requiring load_count=0 too prevents deleting
-  # learnings that read-start is actively surfacing. COALESCE handles pre-013 DBs.
-  local cond="hit_count = 0 AND COALESCE(load_count,0) = 0 AND ts < datetime('now', '-46 days')"
-  local archived
-  archived=$(db_exec "SELECT COUNT(*) FROM learnings WHERE $cond;")
+  # SOFT-DELETE (never DELETE) learnings that are TRULY untouched: never recalled
+  # (hit_count=0) AND never even loaded into a session preamble (load_count=0) AND
+  # >46 days old. Since v7.15 hit_count is recall-only (a still-loaded-but-never-
+  # recalled learning keeps hit_count=0), so requiring load_count=0 too prevents
+  # archiving learnings that read-start is actively surfacing. COALESCE handles
+  # pre-013 DBs. The `archived_at IS NULL` guard makes a re-run idempotent.
+  # This replaces the pre-repair HARD DELETE that destroyed reinforcement history
+  # (the boundary violation the commission exists to prevent; design 3.10).
+  local cond="hit_count = 0 AND COALESCE(load_count,0) = 0 AND ts < datetime('now', '-46 days') AND archived_at IS NULL"
+  local ids n=0 lid
+  ids=$(db_exec "SELECT id FROM learnings WHERE $cond;" 2>/dev/null)
 
-  if [ "$archived" -gt 0 ]; then
-    db_exec "DELETE FROM learnings WHERE $cond;"
-    echo "Archived $archived stale learnings (0 hits, 0 loads, >46 days)"
+  if [ -n "$ids" ]; then
+    # Emit an `archived` observation per row: every disappearance from the working
+    # set is a recorded event with a reason, never a silent destroy (design 3.7).
+    while IFS= read -r lid; do
+      [ -z "$lid" ] && continue
+      emit_memory_event archived "$lid" "decay: 0 hits, 0 loads, >46 days" '{"policy":"decay-46d"}'
+      n=$((n + 1))
+    done <<< "$ids"
+    # Refresh the derived cache columns from that same policy (the cache is a
+    # function of the archived event; recall/read-start filter archived_at IS NULL).
+    db_exec "UPDATE learnings SET archived_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+               archived_reason = 'decay: 0 hits, 0 loads, >46 days'
+             WHERE $cond;" 2>/dev/null
+    echo "Archived $n stale learnings (soft-delete: 0 hits, 0 loads, >46 days). Reverse with: agentdb resurrect <id>"
   else
     echo "No stale learnings to archive"
   fi
 
-  # Report freshness distribution
+  # Report freshness distribution (live rows only; archived rows are excluded).
   echo ""
   echo "Freshness distribution:"
   db_exec "SELECT
@@ -1654,8 +1670,30 @@ cmd_decay() {
       WHEN hit_count >= 1 THEN 'reinforced (' || COUNT(*) || ')'
       ELSE 'unvalidated (' || COUNT(*) || ')'
     END as status
-  FROM learnings GROUP BY
+  FROM learnings WHERE archived_at IS NULL GROUP BY
     CASE WHEN hit_count >= 3 THEN 1 WHEN hit_count >= 1 THEN 2 ELSE 3 END;"
+}
+
+cmd_resurrect() {
+  # Reverse a soft-delete: emit a `resurrected` observation (which clears the
+  # archived cache per the design 1.1 derivation), then null the cache columns.
+  local id="${1:-}"
+  [ -z "$id" ] && { echo "Usage: agentdb resurrect <learning_id>"; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  _ensure_softdelete_cols
+
+  local safe_id exists archived
+  safe_id=$(sql_escape "$id")
+  exists=$(db_exec "SELECT 1 FROM learnings WHERE id='$safe_id' LIMIT 1;" 2>/dev/null || echo "")
+  [ -z "$exists" ] && { echo "No learning with id: $id" >&2; exit 1; }
+  archived=$(db_exec "SELECT 1 FROM learnings WHERE id='$safe_id' AND archived_at IS NOT NULL LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$archived" ]; then
+    echo "Not archived (nothing to resurrect): $id"
+    return 0
+  fi
+  emit_memory_event resurrected "$id" "manual resurrect" '{"via":"agentdb resurrect"}'
+  db_exec "UPDATE learnings SET archived_at = NULL, archived_reason = NULL WHERE id='$safe_id';" 2>/dev/null
+  echo "Resurrected: $id"
 }
 
 cmd_antibody() {
@@ -1717,6 +1755,14 @@ _recall_emit() {
   # Each row is: <dedup-key>@@US@@<display>@@US@@<row id>@@US@@<origin>. The id +
   # origin let cmd_recall emit/reinforce the ACTUALLY-displayed rows (design 5.1),
   # not the raw match set. Older callers that pass no origin default to 'local'.
+  # Archived rows (soft-deleted, design 3.7/3.10) are excluded, but ONLY when the
+  # column exists in THIS db: the global brain may not have migrated yet, so the
+  # filter is column-gated to keep global recall working mid-migration.
+  local arch_fts="" arch_like=""
+  if sqlite3 "$db" "SELECT 1 FROM pragma_table_info('learnings') WHERE name='archived_at' LIMIT 1;" 2>/dev/null | grep -q 1; then
+    arch_fts="AND l.archived_at IS NULL"
+    arch_like="AND archived_at IS NULL"
+  fi
   local has_fts
   has_fts=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
   if [ -n "$has_fts" ]; then
@@ -1730,6 +1776,7 @@ _recall_emit() {
       FROM learnings l JOIN learnings_fts f ON f.rowid = l.rowid
       WHERE learnings_fts MATCH '$fts_query'
         AND (l.visibility = 'agent' OR l.visibility IS NULL)
+        $arch_fts
       ORDER BY (
         bm25(learnings_fts)
         - (CASE WHEN l.type IN ('failure','gotcha') THEN 1.5 ELSE 0 END)
@@ -1747,6 +1794,7 @@ _recall_emit() {
       FROM learnings
       WHERE ($like_clause)
         AND (visibility = 'agent' OR visibility IS NULL)
+        $arch_like
       ORDER BY hit_count DESC, ts DESC
       LIMIT $((limit * 5));" 2>/dev/null || true
   fi
@@ -1795,6 +1843,7 @@ cmd_recall() {
   if [ -z "$has_fts" ] || [ -z "$has_mevents" ]; then
     run_pending_migrations "recall:applied_migration" >/dev/null 2>&1 || true
   fi
+  _ensure_softdelete_cols  # guarantee the local archived_at filter is valid (design 3.7)
 
   # Resolve the global brain only if requested.
   local global_db=""
@@ -2226,6 +2275,7 @@ case "${1:-help}" in
   schema)      shift; cmd_schema "$@" ;;
   trace)       shift; cmd_trace "$@" ;;
   decay)       cmd_decay ;;
+  resurrect)   shift; cmd_resurrect "$@" ;;
   antibody)    shift; cmd_antibody "$@" ;;
   recall)      shift; cmd_recall "$@" ;;
   export)      cmd_export ;;
@@ -2269,7 +2319,8 @@ case "${1:-help}" in
     echo "  inject-context <type>   Build agent-specific context slice"
     echo "LEARNING SYSTEM (after migration 005):"
     echo "  trace <json>            Record GEPA execution trace"
-    echo "  decay                   Archive stale learnings, show freshness"
+    echo "  decay                   Soft-delete stale learnings (archived event + cache), show freshness"
+    echo "  resurrect <id>          Reverse a soft-delete (emits a resurrected event)"
     echo "  antibody <text>         Search learnings for pattern matches"
     echo "HYPOTHESIS TESTING (after migration 006):"
     echo "  hypothesis add <stmt> [--domain X] [--source Y]  Create hypothesis"
