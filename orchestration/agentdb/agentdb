@@ -90,6 +90,76 @@ $1
 EOF
 }
 
+# Ensure the soft-delete cache columns exist on the LOCAL learnings table
+# (migration 014, design 3.7). SQLite has no ADD COLUMN IF NOT EXISTS, so this
+# PRAGMA-gates the add. Single source of truth for the archived_at/archived_reason
+# columns: cmd_preflight, cmd_read_start, cmd_recall, and cmd_decay all call this
+# so the "WHERE archived_at IS NULL" filter is safe regardless of preflight timing.
+# Idempotent + cheap (one PRAGMA select), best-effort (never fails the caller).
+_ensure_softdelete_cols() {
+  [ -f "$DB" ] || return 0
+  local has
+  has=$(db_exec "SELECT 1 FROM pragma_table_info('learnings') WHERE name='archived_at' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has" ]; then
+    db_exec "ALTER TABLE learnings ADD COLUMN archived_at TEXT;" 2>/dev/null || true
+    db_exec "ALTER TABLE learnings ADD COLUMN archived_reason TEXT;" 2>/dev/null || true
+  fi
+  return 0
+}
+
+# Return a SQL literal for a text value: '<escaped>' for a non-empty string, or
+# bare NULL for an empty one (absence = UNKNOWN, never an empty-string fact; the
+# null-semantics contract, design 5.2).
+_sql_text() {
+  if [ -z "${1:-}" ]; then printf 'NULL'; else printf "'%s'" "$(sql_escape "$1")"; fi
+}
+
+# Append one row to the memory-lifecycle event spine (memory_events, design 2.1).
+# BEST-EFFORT BY CONTRACT: a failed emit prints a LOUD warning to stderr and
+# returns 0, so instrumentation can never break a learn/recall/decay/read-start.
+# Never UPDATEs or DELETEs (append-only). event_id is globally unique across dbs.
+# Args (positional; empty = SQL NULL):
+#   1 kind (required)   2 subject_id   3 reason   4 payload_json
+#   5 actor             6 object_id    7 inference_method
+#   8 source_db         9 source_row_id  10 import_batch_id
+emit_memory_event() {
+  local kind="${1:-}" subject_id="${2:-}" reason="${3:-}" payload="${4:-}"
+  local actor="${5:-}" object_id="${6:-}" inference_method="${7:-}"
+  local source_db="${8:-}" source_row_id="${9:-}" import_batch_id="${10:-}"
+
+  if [ -z "$kind" ]; then
+    echo "[agentdb] emit_memory_event: kind is required; event NOT recorded" >&2
+    return 0
+  fi
+  # Advisory known-verb validation (open vocabulary: a new verb is accepted, a
+  # typo in a known verb is surfaced). Never a hard reject (design 2.2).
+  case "$kind" in
+    created|updated|imported|merged|retrieved|surfaced|used|ignored|reinforced|graduated|archived|resurrected|domain_changed|superseded) ;;
+    *) echo "[agentdb] emit_memory_event: '$kind' is not a known memory verb (recording anyway; open vocabulary)" >&2 ;;
+  esac
+
+  # actor defaults to the session id if the caller left it empty.
+  [ -z "$actor" ] && actor="${AGENTDB_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
+
+  local db_short eid
+  db_short=$(basename "$PROJECT_ROOT" 2>/dev/null | tr -cs 'a-zA-Z0-9' '-' | cut -c1-16)
+  [ -z "$db_short" ] && db_short="db"
+  eid="${db_short}-$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}${RANDOM}"
+
+  if db_exec "INSERT INTO memory_events
+      (event_id, kind, actor, source_db, source_row_id, import_batch_id,
+       subject_id, object_id, reason, inference_method, payload)
+      VALUES ('$eid', '$(sql_escape "$kind")', $(_sql_text "$actor"),
+        $(_sql_text "$source_db"), $(_sql_text "$source_row_id"), $(_sql_text "$import_batch_id"),
+        $(_sql_text "$subject_id"), $(_sql_text "$object_id"), $(_sql_text "$reason"),
+        $(_sql_text "$inference_method"), $(_sql_text "$payload"));" 2>/dev/null; then
+    return 0
+  else
+    echo "[agentdb] WARNING: failed to record memory_event (kind=$kind subject=${subject_id:-none}); memory path unaffected, but this observation was LOST. Run 'agentdb preflight' to self-heal the memory_events table." >&2
+    return 0
+  fi
+}
+
 # === COMMANDS ===
 
 # Apply every migration not yet recorded in _migrations, in filename order.
@@ -183,7 +253,7 @@ cmd_preflight() {
   fi
 
   # Check 2: Required tables exist
-  local required_tables="learnings context errors _migrations events"
+  local required_tables="learnings context errors _migrations events memory_events"
   for table in $required_tables; do
     local exists
     exists=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='$table' LIMIT 1;" 2>/dev/null || echo "")
@@ -234,6 +304,18 @@ cmd_preflight() {
   if [ -z "$has_errors_domain" ]; then
     echo "preflight:missing_column — errors.domain not found, adding"
     db_exec "ALTER TABLE errors ADD COLUMN domain TEXT;" 2>/dev/null || true
+    repairs=$((repairs + 1))
+  fi
+
+  # Check 3c: learnings has the soft-delete cache columns (migration 014,
+  # design 3.7). Delegated to a single guarded helper (SQLite has no ADD COLUMN
+  # IF NOT EXISTS), shared with read-start/recall/decay so the archived filter is
+  # always safe. Silent + idempotent: only ALTERs when the column is absent.
+  local has_archived
+  has_archived=$(db_exec "SELECT 1 FROM pragma_table_info('learnings') WHERE name='archived_at' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has_archived" ]; then
+    echo "preflight:missing_column learnings.archived_at not found, adding (migration 014)"
+    _ensure_softdelete_cols
     repairs=$((repairs + 1))
   fi
 
