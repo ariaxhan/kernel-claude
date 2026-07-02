@@ -28,23 +28,41 @@ command -v sqlite3 >/dev/null 2>&1 || { echo "Error: sqlite3 required but not fo
 
 # Find project root (where .claude/ or _meta/ exists)
 find_project_root() {
-  # Explicit override wins — pin the DB location to dodge the PWD-walk foot-gun
+  # Explicit override wins: pin the DB location to dodge the PWD-walk foot-gun
   # when agents run from sub-dirs or temp dirs (D9/R7).
   if [ -n "${AGENTDB_ROOT:-}" ]; then
     echo "$AGENTDB_ROOT"
     return
   fi
+  # KERNEL_VAULTS (if set) is the privileged vault root. A "nested vault" (a
+  # direct child of it that carries its own _meta/.claude, e.g. CollabVault or
+  # CodingVault) must NOT shadow it for a root-scoped command: walk THROUGH such a
+  # match up to KERNEL_VAULTS and return the root, with a one-line shadow warning.
+  # Genuine projects (deeper than a direct child) still win via the nearest-ancestor
+  # rule. This whole block is gated on KERNEL_VAULTS being set, so the walk is
+  # byte-for-byte unchanged when it is unset (design 3.9).
+  local kv="${KERNEL_VAULTS:-}"; kv="${kv%/}"
   local dir="$PWD"
+  local shadow=""
   while [ "$dir" != "/" ]; do
     if [ -d "$dir/_meta" ] || [ -d "$dir/.claude" ]; then
+      if [ -n "$kv" ] && [ "$dir" != "$kv" ] && [ "$(dirname "$dir")" = "$kv" ]; then
+        # A nested vault sitting directly under KERNEL_VAULTS: record it, keep climbing.
+        [ -z "$shadow" ] && shadow="$dir"
+        dir=$(dirname "$dir")
+        continue
+      fi
+      if [ -n "$shadow" ] && [ "$dir" = "$kv" ]; then
+        echo "agentdb: warning: nested vault $shadow shadows KERNEL_VAULTS root $kv; routing to $kv (set AGENTDB_ROOT to pin a different db)" >&2
+      fi
       echo "$dir"
       return
     fi
     dir=$(dirname "$dir")
   done
-  # Fallback: nothing found on the walk up. Warn — this is how orphan DBs get
+  # Fallback: nothing found on the walk up. Warn: this is how orphan DBs get
   # created in whatever PWD happened to be (the "VaultsS" typo orphan, etc.).
-  echo "agentdb: warning — no _meta/ or .claude/ above $PWD; using PWD (set AGENTDB_ROOT to pin)" >&2
+  echo "agentdb: warning: no _meta/ or .claude/ above $PWD; using PWD (set AGENTDB_ROOT to pin)" >&2
   echo "$PWD"
 }
 
