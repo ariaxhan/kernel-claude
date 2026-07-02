@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS learnings (
   load_count INTEGER DEFAULT 0,        -- bumped by read-start (session-open telemetry, never ranked)
   last_hit TEXT,
   visibility TEXT DEFAULT 'agent',     -- agent | human_only | operational
-  sensitivity TEXT DEFAULT 'low'       -- low | medium | high
+  sensitivity TEXT DEFAULT 'low',      -- low | medium | high
+  archived_at TEXT,                    -- migration 014: derived cache of latest archived event (NULL = live)
+  archived_reason TEXT                 -- migration 014: reason from that archived event
 );
 
 CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);
