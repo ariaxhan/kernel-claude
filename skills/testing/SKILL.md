@@ -7,33 +7,33 @@ allowed-tools: Read, Bash, Grep, Glob
 <skill id="testing">
 
 <on_start>
-agentdb read-start — check past test failures, patterns repeat.
+agentdb read-start, check past test failures, patterns repeat.
 Load: skills/testing/reference/testing-research.md on demand.
 </on_start>
 
 ## Core Laws (non-negotiable)
 
-1. TEST REQUIREMENTS, NOT CODE. AI generates tests from code — this validates bugs. Test what SHOULD happen.
+1. TEST REQUIREMENTS, NOT CODE. AI generates tests from code, this validates bugs. Test what SHOULD happen.
 2. EDGE CASES FIRST. Empty, null, boundary, concurrent, error paths. Happy path is least valuable.
 3. STRONG ASSERTIONS ONLY. `.toBeTruthy()` catches nothing. Assert specific values.
 4. ONE BEHAVIOR PER TEST. If "and" appears in the test name, split the test.
 5. REGRESSION OVER COVERAGE. One test that catches a real bug beats 10 that pad metrics.
-6. NEVER use `.skip()` or `.only()` — Claude rewrites tests to pass buggy code rather than fix the bug.
+6. NEVER use `.skip()` or `.only()`, Claude rewrites tests to pass buggy code rather than fix the bug.
 
 ---
 
 ## Flow
 
-### Step 1 — Specify before writing
+### Step 1, Specify before writing
 1. Write test case descriptions (inputs + expected outputs) BEFORE requesting implementation.
 2. For AI-generated code: provide spec, then ask for tests, then ask for implementation.
    (gate: spec exists as comments or descriptions before any test code is written)
-3. If a test name cannot be written in GIVEN/WHEN/SHOULD form, the test is ambiguous — clarify first.
+3. If a test name cannot be written in GIVEN/WHEN/SHOULD form, the test is ambiguous, clarify first.
 4. Explicitly declare TDD before requesting tests: state "We are using Test-Driven Development." Without this signal, Claude defaults to implementation-first and writes tests that validate existing code rather than define requirements. <!-- Updated 2026-06-11: https://dev.to/spyrae/tdd-with-ai-claude-writes-tests-first-then-the-implementation-27hm -->
-5. Vague test detection gate: if Claude cannot pass tests on first generation, the spec is underspecified — not the implementation. Stop and clarify before iterating. <!-- Updated 2026-06-11: https://docs.bswen.com/blog/2026-03-25-tdd-skill-claude-code/ -->
-6. Plan Mode for test strategy: before generating tests at scale, switch to plan mode to outline which behaviors to test, edge cases to cover, and framework conventions — without writing any code. Review and approve the plan before implementation. Prevents ad-hoc generation that fills coverage gaps in the wrong priority order. <!-- Updated 2026-06-27: https://testquality.com/agentic-testing-qa-claude-code/ -->
+5. Vague test detection gate: if Claude cannot pass tests on first generation, the spec is underspecified, not the implementation. Stop and clarify before iterating. <!-- Updated 2026-06-11: https://docs.bswen.com/blog/2026-03-25-tdd-skill-claude-code/ -->
+6. Plan Mode for test strategy: before generating tests at scale, switch to plan mode to outline which behaviors to test, edge cases to cover, and framework conventions, without writing any code. Review and approve the plan before implementation. Prevents ad-hoc generation that fills coverage gaps in the wrong priority order. <!-- Updated 2026-06-27: https://testquality.com/agentic-testing-qa-claude-code/ -->
 
-### Step 2 — Prioritize by risk
+### Step 2, Prioritize by risk
 Order of testing priority:
 1. Business logic (core correctness rules)
 2. Error handling (what fails gracefully vs. crashes)
@@ -42,7 +42,7 @@ Order of testing priority:
 5. Integration points (external systems, DB, APIs)
 6. Regression cases (every bug fix gets a test that would have caught it)
 
-### Step 3 — Write edge cases explicitly
+### Step 3, Write edge cases explicitly
 For every function, enumerate:
 - Empty / null / undefined inputs
 - Boundary values (0, -1, MAX_INT, empty string, oversized input)
@@ -51,7 +51,7 @@ For every function, enumerate:
 - Concurrent access or race conditions where applicable
 (gate: minimum 3 edge cases per non-trivial function)
 
-### Step 4 — Name tests as specifications
+### Step 4, Name tests as specifications
 Format: `GIVEN <state> WHEN <action> SHOULD <expected>`
 ```
 GOOD: test('GIVEN email without domain WHEN validated SHOULD return false')
@@ -59,54 +59,55 @@ POOR: test('validateEmail regex check')
 ```
 Pattern for file/function naming: `test_{function}_{scenario}_{expected}`
 
-### Step 5 — Layer by pyramid
-1. Unit tests — isolated functions, fast, many. (primary layer)
-2. Integration tests — component boundaries, DB/API calls, medium speed.
-3. E2E / browser — critical user-visible flows only, slow, few.
+### Step 5, Layer by pyramid
+1. Unit tests, isolated functions, fast, many. (primary layer)
+2. Integration tests, component boundaries, DB/API calls, medium speed.
+3. E2E / browser, critical user-visible flows only, slow, few.
 (gate: E2E count stays low; flaky tests fixed or deleted immediately)
 
-### Step 5b — Test signal flexibility
-Any deterministic output Claude can read counts as a gate: test suite exit code, linter report, build failure, fixture diff, browser screenshot delta. Don't limit "testing" to unit test runners — if it produces a signal, it can gate a decision. <!-- Updated 2026-06-09: https://code.claude.com/docs/en/best-practices -->
+### Step 5b, Test signal flexibility
+Any deterministic output Claude can read counts as a gate: test suite exit code, linter report, build failure, fixture diff, browser screenshot delta. Don't limit "testing" to unit test runners, if it produces a signal, it can gate a decision. <!-- Updated 2026-06-09: https://code.claude.com/docs/en/best-practices -->
 
-### Step 6 — Review AI-generated tests
+### Step 6, Review AI-generated tests
 Before accepting any AI-generated test, verify:
 1. Does the assertion verify the RIGHT thing? (not just `.toBe(true)`)
 2. Is the test coupled to implementation? (mocks of internals → brittle)
 3. Is state shared between tests? (order-dependent failures)
 4. Does it test requirements or does it mirror code that may be buggy?
-5. Do the Arrange / Act / Assert sections have clear separation? Tests that blur setup and assertion are hard to diagnose on failure — the failure location is ambiguous. Require explicit three-section structure in review. <!-- Updated 2026-06-24: https://www.aiforanything.io/blog/claude-for-automated-testing-tutorial-2026 -->
+5. Do the Arrange / Act / Assert sections have clear separation? Tests that blur setup and assertion are hard to diagnose on failure, the failure location is ambiguous. Require explicit three-section structure in review. <!-- Updated 2026-06-24: https://www.aiforanything.io/blog/claude-for-automated-testing-tutorial-2026 -->
 (gate: at least one negative/rejection case per test file)
 
-### Step 7 — Multi-agent test patterns (tier 2+)
+### Step 7, Multi-agent test patterns (tier 2+)
 - **Writer/Reviewer split**: one agent writes tests (spec only, no implementation), separate agent writes code to pass them.
 - **Parallel per module**: when coverage gaps span multiple modules, spawn one agent per module boundary.
 - **Surgeon done-when**: acceptance criteria = runnable tests passing, not "code written."
 - **Effort level**: use `effort: high` for test-generation agents; default under-generates edge cases.
-- **BQ testing (agent output)**: AI agent output is non-deterministic — validate action patterns and behavioral invariants, not exact text. Test WHAT the agent did, not how it phrased it.
+- **BQ testing (agent output)**: AI agent output is non-deterministic, validate action patterns and behavioral invariants, not exact text. Test WHAT the agent did, not how it phrased it.
 - **Subagent scope reviewer**: after implementation, spawn a reviewer agent to verify: every requirement is implemented, listed edge cases have tests, nothing outside task scope changed. <!-- Updated 2026-06-05: https://code.claude.com/docs/en/best-practices -->
 - **Context-aware verification rigor**: solo dev → verify logic + edge cases; team → systematic peer review; production → mandatory gating tests. Match rigor to deployment stakes. <!-- Updated 2026-06-05: https://levelup.gitconnected.com/claude-code-best-practices-12-patterns-agentic-engineers-use-65264e3eb919 -->
-- **Stop hook gates**: configure `Stop` hooks in `hooks/scripts/` to run tests/lint checks mechanically after each turn — moves quality gates from agent honor-system to enforcement (I0.15). <!-- Updated 2026-06-07: https://popularaitools.ai/blog/claude-code-workflow-patterns-agentic-guide-2026 -->
+- **Stop hook gates**: configure `Stop` hooks in `hooks/scripts/` to run tests/lint checks mechanically after each turn, moves quality gates from agent honor-system to enforcement (I0.15). <!-- Updated 2026-06-07: https://popularaitools.ai/blog/claude-code-workflow-patterns-agentic-guide-2026 -->
 - **Five agentic workflow patterns** (match to test scope): sequential (one agent, ordered steps) · operator (supervisor routes to specialists) · split-and-merge (parallel execution + synthesis) · agent teams (specialist groups per module) · headless (no-UI CI-style automated). <!-- Updated 2026-06-08: https://www.mindstudio.ai/blog/claude-code-agentic-workflow-patterns -->
-- **TDD as oracle**: tests are the only spec that survives context compression. When the session fills, code and comments drift — tests don't. A passing test suite is stronger evidence of correctness than the agent's own assessment. For AI-assisted work, tests are the persistent oracle. <!-- Updated 2026-06-12: https://www.agensi.io/learn/best-qa-testing-skills-claude-code-2026 -->
+- **TDD as oracle**: tests are the only spec that survives context compression. When the session fills, code and comments drift, tests don't. A passing test suite is stronger evidence of correctness than the agent's own assessment. For AI-assisted work, tests are the persistent oracle. <!-- Updated 2026-06-12: https://www.agensi.io/learn/best-qa-testing-skills-claude-code-2026 -->
 - **CI-triggered flaky test repair**: detect flaky tests via CI retry logs and trigger an automated agent run per flaky test (inputs: test name + last failure output + relevant source files). Cap auto-fix attempts at 3; escalate to human if the agent can't stabilize the test. <!-- Updated 2026-06-13: https://www.atlassian.com/blog/bitbucket/agentic-pipelines-now-supports-claude-code -->
-- **Framework-aware generation**: before writing new tests, detect the framework in use (Jest/Vitest/Pytest etc.) and read 2-3 existing test files for pattern conventions. Run coverage gap analysis to find untested branches. Match existing patterns first, fill gaps second — never impose a foreign test style. <!-- Updated 2026-06-12: https://www.agensi.io/learn/best-claude-code-testing-skills -->
+- **Framework-aware generation**: before writing new tests, detect the framework in use (Jest/Vitest/Pytest etc.) and read 2-3 existing test files for pattern conventions. Run coverage gap analysis to find untested branches. Match existing patterns first, fill gaps second, never impose a foreign test style. <!-- Updated 2026-06-12: https://www.agensi.io/learn/best-claude-code-testing-skills -->
 - **Fan-out test migrations**: for large codebases, generate a task list then loop `claude -p "Write tests for $file covering edge cases" --allowedTools "Edit,Bash(npm test *)"` per file. Prototype on 2-3 files, refine the prompt, then run at scale. `--allowedTools` prevents scope bleed in unattended runs. <!-- Updated 2026-06-14: https://code.claude.com/docs/en/best-practices -->
 - **Vitest as the 2026 JS/TS default**: Vitest has displaced Jest as the primary unit testing framework for JS/TS projects. Before writing new tests, check `package.json` for `vitest` vs `jest`. If Vitest: use `describe.concurrent` for independent tests, `vi.mock()` not `jest.mock()`, and MSW for fetch mocking. Don't assume Jest patterns apply to a Vitest project. <!-- Updated 2026-06-18: https://qaskills.sh/blog/best-claude-code-skills-for-testing-2026 -->
-- **Coverage gap analysis**: after initial test generation, run a comparison pass — enumerate all source files, enumerate all test files, identify functions and branches with no corresponding test, produce a prioritized gap report. Order gaps by risk: auth flows → payment paths → error handling → business logic → utilities. Fixes the blind spot where test generation focuses on happy-path coverage of already-written functions. <!-- Updated 2026-06-20: https://www.agensi.io/learn/best-qa-testing-skills-claude-code-2026 -->
-- **AI-directed testing meta-shift**: by 2026, the work has moved from "write tests by hand" to "direct an agent to write, run, repair, and prune tests." Design Claude sessions accordingly: the agent runs the suite, traces failures to source, and fixes or escalates. Your role is spec definition and review — not test authoring. This applies to fan-out migrations (Step 7 above) and to ongoing test maintenance. <!-- Updated 2026-06-20: https://qaskills.sh/blog/best-claude-code-skills-for-testing-2026 -->
-- **Pact contract tests**: wire Pact for microservice boundaries — catches API contract breakage before E2E even runs. Claude learns both provider and consumer flows from the contract DSL. Highest ROI for teams with >2 services sharing a schema boundary; run Pact verification in CI before the E2E stage. <!-- Updated 2026-06-21: https://qaskills.sh/blog/best-claude-code-skills-for-testing-2026 -->
+- **Coverage gap analysis**: after initial test generation, run a comparison pass, enumerate all source files, enumerate all test files, identify functions and branches with no corresponding test, produce a prioritized gap report. Order gaps by risk: auth flows → payment paths → error handling → business logic → utilities. Fixes the blind spot where test generation focuses on happy-path coverage of already-written functions. <!-- Updated 2026-06-20: https://www.agensi.io/learn/best-qa-testing-skills-claude-code-2026 -->
+- **AI-directed testing meta-shift**: by 2026, the work has moved from "write tests by hand" to "direct an agent to write, run, repair, and prune tests." Design Claude sessions accordingly: the agent runs the suite, traces failures to source, and fixes or escalates. Your role is spec definition and review, not test authoring. This applies to fan-out migrations (Step 7 above) and to ongoing test maintenance. <!-- Updated 2026-06-20: https://qaskills.sh/blog/best-claude-code-skills-for-testing-2026 -->
+- **Pact contract tests**: wire Pact for microservice boundaries, catches API contract breakage before E2E even runs. Claude learns both provider and consumer flows from the contract DSL. Highest ROI for teams with >2 services sharing a schema boundary; run Pact verification in CI before the E2E stage. <!-- Updated 2026-06-21: https://qaskills.sh/blog/best-claude-code-skills-for-testing-2026 -->
+- **Factory patterns for test data**: generate fixtures with `@faker-js/faker` (JS/TS), `factory_boy` (Python), or Drizzle seed scripts rather than hand-writing literal test objects. Keeps test data realistic and DRY across a large suite, and centralizes shape changes to one factory instead of every test file. <!-- Updated 2026-07-03: https://www.agensi.io/learn/best-qa-testing-skills-claude-code-2026 -->
 - **CI matrix test runner**: structure the GitHub Actions matrix as: unit (fast, no network) → API (real HTTP, mocked DB) → E2E (full stack, Chrome) → a11y (axe-core). Parallel jobs with shared cache keys compress the full suite to wall-clock of the slowest tier. Generate the matrix config in one Claude pass; specify concurrency limits and cache-key strategy in the prompt. <!-- Updated 2026-06-21: https://qaskills.sh/blog/best-claude-code-skills-for-testing-2026 -->
-- **Seven-layer AI agent validation**: for AI agents under test, validate each layer independently — goal achievement, state perception, decision logic, action execution, outcome evaluation, adaptation, and recovery. Skipping any layer creates production vulnerabilities that pre-release QA won't surface. Applies whenever testing agents that call tools, make decisions, or operate across multi-step workflows. <!-- Updated 2026-06-25: https://www.testriq.com/blog/post/ai-agent-testing-services-2026-enterprise-guide -->
-- **Continuous probabilistic testing post-deploy**: AI agents produce different outputs for identical inputs as context and models shift over time. Pre-release QA is necessary but not sufficient — wire continuous monitoring that tracks output drift and behavioral invariant violations in production. One-time test passes give false confidence for non-deterministic systems. <!-- Updated 2026-06-25: https://autify.com/blog/ai-agent-testing -->
-- **init.sh E2E baseline**: write an `init.sh` that starts the dev server and runs a minimal smoke test (e.g. Puppeteer MCP: open app → trigger core flow → assert success) before implementing any new feature. Wire it so the agent always runs this baseline first — surfaces broken state from the prior session before new code is written, not after. Without this, agents often implement an entire feature on top of a pre-existing breakage. <!-- Updated 2026-06-28: https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents -->
+- **Seven-layer AI agent validation**: for AI agents under test, validate each layer independently, goal achievement, state perception, decision logic, action execution, outcome evaluation, adaptation, and recovery. Skipping any layer creates production vulnerabilities that pre-release QA won't surface. Applies whenever testing agents that call tools, make decisions, or operate across multi-step workflows. <!-- Updated 2026-06-25: https://www.testriq.com/blog/post/ai-agent-testing-services-2026-enterprise-guide -->
+- **Continuous probabilistic testing post-deploy**: AI agents produce different outputs for identical inputs as context and models shift over time. Pre-release QA is necessary but not sufficient, wire continuous monitoring that tracks output drift and behavioral invariant violations in production. One-time test passes give false confidence for non-deterministic systems. <!-- Updated 2026-06-25: https://autify.com/blog/ai-agent-testing -->
+- **init.sh E2E baseline**: write an `init.sh` that starts the dev server and runs a minimal smoke test (e.g. Puppeteer MCP: open app → trigger core flow → assert success) before implementing any new feature. Wire it so the agent always runs this baseline first, surfaces broken state from the prior session before new code is written, not after. Without this, agents often implement an entire feature on top of a pre-existing breakage. <!-- Updated 2026-06-28: https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents -->
 
-### Step 8 — Grader pattern (complex features)
+### Step 8, Grader pattern (complex features)
 1. Define success rubric (expected behaviors, edge handling, perf bounds) BEFORE tests or code.
 2. After implementation, spawn a grader agent in fresh context (no knowledge of implementation).
 3. Grader evaluates output against rubric. Failure → specific issues → surgeon takes another pass.
 (gate: grader verdict is PASS before declaring done on complex features)
 
-### Step 9 — JiT testing for high-churn code
+### Step 9, JiT testing for high-churn code
 Generate tests during code review, not into the static suite, when:
 - Code changes faster than test suites can track
 - Refactoring: generate behavioral tests BEFORE changes, run AFTER to confirm preservation
@@ -126,14 +127,14 @@ Meta 2026: JiT generates ~4x more bug-catching tests than static suite additions
 | `flaky_tolerance` | Flaky test = broken test. Fix or delete. Never ignore. |
 | `skip_or_only` | `.skip()` / `.only()` become permanent. Fix or delete. |
 | `print_over_assert` | Print statements are not assertions. Require formal `expect`/`assert` calls. |
-| `snapshot_relaxation` | Never update snapshots to make failing tests pass. Snapshots are the source of truth — if they fail, the code changed unexpectedly. Fix the code, not the snapshot. <!-- Updated 2026-06-10: https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ --> |
+| `snapshot_relaxation` | Never update snapshots to make failing tests pass. Snapshots are the source of truth, if they fail, the code changed unexpectedly. Fix the code, not the snapshot. <!-- Updated 2026-06-10: https://smartscope.blog/en/generative-ai/claude/claude-code-best-practices-advanced-2026/ --> |
 
 ---
 
 ## Verification Gate
 
 Always provide runnable verification. If you can't verify it, don't ship it.
-AI writes tests prolifically — review for: does it test the actual risk area, or just the happy path it already handles?
+AI writes tests prolifically, review for: does it test the actual risk area, or just the happy path it already handles?
 
 When reviewing AI-generated code in 2026 (40–70% of production is AI-generated), check for **intent drift**: AI correctly implements what it inferred from the prompt, not what was actually needed. Verify against the original spec, not just the code structure.
 
