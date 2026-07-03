@@ -1,4 +1,4 @@
-<kernel version="7.17.0">
+<kernel version="7.22.0">
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->
@@ -55,11 +55,11 @@ Location: _meta/agentdb/agent.db
 <!-- ============================================ -->
 
 <tiers>
-  <tier n="1" files="1-2" role="executor">Execute directly. Write code yourself.</tier>
-  <tier n="2" files="3-5" role="orchestrator">Contract → surgeon → adversary (coordination) → review.</tier>
-  <tier n="3" files="6+" role="orchestrator">Contract → surgeon → adversary (coordination + code) → verify.</tier>
+  <tier n="1" risk="low" role="executor">Easy to undo + loud if wrong + narrow blast radius. Execute directly.</tier>
+  <tier n="2" risk="durable" role="orchestrator">Persistent or moderately quiet. Contract → surgeon if useful → adversary/review.</tier>
+  <tier n="3" risk="high" role="orchestrator">Hard to undo, quiet if wrong, or wide blast radius. Contract → surgeon → adversary → verify.</tier>
 
-  <rule>Count files BEFORE deciding. Ambiguous = assume higher tier.</rule>
+  <rule>Tier by reversibility × silence × blast radius. File count is only a weak hint. Ambiguous = assume higher tier.</rule>
   <rule>IF tier >= 2: create contract, spawn agents, read AgentDB. DO NOT write code.</rule>
   <rule>IF tier >= 2: run /kernel:tearitapart before implementation.</rule>
 </tiers>
@@ -91,7 +91,7 @@ Location: _meta/agentdb/agent.db
   <step id="read">agentdb read-start. Check _meta/research/ for prior work.</step>
   <step id="classify">Task type. Familiar? Search before asking.</step>
   <step id="research">Anti-patterns FIRST. Then proven solutions. Built-in beats dependency.</step>
-  <step id="scope">Count files → determine tier. Ambiguous = higher tier.</step>
+  <step id="scope">Tier by reversibility × silence × blast radius. Ambiguous = higher tier.</step>
   <step id="define">Acceptance criteria + evals BEFORE coding.</step>
   <step id="execute">Tier 1: implement. Tier 2+: contract → surgeon → verify.</step>
   <step id="learn">agentdb learn. Update research docs. Checkpoint.</step>

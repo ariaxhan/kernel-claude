@@ -151,10 +151,13 @@ cat << 'KERNEL_CONTEXT'
        → load: /kernel:security if auth/validation/secrets involved
 
     4. SCOPE
-       → count files that change
-       → tier 1 (1-2 files): execute directly
-       → tier 2 (3-5 files): contract + surgeon agent
-       → tier 3 (6+ files):  contract + surgeon + adversary
+       → tier by reversibility × silence × blast radius:
+         how hard to undo, how quietly it can fail, how far it reaches
+       → file count is only a weak hint
+       → tier 1: easy to undo + loud if wrong: execute directly
+       → tier 2: persistent or moderately quiet: contract + surgeon if useful
+       → tier 3: hard to undo, quiet if wrong, or wide blast radius:
+         contract + surgeon + adversary
 
     5. DEFINE SUCCESS (before coding)
        → load: /kernel:testing — tests BEFORE code
@@ -193,6 +196,8 @@ cat << 'KERNEL_CONTEXT'
   <rule>Research anti-patterns BEFORE solutions. Tests BEFORE code.</rule>
   <rule>Built-in beats library. Library beats custom. Prove you need complexity.</rule>
   <rule>"Done" = verified live, not committed. Run a verification command before claiming done.</rule>
+  <rule>Suspicion scales with convenience: dramatic findings that close the loop need an independent check.</rule>
+  <rule>Fix at the cause's layer, not the symptom's nearest file. Read the generator when sources disagree.</rule>
 </protocol>
 KERNEL_CONTEXT
 
@@ -320,9 +325,9 @@ commands:
 
 ```yaml
 tiers:
-  1: {files: 1-2, role: execute directly}
-  2: {files: 3-5, role: orchestrate → surgeon}
-  3: {files: 6+, role: orchestrate → surgeon → adversary}
+  1: {risk: easy to undo + loud if wrong, role: execute directly}
+  2: {risk: persistent or moderately quiet, role: orchestrate → surgeon if useful}
+  3: {risk: hard to undo, quiet if wrong, or wide blast radius, role: orchestrate → surgeon → adversary}
 
 rule: tier 2+ you orchestrate, agents implement, don't write code yourself
 ```

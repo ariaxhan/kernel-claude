@@ -1910,11 +1910,13 @@ test_decay_spares_loaded_learnings() {
   sqlite3 "$db" "INSERT INTO learnings (id,ts,type,insight,hit_count,load_count) VALUES ('OLD-LOADED','2020-01-01T00:00:00Z','pattern','old but still loaded lesson',0,3);"
   sqlite3 "$db" "INSERT INTO learnings (id,ts,type,insight,hit_count,load_count) VALUES ('OLD-DEAD','2020-01-01T00:00:00Z','pattern','old and truly untouched lesson',0,0);"
   agentdb decay >/dev/null
-  local loaded dead
-  loaded=$(sqlite3 "$db" "SELECT count(*) FROM learnings WHERE id='OLD-LOADED';")
-  dead=$(sqlite3 "$db" "SELECT count(*) FROM learnings WHERE id='OLD-DEAD';")
+  local loaded live_dead archived_dead
+  loaded=$(sqlite3 "$db" "SELECT count(*) FROM learnings WHERE id='OLD-LOADED' AND archived_at IS NULL;")
+  live_dead=$(sqlite3 "$db" "SELECT count(*) FROM learnings WHERE id='OLD-DEAD' AND archived_at IS NULL;")
+  archived_dead=$(sqlite3 "$db" "SELECT count(*) FROM learnings WHERE id='OLD-DEAD' AND archived_at IS NOT NULL;")
   [ "$loaded" -eq 1 ] || { echo "decay wrongly deleted a loaded learning"; return 1; }
-  [ "$dead" -eq 0 ] || { echo "decay failed to remove a truly-untouched learning"; return 1; }
+  [ "$live_dead" -eq 0 ] || { echo "decay failed to archive a truly-untouched learning"; return 1; }
+  [ "$archived_dead" -eq 1 ] || { echo "decay should soft-archive, not hard-delete, stale learnings"; return 1; }
 }
 
 # --- Learn Domain Auto-Population Tests ---
@@ -2409,6 +2411,18 @@ test_session_start_surfaces_red() {
 
 test_pre_compact_has_red_gate() {
   assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh")" ".test-status"
+}
+
+test_lifecycle_hooks_guard_main_push() {
+  local session_end precompact postcommit
+  session_end=$(cat "$PLUGIN_ROOT/hooks/scripts/session-end.sh")
+  precompact=$(cat "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh")
+  postcommit=$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")
+
+  assert_contains "$session_end" "NEVER AUTO-COMMIT" "session-end should forbid auto-commit"
+  assert_contains "$session_end" "test-gate.sh" "session-end should run the test gate before reporting dirty work"
+  assert_contains "$precompact" "PreCompact must NEVER create a commit" "pre-compact should forbid auto-commit"
+  assert_contains "$postcommit" "AUTO-PUSH DISABLED" "post-commit auto-push should stay disabled"
 }
 
 run_test_suite() {

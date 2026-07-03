@@ -116,11 +116,11 @@ Or type `/kernel:ingest` first, then describe your task on the next line.
 
 **Why this matters:** `/kernel:ingest` reads memory, classifies your request, and routes to the right approach. Without it, Claude Code skips the memory system entirely.
 
-Behind the scenes, it classifies your request (bug, feature, refactor, question), decides scope by file count (1–2 files = Tier 1 direct, 3–5 = Tier 2 surgeon, 6+ = Tier 3 surgeon + adversary), reads what's been tried before, checks what broke last time, and picks up where you left off.
+Behind the scenes, it classifies your request (bug, feature, refactor, question), decides scope by risk (how hard it is to undo, how quietly it can fail, and how far it reaches), reads what's been tried before, checks what broke last time, and picks up where you left off.
 
 ### Doing Work
 
-Claude Code builds what you asked for. For small changes (Tier 1), it executes directly. For bigger projects (Tier 2+: contract → surgeon → adversary), it breaks the work into steps, gets it done, and verifies everything works. In plain terms: you just describe what you want.
+Claude Code builds what you asked for. For low-risk changes (Tier 1), it executes directly. For durable or high-risk projects (Tier 2+: contract → surgeon → adversary), it breaks the work into steps, gets it done, and verifies everything works. In plain terms: you just describe what you want.
 
 ### Checking Work
 
