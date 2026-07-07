@@ -1,8 +1,18 @@
 # Local settings
 .claude/settings.local.json
 
+# Session kill-switch counters (per-machine run state)
+.claude/.killswitch/
+
 # macOS
 .DS_Store
+
+# Build artifacts (generated from frontend/ source via `npm run build`)
+frontend/build/
+
+# Python bytecode
+__pycache__/
+*.pyc
 
 # AgentDB (per-machine state)
 _meta/agentdb/*.db

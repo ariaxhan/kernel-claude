@@ -63,6 +63,8 @@ detect_vaults() {
     # "$HOME/Vaults" default silently grew a stray tree of orphaned agent
     # registrations after the machine migration moved the vault to
     # ~/Documents/Vaults (and broke session identity + checkpoints for weeks).
+    # Degradation must self-report: nothing matched, so say so on stderr.
+    echo "kernel: no vault detected; falling back to $HOME/Documents/Vaults (set KERNEL_VAULTS to override)" >&2
     echo "$HOME/Documents/Vaults"
   fi
 }
@@ -131,7 +133,7 @@ parse_github_remote() {
   echo "$url" | sed -E 's#^(https?://|git@|ssh://git@)github\.com[:/]##; s/\.git$//'
 }
 
-# Pure classification — no side effects, fully testable
+# Pure classification, no side effects, fully testable
 # Args: is_github visibility collab_count env_count has_projects
 classify_profile() {
   local is_github="${1:-false}"
@@ -194,7 +196,7 @@ detect_profile() {
   local env_count=0
   local has_projects="false"
 
-  # API calls — all failure-safe with 5s timeout
+  # API calls, all failure-safe with 5s timeout
   if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     local repo_json
     repo_json=$(GH_HTTP_TIMEOUT=5 gh api "repos/${owner_repo}" --cache 3600s 2>/dev/null) || true
@@ -211,7 +213,7 @@ detect_profile() {
 
       local project_count
       project_count=$(GH_HTTP_TIMEOUT=5 gh api graphql -f query='query($owner:String!,$repo:String!){repository(owner:$owner,name:$repo){projectsV2(first:1){totalCount}}}' -f owner="${owner_repo%%/*}" -f repo="${owner_repo##*/}" --jq '.data.repository.projectsV2.totalCount // 0' 2>/dev/null) || true
-      # Validate numeric — graphql errors return JSON strings that break arithmetic
+      # Validate numeric, graphql errors return JSON strings that break arithmetic
       [[ "${project_count:-0}" =~ ^[0-9]+$ ]] && [[ "$project_count" -gt 0 ]] && has_projects="true"
     fi
   fi

@@ -480,18 +480,24 @@ test_hooks_json_has_session_end() {
 test_session_start_workflow_present() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
-  # Should contain the workflow steps we defined
-  assert_contains "$output" "READ"
-  assert_contains "$output" "RESEARCH"
-  assert_contains "$output" "EXECUTE"
+  # Compact static block: agentdb quick reference + tier rule
+  assert_contains "$output" "agentdb recall"
+  assert_contains "$output" "Tier by reversibility x silence x blast radius"
 }
 
-test_session_start_testing_philosophy() {
+test_session_start_skill_routing() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
-  # Should reference testing skill in decision tree
-  assert_contains "$output" "/kernel:testing"
-  assert_contains "$output" "decision_tree"
+  # Skills fire ambiently; the hook points at /kernel:help instead of inlining an index
+  assert_contains "$output" "/kernel:help"
+}
+
+test_session_start_no_scripted_interrupts() {
+  # Scripted "ASK USER" phrasing was removed; the hook states facts only.
+  if grep -q "ASK USER" "$PLUGIN_ROOT/hooks/scripts/session-start.sh"; then
+    echo "FAIL: session-start.sh must not contain scripted ASK USER prompts"
+    return 1
+  fi
 }
 
 test_pre_compact_writes_checkpoint() {
@@ -754,7 +760,7 @@ test_auto_approve_rejects_rm_rf() {
   local output
   output=$(echo '{"tool_input":{"command":"rm -rf /tmp/something"}}' \
     | "$PLUGIN_ROOT/hooks/scripts/auto-approve-safe.sh" 2>&1)
-  # Should NOT contain allow — falls through to normal permission flow
+  # Should NOT contain allow, falls through to normal permission flow
   if [[ "$output" == *"allow"* ]]; then
     echo "FAIL: rm -rf should not be auto-approved"
     return 1
@@ -1293,7 +1299,7 @@ test_inline_schema_includes_events() {
 test_preflight_restores_dropped_migration_table() {
   local db="$TEST_PROJECT/_meta/agentdb/agent.db"
   agentdb init >/dev/null
-  # Drop the table but KEEP its migration marker — the drift state.
+  # Drop the table but KEEP its migration marker, the drift state.
   sqlite3 "$db" "DROP TABLE events;"
   assert_equals "1" "$(sqlite3 "$db" "SELECT COUNT(*) FROM _migrations WHERE name='003_telemetry';")" "003 marker must still be present (drift precondition)"
   agentdb preflight >/dev/null 2>&1
@@ -1307,13 +1313,13 @@ test_preflight_idempotent_after_table_drift() {
   sqlite3 "$db" "DROP TABLE events;"
   agentdb preflight >/dev/null 2>&1          # run 1 heals
   local second
-  second=$(agentdb preflight 2>&1)            # run 2 must be clean — no phantom repair
+  second=$(agentdb preflight 2>&1)            # run 2 must be clean, no phantom repair
   assert_contains "$second" "preflight:ok" "second preflight after drift repair must be clean (no phantom repairs)"
 }
 
 # Regression: migration 010 must normalize parseable legacy timestamps WITHOUT
 # nulling empty/garbage/NULL ts (strftime returns NULL on those, and the bare
-# NOT LIKE '%Z' filter matched them — silent data loss before the IS NOT NULL guard).
+# NOT LIKE '%Z' filter matched them, silent data loss before the IS NOT NULL guard).
 test_migration_010_preserves_unparseable_ts() {
   local db="$TEST_PROJECT/_meta/agentdb/agent.db"
   agentdb init >/dev/null
@@ -1423,7 +1429,7 @@ test_blocking_guards_do_not_source_breaker() {
   local g
   for g in guard-bash guard-config detect-secrets; do
     if grep -qE '^[[:space:]]*(source|\.)[[:space:]]+.*circuit-breaker\.sh' "$PLUGIN_ROOT/hooks/scripts/$g.sh"; then
-      echo "FAIL: $g.sh sources circuit-breaker.sh — a blocking guard must always run"
+      echo "FAIL: $g.sh sources circuit-breaker.sh, a blocking guard must always run"
       return 1
     fi
   done
@@ -1465,7 +1471,7 @@ test_breaker_resets() {
   mkdir -p _meta/.breakers
   # Trip breaker 11 minutes ago (past 10-min cooldown)
   echo $(( $(date +%s) - 700 )) > _meta/.breakers/test-reset
-  # Source circuit breaker — it should detect expired cooldown and clean up
+  # Source circuit breaker, it should detect expired cooldown and clean up
   HOOK_NAME="test-reset"
   BREAKER_FILE="_meta/.breakers/test-reset"
   [ -f "$BREAKER_FILE" ] || return 1  # file should exist before
@@ -1537,7 +1543,7 @@ test_github_integration_has_availability_check() {
 }
 
 test_github_integration_has_profile_gate() {
-  # Must check profile — local profiles get no GitHub operations
+  # Must check profile, local profiles get no GitHub operations
   grep -q "local\|profile" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
 }
 
@@ -1554,7 +1560,7 @@ test_github_integration_has_discussion_functions() {
 }
 
 test_github_integration_fire_and_forget() {
-  # All gh calls should have error suppression — never block hooks
+  # All gh calls should have error suppression, never block hooks
   # Check that functions return 0 on failure paths
   grep -q '2>/dev/null' "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
 }
@@ -1727,27 +1733,28 @@ test_triage_has_complexity_classification() {
    grep -q "epic:" "$PLUGIN_ROOT/agents/triage.md")
 }
 
-test_understudier_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/agents/understudier.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/agents/understudier.md" | grep -q "^---"
+test_understudier_is_gone() {
+  # understudier merged into triage (viability pre-flight); the file must stay deleted.
+  if [ -f "$PLUGIN_ROOT/agents/understudier.md" ]; then
+    echo "FAIL: agents/understudier.md should not exist (folded into triage)"
+    return 1
+  fi
 }
 
-test_understudier_model_haiku() {
-  grep -q "^model: haiku" "$PLUGIN_ROOT/agents/understudier.md"
-}
-
-test_understudier_has_viability_assessment() {
-  grep -q "viable" "$PLUGIN_ROOT/agents/understudier.md" &&
-  grep -q "risky" "$PLUGIN_ROOT/agents/understudier.md" &&
-  grep -q "blocked" "$PLUGIN_ROOT/agents/understudier.md"
+test_triage_has_viability_preflight() {
+  grep -qi "viability pre-flight" "$PLUGIN_ROOT/agents/triage.md"
 }
 
 test_claude_md_references_triage() {
   grep -q 'agent id="triage"' "$PLUGIN_ROOT/CLAUDE.md"
 }
 
-test_claude_md_references_understudier() {
-  grep -q 'agent id="understudier"' "$PLUGIN_ROOT/CLAUDE.md"
+test_researcher_model_not_pinned() {
+  # Deep research on haiku is a tier mismatch; researcher inherits the session model.
+  if grep -q "^model:" "$PLUGIN_ROOT/agents/researcher.md"; then
+    echo "FAIL: researcher.md must not pin a model"
+    return 1
+  fi
 }
 
 # --- Inject Context Tests ---
@@ -1797,7 +1804,7 @@ test_read_start_outputs_gotchas() {
 
 test_read_start_bumps_load_count_not_hit_count() {
   # Migration 013: read-start bumps load_count (session-open telemetry), and must
-  # NOT touch hit_count — hit_count is relevance feedback, earned only via recall.
+  # NOT touch hit_count, hit_count is relevance feedback, earned only via recall.
   agentdb init >/dev/null
   agentdb learn failure "never skip validation" "broke prod" >/dev/null
   agentdb read-start >/dev/null
@@ -1903,7 +1910,7 @@ test_recall_survives_sqlite_control_char_escaping() {
 
 test_decay_spares_loaded_learnings() {
   # v7.15: hit_count is recall-only. decay must NOT delete an old, never-recalled
-  # learning that read-start is still loading (load_count>0) — only truly untouched
+  # learning that read-start is still loading (load_count>0), only truly untouched
   # ones (hit_count=0 AND load_count=0 AND >46d).
   agentdb init >/dev/null
   local db="$TEST_PROJECT/_meta/agentdb/agent.db"
@@ -1996,22 +2003,16 @@ test_approval_learner_has_progressive_trust() {
   }
 }
 
-test_quality_skill_has_r_factor() {
-  grep -q "r_factor" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
-    echo "FAIL: quality SKILL.md should have r_factor section"
+test_quality_has_big5_greps() {
+  # The Big 5 keep their runnable grep one-liners; r_factor/adsr are gone by design.
+  grep -q "quick_checks" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
+    echo "FAIL: quality SKILL.md should keep the Big 5 quick_checks greps"
     return 1
   }
-}
-
-test_r_factor_has_weighted_formula() {
-  grep -q "0.20 \* test_pass_rate" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
-    echo "FAIL: r_factor should have weighted formula with test_pass_rate"
+  if grep -q "r_factor\|adsr" "$PLUGIN_ROOT/skills/quality/SKILL.md"; then
+    echo "FAIL: quality SKILL.md must not reintroduce r_factor/adsr"
     return 1
-  }
-  grep -q "0.15 \* scope_accuracy" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
-    echo "FAIL: r_factor should have scope_accuracy weight"
-    return 1
-  }
+  fi
 }
 
 test_claude_md_references_approval_learner() {
@@ -2085,12 +2086,19 @@ test_analyzer_agent_has_model_opus() {
   grep -q "model: opus" "$PLUGIN_ROOT/agents/analyzer.md"
 }
 
-test_orchestration_has_progressive_autonomy() {
-  grep -q "progressive_autonomy" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+test_orchestration_has_lane_contract() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
+  assert_contains "$content" "lane_contract" "orchestration should define the lane contract"
+  assert_contains "$content" "Forbidden list" "lane contract should include a forbidden list"
+  assert_contains "$content" "Raw-data return format" "lane contract should demand raw-data returns"
 }
 
-test_orchestration_has_budget_awareness() {
-  grep -q "budget_awareness" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+test_orchestration_has_worker_model_doctrine() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
+  assert_contains "$content" "worker_model_doctrine" "orchestration should carry the worker-model doctrine"
+  assert_contains "$content" "use your judgment" "doctrine should name the judgment tell"
 }
 
 test_claude_md_references_analyzer() {
@@ -2174,14 +2182,6 @@ test_claude_md_references_app_dev() {
 
 # === Extension Tests (Phase 4) ===
 
-test_quality_has_adsr() {
-  grep -q "adsr" "$PLUGIN_ROOT/skills/quality/SKILL.md"
-}
-
-test_orchestration_has_checkpoint_recovery() {
-  grep -q "checkpoint_recovery" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
-}
-
 test_agentdb_co_change_exists() {
   grep -q "cmd_co_change" "$PLUGIN_ROOT/orchestration/agentdb/agentdb"
 }
@@ -2196,30 +2196,30 @@ test_agentdb_co_change_runs() {
 # === Framework Tests (Phase 4) ===
 
 test_template_exists() {
-  assert_file_exists "$PLUGIN_ROOT/skills/TEMPLATE.md" "TEMPLATE.md should exist"
+  assert_file_exists "$PLUGIN_ROOT/docs/skill-template.md" "TEMPLATE.md should exist"
 }
 
 test_template_has_sources() {
   local content
-  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
   assert_contains "$content" "sources:" "TEMPLATE.md should have sources section"
 }
 
 test_template_has_triggers() {
   local content
-  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
   assert_contains "$content" "triggers:" "TEMPLATE.md should have triggers section"
 }
 
 test_template_has_gates() {
   local content
-  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
   assert_contains "$content" "gates:" "TEMPLATE.md should have gates section"
 }
 
 test_template_has_output() {
   local content
-  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
   assert_contains "$content" "output:" "TEMPLATE.md should have output section"
 }
 
@@ -2288,35 +2288,12 @@ test_warn_hardcoded_sources_common() {
   assert_contains "$content" "common.sh" "warn-hardcoded.sh should source common.sh"
 }
 
-# --- Entropy Adaptive Tests ---
-
-test_orchestration_has_entropy_adaptive() {
-  local file="$PLUGIN_ROOT/skills/orchestration/SKILL.md"
-  assert_file_exists "$file"
-  local content
-  content=$(cat "$file")
-  assert_contains "$content" "entropy_adaptive" "orchestration SKILL.md should have entropy_adaptive section"
-}
-
-test_entropy_adaptive_has_adaptation_levels() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
-  assert_contains "$content" "low_entropy" "should have low_entropy adaptation"
-  assert_contains "$content" "medium_entropy" "should have medium_entropy adaptation"
-  assert_contains "$content" "high_entropy" "should have high_entropy adaptation"
-}
+# --- Forge Entropy Test ---
 
 test_forge_has_entropy_measurement() {
   local content
   content=$(cat "$PLUGIN_ROOT/commands/forge.md")
   assert_contains "$content" "Measure entropy" "forge.md should mention entropy measurement"
-}
-
-test_entropy_adaptive_has_security_override() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
-  assert_contains "$content" "security-sensitive changes always get full pipeline" "should have security override"
-  assert_contains "$content" "never skip security checks" "should enforce security regardless of entropy"
 }
 
 # === Run Tests ===
@@ -2389,10 +2366,30 @@ test_autopush_postcommit_is_disabled() {
   # Per Aria directive 2026-06-15: per-commit auto-push to a shared `main` is OFF.
   # The hook is intentionally a no-op (commits stay local; pushing is explicit). Guard
   # that intent so nobody silently re-enables per-commit push. The red-gate now lives on
-  # the paths that actually push (autopush.sh sweep) — covered by test_autopush_sweep_has_red_gate.
+  # the paths that actually push (autopush.sh sweep), covered by test_autopush_sweep_has_red_gate.
   local hook; hook="$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")"
   assert_contains "$hook" "AUTO-PUSH DISABLED"
   assert_contains "$hook" "exit 0"
+}
+
+test_autopush_install_is_opt_in() {
+  # Per-commit autopush install must be a no-op unless AUTOPUSH_ON=1 (opt-in).
+  # AUTOPUSH_OFF is pinned to 0 so a machine-level AUTOPUSH_OFF=1 can't mask the check.
+  local d; d=$(mktemp -d)
+  git -C "$d" init -q
+  (cd "$d" && CLAUDE_PROJECT_DIR="$d" AUTOPUSH_OFF=0 AUTOPUSH_ON=0 \
+    bash "$PLUGIN_ROOT/hooks/scripts/autopush.sh" install >/dev/null 2>&1)
+  if [ -f "$d/.git/hooks/post-commit" ]; then
+    echo "FAIL: install stamped a post-commit hook without AUTOPUSH_ON=1"
+    rm -rf "$d"; return 1
+  fi
+  (cd "$d" && CLAUDE_PROJECT_DIR="$d" AUTOPUSH_OFF=0 AUTOPUSH_ON=1 \
+    bash "$PLUGIN_ROOT/hooks/scripts/autopush.sh" install >/dev/null 2>&1)
+  if [ ! -f "$d/.git/hooks/post-commit" ]; then
+    echo "FAIL: install with AUTOPUSH_ON=1 should stamp the hook"
+    rm -rf "$d"; return 1
+  fi
+  rm -rf "$d"
 }
 
 test_autopush_sweep_has_red_gate() {
@@ -2411,6 +2408,18 @@ test_pre_compact_has_red_gate() {
   assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh")" ".test-status"
 }
 
+test_lifecycle_hooks_guard_main_push() {
+  local session_end precompact postcommit
+  session_end=$(cat "$PLUGIN_ROOT/hooks/scripts/session-end.sh")
+  precompact=$(cat "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh")
+  postcommit=$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")
+
+  assert_contains "$session_end" "NEVER AUTO-COMMIT" "session-end should forbid auto-commit"
+  assert_contains "$session_end" "test-gate.sh" "session-end should run the test gate before reporting dirty work"
+  assert_contains "$precompact" "PreCompact must NEVER create a commit" "pre-compact should forbid auto-commit"
+  assert_contains "$postcommit" "AUTO-PUSH DISABLED" "post-commit auto-push should stay disabled"
+}
+
 run_test_suite() {
   local suite="$1"
   echo ""
@@ -2424,6 +2433,7 @@ run_test_suite() {
       run_test "test-gate red recovers to pass" test_test_gate_status_recovers_to_pass
       run_test "test-gate honors override file" test_test_gate_honors_override_file
       run_test "autopush postcommit is disabled" test_autopush_postcommit_is_disabled
+      run_test "autopush install is opt-in" test_autopush_install_is_opt_in
       run_test "autopush sweep has red gate" test_autopush_sweep_has_red_gate
       run_test "session-end runs test gate" test_session_end_runs_test_gate
       run_test "session-start surfaces red" test_session_start_surfaces_red
@@ -2460,8 +2470,9 @@ run_test_suite() {
       run_test "detect-secrets clean file" test_detect_secrets_clean
       run_test "hooks.json has SessionStart" test_hooks_json_has_session_start
       run_test "hooks.json has SessionEnd" test_hooks_json_has_session_end
-      run_test "session-start has workflow" test_session_start_workflow_present
-      run_test "session-start has testing philosophy" test_session_start_testing_philosophy
+      run_test "session-start has compact quick reference" test_session_start_workflow_present
+      run_test "session-start points at skill routing" test_session_start_skill_routing
+      run_test "session-start has no scripted interrupts" test_session_start_no_scripted_interrupts
       run_test "pre-compact writes checkpoint" test_pre_compact_writes_checkpoint
       run_test "pre-compact payload survives quotes" test_pre_compact_payload_survives_quotes
       run_test "lifecycle hooks guard main push" test_lifecycle_hooks_guard_main_push
@@ -2679,19 +2690,17 @@ run_test_suite() {
       run_test "triage.md exists with frontmatter" test_triage_exists_with_frontmatter
       run_test "triage.md has model: haiku" test_triage_model_haiku
       run_test "triage.md has complexity classification" test_triage_has_complexity_classification
-      run_test "understudier.md exists with frontmatter" test_understudier_exists_with_frontmatter
-      run_test "understudier.md has model: haiku" test_understudier_model_haiku
-      run_test "understudier.md has viability assessment" test_understudier_has_viability_assessment
+      run_test "triage.md carries the viability pre-flight" test_triage_has_viability_preflight
+      run_test "understudier stays deleted" test_understudier_is_gone
+      run_test "researcher model is not pinned" test_researcher_model_not_pinned
       run_test "CLAUDE.md references triage agent" test_claude_md_references_triage
-      run_test "CLAUDE.md references understudier agent" test_claude_md_references_understudier
       ;;
     approval_rfactor)
       run_test "approval-learner exists with frontmatter" test_approval_learner_exists_with_frontmatter
       run_test "approval-learner model is sonnet" test_approval_learner_model_sonnet
       run_test "approval-learner has confidence scoring" test_approval_learner_has_confidence_scoring
       run_test "approval-learner has progressive trust" test_approval_learner_has_progressive_trust
-      run_test "quality SKILL.md has r_factor" test_quality_skill_has_r_factor
-      run_test "r_factor has weighted formula" test_r_factor_has_weighted_formula
+      run_test "quality keeps Big 5 greps, no r_factor/adsr" test_quality_has_big5_greps
       run_test "CLAUDE.md references approval-learner" test_claude_md_references_approval_learner
       ;;
     learning_system)
@@ -2716,13 +2725,11 @@ run_test_suite() {
       run_test "analyzer agent exists with frontmatter" test_analyzer_agent_exists_with_frontmatter
       run_test "analyzer agent has dependency detection" test_analyzer_agent_has_dependency_detection
       run_test "analyzer agent has model opus" test_analyzer_agent_has_model_opus
-      run_test "orchestration has progressive_autonomy" test_orchestration_has_progressive_autonomy
-      run_test "orchestration has budget_awareness" test_orchestration_has_budget_awareness
+      run_test "orchestration defines the lane contract" test_orchestration_has_lane_contract
+      run_test "orchestration carries worker-model doctrine" test_orchestration_has_worker_model_doctrine
       run_test "CLAUDE.md references analyzer" test_claude_md_references_analyzer
       ;;
     phase4_extensions)
-      run_test "quality SKILL.md has adsr section" test_quality_has_adsr
-      run_test "orchestration SKILL.md has checkpoint_recovery" test_orchestration_has_checkpoint_recovery
       run_test "agentdb co-change command exists" test_agentdb_co_change_exists
       run_test "co-change runs without error" test_agentdb_co_change_runs
       ;;
@@ -2756,10 +2763,7 @@ run_test_suite() {
       run_test "CLAUDE.md references app-dev" test_claude_md_references_app_dev
       ;;
     entropy_adaptive)
-      run_test "orchestration has entropy_adaptive section" test_orchestration_has_entropy_adaptive
-      run_test "entropy_adaptive has low/medium/high adaptation" test_entropy_adaptive_has_adaptation_levels
       run_test "forge.md mentions entropy measurement" test_forge_has_entropy_measurement
-      run_test "entropy_adaptive has security override" test_entropy_adaptive_has_security_override
       ;;
   esac
 }

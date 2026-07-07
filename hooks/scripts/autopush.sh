@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 # Auto-push driver (kernel plugin). Two modes:
-#   install  — copy the post-commit auto-push hook into every repo in the current
-#              project's tree (root superproject + all submodules on disk). Run by the
-#              plugin SessionStart hook → every machine with the plugin gets per-commit
-#              auto-push with ZERO manual setup, and new submodules are covered each session.
-#   sweep    — fetch + push every repo in the tree that has unpushed commits. Run by the
-#              plugin Stop hook → no session ever ends with work left solely local.
+#   install: copy the post-commit hook into every repo in the current project's tree
+#              (root superproject + all submodules on disk). OPT-IN: does nothing unless
+#              AUTOPUSH_ON=1 is set. Explicit push is the rule (directive 2026-06-15);
+#              a plugin that re-installs per-commit push hooks every SessionStart was
+#              fighting that rule, one env var away from silent reversal.
+#   sweep: fetch + push every repo in the tree that has unpushed commits. Run by the
+#              plugin SessionEnd hook → no session ever ends with work left solely local.
 #
 # Portable: discovers the tree by walking up to the OUTERMOST superproject from the
 # current project (no hardcoded vault path). Safe: origin-only, skips detached/mid-rebase,
-# non-fatal. Set AUTOPUSH_OFF=1 to disable. DRY_RUN=1 previews sweep.
+# non-fatal. AUTOPUSH_OFF=1 hard-disables both modes. DRY_RUN=1 previews sweep.
 set -u
 
 MODE="${1:-sweep}"
 [ "${AUTOPUSH_OFF:-0}" = "1" ] && exit 0
+# install is opt-in: never stamp post-commit hooks into repos by default.
+if [ "$MODE" = "install" ] && [ "${AUTOPUSH_ON:-0}" != "1" ]; then
+  exit 0
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOOK_SRC="$SCRIPT_DIR/autopush-postcommit"
@@ -48,7 +53,7 @@ while IFS= read -r gitpath; do
     br="$(git -C "$repo" symbolic-ref --short HEAD 2>/dev/null)" || continue
     [ -n "$br" ] || continue
     # Hard gate (I0.15: hooks, not honor-system). If the test gate recorded a red verdict
-    # for this repo, refuse to push it — red must never reach the remote. Clears itself when
+    # for this repo, refuse to push it, red must never reach the remote. Clears itself when
     # the suite goes green (test-gate rewrites .test-status to PASS).
     if [ -f "$repo/_meta/.test-status" ]; then
       ts_status="$(cut -d'|' -f1 "$repo/_meta/.test-status" 2>/dev/null)"

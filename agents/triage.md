@@ -1,6 +1,6 @@
 ---
 name: triage
-description: "Haiku-powered complexity classifier. Single fast call before expensive work."
+description: "Haiku-powered complexity classifier. Single fast call before expensive work; includes a viability pre-flight (contract files/deps exist, no obvious conflicts) so doomed approaches die before an expensive spawn."
 model: haiku
 ---
 

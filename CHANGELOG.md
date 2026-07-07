@@ -2,6 +2,58 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [7.23.0] - 2026-07-06
+
+The Fable harness prune. One theme: the plugin stops re-teaching what the model already
+knows and stops contradicting the layers above it.
+
+### Changed
+- **session-start.sh** static context cut from ~4.8KB to ~0.6KB: the `<protocol>`,
+  `<decision_tree>`, Commands/Tiers reference, and profile-gated static blocks are replaced by
+  one compact block (agentdb quick reference, the reversibility x silence x blast radius tier
+  line, a pointer to `/kernel:help`). All dynamic state stays; scripted "ASK USER" prompts now
+  state facts instead; the NOT-INITIALIZED wall is 2 lines; the stale "local: commit to main"
+  advice is gone.
+- **Per-commit autopush install is opt-in** (`AUTOPUSH_ON=1`); explicit push is the rule
+  (2026-06-15 directive) and the plugin was fighting it. `AUTOPUSH_OFF=1` stays as hard off.
+- **detect_vaults()** emits a one-line stderr warning when it falls through to the hardcoded
+  default path, naming the resolved path and the `KERNEL_VAULTS` override.
+- **Skills pruned**: tdd merged into testing (one skill owns test methodology); build, debug,
+  orchestration, quality, and git rewritten to <=80 lines each; dated blog-citation walls,
+  the r_factor/adsr machinery, and the speculative orchestration XML sub-blocks deleted.
+  Orchestration gains the lane-contract fields and a worker-model doctrine (cheap models only
+  for total-spec execution; lane reports are claims, wrong roughly 1 in 5).
+- **Agents**: understudier folded into triage (viability pre-flight one-liner); researcher's
+  `model: haiku` pin removed (deep research on haiku is a tier mismatch). 15 agents on disk,
+  and CLAUDE.md / plugin.json / marketplace.json now agree (blind-evaluator, deep-diver,
+  dreamer documented).
+- **Docs**: tiers unified on reversibility everywhere; the duplicated 8-step `<flow>` block is
+  3 lines; app-dev described fastlane-first; AGENTS.md regenerated from CLAUDE.md.
+
+### Removed
+- `frontend/build/` (generated) untracked + gitignored; stray `solution.py` + its bytecode
+  deleted; `skills/TEMPLATE.md` moved to `docs/skill-template.md`.
+
+## [7.22.0] - 2026-06-27
+
+### Removed
+- **Runaway-agent killswitch removed entirely** (killswitch.sh / killswitch-init.sh /
+  killswitch-status.sh / KILLSWITCH.md + both hook entries). The wall-clock and tool-count
+  caps tripped mid-forge on normal multi-hour sessions, and the over-cap escape hatches were
+  partly unreachable (override-file write blocked by guard-config; env prefix never reached
+  the hook). Net friction outweighed the runaway protection.
+
+## [7.21.0] - 2026-06-26
+
+### Added
+- **Runaway-agent killswitch** as a PreToolUse budget cap (wall-clock + tool-count),
+  merged via PR #140. Reverted one day later in 7.22.0; see above.
+- **CI auto-fix workflow** that reacts when Tests & Quality goes red on main.
+
+### Fixed
+- Test assertion for the (deliberately disabled) autopush-postcommit hook.
+- Ongoing skill syncs from external sources (2026-06-20 through 2026-06-26).
+
 ## [7.20.0] - 2026-06-15
 
 The auto-commit / auto-push path now refuses to ship a red test suite. Previously the

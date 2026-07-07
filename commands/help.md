@@ -8,7 +8,7 @@ allowed-tools: Read, Bash, Grep, Glob
 <command id="help">
 
 <purpose>
-Quick reference for KERNEL v7.20.0.
+Quick reference for KERNEL v7.23.0.
 Commands, agents, workflows, philosophy — and current plugin status.
 </purpose>
 
@@ -86,11 +86,13 @@ Typical workflows — commands chain together:
 </command_flow>
 
 <tiers>
-| Tier | Files | Your Role | Commands involved |
-|------|-------|-----------|-------------------|
-| 1 | 1-2 | Execute directly | ingest → validate |
-| 2 | 3-5 | Orchestrate, spawn surgeon | ingest → tearitapart → validate → review |
-| 3 | 6+ | Orchestrate, surgeon + adversary | ingest → tearitapart → validate → review |
+Tier by reversibility x silence x blast radius; file count is only a weak hint.
+
+| Tier | Risk profile | Your Role | Commands involved |
+|------|--------------|-----------|-------------------|
+| 1 | easy to undo, loud if wrong | Execute directly | ingest → validate |
+| 2 | persistent or moderately quiet | Orchestrate, spawn surgeon | ingest → tearitapart → validate → review |
+| 3 | hard to undo, quiet, wide blast | Orchestrate, surgeon + adversary | ingest → tearitapart → validate → review |
 </tiers>
 
 <agents>
