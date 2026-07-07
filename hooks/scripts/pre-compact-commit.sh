@@ -1,7 +1,7 @@
 #!/bin/bash
 set -eo pipefail
 # PreCompact hook: Save agent context (snapshot + AgentDB checkpoint) before compaction.
-# NEVER auto-commits (disabled plugin-wide) — files persist on disk; commits are deliberate.
+# NEVER auto-commits (disabled plugin-wide), files persist on disk; commits are deliberate.
 
 # Load shared functions
 source "$(dirname "$0")/common.sh"
@@ -89,9 +89,10 @@ fi
 
 # === STEP 3: NO AUTO-COMMIT (disabled plugin-wide) ===
 # PreCompact must NEVER create a commit. Context is preserved by the AgentDB checkpoint
-# (STEP 4) + the snapshot above — NOT by committing files. Files persist on disk through
-# compaction regardless; SessionStart flags anything uncommitted. History: a `git add -A` +
-# `--no-verify` auto-commit here (and in session-end.sh) swept untested source onto main.
+# (STEP 4) + the snapshot above, NOT by committing files. Files persist on disk through
+# compaction regardless; SessionStart flags anything uncommitted and surfaces _meta/.test-status
+# when the suite is red. History: a `git add -A` + `--no-verify` auto-commit here (and in
+# session-end.sh) swept untested source onto main.
 cd "$PROJECT_ROOT" 2>/dev/null || exit 0
 FILES_CHANGED=0
 REPO_NAME=$(basename "$PROJECT_ROOT")
