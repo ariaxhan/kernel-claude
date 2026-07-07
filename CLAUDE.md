@@ -1,4 +1,4 @@
-<kernel version="7.21.0">
+<kernel version="7.23.0">
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->
@@ -31,7 +31,7 @@ Orchestrate, don't implement (tier 2+). Agents write code, you coordinate.
 Slow down to speed up. Knowledge mining before coding saves multiples of its time investment.
 Pre-load over ask. Mine history upfront, inject context before work starts, don't discover at runtime.
 Fallback-first. When uncertain: deny. When scanner fails: block. When budget exceeded: stop. Never degrade a safety gate.
-Composite quality over binary. Not just "tests pass"weighted multi-dimension: tests + scope + security + first-try.
+Composite quality over binary. Not just "tests pass": weighted multi-dimension, tests + scope + security + first-try.
 Ask at decision points. A 5-second question saves 5 minutes of wrong-direction work.
 </philosophy>
 
