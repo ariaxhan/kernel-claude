@@ -2002,22 +2002,16 @@ test_approval_learner_has_progressive_trust() {
   }
 }
 
-test_quality_skill_has_r_factor() {
-  grep -q "r_factor" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
-    echo "FAIL: quality SKILL.md should have r_factor section"
+test_quality_has_big5_greps() {
+  # The Big 5 keep their runnable grep one-liners; r_factor/adsr are gone by design.
+  grep -q "quick_checks" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
+    echo "FAIL: quality SKILL.md should keep the Big 5 quick_checks greps"
     return 1
   }
-}
-
-test_r_factor_has_weighted_formula() {
-  grep -q "0.20 \* test_pass_rate" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
-    echo "FAIL: r_factor should have weighted formula with test_pass_rate"
+  if grep -q "r_factor\|adsr" "$PLUGIN_ROOT/skills/quality/SKILL.md"; then
+    echo "FAIL: quality SKILL.md must not reintroduce r_factor/adsr"
     return 1
-  }
-  grep -q "0.15 \* scope_accuracy" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
-    echo "FAIL: r_factor should have scope_accuracy weight"
-    return 1
-  }
+  fi
 }
 
 test_claude_md_references_approval_learner() {
@@ -2186,10 +2180,6 @@ test_claude_md_references_app_dev() {
 }
 
 # === Extension Tests (Phase 4) ===
-
-test_quality_has_adsr() {
-  grep -q "adsr" "$PLUGIN_ROOT/skills/quality/SKILL.md"
-}
 
 test_agentdb_co_change_exists() {
   grep -q "cmd_co_change" "$PLUGIN_ROOT/orchestration/agentdb/agentdb"
@@ -2698,8 +2688,7 @@ run_test_suite() {
       run_test "approval-learner model is sonnet" test_approval_learner_model_sonnet
       run_test "approval-learner has confidence scoring" test_approval_learner_has_confidence_scoring
       run_test "approval-learner has progressive trust" test_approval_learner_has_progressive_trust
-      run_test "quality SKILL.md has r_factor" test_quality_skill_has_r_factor
-      run_test "r_factor has weighted formula" test_r_factor_has_weighted_formula
+      run_test "quality keeps Big 5 greps, no r_factor/adsr" test_quality_has_big5_greps
       run_test "CLAUDE.md references approval-learner" test_claude_md_references_approval_learner
       ;;
     learning_system)
