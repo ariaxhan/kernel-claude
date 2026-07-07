@@ -480,18 +480,24 @@ test_hooks_json_has_session_end() {
 test_session_start_workflow_present() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
-  # Should contain the workflow steps we defined
-  assert_contains "$output" "READ"
-  assert_contains "$output" "RESEARCH"
-  assert_contains "$output" "EXECUTE"
+  # Compact static block: agentdb quick reference + tier rule
+  assert_contains "$output" "agentdb recall"
+  assert_contains "$output" "Tier by reversibility x silence x blast radius"
 }
 
-test_session_start_testing_philosophy() {
+test_session_start_skill_routing() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
-  # Should reference testing skill in decision tree
-  assert_contains "$output" "/kernel:testing"
-  assert_contains "$output" "decision_tree"
+  # Skills fire ambiently; the hook points at /kernel:help instead of inlining an index
+  assert_contains "$output" "/kernel:help"
+}
+
+test_session_start_no_scripted_interrupts() {
+  # Scripted "ASK USER" phrasing was removed; the hook states facts only.
+  if grep -q "ASK USER" "$PLUGIN_ROOT/hooks/scripts/session-start.sh"; then
+    echo "FAIL: session-start.sh must not contain scripted ASK USER prompts"
+    return 1
+  fi
 }
 
 test_pre_compact_writes_checkpoint() {
@@ -754,7 +760,7 @@ test_auto_approve_rejects_rm_rf() {
   local output
   output=$(echo '{"tool_input":{"command":"rm -rf /tmp/something"}}' \
     | "$PLUGIN_ROOT/hooks/scripts/auto-approve-safe.sh" 2>&1)
-  # Should NOT contain allow — falls through to normal permission flow
+  # Should NOT contain allow, falls through to normal permission flow
   if [[ "$output" == *"allow"* ]]; then
     echo "FAIL: rm -rf should not be auto-approved"
     return 1
@@ -1293,7 +1299,7 @@ test_inline_schema_includes_events() {
 test_preflight_restores_dropped_migration_table() {
   local db="$TEST_PROJECT/_meta/agentdb/agent.db"
   agentdb init >/dev/null
-  # Drop the table but KEEP its migration marker — the drift state.
+  # Drop the table but KEEP its migration marker, the drift state.
   sqlite3 "$db" "DROP TABLE events;"
   assert_equals "1" "$(sqlite3 "$db" "SELECT COUNT(*) FROM _migrations WHERE name='003_telemetry';")" "003 marker must still be present (drift precondition)"
   agentdb preflight >/dev/null 2>&1
@@ -1307,13 +1313,13 @@ test_preflight_idempotent_after_table_drift() {
   sqlite3 "$db" "DROP TABLE events;"
   agentdb preflight >/dev/null 2>&1          # run 1 heals
   local second
-  second=$(agentdb preflight 2>&1)            # run 2 must be clean — no phantom repair
+  second=$(agentdb preflight 2>&1)            # run 2 must be clean, no phantom repair
   assert_contains "$second" "preflight:ok" "second preflight after drift repair must be clean (no phantom repairs)"
 }
 
 # Regression: migration 010 must normalize parseable legacy timestamps WITHOUT
 # nulling empty/garbage/NULL ts (strftime returns NULL on those, and the bare
-# NOT LIKE '%Z' filter matched them — silent data loss before the IS NOT NULL guard).
+# NOT LIKE '%Z' filter matched them, silent data loss before the IS NOT NULL guard).
 test_migration_010_preserves_unparseable_ts() {
   local db="$TEST_PROJECT/_meta/agentdb/agent.db"
   agentdb init >/dev/null
@@ -1423,7 +1429,7 @@ test_blocking_guards_do_not_source_breaker() {
   local g
   for g in guard-bash guard-config detect-secrets; do
     if grep -qE '^[[:space:]]*(source|\.)[[:space:]]+.*circuit-breaker\.sh' "$PLUGIN_ROOT/hooks/scripts/$g.sh"; then
-      echo "FAIL: $g.sh sources circuit-breaker.sh — a blocking guard must always run"
+      echo "FAIL: $g.sh sources circuit-breaker.sh, a blocking guard must always run"
       return 1
     fi
   done
@@ -1465,7 +1471,7 @@ test_breaker_resets() {
   mkdir -p _meta/.breakers
   # Trip breaker 11 minutes ago (past 10-min cooldown)
   echo $(( $(date +%s) - 700 )) > _meta/.breakers/test-reset
-  # Source circuit breaker — it should detect expired cooldown and clean up
+  # Source circuit breaker, it should detect expired cooldown and clean up
   HOOK_NAME="test-reset"
   BREAKER_FILE="_meta/.breakers/test-reset"
   [ -f "$BREAKER_FILE" ] || return 1  # file should exist before
@@ -1537,7 +1543,7 @@ test_github_integration_has_availability_check() {
 }
 
 test_github_integration_has_profile_gate() {
-  # Must check profile — local profiles get no GitHub operations
+  # Must check profile, local profiles get no GitHub operations
   grep -q "local\|profile" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
 }
 
@@ -1554,7 +1560,7 @@ test_github_integration_has_discussion_functions() {
 }
 
 test_github_integration_fire_and_forget() {
-  # All gh calls should have error suppression — never block hooks
+  # All gh calls should have error suppression, never block hooks
   # Check that functions return 0 on failure paths
   grep -q '2>/dev/null' "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
 }
@@ -1797,7 +1803,7 @@ test_read_start_outputs_gotchas() {
 
 test_read_start_bumps_load_count_not_hit_count() {
   # Migration 013: read-start bumps load_count (session-open telemetry), and must
-  # NOT touch hit_count — hit_count is relevance feedback, earned only via recall.
+  # NOT touch hit_count, hit_count is relevance feedback, earned only via recall.
   agentdb init >/dev/null
   agentdb learn failure "never skip validation" "broke prod" >/dev/null
   agentdb read-start >/dev/null
@@ -1903,7 +1909,7 @@ test_recall_survives_sqlite_control_char_escaping() {
 
 test_decay_spares_loaded_learnings() {
   # v7.15: hit_count is recall-only. decay must NOT delete an old, never-recalled
-  # learning that read-start is still loading (load_count>0) — only truly untouched
+  # learning that read-start is still loading (load_count>0), only truly untouched
   # ones (hit_count=0 AND load_count=0 AND >46d).
   agentdb init >/dev/null
   local db="$TEST_PROJECT/_meta/agentdb/agent.db"
@@ -2389,7 +2395,7 @@ test_autopush_postcommit_is_disabled() {
   # Per Aria directive 2026-06-15: per-commit auto-push to a shared `main` is OFF.
   # The hook is intentionally a no-op (commits stay local; pushing is explicit). Guard
   # that intent so nobody silently re-enables per-commit push. The red-gate now lives on
-  # the paths that actually push (autopush.sh sweep) — covered by test_autopush_sweep_has_red_gate.
+  # the paths that actually push (autopush.sh sweep), covered by test_autopush_sweep_has_red_gate.
   local hook; hook="$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")"
   assert_contains "$hook" "AUTO-PUSH DISABLED"
   assert_contains "$hook" "exit 0"
@@ -2460,8 +2466,9 @@ run_test_suite() {
       run_test "detect-secrets clean file" test_detect_secrets_clean
       run_test "hooks.json has SessionStart" test_hooks_json_has_session_start
       run_test "hooks.json has SessionEnd" test_hooks_json_has_session_end
-      run_test "session-start has workflow" test_session_start_workflow_present
-      run_test "session-start has testing philosophy" test_session_start_testing_philosophy
+      run_test "session-start has compact quick reference" test_session_start_workflow_present
+      run_test "session-start points at skill routing" test_session_start_skill_routing
+      run_test "session-start has no scripted interrupts" test_session_start_no_scripted_interrupts
       run_test "pre-compact writes checkpoint" test_pre_compact_writes_checkpoint
       run_test "pre-compact payload survives quotes" test_pre_compact_payload_survives_quotes
       run_test "lifecycle hooks guard main push" test_lifecycle_hooks_guard_main_push

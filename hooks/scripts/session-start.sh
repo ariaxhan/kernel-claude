@@ -25,7 +25,7 @@ export KERNEL_SESSION_ID
 
 # Generate agent name and persist for other hooks.
 # Keyed by Claude's session_id (hook stdin JSON): the shared .current file is a
-# race under concurrent sessions — any parallel SessionStart overwrites it and any
+# race under concurrent sessions, any parallel SessionStart overwrites it and any
 # SessionEnd deletes it, which is how ~43% of commits ended up tagged "unknown-*".
 AGENT_NAME="main-$$"
 AGENTS_DIR="$VAULTS/_meta/agents"
@@ -83,8 +83,7 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   echo "**Branch:** $BRANCH"
   CHANGES=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
   if [ "$CHANGES" -gt 0 ]; then
-    echo "**Uncommitted:** $CHANGES file(s)"
-    echo "**ASK USER:** $CHANGES uncommitted file(s). Stash, commit, or continue?"
+    echo "**Uncommitted:** $CHANGES file(s) on branch $BRANCH"
   fi
   echo ""
   echo "**Recent commits:**"
@@ -92,14 +91,14 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   echo ""
 fi
 
-# Test gate verdict — surface red FIRST so it's addressed before any new work.
+# Test gate verdict, surface red FIRST so it's addressed before any new work.
 if [ -f "$PROJECT_ROOT/_meta/.test-status" ]; then
   TS_STATUS=$(cut -d'|' -f1 "$PROJECT_ROOT/_meta/.test-status" 2>/dev/null)
   if [ "$TS_STATUS" = "FAIL" ]; then
     TS_SUMMARY=$(cut -d'|' -f4 "$PROJECT_ROOT/_meta/.test-status" 2>/dev/null)
-    echo "## ⚠️ TESTS RED — auto-push is BLOCKED"
+    echo "## ⚠️ TESTS RED, auto-push is BLOCKED"
     echo "**${TS_SUMMARY:-test suite failing}**"
-    echo "**ASK USER:** The test suite is red and pushes are withheld until it's green. Fix the suite first? (details: _meta/plans/tests-red.md)"
+    echo "Pushes are withheld until the suite is green (details: _meta/plans/tests-red.md)."
     echo ""
   fi
 fi
@@ -107,10 +106,10 @@ fi
 # === SYSTEM HEALTH ===
 HEALTH_WARNINGS=""
 # Check dependencies
-command -v jq >/dev/null 2>&1 || HEALTH_WARNINGS="${HEALTH_WARNINGS}\n⚠ jq not installed — some hooks will not function"
-command -v gh >/dev/null 2>&1 || HEALTH_WARNINGS="${HEALTH_WARNINGS}\n⚠ gh CLI not installed — GitHub features unavailable (install: https://cli.github.com)"
+command -v jq >/dev/null 2>&1 || HEALTH_WARNINGS="${HEALTH_WARNINGS}\n⚠ jq not installed, some hooks will not function"
+command -v gh >/dev/null 2>&1 || HEALTH_WARNINGS="${HEALTH_WARNINGS}\n⚠ gh CLI not installed, GitHub features unavailable (install: https://cli.github.com)"
 if command -v gh >/dev/null 2>&1 && ! gh auth status >/dev/null 2>&1; then
-  HEALTH_WARNINGS="${HEALTH_WARNINGS}\n⚠ gh not authenticated — run: gh auth login"
+  HEALTH_WARNINGS="${HEALTH_WARNINGS}\n⚠ gh not authenticated, run: gh auth login"
 fi
 
 if [ -n "$HEALTH_WARNINGS" ]; then
@@ -120,80 +119,17 @@ if [ -n "$HEALTH_WARNINGS" ]; then
 fi
 
 cat << 'KERNEL_CONTEXT'
-<protocol>
-  <agentdb>
-    on_start: agentdb read-start
-    on_task:  agentdb recall "<task keywords>" [--global]   # relevance lookup; --global adds the cross-project brain
-    on_end:   agentdb write-end '{"did":"X","learned":["Y"]}'
-    on_learn: agentdb learn failure|pattern|gotcha "what" "evidence"
-    confused: agentdb wtf
-    history:  agentdb timeline 10
-    cleanup:  agentdb prune all | agentdb contract close --stale
-    reference: agentdb guide
-  </agentdb>
+## KERNEL quick reference
 
-  <decision_tree>
-    1. READ context
-       → agentdb read-start
-       → ls _meta/research/ (check prior work)
+```
+agentdb recall "<task keywords>" [--global]        # relevance lookup before acting
+agentdb learn failure|pattern|gotcha "what" "why"  # capture as discovered
+agentdb write-end '{"did":"X","learned":["Y"]}'    # at session end
+agentdb wtf                                        # confused? full ref: agentdb guide
+```
 
-    2. CLASSIFY request
-       → bug?      load: /kernel:debug → /kernel:diagnose
-       → feature?  load: /kernel:build
-       → refactor? load: /kernel:refactor
-       → review?   load: /kernel:review
-       → unsure?   load: /kernel:build (default)
-
-    3. RESEARCH (before coding)
-       → check _meta/research/ for cached results
-       → anti-patterns FIRST: "{tech} gotchas", "{tech} not working"
-       → then solutions: official docs → github issues
-       → load: /kernel:security if auth/validation/secrets involved
-
-    4. SCOPE
-       → count files that change
-       → tier 1 (1-2 files): execute directly
-       → tier 2 (3-5 files): contract + surgeon agent
-       → tier 3 (6+ files):  contract + surgeon + adversary
-
-    5. DEFINE SUCCESS (before coding)
-       → load: /kernel:testing — tests BEFORE code
-       → load: /kernel:tdd if red-green-refactor appropriate
-       → edge cases first: null, empty, boundary, concurrent, timeout
-
-    6. EXECUTE
-       → load: /kernel:quality — Big 5 checks on all code
-       → tier 1: implement directly
-       → tier 2+: spawn surgeon, orchestrate via /kernel:orchestration
-
-    7. SHIP
-       → load: /kernel:git — atomic commits, profile-gated workflow
-       → local: commit to main
-       → github-oss/production: feature branch → PR → review
-       → VERIFY LIVE: "done" = verified live, not committed. Committed ≠ pushed ≠
-         deployed ≠ working. Run a command that confirms the real state (deploy
-         check, curl the served asset, the passing test, the exercised path) before
-         claiming done. Can't check headlessly → "deployed — your check," not "it works."
-
-    8. LEARN
-       → agentdb learn pattern|failure "what" "evidence"
-       → agentdb write-end
-       → update _meta/research/ if new findings
-  </decision_tree>
-
-  <skills index="true">
-    always: /kernel:quality, /kernel:testing, /kernel:git
-    by_task: /kernel:build, /kernel:debug, /kernel:refactor, /kernel:security
-    by_domain: /kernel:api, /kernel:backend, /kernel:e2e, /kernel:tdd
-    commands: /kernel:dream, /kernel:diagnose, /kernel:tearitapart, /kernel:review
-    advanced: /kernel:orchestration, /kernel:architecture, /kernel:performance
-  </skills>
-
-  <rule>Load the relevant skill BEFORE acting. Skills ARE the methodology.</rule>
-  <rule>Research anti-patterns BEFORE solutions. Tests BEFORE code.</rule>
-  <rule>Built-in beats library. Library beats custom. Prove you need complexity.</rule>
-  <rule>"Done" = verified live, not committed. Run a verification command before claiming done.</rule>
-</protocol>
+Tier by reversibility x silence x blast radius (T1 execute, T2 plan+verify, T3 confirm); file count is only a weak hint.
+Skills fire by trigger; /kernel:help lists them.
 KERNEL_CONTEXT
 
 # =============================================================================
@@ -250,14 +186,12 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
     echo "## Active Contract"
     echo "$ACTIVE_CONTRACT"
     echo ""
-    echo "**Resume or close before starting new work.**"
-    echo ""
-    echo "**ASK USER:** Stale contract detected. Resume, close, or start fresh?"
+    echo "Open contract found. Resume or close it before starting new work."
     echo ""
   fi
 
   # === BLOCKER SURFACING ===
-  # Tell Claude to ask about blockers instead of assuming
+  # State the facts; the model decides what to do with them.
   BLOCKERS=""
 
   # Check for stale contracts (>24h with no checkpoint)
@@ -276,8 +210,6 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
     echo "## Blockers Detected"
     printf "%b\n" "$BLOCKERS"
     echo ""
-    echo "**ASK USER:** Use AskUserQuestion to confirm: address blockers first, or proceed with new work?"
-    echo ""
   fi
 
   PENDING=$("$AGENTDB" query "SELECT agent, content FROM context WHERE type='checkpoint' AND ts > (SELECT COALESCE(MAX(ts), '1970-01-01') FROM context WHERE type='verdict') ORDER BY ts DESC LIMIT 1" 2>/dev/null)
@@ -288,84 +220,8 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   fi
 else
   echo ""
-  echo "## ⚠️ KERNEL NOT INITIALIZED"
-  echo ""
-  echo "**STOP. Run:** \`mkdir -p _meta/{agentdb,research,plans,handoffs,agents} && agentdb init\`"
-  echo ""
-fi
-
-# === PROFILE-GATED REFERENCE ===
-# local: compact reference. github+: full reference with GitHub features.
-
-cat << 'REFERENCE'
----
-
-## Commands
-
-```yaml
-commands:
-  /kernel:ingest: guided flow, human confirms each phase
-  /kernel:forge: autonomous engine — heat/hammer/quench/anneal until antifragile
-  /kernel:dream: creative exploration — 3 perspectives + 4-persona stress test
-  /kernel:diagnose: systematic debugging + refactor analysis before fixing
-  /kernel:retrospective: cross-session learning synthesis + pattern promotion
-  /kernel:metrics: observability dashboard — sessions, agents, hooks, learnings
-  /kernel:validate: pre-commit quality gates
-  /kernel:tearitapart: critical review before implementation
-  /kernel:review: code review for PRs
-  /kernel:handoff: context brief for session continuity
-```
-
-## Tiers
-
-```yaml
-tiers:
-  1: {files: 1-2, role: execute directly}
-  2: {files: 3-5, role: orchestrate → surgeon}
-  3: {files: 6+, role: orchestrate → surgeon → adversary}
-
-rule: tier 2+ you orchestrate, agents implement, don't write code yourself
-```
-
-REFERENCE
-
-# Profile-gated sections — only show what's relevant
-if [ "$PROFILE" != "local" ]; then
-cat << 'GITHUB_REF'
-
-## Agents
-
-```yaml
-agents:
-  researcher: find proven solutions, anti-patterns (spawn: unfamiliar tech)
-  surgeon: implement contract scope (spawn: tier 2+)
-  adversary: QA, find edge cases (spawn: tier 3)
-  dreamer: multi-perspective debate (spawn: /kernel:dream tier 2+)
-```
-
-GITHUB_REF
-fi
-
-if [ "$PROFILE" = "github-oss" ] || [ "$PROFILE" = "github-production" ]; then
-cat << 'OSS_REF'
-
-## Git Workflow (OSS/Production)
-
-```yaml
-workflow:
-  branch: feature/{type}/{name} for all changes
-  pr: required before merge to main
-  review: /kernel:review + CI checks
-  merge: squash merge to main
-```
-
-OSS_REF
-fi
-
-if [ "$PROFILE" = "github-production" ]; then
-  echo "## Team Signals"
-  echo "Production profile detected: >2 collaborators or environments configured."
-  echo "Use GitHub Issues for work tracking. Enforce branch protection."
+  echo "## ⚠️ KERNEL not initialized (no agent.db at $VAULTS/_meta/agentdb/)"
+  echo "Repair: \`mkdir -p _meta/{agentdb,research,plans,handoffs,agents} && agentdb init\`"
   echo ""
 fi
 
