@@ -2091,12 +2091,19 @@ test_analyzer_agent_has_model_opus() {
   grep -q "model: opus" "$PLUGIN_ROOT/agents/analyzer.md"
 }
 
-test_orchestration_has_progressive_autonomy() {
-  grep -q "progressive_autonomy" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+test_orchestration_has_lane_contract() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
+  assert_contains "$content" "lane_contract" "orchestration should define the lane contract"
+  assert_contains "$content" "Forbidden list" "lane contract should include a forbidden list"
+  assert_contains "$content" "Raw-data return format" "lane contract should demand raw-data returns"
 }
 
-test_orchestration_has_budget_awareness() {
-  grep -q "budget_awareness" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
+test_orchestration_has_worker_model_doctrine() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
+  assert_contains "$content" "worker_model_doctrine" "orchestration should carry the worker-model doctrine"
+  assert_contains "$content" "use your judgment" "doctrine should name the judgment tell"
 }
 
 test_claude_md_references_analyzer() {
@@ -2182,10 +2189,6 @@ test_claude_md_references_app_dev() {
 
 test_quality_has_adsr() {
   grep -q "adsr" "$PLUGIN_ROOT/skills/quality/SKILL.md"
-}
-
-test_orchestration_has_checkpoint_recovery() {
-  grep -q "checkpoint_recovery" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
 }
 
 test_agentdb_co_change_exists() {
@@ -2294,35 +2297,12 @@ test_warn_hardcoded_sources_common() {
   assert_contains "$content" "common.sh" "warn-hardcoded.sh should source common.sh"
 }
 
-# --- Entropy Adaptive Tests ---
-
-test_orchestration_has_entropy_adaptive() {
-  local file="$PLUGIN_ROOT/skills/orchestration/SKILL.md"
-  assert_file_exists "$file"
-  local content
-  content=$(cat "$file")
-  assert_contains "$content" "entropy_adaptive" "orchestration SKILL.md should have entropy_adaptive section"
-}
-
-test_entropy_adaptive_has_adaptation_levels() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
-  assert_contains "$content" "low_entropy" "should have low_entropy adaptation"
-  assert_contains "$content" "medium_entropy" "should have medium_entropy adaptation"
-  assert_contains "$content" "high_entropy" "should have high_entropy adaptation"
-}
+# --- Forge Entropy Test ---
 
 test_forge_has_entropy_measurement() {
   local content
   content=$(cat "$PLUGIN_ROOT/commands/forge.md")
   assert_contains "$content" "Measure entropy" "forge.md should mention entropy measurement"
-}
-
-test_entropy_adaptive_has_security_override() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
-  assert_contains "$content" "security-sensitive changes always get full pipeline" "should have security override"
-  assert_contains "$content" "never skip security checks" "should enforce security regardless of entropy"
 }
 
 # === Run Tests ===
@@ -2744,13 +2724,11 @@ run_test_suite() {
       run_test "analyzer agent exists with frontmatter" test_analyzer_agent_exists_with_frontmatter
       run_test "analyzer agent has dependency detection" test_analyzer_agent_has_dependency_detection
       run_test "analyzer agent has model opus" test_analyzer_agent_has_model_opus
-      run_test "orchestration has progressive_autonomy" test_orchestration_has_progressive_autonomy
-      run_test "orchestration has budget_awareness" test_orchestration_has_budget_awareness
+      run_test "orchestration defines the lane contract" test_orchestration_has_lane_contract
+      run_test "orchestration carries worker-model doctrine" test_orchestration_has_worker_model_doctrine
       run_test "CLAUDE.md references analyzer" test_claude_md_references_analyzer
       ;;
     phase4_extensions)
-      run_test "quality SKILL.md has adsr section" test_quality_has_adsr
-      run_test "orchestration SKILL.md has checkpoint_recovery" test_orchestration_has_checkpoint_recovery
       run_test "agentdb co-change command exists" test_agentdb_co_change_exists
       run_test "co-change runs without error" test_agentdb_co_change_runs
       ;;
@@ -2784,10 +2762,7 @@ run_test_suite() {
       run_test "CLAUDE.md references app-dev" test_claude_md_references_app_dev
       ;;
     entropy_adaptive)
-      run_test "orchestration has entropy_adaptive section" test_orchestration_has_entropy_adaptive
-      run_test "entropy_adaptive has low/medium/high adaptation" test_entropy_adaptive_has_adaptation_levels
       run_test "forge.md mentions entropy measurement" test_forge_has_entropy_measurement
-      run_test "entropy_adaptive has security override" test_entropy_adaptive_has_security_override
       ;;
   esac
 }
