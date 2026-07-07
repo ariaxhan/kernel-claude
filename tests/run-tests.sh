@@ -2401,6 +2401,26 @@ test_autopush_postcommit_is_disabled() {
   assert_contains "$hook" "exit 0"
 }
 
+test_autopush_install_is_opt_in() {
+  # Per-commit autopush install must be a no-op unless AUTOPUSH_ON=1 (opt-in).
+  # AUTOPUSH_OFF is pinned to 0 so a machine-level AUTOPUSH_OFF=1 can't mask the check.
+  local d; d=$(mktemp -d)
+  git -C "$d" init -q
+  (cd "$d" && CLAUDE_PROJECT_DIR="$d" AUTOPUSH_OFF=0 AUTOPUSH_ON=0 \
+    bash "$PLUGIN_ROOT/hooks/scripts/autopush.sh" install >/dev/null 2>&1)
+  if [ -f "$d/.git/hooks/post-commit" ]; then
+    echo "FAIL: install stamped a post-commit hook without AUTOPUSH_ON=1"
+    rm -rf "$d"; return 1
+  fi
+  (cd "$d" && CLAUDE_PROJECT_DIR="$d" AUTOPUSH_OFF=0 AUTOPUSH_ON=1 \
+    bash "$PLUGIN_ROOT/hooks/scripts/autopush.sh" install >/dev/null 2>&1)
+  if [ ! -f "$d/.git/hooks/post-commit" ]; then
+    echo "FAIL: install with AUTOPUSH_ON=1 should stamp the hook"
+    rm -rf "$d"; return 1
+  fi
+  rm -rf "$d"
+}
+
 test_autopush_sweep_has_red_gate() {
   assert_contains "$(grep -A1 'tests RED' "$PLUGIN_ROOT/hooks/scripts/autopush.sh")" "continue"
 }
@@ -2430,6 +2450,7 @@ run_test_suite() {
       run_test "test-gate red recovers to pass" test_test_gate_status_recovers_to_pass
       run_test "test-gate honors override file" test_test_gate_honors_override_file
       run_test "autopush postcommit is disabled" test_autopush_postcommit_is_disabled
+      run_test "autopush install is opt-in" test_autopush_install_is_opt_in
       run_test "autopush sweep has red gate" test_autopush_sweep_has_red_gate
       run_test "session-end runs test gate" test_session_end_runs_test_gate
       run_test "session-start surfaces red" test_session_start_surfaces_red
