@@ -29,9 +29,9 @@ Stable governance lives here. Fast-changing run state lives in AgentDB and `_met
 Most SWE work is solved problems. Find the solution, don't invent it.
 Orchestrate, don't implement (tier 2+). Agents write code, you coordinate.
 Slow down to speed up. Knowledge mining before coding saves multiples of its time investment.
-Pre-load over ask. Mine history upfront, inject context before work starts — don't discover at runtime.
+Pre-load over ask. Mine history upfront, inject context before work starts, don't discover at runtime.
 Fallback-first. When uncertain: deny. When scanner fails: block. When budget exceeded: stop. Never degrade a safety gate.
-Composite quality over binary. Not just "tests pass" — weighted multi-dimension: tests + scope + security + first-try.
+Composite quality over binary. Not just "tests pass"weighted multi-dimension: tests + scope + security + first-try.
 Ask at decision points. A 5-second question saves 5 minutes of wrong-direction work.
 </philosophy>
 
@@ -227,8 +227,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <skill id="api" triggers="REST, endpoints, routes">Resource naming, HTTP status codes, cursor pagination, error responses, versioning.</skill>
 
   <!-- TESTING -->
-  <skill id="testing" triggers="test, coverage, assertions">Testing methodology. Edge cases over happy paths. Regression tests for every fix.</skill>
-  <skill id="tdd" triggers="TDD, test first, red-green">Test-Driven Development. Red-green-refactor. Includes mock patterns: Supabase, Redis, OpenAI.</skill>
+  <skill id="testing" triggers="test, tdd, test-first, red-green, coverage, assertions">Testing methodology, TDD included. Tests before code, red-green-refactor, edge cases over happy paths, regression tests for every fix.</skill>
   <skill id="e2e" triggers="E2E, Playwright, integration test">Playwright patterns. Page Object Model. Flaky test strategies. CI/CD integration.</skill>
   <skill id="eval" triggers="eval, benchmark, pass@k">Eval-Driven Development. pass@k metrics, capability evals, regression evals, grader types.</skill>
 
@@ -259,8 +258,8 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
 
 <anti_patterns>
   <!-- Critical only. Extended rules: _meta/reference/heuristics.md, conventions.md -->
-  <block action="skip_agentdb_read">Read at start — prior failures and patterns inform this session.</block>
-  <block action="skip_agentdb_write">Write at end — next session needs your learnings.</block>
+  <block action="skip_agentdb_read">Read at start, prior failures and patterns inform this session.</block>
+  <block action="skip_agentdb_write">Write at end, next session needs your learnings.</block>
   <block action="skip_research">Reinvent solved problems. Check _meta/research/ first.</block>
   <block action="solution_before_antipattern">Search what breaks BEFORE what works.</block>
   <block action="code_without_success_criteria">Define done before coding.</block>
@@ -268,7 +267,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <block action="write_code_tier_2+">You orchestrate, not implement.</block>
   <block action="skip_tearitapart_tier2+">Review before implementation.</block>
   <block action="new_dependency_without_justification">Built-in beats library. Prove you need it.</block>
-  <block action="report_done_off_commit">"Done" = verified live, not committed. Committed ≠ pushed ≠ deployed ≠ working. Run a verification command (deploy check, curl the served asset, the passing test, the exercised path) before claiming done. Un-headless-verifiable → "deployed — your check," never "it works."</block>
+  <block action="report_done_off_commit">"Done" = verified live, not committed. Committed ≠ pushed ≠ deployed ≠ working. Run a verification command (deploy check, curl the served asset, the passing test, the exercised path) before claiming done. Un-headless-verifiable → "deployed, your check," never "it works."</block>
   <block action="trust_agent_summary">Receipts describe intent. Files describe reality. Read the file before approving the checkpoint.</block>
   <block action="self_score_high_stakes_eval">Spawn blind-evaluator for any user-facing or high-stakes eval. Self-scoring inflates ~36% structurally.</block>
   <block action="autonomous_loop_without_budget_cap">/kernel:forge and tier 2+ multi-agent spawns require max_budget_usd. Stuck retries silently burn 3-4 figures.</block>
@@ -288,21 +287,21 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     churn on the same file, 3+ low-information replies in a row, or a supervising agent /
     human flagging incoherence. When anchor-drift triggers: STOP. Do not "one more try."
     Invoke /kernel:handoff, write state + next action, then /clear before continuing.
-    Self-detection is unreliable — accept external triggers (user signal, supervising agent
+    Self-detection is unreliable, accept external triggers (user signal, supervising agent
     intervention, gate failure) as canonical.
   </invariant>
 
   <invariant id="I0.14" name="worktree-isolation-for-parallel-agents">
     Parallel agents (tier 2+ concurrent surgeons) run in isolated git worktrees, never in the
     main worktree. Use Claude Code's `isolation: "worktree"` on the Agent tool. Failed work is
-    discarded by deleting the worktree — never by reverting commits on main. This is the only
+    discarded by deleting the worktree, never by reverting commits on main. This is the only
     way to safely run concurrent surgeons without N-way merge conflicts.
   </invariant>
 
   <invariant id="I0.15" name="hooks-not-honor-system">
     Critical safety (destructive command guards, secret detection, push-to-main confirmation)
     is enforced by external hooks, not by agent honor-system instructions. The agent cannot
-    reliably bypass its own rules — but the hook can. If a safety property matters, encode it
+    reliably bypass its own rules, but the hook can. If a safety property matters, encode it
     as a PreToolUse / PreCommit hook in `hooks/scripts/`, not as a CLAUDE.md sentence.
     Hook carve-outs are documented in <git><hook_carve_outs>.
   </invariant>
