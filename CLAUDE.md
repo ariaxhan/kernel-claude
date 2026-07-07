@@ -55,11 +55,11 @@ Location: _meta/agentdb/agent.db
 <!-- ============================================ -->
 
 <tiers>
-  <tier n="1" files="1-2" role="executor">Execute directly. Write code yourself.</tier>
-  <tier n="2" files="3-5" role="orchestrator">Contract → surgeon → adversary (coordination) → review.</tier>
-  <tier n="3" files="6+" role="orchestrator">Contract → surgeon → adversary (coordination + code) → verify.</tier>
+  <tier n="1" risk="low" role="executor">Easy to undo + loud if wrong + narrow blast radius. Execute directly.</tier>
+  <tier n="2" risk="durable" role="orchestrator">Persistent or moderately quiet. Contract → surgeon if useful → adversary/review.</tier>
+  <tier n="3" risk="high" role="orchestrator">Hard to undo, quiet if wrong, or wide blast radius. Contract → surgeon → adversary → verify.</tier>
 
-  <rule>Count files BEFORE deciding. Ambiguous = assume higher tier.</rule>
+  <rule>Tier by reversibility × silence × blast radius. File count is only a weak hint. Ambiguous = assume higher tier.</rule>
   <rule>IF tier >= 2: create contract, spawn agents, read AgentDB. DO NOT write code.</rule>
   <rule>IF tier >= 2: run /kernel:tearitapart before implementation.</rule>
 </tiers>
@@ -81,29 +81,17 @@ Location: _meta/agentdb/agent.db
   <agent id="cartographer">agents/cartographer.md. Opus whole-codebase mapper. 1M context for holistic understanding. Maps modules, dependencies, risk zones.</agent>
   <agent id="coroner">agents/coroner.md. Sonnet post-mortem analyst. Structured cause-of-death for failed contracts using AgentDB telemetry.</agent>
   <agent id="pre-ship">agents/pre-ship.md. Composite release gate. Spawns 4 parallel validators, aggregates into SHIP/NO-SHIP verdict.</agent>
+  <agent id="blind-evaluator">agents/blind-evaluator.md. Structurally separate evaluator. Receives ONLY the problem statement + rubric, never the solution. For high-stakes assessment where self-scoring inflates.</agent>
+  <agent id="deep-diver">agents/deep-diver.md. Pre-implementation failure-mode research. Merges GitHub-issue + production-case channels into a failure-mode map at _meta/research/. Gates non-trivial native/infra/schema work.</agent>
+  <agent id="dreamer">agents/dreamer.md. Multi-perspective debate. Generates minimalist, maximalist, and pragmatist approaches grounded in actual codebase context.</agent>
   <rule>Tier 2+: you orchestrate. Agents write to AgentDB, not conversation.</rule>
   <rule>Every agent must load relevant skills/*/SKILL.md and reference skills/*/reference/*-research.md when applicable.</rule>
 </agents>
 
 <flow>
-  READ → CLASSIFY → [branch] → SCOPE → DEFINE SUCCESS → EXECUTE → [branch] → LEARN
-  <step id="read">agentdb read-start. Check _meta/research/ for prior work.</step>
-  <step id="classify">Task type. Familiar? Search before asking.</step>
-  <step id="research">Anti-patterns FIRST. Then proven solutions. Built-in beats dependency.</step>
-  <step id="scope">Count files → determine tier. Ambiguous = higher tier.</step>
-  <step id="define">Acceptance criteria + evals BEFORE coding.</step>
-  <step id="execute">Tier 1: implement. Tier 2+: contract → surgeon → verify.</step>
-  <step id="learn">agentdb learn. Update research docs. Checkpoint.</step>
-
-  <branches>
-    classify.familiar AND scope.tier==1 → skip research, go to scope
-    scope.reveals_unknowns → loop back to research
-    execute.fails → branch to debug skill, then retry execute
-    adversary.rejects → loop to surgeon with feedback (max 3 retries)
-  </branches>
-
-  <rule>Never implement first solution. Generate 2-3 approaches, choose simplest.</rule>
-  <rule>Never code without research. Most problems are already solved.</rule>
+  Read context (agentdb read-start, _meta/research/) → research anti-patterns before solutions →
+  tier the work → define success before coding → execute (tier 1 directly; tier 2+ contract → surgeon → verify) → learn (agentdb learn).
+  Never implement the first idea: generate 2-3 approaches, choose simplest. Details live in the skills, not here.
 </flow>
 
 <contract>
@@ -244,7 +232,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <!-- WORKFLOW -->
   <skill id="git" triggers="commit, branch, merge, PR">Atomic commits, conventional messages, branch strategies, merge protocols.</skill>
   <skill id="design" triggers="UI, frontend, styling, visual">/design command. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
-  <skill id="app-dev" triggers="app, mobile, EAS, store submission, build, deploy">Mobile/web build pipeline, EAS, store submission, pre-submission checklists.</skill>
+  <skill id="app-dev" triggers="app, mobile, store submission, build, deploy, fastlane">Mobile/web build pipeline: fastlane-first local builds, store submission, pre-submission checklists. EAS only as a stated exception.</skill>
 
   <!-- EXPERIMENTATION -->
   <skill id="experiment" triggers="experiment, hypothesis, prove, test rule, validate methodology, scientific, evidence">Scientific method for rules. Every rule is a hypothesis until proven. Seed, test, graduate, or kill based on evidence.</skill>

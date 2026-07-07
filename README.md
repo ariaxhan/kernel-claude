@@ -40,7 +40,7 @@ AgentDB remembers what worked, what broke, and where you left off — across eve
 
 ### Agents That Coordinate
 
-13 specialized agents route by complexity. Tier 1 (1-2 files) executes directly. Tier 2+ spawns surgeons to implement and an adversary to verify. The adversary checks **coordination first** (file overlap, scope drift, duplicate work) because our telemetry proved coordination failures are 4.3x more impactful than code bugs.
+15 specialized agents route by complexity (tier = reversibility x silence x blast radius; file count is only a weak hint). Tier 1 executes directly. Tier 2+ spawns surgeons to implement and an adversary to verify. The adversary checks **coordination first** (file overlap, scope drift, duplicate work) because our telemetry proved coordination failures are 4.3x more impactful than code bugs.
 
 | Agent | Role |
 |-------|------|
@@ -58,7 +58,7 @@ The experiment engine treats every rule as a hypothesis. It seeds them from your
 
 ### Skills That Load On-Demand
 
-20 skills (testing, security, debug, api, backend, architecture, etc.) load when relevant — not at startup. Each is a methodology: HOW to approach a problem, not just tools to use.
+19 skills (testing, security, debug, api, backend, architecture, etc.) load when relevant — not at startup. Each is a methodology: HOW to approach a problem, not just tools to use.
 
 ---
 
