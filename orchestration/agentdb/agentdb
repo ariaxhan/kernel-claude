@@ -1446,7 +1446,7 @@ cmd_inject_context() {
       echo "## Recent Verdicts"
       db_exec "SELECT '- ' || content FROM context WHERE type='verdict' ORDER BY ts DESC LIMIT 3;" 2>/dev/null || true
       ;;
-    triage|understudier)
+    triage)
       echo "## Complexity Signals"
       db_exec "SELECT '- ' || insight FROM learnings WHERE type IN ('failure', 'gotcha') ORDER BY ts DESC LIMIT 5;" 2>/dev/null || true
       echo ""

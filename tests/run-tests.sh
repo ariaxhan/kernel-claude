@@ -1733,27 +1733,28 @@ test_triage_has_complexity_classification() {
    grep -q "epic:" "$PLUGIN_ROOT/agents/triage.md")
 }
 
-test_understudier_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/agents/understudier.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/agents/understudier.md" | grep -q "^---"
+test_understudier_is_gone() {
+  # understudier merged into triage (viability pre-flight); the file must stay deleted.
+  if [ -f "$PLUGIN_ROOT/agents/understudier.md" ]; then
+    echo "FAIL: agents/understudier.md should not exist (folded into triage)"
+    return 1
+  fi
 }
 
-test_understudier_model_haiku() {
-  grep -q "^model: haiku" "$PLUGIN_ROOT/agents/understudier.md"
-}
-
-test_understudier_has_viability_assessment() {
-  grep -q "viable" "$PLUGIN_ROOT/agents/understudier.md" &&
-  grep -q "risky" "$PLUGIN_ROOT/agents/understudier.md" &&
-  grep -q "blocked" "$PLUGIN_ROOT/agents/understudier.md"
+test_triage_has_viability_preflight() {
+  grep -qi "viability pre-flight" "$PLUGIN_ROOT/agents/triage.md"
 }
 
 test_claude_md_references_triage() {
   grep -q 'agent id="triage"' "$PLUGIN_ROOT/CLAUDE.md"
 }
 
-test_claude_md_references_understudier() {
-  grep -q 'agent id="understudier"' "$PLUGIN_ROOT/CLAUDE.md"
+test_researcher_model_not_pinned() {
+  # Deep research on haiku is a tier mismatch; researcher inherits the session model.
+  if grep -q "^model:" "$PLUGIN_ROOT/agents/researcher.md"; then
+    echo "FAIL: researcher.md must not pin a model"
+    return 1
+  fi
 }
 
 # --- Inject Context Tests ---
@@ -2677,11 +2678,10 @@ run_test_suite() {
       run_test "triage.md exists with frontmatter" test_triage_exists_with_frontmatter
       run_test "triage.md has model: haiku" test_triage_model_haiku
       run_test "triage.md has complexity classification" test_triage_has_complexity_classification
-      run_test "understudier.md exists with frontmatter" test_understudier_exists_with_frontmatter
-      run_test "understudier.md has model: haiku" test_understudier_model_haiku
-      run_test "understudier.md has viability assessment" test_understudier_has_viability_assessment
+      run_test "triage.md carries the viability pre-flight" test_triage_has_viability_preflight
+      run_test "understudier stays deleted" test_understudier_is_gone
+      run_test "researcher model is not pinned" test_researcher_model_not_pinned
       run_test "CLAUDE.md references triage agent" test_claude_md_references_triage
-      run_test "CLAUDE.md references understudier agent" test_claude_md_references_understudier
       ;;
     approval_rfactor)
       run_test "approval-learner exists with frontmatter" test_approval_learner_exists_with_frontmatter

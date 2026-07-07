@@ -241,7 +241,7 @@ adaptation detail:
     rationale: some unknowns but manageable risk
 
   high_entropy:
-    full: researcher + scout → triage → understudier → surgeon → adversary → reviewer
+    full: researcher + scout → triage → surgeon → adversary → reviewer
     add: coroner on failure (automatic post-mortem)
     rationale: maximum coverage, expect failures, learn from them
 
