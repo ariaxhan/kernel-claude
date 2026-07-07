@@ -2196,30 +2196,30 @@ test_agentdb_co_change_runs() {
 # === Framework Tests (Phase 4) ===
 
 test_template_exists() {
-  assert_file_exists "$PLUGIN_ROOT/skills/TEMPLATE.md" "TEMPLATE.md should exist"
+  assert_file_exists "$PLUGIN_ROOT/docs/skill-template.md" "TEMPLATE.md should exist"
 }
 
 test_template_has_sources() {
   local content
-  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
   assert_contains "$content" "sources:" "TEMPLATE.md should have sources section"
 }
 
 test_template_has_triggers() {
   local content
-  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
   assert_contains "$content" "triggers:" "TEMPLATE.md should have triggers section"
 }
 
 test_template_has_gates() {
   local content
-  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
   assert_contains "$content" "gates:" "TEMPLATE.md should have gates section"
 }
 
 test_template_has_output() {
   local content
-  content=$(cat "$PLUGIN_ROOT/skills/TEMPLATE.md")
+  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
   assert_contains "$content" "output:" "TEMPLATE.md should have output section"
 }
 
