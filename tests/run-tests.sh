@@ -2408,6 +2408,18 @@ test_pre_compact_has_red_gate() {
   assert_contains "$(cat "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh")" ".test-status"
 }
 
+test_lifecycle_hooks_guard_main_push() {
+  local session_end precompact postcommit
+  session_end=$(cat "$PLUGIN_ROOT/hooks/scripts/session-end.sh")
+  precompact=$(cat "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh")
+  postcommit=$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")
+
+  assert_contains "$session_end" "NEVER AUTO-COMMIT" "session-end should forbid auto-commit"
+  assert_contains "$session_end" "test-gate.sh" "session-end should run the test gate before reporting dirty work"
+  assert_contains "$precompact" "PreCompact must NEVER create a commit" "pre-compact should forbid auto-commit"
+  assert_contains "$postcommit" "AUTO-PUSH DISABLED" "post-commit auto-push should stay disabled"
+}
+
 run_test_suite() {
   local suite="$1"
   echo ""
