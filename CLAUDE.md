@@ -176,8 +176,10 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     Bug mode: reproduce → trace → isolate → hypothesize → diagnose.
     Refactor mode: map → trace deps → coupling → risks → diagnose.
   </command>
-  <command id="/kernel:retrospective" purpose="Cross-session learning synthesis. Finds patterns, resolves contradictions, promotes insights." file="commands/retrospective.md">
-    Groups learnings, merges duplicates, archives stale, promotes high-confidence patterns.
+  <command id="/kernel:retrospective" purpose="Cross-session learning synthesis. Finds patterns, resolves contradictions, promotes insights into project artifacts." file="commands/retrospective.md">
+    Groups learnings, merges duplicates, archives stale, promotes via the artifact ladder
+    (hook > agent > skill > prose), scaffolds the artifact in the host project's .claude/,
+    doesn't just recommend. Audits project fit: missing artifacts created, dormant ones flagged.
   </command>
   <command id="/kernel:metrics" purpose="Observability dashboard. Sessions, agents, hooks, learnings." file="commands/metrics.md">
     Wraps agentdb metrics + health with actionable insights.
@@ -258,6 +260,8 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <block action="trust_agent_summary">Receipts describe intent. Files describe reality. Read the file before approving the checkpoint.</block>
   <block action="self_score_high_stakes_eval">Spawn blind-evaluator for any user-facing or high-stakes eval. Self-scoring inflates ~36% structurally.</block>
   <block action="autonomous_loop_without_budget_cap">/kernel:forge and tier 2+ multi-agent spawns require max_budget_usd. Stuck retries silently burn 3-4 figures.</block>
+  <block action="verify_sub_computation_only">A green sub-computation is not a green control flow. Drive the armed path end-to-end (wired hook, registered handler, fresh runtime); echo-test every wrapper param once (silently dropped params run defaults while reporting your value); name the live call site that reaches new code, built-but-unreachable is not shipped.</block>
+  <block action="promote_learning_to_prose">A pattern reinforced 2+ (or once, if the failure is quiet/expensive) becomes an artifact: hook if enforceable, agent if it's a role, skill if it's methodology. CLAUDE.md prose is the last resort, not the default. Project-specific artifacts scaffold into the host project's .claude/, not the plugin.</block>
 </anti_patterns>
 
 <!-- ============================================ -->

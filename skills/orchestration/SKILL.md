@@ -27,6 +27,23 @@ Every spawned lane gets ALL of these fields; a missing field is where the lane f
    alone; a lane that returns only prose has returned nothing checkable.
 </lane_contract>
 
+<output_integrity>
+Structured long-report lanes degrade silently to placeholders under load. Validate
+every lane return mechanically before using it: minimum-length check on required
+sections, placeholder detection ("TBD", "...", repeated boilerplate), counts match
+the claimed work. Reject-and-retry a degraded return; never synthesize over it.
+Pass large input pools to lanes by FILE PATH, never as an inline slice (silent
+truncation reads as full coverage). Each lane keeps a per-lane journal/checkpoint
+so a degraded final message is not the only record of what it did.
+</output_integrity>
+
+<single_coordinator>
+One coordinator per repo at a time. Before coordinating, check for a live second
+session on the same working directory (stale sessions can survive as background
+daemons and produce split-brain: two coordinators mutating one repo in parallel).
+When killing a stuck session, kill its whole process pool, not just the visible pid.
+</single_coordinator>
+
 <worker_model_doctrine>
 Cheap models (haiku/codex-tier) are safe ONLY for total-spec execution and mechanical
 evidence-only verification: zero delegated decisions, a pre-verified guide, every step
@@ -66,7 +83,9 @@ Holding context in memory instead of AgentDB · assuming a lane finished without
 reading the deliverable file (receipts describe intent; files describe reality) ·
 parallel lanes touching shared files (N-way merge conflicts) · serial execution when
 parallel is genuinely safe · retrying without new information from the failure ·
-autonomous loops without a budget cap (`max_budget_usd` on the contract).
+autonomous loops without a budget cap (`max_budget_usd` on the contract) ·
+accepting a lane return without the output-integrity check (placeholder degradation
+is silent) · two coordinators on one repo.
 </anti_patterns>
 
 </skill>

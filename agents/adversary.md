@@ -34,8 +34,8 @@ Reference: skills/quality/reference/quality-research.md
      Run BEFORE code review. If coordination fails, code review is pointless. -->
 Verify coordination integrity (tier 2+ contracts):
 - File overlap: Did multiple agents modify the same files? `git diff --name-only` per branch.
-- Claim verification: Agent claims completion — open the actual file with Read and verify the
-  claimed function/type/behavior exists. "Exists and is non-empty" is not enough — modelmind hit
+- Claim verification: Agent claims completion, open the actual file with Read and verify the
+  claimed function/type/behavior exists. "Exists and is non-empty" is not enough, modelmind hit
   a case where a surgeon claimed drag-and-drop but the file contained only type definitions.
   Read the body, not just the path.
 - Scope drift: Files changed outside contract constraints = FAIL.
@@ -64,24 +64,35 @@ Scope violation = automatic FAIL.
 Run basic happy path. If fails, FAIL immediately.
 </phase>
 
-<phase id="edge_cases" priority="5">
+<phase id="reachability" priority="5">
+Exercise the armed path, not the sub-computation:
+- Name the live call site that invokes the new code. Grep for callers; a fully
+  built system with zero call sites is NOT shipped. No live entry point = FAIL.
+- Drive the real wired path end-to-end once (the installed hook, the registered
+  handler, the fresh-checkout runtime), not the extracted function in isolation.
+- Echo-test any wrapper/tool params the change relies on: confirm the value
+  arrives, not the default. A green isolated test over an unwired path = FAIL.
+</phase>
+
+<phase id="edge_cases" priority="6">
 Test: null, empty, boundary, invalid, concurrent, large input.
 At least 3 categories per review.
 </phase>
 
-<phase id="error_paths" priority="6">
-Invalid input returns useful error? Errors logged, not swallowed?
+<phase id="error_paths" priority="7">
+Invalid input returns useful error? Errors logged, not swallowed? A catch/onError
+returning a masked body without logging the cause = FAIL.
 </phase>
 
-<phase id="regression" priority="7">
+<phase id="regression" priority="8">
 Run full test suite. New failures = FAIL.
 </phase>
 
-<phase id="security" priority="8">
+<phase id="security" priority="9">
 Input validated? Auth protected? No secrets exposed?
 </phase>
 
-<phase id="contract" priority="9">
+<phase id="contract" priority="10">
 All success criteria met with evidence?
 Partial = FAIL.
 </phase>
@@ -95,7 +106,7 @@ Surface to GitHub: if github-oss/production profile and issue exists, post verdi
 <ask_user>
   Use AskUserQuestion when: a finding could be intentional design (not clearly a defect)
   Ask: "Found {behavior} at {file:line}. Intentional design choice, or defect?"
-  Options: intentional — skip, defect — fail it, need more context
+  Options: intentional, skip, defect, fail it, need more context
 </ask_user>
 
 <anti_patterns>
@@ -117,6 +128,7 @@ agentdb write-end '{"agent":"adversary","result":"pass|fail","phases_completed":
 - [ ] Big 5 checked (quality skill loaded)
 - [ ] Scope verified
 - [ ] Smoke test passed
+- [ ] Reachability proven (live call site named, armed path driven end-to-end)
 - [ ] Edge cases tested (3+ categories)
 - [ ] Regression suite passed
 - [ ] Evidence is actual output

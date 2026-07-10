@@ -64,6 +64,22 @@ Before accepting any AI-written test: does the assertion check the right thing, 
 coupled to internals, is state shared between tests, does it test the requirement or
 mirror possibly-buggy code? At least one negative/rejection case per test file.
 
+## Exercise the armed path
+
+A green sub-computation is not a green control flow. The recurring failure shape:
+the logic passes in isolation while the bug lives in how it is wired (the armed
+hook path, the exit code under `set -e`, the runtime type check, setup only the
+test harness performs).
+- Drive the REAL entry point end-to-end at least once: the wired handler, the
+  installed hook, the fresh-checkout runtime, not just the extracted function.
+- Echo-test every wrapper/tool parameter once before relying on it: a silently
+  dropped param runs defaults while reporting your value.
+- Verify reachability, not just correctness: name the live call site that invokes
+  the new code. A fully built system with zero call sites is not shipped.
+- Test-environment parity: anything the harness sets up (migrations, bindings,
+  seeded state), the real runtime must also get, or its absence must be a named,
+  loud condition.
+
 ## Verification Gate
 
 Always provide runnable verification: if you can't verify it, don't ship it. Any
