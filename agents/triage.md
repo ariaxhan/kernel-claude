@@ -17,7 +17,7 @@ agentdb read-start
 
 <input>
 - Task description (natural language)
-- File count (estimated or exact)
+- Estimated files, if known
 - Current learnings from AgentDB (patterns, failures)
 </input>
 
@@ -25,10 +25,10 @@ agentdb read-start
 <phase id="classify">
 Analyze task against classification matrix:
 
-  low:    1-2 files, familiar pattern, existing tests       -> tier 1
-  medium: 3-5 files, some unknowns, partial test coverage   -> tier 2
-  high:   6+ files, unfamiliar tech, cross-cutting concerns  -> tier 3
-  epic:   architecture change, schema migration, breaking changes -> tier 3 + human review
+  low:    easy to undo, loud if wrong, narrow blast radius -> tier 1
+  medium: persistent or moderately quiet failure           -> tier 2
+  high:   hard to undo, quiet if wrong, or wide blast      -> tier 3
+  epic:   architecture, schema, security, policy, or breaking change -> tier 3 + human review
 
 Signals that increase complexity:
 - Multiple modules touched
@@ -36,6 +36,7 @@ Signals that increase complexity:
 - New dependency required
 - Schema or API contract changes
 - Auth/payment/migration involvement
+- Failure would be silent or hard to notice
 </phase>
 
 <phase id="risk_scan">
@@ -69,7 +70,7 @@ surface the ambiguity and ask:
 
 <integration>
 Called at start of /kernel:ingest CLASSIFY step, before tier determination.
-Replaces manual file counting with structured assessment.
+Replaces manual file counting with structured risk assessment. File count is only a weak hint.
 </integration>
 
 <anti_patterns>

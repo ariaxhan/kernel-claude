@@ -28,23 +28,41 @@ command -v sqlite3 >/dev/null 2>&1 || { echo "Error: sqlite3 required but not fo
 
 # Find project root (where .claude/ or _meta/ exists)
 find_project_root() {
-  # Explicit override wins — pin the DB location to dodge the PWD-walk foot-gun
+  # Explicit override wins: pin the DB location to dodge the PWD-walk foot-gun
   # when agents run from sub-dirs or temp dirs (D9/R7).
   if [ -n "${AGENTDB_ROOT:-}" ]; then
     echo "$AGENTDB_ROOT"
     return
   fi
+  # KERNEL_VAULTS (if set) is the privileged vault root. A "nested vault" (a
+  # direct child of it that carries its own _meta/.claude, e.g. CollabVault or
+  # CodingVault) must NOT shadow it for a root-scoped command: walk THROUGH such a
+  # match up to KERNEL_VAULTS and return the root, with a one-line shadow warning.
+  # Genuine projects (deeper than a direct child) still win via the nearest-ancestor
+  # rule. This whole block is gated on KERNEL_VAULTS being set, so the walk is
+  # byte-for-byte unchanged when it is unset (design 3.9).
+  local kv="${KERNEL_VAULTS:-}"; kv="${kv%/}"
   local dir="$PWD"
+  local shadow=""
   while [ "$dir" != "/" ]; do
     if [ -d "$dir/_meta" ] || [ -d "$dir/.claude" ]; then
+      if [ -n "$kv" ] && [ "$dir" != "$kv" ] && [ "$(dirname "$dir")" = "$kv" ]; then
+        # A nested vault sitting directly under KERNEL_VAULTS: record it, keep climbing.
+        [ -z "$shadow" ] && shadow="$dir"
+        dir=$(dirname "$dir")
+        continue
+      fi
+      if [ -n "$shadow" ] && [ "$dir" = "$kv" ]; then
+        echo "agentdb: warning: nested vault $shadow shadows KERNEL_VAULTS root $kv; routing to $kv (set AGENTDB_ROOT to pin a different db)" >&2
+      fi
       echo "$dir"
       return
     fi
     dir=$(dirname "$dir")
   done
-  # Fallback: nothing found on the walk up. Warn — this is how orphan DBs get
+  # Fallback: nothing found on the walk up. Warn: this is how orphan DBs get
   # created in whatever PWD happened to be (the "VaultsS" typo orphan, etc.).
-  echo "agentdb: warning — no _meta/ or .claude/ above $PWD; using PWD (set AGENTDB_ROOT to pin)" >&2
+  echo "agentdb: warning: no _meta/ or .claude/ above $PWD; using PWD (set AGENTDB_ROOT to pin)" >&2
   echo "$PWD"
 }
 
@@ -88,6 +106,77 @@ db_exec_opts() {
 .timeout 5000
 $1
 EOF
+}
+
+# Ensure the soft-delete cache columns exist on the LOCAL learnings table
+# (migration 014, design 3.7). SQLite has no ADD COLUMN IF NOT EXISTS, so this
+# PRAGMA-gates the add. Single source of truth for the archived_at/archived_reason
+# columns: cmd_preflight, cmd_read_start, cmd_recall, and cmd_decay all call this
+# so the "WHERE archived_at IS NULL" filter is safe regardless of preflight timing.
+# Idempotent + cheap (one PRAGMA select), best-effort (never fails the caller).
+_ensure_softdelete_cols() {
+  [ -f "$DB" ] || return 0
+  local has
+  has=$(db_exec "SELECT 1 FROM pragma_table_info('learnings') WHERE name='archived_at' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has" ]; then
+    db_exec "ALTER TABLE learnings ADD COLUMN archived_at TEXT;" 2>/dev/null || true
+    db_exec "ALTER TABLE learnings ADD COLUMN archived_reason TEXT;" 2>/dev/null || true
+  fi
+  return 0
+}
+
+# Return a SQL literal for a text value: '<escaped>' for a non-empty string, or
+# bare NULL for an empty one (absence = UNKNOWN, never an empty-string fact; the
+# null-semantics contract, design 5.2).
+_sql_text() {
+  if [ -z "${1:-}" ]; then printf 'NULL'; else printf "'%s'" "$(sql_escape "$1")"; fi
+}
+
+# Append one row to the memory-lifecycle event spine (memory_events, design 2.1).
+# BEST-EFFORT BY CONTRACT: a failed emit prints a LOUD warning to stderr and
+# returns 0, so instrumentation can never break a learn/recall/decay/read-start.
+# Never UPDATEs or DELETEs (append-only). event_id is globally unique across dbs.
+# Args (positional; empty = SQL NULL):
+#   1 kind (required)   2 subject_id   3 reason   4 payload_json
+#   5 actor             6 object_id    7 inference_method
+#   8 source_db         9 source_row_id  10 import_batch_id
+emit_memory_event() {
+  local kind="${1:-}" subject_id="${2:-}" reason="${3:-}" payload="${4:-}"
+  local actor="${5:-}" object_id="${6:-}" inference_method="${7:-}"
+  local source_db="${8:-}" source_row_id="${9:-}" import_batch_id="${10:-}"
+
+  if [ -z "$kind" ]; then
+    echo "[agentdb] emit_memory_event: kind is required; event NOT recorded" >&2
+    return 0
+  fi
+  # Advisory known-verb validation (open vocabulary: a new verb is accepted, a
+  # typo in a known verb is surfaced). Never a hard reject (design 2.2).
+  case "$kind" in
+    created|updated|imported|merged|retrieved|surfaced|used|ignored|reinforced|graduated|archived|resurrected|domain_changed|superseded) ;;
+    session_outcome) ;;  # phase-4 causal anchor (design 5.1 weak session association): a session's QA outcome, joined to surfaced events by actor
+    *) echo "[agentdb] emit_memory_event: '$kind' is not a known memory verb (recording anyway; open vocabulary)" >&2 ;;
+  esac
+
+  # actor defaults to the session id if the caller left it empty.
+  [ -z "$actor" ] && actor="${AGENTDB_SESSION_ID:-${CLAUDE_SESSION_ID:-}}"
+
+  local db_short eid
+  db_short=$(basename "$PROJECT_ROOT" 2>/dev/null | tr -cs 'a-zA-Z0-9' '-' | cut -c1-16)
+  [ -z "$db_short" ] && db_short="db"
+  eid="${db_short}-$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}${RANDOM}"
+
+  if db_exec "INSERT INTO memory_events
+      (event_id, kind, actor, source_db, source_row_id, import_batch_id,
+       subject_id, object_id, reason, inference_method, payload)
+      VALUES ('$eid', '$(sql_escape "$kind")', $(_sql_text "$actor"),
+        $(_sql_text "$source_db"), $(_sql_text "$source_row_id"), $(_sql_text "$import_batch_id"),
+        $(_sql_text "$subject_id"), $(_sql_text "$object_id"), $(_sql_text "$reason"),
+        $(_sql_text "$inference_method"), $(_sql_text "$payload"));" 2>/dev/null; then
+    return 0
+  else
+    echo "[agentdb] WARNING: failed to record memory_event (kind=$kind subject=${subject_id:-none}); memory path unaffected, but this observation was LOST. Run 'agentdb preflight' to self-heal the memory_events table." >&2
+    return 0
+  fi
 }
 
 # === COMMANDS ===
@@ -183,7 +272,7 @@ cmd_preflight() {
   fi
 
   # Check 2: Required tables exist
-  local required_tables="learnings context errors _migrations events"
+  local required_tables="learnings context errors _migrations events memory_events"
   for table in $required_tables; do
     local exists
     exists=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='$table' LIMIT 1;" 2>/dev/null || echo "")
@@ -234,6 +323,18 @@ cmd_preflight() {
   if [ -z "$has_errors_domain" ]; then
     echo "preflight:missing_column — errors.domain not found, adding"
     db_exec "ALTER TABLE errors ADD COLUMN domain TEXT;" 2>/dev/null || true
+    repairs=$((repairs + 1))
+  fi
+
+  # Check 3c: learnings has the soft-delete cache columns (migration 014,
+  # design 3.7). Delegated to a single guarded helper (SQLite has no ADD COLUMN
+  # IF NOT EXISTS), shared with read-start/recall/decay so the archived filter is
+  # always safe. Silent + idempotent: only ALTERs when the column is absent.
+  local has_archived
+  has_archived=$(db_exec "SELECT 1 FROM pragma_table_info('learnings') WHERE name='archived_at' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has_archived" ]; then
+    echo "preflight:missing_column learnings.archived_at not found, adding (migration 014)"
+    _ensure_softdelete_cols
     repairs=$((repairs + 1))
   fi
 
@@ -310,6 +411,10 @@ cmd_preflight() {
 cmd_read_start() {
   local mode="${1:---weighted}"
   [ ! -f "$DB" ] && cmd_init >/dev/null
+  _ensure_softdelete_cols  # guarantee the archived_at filter below is valid (design 3.7)
+  # D9 fix (design 5.1): the ids this preamble surfaces + a label, captured per
+  # mode below and emitted as `surfaced` observations after the case.
+  local loaded_ids="" sf_mode=""
 
   echo "# AgentDB Context"
 
@@ -319,16 +424,17 @@ cmd_read_start() {
       echo "## Mode: full (all learnings)"
       echo ""
       echo "## Failures (AVOID THESE)"
-      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') AND archived_at IS NULL ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
       echo ""
       echo "## Patterns"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' AND archived_at IS NULL ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
       echo ""
       echo "## Preferences"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE type='preference' ORDER BY ts DESC;" 2>/dev/null || echo "None"
-      # Telemetry only: bump load_count (NOT hit_count — read-start dumps are not
+      db_exec "SELECT '- ' || insight FROM learnings WHERE type='preference' AND archived_at IS NULL ORDER BY ts DESC;" 2>/dev/null || echo "None"
+      # Telemetry only: bump load_count (NOT hit_count: read-start dumps are not
       # relevance feedback; only recall earns a hit_count bump). See migration 013.
-      db_exec "UPDATE learnings SET load_count = load_count + 1;" 2>/dev/null
+      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE archived_at IS NULL;" 2>/dev/null
+      loaded_ids=$(db_exec "SELECT id FROM learnings WHERE archived_at IS NULL;" 2>/dev/null); sf_mode="full"
       ;;
 
     --summary)
@@ -343,7 +449,7 @@ cmd_read_start() {
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END)
             AS score
-          FROM learnings ORDER BY score DESC LIMIT 10
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 10
         );
       " 2>/dev/null || echo "None"
       db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE id IN (
@@ -352,9 +458,16 @@ cmd_read_start() {
             (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings ORDER BY score DESC LIMIT 10
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 10
         )
       );" 2>/dev/null
+      loaded_ids=$(db_exec "SELECT id FROM (
+          SELECT id,
+            (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 10
+        );" 2>/dev/null); sf_mode="summary"
       ;;
 
     --tiered)
@@ -362,15 +475,16 @@ cmd_read_start() {
       echo "## Mode: tiered (hot + warm + cold)"
       echo ""
       echo "### Hot (high-hit, proven valuable)"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count > 5 ORDER BY hit_count DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count > 5 AND archived_at IS NULL ORDER BY hit_count DESC;" 2>/dev/null || echo "None"
       echo ""
       echo "### Warm (all failures + gotchas)"
-      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') AND hit_count <= 5 ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE type IN ('failure','gotcha') AND hit_count <= 5 AND archived_at IS NULL ORDER BY hit_count DESC, ts DESC;" 2>/dev/null || echo "None"
       echo ""
       echo "### Cold (last 7 days)"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count <= 5 AND type NOT IN ('failure','gotcha') AND julianday('now') - julianday(ts) < 7 ORDER BY ts DESC;" 2>/dev/null || echo "None"
+      db_exec "SELECT '- ' || insight FROM learnings WHERE hit_count <= 5 AND type NOT IN ('failure','gotcha') AND julianday('now') - julianday(ts) < 7 AND archived_at IS NULL ORDER BY ts DESC;" 2>/dev/null || echo "None"
       # Telemetry only: bump load_count for the dumped tier set (see migration 013).
-      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7;" 2>/dev/null
+      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE (hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7) AND archived_at IS NULL;" 2>/dev/null
+      loaded_ids=$(db_exec "SELECT id FROM learnings WHERE (hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7) AND archived_at IS NULL;" 2>/dev/null); sf_mode="tiered"
       ;;
 
     --weighted|*)
@@ -386,7 +500,7 @@ cmd_read_start() {
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END)
             AS score
-          FROM learnings ORDER BY score DESC LIMIT 75
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 75
         );
       " 2>/dev/null || echo "None"
       # Telemetry only: bump load_count for the dumped set (see migration 013).
@@ -396,11 +510,38 @@ cmd_read_start() {
             (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
             + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings ORDER BY score DESC LIMIT 75
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 75
         )
       );" 2>/dev/null
+      loaded_ids=$(db_exec "SELECT id FROM (
+          SELECT id,
+            (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
+            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
+          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 75
+        );" 2>/dev/null); sf_mode="weighted-75"
       ;;
   esac
+
+  # D9 fix (design 5.1): emit one `surfaced` observation per loaded id, so the
+  # memory spine records what a session preamble actually put in front of the
+  # agent (distinct from recall's task-driven surface). One batched INSERT keeps
+  # this session-start hot path fast (no per-row process spawn). Best-effort.
+  if [ -n "$loaded_ids" ]; then
+    local sf_actor sf_short sf_values="" sf_n=0 lid
+    sf_actor=$(_sql_text "${AGENTDB_SESSION_ID:-${CLAUDE_SESSION_ID:-}}")
+    sf_short=$(basename "$PROJECT_ROOT" 2>/dev/null | tr -cs 'a-zA-Z0-9' '-' | cut -c1-16)
+    [ -z "$sf_short" ] && sf_short="db"
+    while IFS= read -r lid; do
+      [ -z "$lid" ] && continue
+      sf_values="${sf_values:+$sf_values,}('${sf_short}-$(date -u +%Y%m%d%H%M%S)-$$-${RANDOM}-${sf_n}', 'surfaced', $sf_actor, '$(sql_escape "$lid")', 'read-start session preamble', '{\"mode\":\"$sf_mode\"}')"
+      sf_n=$((sf_n + 1))
+    done <<< "$loaded_ids"
+    if [ -n "$sf_values" ]; then
+      db_exec "INSERT INTO memory_events (event_id, kind, actor, subject_id, reason, payload) VALUES $sf_values;" 2>/dev/null \
+        || echo "[agentdb] WARNING: read-start surfaced emit failed for $sf_n ids (memory path unaffected)" >&2
+    fi
+  fi
 
   echo ""
   echo "## Recent Errors"
@@ -516,6 +657,9 @@ cmd_learn() {
   existing=$(db_exec "SELECT id FROM learnings WHERE insight LIKE '%${safe_substr}%' AND type='$safe_type' LIMIT 1;" 2>/dev/null || echo "")
   if [ -n "$existing" ]; then
     db_exec "UPDATE learnings SET hit_count = hit_count + 1 WHERE id='$existing';"
+    # Observation: a near-identical insight recurred and reinforced an existing row.
+    emit_memory_event reinforced "$existing" "learn dedup: near-identical insight recurred" \
+      "{\"type\":\"$(json_escape "$type")\",\"domain\":\"$(json_escape "$domain")\"}"
     echo "Reinforced: [$type] (existing: $existing)"
     return
   fi
@@ -523,6 +667,9 @@ cmd_learn() {
   local id="LRN-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
   db_exec "INSERT INTO learnings (id, type, insight, evidence, domain, visibility, sensitivity)
     VALUES ('$id', '$safe_type', '$safe_insight', '$safe_evidence', '$safe_domain', '$safe_visibility', '$safe_sensitivity');"
+  # Observation: a new insight was recorded (origin event for this learning).
+  emit_memory_event created "$id" "learn: new insight recorded" \
+    "{\"type\":\"$(json_escape "$type")\",\"domain\":\"$(json_escape "$domain")\"}"
   echo "Learned: [$type] $insight"
 }
 
@@ -665,6 +812,13 @@ cmd_verdict() {
   local safe_content
   safe_content=$(sql_escape "$content")
   db_exec "INSERT INTO context (id, type, agent, content, contract_id) VALUES ('$id', 'verdict', 'adversary', '$safe_content', '$safe_contract_id');"
+  # Phase-4 causal anchor (design 5.1): record the session's QA outcome so a future
+  # decision-leverage metric can join it to the memories surfaced in the same
+  # session (weak association by actor). NOT a per-memory signal, so subject_id is
+  # NULL and inference_method says so. Best-effort; never blocks the verdict.
+  emit_memory_event session_outcome "" "verdict: $result" \
+    "{\"result\":\"$(json_escape "$result")\",\"contract_id\":\"$(json_escape "$contract_id")\"}" \
+    "" "" "weak: session-level QA outcome, not a per-memory observation"
   echo "Verdict: $result"
 }
 
@@ -1493,24 +1647,39 @@ cmd_trace() {
 
 cmd_decay() {
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  _ensure_softdelete_cols  # archived_at/archived_reason are the soft-delete cache (design 3.10)
 
-  # Delete learnings that are TRULY untouched: never recalled (hit_count=0) AND
-  # never even loaded into a session preamble (load_count=0) AND >46 days old.
-  # Since v7.15, hit_count is recall-only — a still-loaded-but-never-recalled
-  # learning keeps hit_count=0, so requiring load_count=0 too prevents deleting
-  # learnings that read-start is actively surfacing. COALESCE handles pre-013 DBs.
-  local cond="hit_count = 0 AND COALESCE(load_count,0) = 0 AND ts < datetime('now', '-46 days')"
-  local archived
-  archived=$(db_exec "SELECT COUNT(*) FROM learnings WHERE $cond;")
+  # SOFT-DELETE (never DELETE) learnings that are TRULY untouched: never recalled
+  # (hit_count=0) AND never even loaded into a session preamble (load_count=0) AND
+  # >46 days old. Since v7.15 hit_count is recall-only (a still-loaded-but-never-
+  # recalled learning keeps hit_count=0), so requiring load_count=0 too prevents
+  # archiving learnings that read-start is actively surfacing. COALESCE handles
+  # pre-013 DBs. The `archived_at IS NULL` guard makes a re-run idempotent.
+  # This replaces the pre-repair HARD DELETE that destroyed reinforcement history
+  # (the boundary violation the commission exists to prevent; design 3.10).
+  local cond="hit_count = 0 AND COALESCE(load_count,0) = 0 AND ts < datetime('now', '-46 days') AND archived_at IS NULL"
+  local ids n=0 lid
+  ids=$(db_exec "SELECT id FROM learnings WHERE $cond;" 2>/dev/null)
 
-  if [ "$archived" -gt 0 ]; then
-    db_exec "DELETE FROM learnings WHERE $cond;"
-    echo "Archived $archived stale learnings (0 hits, 0 loads, >46 days)"
+  if [ -n "$ids" ]; then
+    # Emit an `archived` observation per row: every disappearance from the working
+    # set is a recorded event with a reason, never a silent destroy (design 3.7).
+    while IFS= read -r lid; do
+      [ -z "$lid" ] && continue
+      emit_memory_event archived "$lid" "decay: 0 hits, 0 loads, >46 days" '{"policy":"decay-46d"}'
+      n=$((n + 1))
+    done <<< "$ids"
+    # Refresh the derived cache columns from that same policy (the cache is a
+    # function of the archived event; recall/read-start filter archived_at IS NULL).
+    db_exec "UPDATE learnings SET archived_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+               archived_reason = 'decay: 0 hits, 0 loads, >46 days'
+             WHERE $cond;" 2>/dev/null
+    echo "Archived $n stale learnings (soft-delete: 0 hits, 0 loads, >46 days). Reverse with: agentdb resurrect <id>"
   else
     echo "No stale learnings to archive"
   fi
 
-  # Report freshness distribution
+  # Report freshness distribution (live rows only; archived rows are excluded).
   echo ""
   echo "Freshness distribution:"
   db_exec "SELECT
@@ -1519,8 +1688,30 @@ cmd_decay() {
       WHEN hit_count >= 1 THEN 'reinforced (' || COUNT(*) || ')'
       ELSE 'unvalidated (' || COUNT(*) || ')'
     END as status
-  FROM learnings GROUP BY
+  FROM learnings WHERE archived_at IS NULL GROUP BY
     CASE WHEN hit_count >= 3 THEN 1 WHEN hit_count >= 1 THEN 2 ELSE 3 END;"
+}
+
+cmd_resurrect() {
+  # Reverse a soft-delete: emit a `resurrected` observation (which clears the
+  # archived cache per the design 1.1 derivation), then null the cache columns.
+  local id="${1:-}"
+  [ -z "$id" ] && { echo "Usage: agentdb resurrect <learning_id>"; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  _ensure_softdelete_cols
+
+  local safe_id exists archived
+  safe_id=$(sql_escape "$id")
+  exists=$(db_exec "SELECT 1 FROM learnings WHERE id='$safe_id' LIMIT 1;" 2>/dev/null || echo "")
+  [ -z "$exists" ] && { echo "No learning with id: $id" >&2; exit 1; }
+  archived=$(db_exec "SELECT 1 FROM learnings WHERE id='$safe_id' AND archived_at IS NOT NULL LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$archived" ]; then
+    echo "Not archived (nothing to resurrect): $id"
+    return 0
+  fi
+  emit_memory_event resurrected "$id" "manual resurrect" '{"via":"agentdb resurrect"}'
+  db_exec "UPDATE learnings SET archived_at = NULL, archived_reason = NULL WHERE id='$safe_id';" 2>/dev/null
+  echo "Resurrected: $id"
 }
 
 cmd_antibody() {
@@ -1577,8 +1768,19 @@ find_global_db() {
 # global brain — its FTS is refreshed by the nightly consolidation job, never here).
 # Always visibility-filtered (never surfaces human_only/operational to an agent).
 _recall_emit() {
-  local db="$1" fts_query="$2" like_clause="$3" tag="$4" limit="$5" writable="$6"
+  local db="$1" fts_query="$2" like_clause="$3" tag="$4" limit="$5" writable="$6" origin="${7:-local}"
   [ -f "$db" ] || return 0
+  # Each row is: <dedup-key>@@US@@<display>@@US@@<row id>@@US@@<origin>. The id +
+  # origin let cmd_recall emit/reinforce the ACTUALLY-displayed rows (design 5.1),
+  # not the raw match set. Older callers that pass no origin default to 'local'.
+  # Archived rows (soft-deleted, design 3.7/3.10) are excluded, but ONLY when the
+  # column exists in THIS db: the global brain may not have migrated yet, so the
+  # filter is column-gated to keep global recall working mid-migration.
+  local arch_fts="" arch_like=""
+  if sqlite3 "$db" "SELECT 1 FROM pragma_table_info('learnings') WHERE name='archived_at' LIMIT 1;" 2>/dev/null | grep -q 1; then
+    arch_fts="AND l.archived_at IS NULL"
+    arch_like="AND archived_at IS NULL"
+  fi
   local has_fts
   has_fts=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
   if [ -n "$has_fts" ]; then
@@ -1588,9 +1790,11 @@ _recall_emit() {
              '- [' || l.type || '] ' || l.insight || '$tag' ||
              CASE WHEN l.evidence IS NOT NULL AND l.evidence != ''
                   THEN '  ↳ ' || substr(l.evidence,1,90) ELSE '' END
+             || '@@US@@' || l.id || '@@US@@' || '$origin'
       FROM learnings l JOIN learnings_fts f ON f.rowid = l.rowid
       WHERE learnings_fts MATCH '$fts_query'
         AND (l.visibility = 'agent' OR l.visibility IS NULL)
+        $arch_fts
       ORDER BY (
         bm25(learnings_fts)
         - (CASE WHEN l.type IN ('failure','gotcha') THEN 1.5 ELSE 0 END)
@@ -1604,9 +1808,11 @@ _recall_emit() {
              '- [' || type || '] ' || insight || '$tag' ||
              CASE WHEN evidence IS NOT NULL AND evidence != ''
                   THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END
+             || '@@US@@' || id || '@@US@@' || '$origin'
       FROM learnings
       WHERE ($like_clause)
         AND (visibility = 'agent' OR visibility IS NULL)
+        $arch_like
       ORDER BY hit_count DESC, ts DESC
       LIMIT $((limit * 5));" 2>/dev/null || true
   fi
@@ -1647,11 +1853,15 @@ cmd_recall() {
 
   # Self-heal local FTS (build it if this DB predates migration 012 / hasn't run
   # preflight this session) so the local path uses bm25 ranking, not LIKE.
-  local has_fts
+  local has_fts has_mevents
   has_fts=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
-  if [ -z "$has_fts" ]; then
+  has_mevents=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_events' LIMIT 1;" 2>/dev/null || echo "")
+  # Self-heal on recall (the design's "migrations self-heal on cmd_recall"): build
+  # the FTS index and/or the memory_events spine if this DB predates migration 012/014.
+  if [ -z "$has_fts" ] || [ -z "$has_mevents" ]; then
     run_pending_migrations "recall:applied_migration" >/dev/null 2>&1 || true
   fi
+  _ensure_softdelete_cols  # guarantee the local archived_at filter is valid (design 3.7)
 
   # Resolve the global brain only if requested.
   local global_db=""
@@ -1664,35 +1874,65 @@ cmd_recall() {
   echo ""
 
   # Collect local first (so a lesson present in both wins as the local copy), then
-  # global, then dedup by 200-char insight key and cut to the limit. bm25() can't
-  # live inside GROUP BY/an aggregate (the optimizer flattens the subquery →
+  # global, then dedup by 200-char insight key and cut to the limit. bm25() cannot
+  # live inside GROUP BY / an aggregate (the optimizer flattens the subquery into
   # "unable to use function bm25 in the requested context"), so dedup is post-query
-  # in awk (printable @@US@@ delimiter — sqlite3 escapes control chars on output,
-  # so a raw \037 byte never survives the shell; see _recall_emit note).
-  local raw_local raw_global out
-  raw_local=$(_recall_emit "$DB" "$fts_query" "$like_clause" "" "$limit" 1)
+  # in awk. Printable @@US@@ delimiter (sqlite3 escapes control chars on output, so
+  # a raw \037 byte never survives the shell; see _recall_emit note). Each row now
+  # carries trailing @@US@@<id>@@US@@<origin> fields so events + reinforcement target
+  # the ACTUALLY-displayed rows, not the raw match set (the D9 / 5.1 bump-vs-display fix).
+  local raw_local raw_global dedup out
+  raw_local=$(_recall_emit "$DB" "$fts_query" "$like_clause" "" "$limit" 1 "local")
   raw_global=""
-  [ -n "$global_db" ] && raw_global=$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0)
-  out=$(printf '%s\n%s\n' "$raw_local" "$raw_global" | grep -v '^[[:space:]]*$' \
-        | awk -F'@@US@@' '!seen[$1]++{print $2}' | head -n "$limit")
+  [ -n "$global_db" ] && raw_global=$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0 "global")
+  dedup=$(printf '%s\n%s\n' "$raw_local" "$raw_global" | grep -v '^[[:space:]]*$' \
+        | awk -F'@@US@@' '!seen[$1]++' | head -n "$limit")
+  out=$(printf '%s\n' "$dedup" | awk -F'@@US@@' 'NF{print $2}')
 
   if [ -n "$out" ]; then
     echo "$out"
-    # Relevance feedback: bump only the (agent-visible) LOCAL rows this query
-    # surfaced. hit_count is exclusively recall-earned (read-start uses load_count),
-    # so it's a trustworthy "answered a real task" signal. Never write to the global
-    # brain from recall (the consolidation job owns it).
-    if [ -n "$has_fts" ] || db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null | grep -q 1; then
+
+    local q_json
+    q_json=$(json_escape "$query")
+
+    # retrieved: one query-level observation carrying the local candidate set
+    # (design 5.1). subject_id is NULL (this is about the query, not one learning).
+    local cand_ids cand_json
+    cand_ids=$(printf '%s\n' "$raw_local" | awk -F'@@US@@' 'NF>=4{print $3}')
+    if command -v jq >/dev/null 2>&1; then
+      cand_json=$(printf '%s\n' "$cand_ids" | grep -v '^[[:space:]]*$' | jq -R . | jq -cs .)
+    fi
+    [ -z "${cand_json:-}" ] && cand_json="[]"
+    emit_memory_event retrieved "" "recall query ran" \
+      "{\"query\":\"$q_json\",\"candidate_ids\":$cand_json}"
+
+    # The ids actually SHOWN (post-dedup, post-limit), split by origin: $3=id, $4=origin.
+    local surfaced_local surfaced_global lid in_list=""
+    surfaced_local=$(printf '%s\n' "$dedup" | awk -F'@@US@@' 'NF>=4 && $4=="local"{print $3}')
+    surfaced_global=$(printf '%s\n' "$dedup" | awk -F'@@US@@' 'NF>=4 && $4=="global"{print $3}')
+
+    # LOCAL displayed rows: emit surfaced + reinforced, and bump hit_count on exactly
+    # these ids. This is the fix: pre-repair the bump hit the raw FTS match set up to
+    # `limit` (agentdb old :1686-1694), NOT the deduped display set, so the counter
+    # never matched what was shown. Never reinforce the global brain (job owns it).
+    while IFS= read -r lid; do
+      [ -z "$lid" ] && continue
+      emit_memory_event surfaced   "$lid" "recall displayed (local)" "{\"query\":\"$q_json\"}"
+      emit_memory_event reinforced "$lid" "recall hit: displayed for a task query" "{\"query\":\"$q_json\"}"
+      in_list="${in_list:+$in_list,}'$(sql_escape "$lid")'"
+    done <<< "$surfaced_local"
+    if [ -n "$in_list" ]; then
       db_exec "UPDATE learnings SET hit_count = hit_count + 1,
                  last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now')
-               WHERE rowid IN (
-                 SELECT f.rowid FROM learnings_fts f
-                 JOIN learnings l ON l.rowid = f.rowid
-                 WHERE learnings_fts MATCH '$fts_query'
-                   AND (l.visibility = 'agent' OR l.visibility IS NULL)
-                 LIMIT $limit
-               );" 2>/dev/null
+               WHERE id IN ($in_list);" 2>/dev/null || true
     fi
+
+    # GLOBAL displayed rows: a surfaced observation (source-stamped), NO reinforcement.
+    while IFS= read -r lid; do
+      [ -z "$lid" ] && continue
+      emit_memory_event surfaced "$lid" "recall displayed (global brain)" \
+        "{\"query\":\"$q_json\",\"origin\":\"global\"}" "" "" "" "$global_db"
+    done <<< "$surfaced_global"
   else
     echo "(no matching learnings)"
   fi
@@ -2053,6 +2293,7 @@ case "${1:-help}" in
   schema)      shift; cmd_schema "$@" ;;
   trace)       shift; cmd_trace "$@" ;;
   decay)       cmd_decay ;;
+  resurrect)   shift; cmd_resurrect "$@" ;;
   antibody)    shift; cmd_antibody "$@" ;;
   recall)      shift; cmd_recall "$@" ;;
   export)      cmd_export ;;
@@ -2096,7 +2337,8 @@ case "${1:-help}" in
     echo "  inject-context <type>   Build agent-specific context slice"
     echo "LEARNING SYSTEM (after migration 005):"
     echo "  trace <json>            Record GEPA execution trace"
-    echo "  decay                   Archive stale learnings, show freshness"
+    echo "  decay                   Soft-delete stale learnings (archived event + cache), show freshness"
+    echo "  resurrect <id>          Reverse a soft-delete (emits a resurrected event)"
     echo "  antibody <text>         Search learnings for pattern matches"
     echo "HYPOTHESIS TESTING (after migration 006):"
     echo "  hypothesis add <stmt> [--domain X] [--source Y]  Create hypothesis"
