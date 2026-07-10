@@ -9,7 +9,7 @@ allowed-tools: Read, Bash, Grep, Glob
 
 <purpose>
 Quick reference for KERNEL v7.23.0.
-Commands, agents, workflows, philosophy — and current plugin status.
+Commands, agents, workflows, philosophy, and current plugin status.
 </purpose>
 
 <on_start>
@@ -17,7 +17,7 @@ Before showing help, check the actual state of the plugin as loaded in your cont
 1. Is the session-start hook output visible? (Look for "# KERNEL" at conversation start)
 2. Which profile is active? (local, github, github-oss, github-production)
 3. Are there active contracts or pending reviews in AgentDB?
-4. Report what you see — don't just recite docs.
+4. Report what you see, don't just recite docs.
 
 ```bash
 agentdb read-start
@@ -40,16 +40,16 @@ agentdb read-start
 
 | Command | Purpose | When to use |
 |---------|---------|-------------|
-| `/kernel:ingest` | Guided entry — classify, scope, execute | Default for any task. Human confirms each phase. |
-| `/kernel:forge` | Autonomous engine — heat/hammer/quench/anneal | Run overnight. Iterates until antifragile or reports why not. |
-| `/kernel:dream` | Creative exploration — 3 perspectives + stress test | When you need competing approaches before committing. |
+| `/kernel:ingest` | Guided entry, classify, scope, execute | Default for any task. Human confirms each phase. |
+| `/kernel:forge` | Autonomous engine, heat/hammer/quench/anneal | Run overnight. Iterates until antifragile or reports why not. |
+| `/kernel:dream` | Creative exploration, 3 perspectives + stress test | When you need competing approaches before committing. |
 | `/kernel:diagnose` | Systematic debugging + refactor analysis | Bugs, regressions, or before refactoring. Diagnosis before prescription. |
 
 ## Quality & Review
 
 | Command | Purpose | When to use |
 |---------|---------|-------------|
-| `/kernel:validate` | Pre-commit gates — build, lint, test, security | Before every commit. Blocks on failure. |
+| `/kernel:validate` | Pre-commit gates, build, lint, test, security | Before every commit. Blocks on failure. |
 | `/kernel:tearitapart` | Critical pre-implementation review | Before tier 2+ work. Verdict: PROCEED/REVISE/RETHINK. |
 | `/kernel:review` | Code review for PRs or staged changes | Before merging. >80% confidence threshold. |
 
@@ -57,7 +57,7 @@ agentdb read-start
 
 | Command | Purpose | When to use |
 |---------|---------|-------------|
-| `/kernel:retrospective` | Cross-session learning synthesis | When 5+ learnings accumulated. Clusters, deduplicates, promotes patterns. |
+| `/kernel:retrospective` | Cross-session learning synthesis | When 5+ learnings accumulated. Clusters, deduplicates, promotes patterns into project hooks/agents/skills. |
 | `/kernel:metrics` | Observability dashboard | Check session stats, agent success rates, hook health, learning utilization. |
 
 ## Session Management
@@ -70,7 +70,7 @@ agentdb read-start
 </commands>
 
 <command_flow>
-Typical workflows — commands chain together:
+Typical workflows, commands chain together:
 
 **New feature:**
   ingest → (dream if complex) → tearitapart → execute → validate → review → handoff
@@ -99,12 +99,12 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 | Agent | Role |
 |-------|------|
 | **Surgeon** | Minimal diff implementation. Only touches contract-listed files. |
-| **Adversary** | QA — assumes broken, finds edge cases, proves with evidence. |
+| **Adversary** | QA, assumes broken, finds edge cases, proves with evidence. |
 | **Reviewer** | Code review with APPROVE/REQUEST CHANGES/COMMENT verdict. |
 | **Researcher** | Finds proven solutions and anti-patterns before coding. |
-| **Scout** | Codebase reconnaissance — maps structure, detects tooling. |
-| **Validator** | Pre-commit quality gate — build, types, lint, tests, security. |
-| **Dreamer** | Multi-perspective debate — minimalist/maximalist/pragmatist. |
+| **Scout** | Codebase reconnaissance, maps structure, detects tooling. |
+| **Validator** | Pre-commit quality gate, build, types, lint, tests, security. |
+| **Dreamer** | Multi-perspective debate, minimalist/maximalist/pragmatist. |
 </agents>
 
 <philosophy>
@@ -119,7 +119,7 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 - **Be specific**: "Add rate limiting to /api/upload" > "make it more secure"
 - **Use the right command**: diagnose for bugs, dream for design, ingest for everything else
 - **Check metrics**: `/kernel:metrics` shows if learnings are being used or ignored
-- **Save often**: `/kernel:handoff` before long breaks — the next session starts faster
+- **Save often**: `/kernel:handoff` before long breaks, the next session starts faster
 - **Run retrospective**: After several sessions, synthesize what you've learned
 </tips>
 
