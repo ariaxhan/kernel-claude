@@ -1985,6 +1985,26 @@ test_methodology_carries_cross_loader_release_lessons() {
     grep -q "resource ceiling" "$PLUGIN_ROOT/skills/ship/SKILL.md"
 }
 
+test_retrospective_contradictions_have_mutation_evidence() {
+  python3 - "$PLUGIN_ROOT/_meta/reports/retrospective-2026-07-11.json" <<'PY'
+import json
+import sys
+
+report = json.load(open(sys.argv[1]))
+expected = report["analyzed"].get("contradictions_resolved", 0)
+backed = [
+    mutation for mutation in report["mutations"]
+    if mutation.get("artifact_type") == "learning"
+    and "contradiction" in mutation.get("reason", "").lower()
+    and mutation.get("evidence")
+]
+if len(backed) < expected:
+    raise SystemExit(
+        f"contradictions_resolved={expected}, but only {len(backed)} learning mutations carry contradiction evidence"
+    )
+PY
+}
+
 # === GitHub Integration Tests ===
 
 test_github_integration_exists() {
@@ -4175,6 +4195,7 @@ run_test_suite() {
       run_test "retrospective has cluster analysis" test_retrospective_has_clusters
       run_test "retrospective queries current learning schema" test_retrospective_queries_current_learning_schema
       run_test "methodology carries cross-loader release lessons" test_methodology_carries_cross_loader_release_lessons
+      run_test "resolved contradictions have learning mutation evidence" test_retrospective_contradictions_have_mutation_evidence
       ;;
     github_integration)
       run_test "github-integration.sh exists" test_github_integration_exists

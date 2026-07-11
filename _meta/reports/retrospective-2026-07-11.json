@@ -24,6 +24,15 @@
     },
     {
       "op": "modify",
+      "artifact_type": "learning",
+      "path": "agentdb://learnings/LRN-20260710185543-1035-14087",
+      "reason": "Resolve the contradiction between a Claude-only slash-syntax learning and verified loader-specific invocation syntax.",
+      "evidence": "Claude Code invokes /kernel:<skill>; Codex 0.144.1 invokes $kernel:<skill>. README, QUICKSTART, MIGRATION-8, help, and release-doc tests all encode the loader split.",
+      "reinforced": 1,
+      "status": "applied"
+    },
+    {
+      "op": "modify",
       "artifact_type": "skill",
       "path": "skills/testing/SKILL.md",
       "reason": "Promote cross-loader payload, disposable upgrade, documentation command, and resource-bound verification into reusable test methodology.",
