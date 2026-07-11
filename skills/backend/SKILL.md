@@ -2,6 +2,11 @@
 name: backend
 description: "Backend architecture patterns. Repository pattern, caching, queues, N+1 prevention, transactions. Triggers: backend, server, database, cache, redis, queue, repository, service."
 allowed-tools: Read, Bash, Write, Edit, Grep, Glob
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="backend">

@@ -1,7 +1,7 @@
 ---
 name: Feature Implementation
 trigger:
-  - command: /kernel:ingest
+  - skill: /kernel:ingest
   - issue_label: feature
   - task_type: feature
 tier: auto  # determined at classify step
@@ -23,7 +23,7 @@ tier: auto  # determined at classify step
 3. **Plan** -- Define scope and acceptance criteria
    - agent: orchestrator (you)
    - output: contract with goal, files, tier, done_when
-   - requires: human confirmation (ingest mode) OR auto-proceed (auto mode)
+   - requires: human confirmation (ingest mode) OR auto-proceed (forge mode)
 
 4. **Implement** -- Execute the contract
    - agent: surgeon

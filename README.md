@@ -54,11 +54,11 @@ AgentDB remembers what worked, what broke, and where you left off — across eve
 
 ### Rules That Prove Themselves
 
-The experiment engine treats every rule as a hypothesis. It seeds them from your CLAUDE.md, designs experiments, runs them against AgentDB telemetry, and graduates rules that survive or kills rules that don't. 22 rules graduated from 107 hypotheses across 205 experiments. The forge command uses this: after building, it **tempers** — experiments on its own output, discovers emergent patterns, and self-corrects before shipping.
+The experiment engine treats every rule as a hypothesis. It seeds them from your CLAUDE.md, designs experiments, runs them against AgentDB telemetry, and graduates rules that survive or kills rules that don't. 22 rules graduated from 107 hypotheses across 205 experiments. The forge skill uses this: after building, it **tempers** — experiments on its own output, discovers emergent patterns, and self-corrects before shipping.
 
-### Skills That Load On-Demand
+### One Primitive: Skills That Load On-Demand
 
-19 skills (testing, security, debug, api, backend, architecture, etc.) load when relevant, not at startup. Each is a methodology: HOW to approach a problem, not just tools to use.
+Everything is a skill (v8): methodology skills (testing, security, debug, api, backend, architecture, ...) load when relevant, not at startup; workflow skills (`/kernel:ingest`, `/kernel:forge`) orchestrate them; state-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit validated JSON manifests so resumed sessions reconstruct bounded task state instead of inheriting whole conversations. Side-effecting skills can never fire ambiently. Details: docs/MIGRATION-8.md.
 
 ---
 
@@ -76,7 +76,7 @@ The experiment engine treats every rule as a hypothesis. It seeds them from your
 
 **Check with `/validate`** before committing. Tests, lint, types, security.
 
-> **Note:** In Claude Code terminal, commands use the `kernel:` prefix (`/kernel:ingest`). In Claude Desktop and Cursor, they appear without the prefix (`/ingest`).
+> **Note:** Everything is a skill (v8 unified architecture; the old commands layer merged into skills). In the Claude Code terminal, skills use the `kernel:` prefix (`/kernel:ingest`). In Claude Desktop and Cursor, they appear without the prefix (`/ingest`). All v7 invocations work unchanged.
 
 ---
 
@@ -94,7 +94,9 @@ The experiment engine treats every rule as a hypothesis. It seeds them from your
 | `/kernel:validate` | `/validate` | Pre-commit quality gates |
 | `/kernel:tearitapart` | `/tearitapart` | Critical pre-implementation review |
 | `/kernel:review` | `/review` | Code review for PRs |
-| `/kernel:handoff` | `/handoff` | Save progress for next session |
+| `/kernel:handoff` | `/handoff` | Save progress for next session — emits a canonical `kernel.handoff/v1` JSON manifest |
+| `/kernel:checkpoint` | `/checkpoint` | Bounded mid-task save — `kernel.checkpoint/v1` manifest for safe context resets |
+| `/kernel:landing-page` | `/landing-page` | Guided landing page generator — interview, scaffold, enforce, deploy |
 | `/kernel:init` | `/init` | Setup (run once per project) |
 | `/kernel:help` | `/help` | Show help |
 
@@ -132,8 +134,8 @@ The experiment engine treats every rule as a hypothesis. It seeds them from your
 Symlink the cache to avoid stale copies:
 
 ```bash
-rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/7.23.0
-ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/7.23.0
+rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/8.0.0
+ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/8.0.0
 ```
 
 Edits take effect immediately — no version bumps or reinstalls needed. Claude Code [caches plugins](https://dev.to/wkusnierczyk/claude-code-plugin-cache-1dn) by version; the symlink bypasses this.
@@ -142,7 +144,7 @@ Edits take effect immediately — no version bumps or reinstalls needed. Claude 
 
 ## Troubleshooting
 
-**Commands not showing up?** Run the quick update commands above.
+**Skills not showing up?** Run the quick update commands above.
 
 **Claude isn't reading memory?** Start with `/ingest`. Plain requests skip the memory system.
 
@@ -162,13 +164,17 @@ Edits take effect immediately — no version bumps or reinstalls needed. Claude 
 
 SQLite database at `_meta/agentdb/agent.db`. Stores learnings, events, errors, hypotheses, experiments, contracts, checkpoints, verdicts. Graduated retrieval loads the top 75 by weighted score (86% token savings vs loading everything).
 
-### Graph Layer (Built on aDNA)
+### Context Graph (Observational, Receipt-Derived)
 
-Context graph inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtocol/adna) from Lattice Protocol. Models context as nodes + edges — which skills load well together, which agent combinations succeed, which nodes conflict. The graph learns over time.
+Inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtocol/adna) — but **JSON manifests stay authoritative** for resume, policy, and safety. After `/kernel:ingest` compiles a manifest, the `kernel.context-receipt/v1` JSON records what context was actually loaded. `agentdb graph-project` derives nodes and co-load edges from those receipts (automatic on `kernel-manifest deactivate`). `agentdb graph-suggest` surfaces **shadow-mode** advisory patterns only; it never auto-loads context or overrides manifest selectors until experiment-backed promotion (50+ comparable sessions). The graph observes; manifests decide.
 
 ### Experiment Engine
 
 107 hypotheses, 205 experiments, 22 graduated rules. Every rule in CLAUDE.md is a hypothesis until proven by evidence. The engine seeds rules, designs experiments against AgentDB telemetry, issues verdicts (supports/refutes/inconclusive), and graduates or kills rules based on Bayesian confidence scoring. Runs autonomously via `/kernel:experiment`.
+
+### Manifest Runtime (v8)
+
+JSON manifests are the canonical machine-readable representation of resumable state. State-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit schema-validated manifests (`schemas/`: `kernel.handoff/v1`, `kernel.checkpoint/v1`, `kernel.retrospective-result/v1`, `kernel.context-receipt/v1`) instead of prose. The CLI at `orchestration/manifest/kernel-manifest` (`validate | latest | divergence | compile | resume | activate | deactivate`) drives resume: a fresh session compiles bounded task state from the manifest rather than inheriting a whole transcript. Context policies — **sealed** (forbidden globs are hook-blocked, fails closed), **bounded** (extra loads are ledgered into a receipt), **advisory** — are enforced by `hooks/scripts/guard-context.sh` reading the activated manifest (I0.15: hooks, not honor-system). Grounding: EXP-L21 showed load-bearing context stays flat (~50–70k tokens/decision) while attended context grows 7–11x per session, so resumes reconstruct minimal state instead of replaying history.
 
 ---
 

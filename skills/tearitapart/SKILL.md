@@ -1,11 +1,16 @@
 ---
-name: kernel:tearitapart
+name: tearitapart
 description: "Critical pre-implementation review. Find what AI breaks. Verdict: PROCEED, REVISE, or RETHINK. Triggers: review plan, tear apart, critique, analyze."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob
+kernel:
+  kind: validator
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
-<command id="tearitapart">
+<skill id="tearitapart">
 
 <purpose>
 Pre-implementation review. Check Big 5, security, testing, architecture.
@@ -141,4 +146,4 @@ agentdb write-end '{"command":"tearitapart","verdict":"X","big5_violations":N}'
 ```
 </on_complete>
 
-</command>
+</skill>

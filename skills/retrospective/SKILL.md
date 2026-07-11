@@ -1,11 +1,18 @@
 ---
-name: kernel:retrospective
+name: retrospective
 description: "Cross-session learning synthesis. Finds patterns, resolves contradictions, promotes insights into project skills, agents, and hooks. Triggers: retrospective, reflect, patterns, learnings, synthesis."
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+kernel:
+  kind: state_transition
+  version: 1
+  side_effects: writes_repo
+  confirmation: on_side_effect
+  produces:
+    - kernel.retrospective-result/v1
 ---
 
-<command id="retrospective">
+<skill id="retrospective">
 
 <purpose>
 Cross-session learning synthesis. Reviews AgentDB learnings, finds patterns across sessions,
@@ -60,9 +67,24 @@ sentence in a doc is honor-system; an artifact fires on its own.
    - Archive stale: `agentdb query "DELETE FROM learnings WHERE id = {id}"`
    - If non-local profile: surface promoted patterns to GitHub Discussions (Learnings category)
 
-6. Write synthesis to AgentDB:
+6. Emit the machine-readable mutation record — MANDATORY, not optional:
+   Write `_meta/reports/retrospective-{date}.json` per
+   schemas/kernel.retrospective-result.v1.schema.json:
+   - analyzed: learnings/clusters/merged/archived/contradictions_resolved counts
+   - mutations[]: every artifact created/modified/removed/promoted —
+     {op, artifact_type: hook|agent|skill|prose|learning, path, reason, evidence,
+     reinforced, status: applied|scaffolded|proposed|rejected}
+   - project_fit: missing[] and dormant[] (prune candidates need explicit approval)
+   Then validate:
    ```bash
-   agentdb write-end '{"did":"retrospective","clusters":N,"merged":N,"archived":N,"promoted":N,"artifacts":["path1","path2"]}'
+   "${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest" validate _meta/reports/retrospective-{date}.json
+   ```
+   Future handoffs reference this file via provenance.retrospective_refs, so resumed
+   work knows which infrastructure mutations it depends on.
+
+7. Write synthesis to AgentDB:
+   ```bash
+   agentdb write-end '{"did":"retrospective","clusters":N,"merged":N,"archived":N,"promoted":N,"artifacts":["path1","path2"],"mutation_record":"_meta/reports/retrospective-{date}.json"}'
    ```
 </execution>
 
@@ -87,6 +109,9 @@ sentence in a doc is honor-system; an artifact fires on its own.
 ### Health
 - Total learnings: {N}
 - Active: {N} | Stale: {N} | Reinforced: {N}
+
+### Mutation Record
+- `_meta/reports/retrospective-{date}.json` (kernel.retrospective-result/v1, validated)
 </output_format>
 
-</command>
+</skill>

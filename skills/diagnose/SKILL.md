@@ -1,12 +1,19 @@
 ---
-name: kernel:diagnose
+name: diagnose
 description: "Systematic debugging and refactor analysis. Diagnosis before prescription. Bug mode: reproduce, trace, isolate, hypothesize, diagnose. Refactor mode: map, trace deps, measure coupling, risks, diagnose."
 user-invocable: true
 allowed-tools: Agent, Bash, Read, Write, Grep, Glob
+kernel:
+  kind: workflow
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
+<skill id="diagnose">
+
 <purpose>
-Diagnose before fixing. The debug skill exists but no command orchestrates it.
+Diagnose before fixing. The debug skill holds the methodology; this workflow orchestrates it.
 Mixing diagnosis with implementation means the surgeon starts cutting before the X-ray.
 /kernel:diagnose is the X-ray.
 </purpose>
@@ -137,3 +144,5 @@ Load: skills/debug/SKILL.md, skills/testing/SKILL.md, skills/architecture/SKILL.
 Record diagnosis event:
   agentdb emit command "diagnose" "" '{"mode":"bug|refactor","confidence":"high|medium|low","blast_radius":N,"tier":N}'
 </telemetry>
+
+</skill>

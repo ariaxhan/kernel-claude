@@ -2,6 +2,11 @@
 name: refactor
 description: "Safe refactoring methodology. Behavior-preserving transformations only. Tests green before AND after. Triggers: refactor, clean, simplify, restructure, extract, inline."
 allowed-tools: Read, Edit, Bash, Grep, Glob
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="refactor">

@@ -831,7 +831,8 @@ _ensure_graph_migration() {
   local has_table
   has_table=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='context_sessions' LIMIT 1;" 2>/dev/null || echo "")
   if [ -z "$has_table" ]; then
-    sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" < "$PLUGIN_ROOT/orchestration/agentdb/migrations/002_graph_tracking.sql"
+    echo "FAIL: agentdb init did not apply graph tracking migration"
+    return 1
   fi
 }
 
@@ -877,6 +878,48 @@ test_session_end_validates_tokens() {
     echo "FAIL: non-integer tokens should fail"
     return 1
   }
+}
+
+test_graph_project_from_receipt() {
+  _ensure_graph_migration
+  local receipt="$PLUGIN_ROOT/tests/fixtures/manifests/receipt-example.json"
+  [ -f "$receipt" ] || { echo "FAIL: missing receipt fixture"; return 1; }
+  agentdb graph-project "$receipt" >/dev/null
+  local sessions nodes edges
+  sessions=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM context_sessions WHERE id LIKE 'RCP-%';")
+  nodes=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM nodes;")
+  edges=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM edges;")
+  assert_equals "1" "$sessions" "receipt should create one graph session"
+  [ "$nodes" -gt 0 ] || { echo "FAIL: expected nodes from receipt projection"; return 1; }
+  [ "$edges" -gt 0 ] || { echo "FAIL: expected co-load edges from receipt projection"; return 1; }
+}
+
+test_graph_project_idempotent() {
+  _ensure_graph_migration
+  local receipt="$PLUGIN_ROOT/tests/fixtures/manifests/receipt-example.json"
+  agentdb graph-project "$receipt" >/dev/null
+  agentdb graph-project "$receipt" >/dev/null
+  local sessions
+  sessions=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM graph_receipts WHERE receipt_path LIKE '%receipt-example.json';")
+  assert_equals "1" "$sessions" "receipt projection should be idempotent"
+}
+
+test_graph_suggest_shadow_mode() {
+  _ensure_graph_migration
+  local output
+  output=$(agentdb graph-suggest feature 2>&1)
+  assert_contains "$output" "shadow mode"
+  assert_contains "$output" "JSON manifests remain authoritative"
+}
+
+test_graph_outcome_from_write_end() {
+  _ensure_graph_migration
+  local receipt="$PLUGIN_ROOT/tests/fixtures/manifests/receipt-example.json"
+  agentdb graph-project "$receipt" >/dev/null
+  agentdb write-end '{"did":"finished task","next":"","blocked":""}' >/dev/null
+  local success
+  success=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT success FROM context_sessions WHERE id LIKE 'RCP-%' ORDER BY started_at DESC LIMIT 1;")
+  assert_equals "1" "$success" "write-end should mark latest graph session successful"
 }
 
 # === Schema Validation Tests ===
@@ -985,7 +1028,7 @@ test_agentdb_numeric_injection_prune() {
 # === Command Structure Tests ===
 
 test_ingest_command_has_research_step() {
-  local cmd_file="$PLUGIN_ROOT/commands/ingest.md"
+  local cmd_file="$PLUGIN_ROOT/skills/ingest/SKILL.md"
   local content
   content=$(cat "$cmd_file")
   assert_contains "$content" "RESEARCH"
@@ -993,7 +1036,7 @@ test_ingest_command_has_research_step() {
 }
 
 test_forge_command_has_loop() {
-  local cmd_file="$PLUGIN_ROOT/commands/forge.md"
+  local cmd_file="$PLUGIN_ROOT/skills/forge/SKILL.md"
   local content
   content=$(cat "$cmd_file")
   assert_contains "$content" "loop"
@@ -1001,20 +1044,17 @@ test_forge_command_has_loop() {
 }
 
 test_commands_use_structured_format() {
-  # Commands should use XML structure (like skills) with semantic tags
-  # or YAML code blocks - both are valid formats
+  # Workflow skills (former commands) use XML structure or YAML blocks
   local structured_count=0
-  local total_commands=0
-  for cmd in "$PLUGIN_ROOT/commands/"*.md; do
-    ((total_commands++))
-    # Check for XML structure (<command id="X">) or YAML blocks
-    if grep -qE '<command id=|```yaml' "$cmd" 2>/dev/null; then
+  local total=0
+  for s in ingest forge validate handoff retrospective diagnose dream experiment; do
+    ((total++))
+    if grep -qE '<skill id=|```yaml' "$PLUGIN_ROOT/skills/$s/SKILL.md" 2>/dev/null; then
       ((structured_count++))
     fi
   done
-  # Core commands must use structured format - at least 2
-  [ "$structured_count" -ge 2 ] || {
-    echo "FAIL: core commands should use structured format ($structured_count/$total_commands)"
+  [ "$structured_count" -ge "$total" ] || {
+    echo "FAIL: workflow skills should use structured format ($structured_count/$total)"
     return 1
   }
 }
@@ -1035,20 +1075,19 @@ test_claude_md_token_budget() {
 }
 
 test_commands_token_budget() {
-  # Commands should be focused single workflows. Guided generators
-  # (landing-page) and autonomous engines (forge) legitimately run long;
-  # cap reflects real command sizes rather than mutilating them.
+  # Skills should be focused. Guided generators (landing-page) and autonomous
+  # engines (forge) legitimately run long; cap reflects real sizes.
   local failed=0
-  for cmd in "$PLUGIN_ROOT/commands/"*.md; do
+  for skill in "$PLUGIN_ROOT/skills/"*/SKILL.md; do
     local lines
-    lines=$(wc -l < "$cmd" | tr -d ' ')
+    lines=$(wc -l < "$skill" | tr -d ' ')
     if [ "$lines" -gt 1000 ]; then
-      echo "  OVER BUDGET: $(basename "$cmd") = $lines lines (max 1000)"
+      echo "  OVER BUDGET: $skill = $lines lines (max 1000)"
       failed=1
     fi
   done
   [ "$failed" -eq 0 ] || {
-    echo "FAIL: some commands exceed token budget. Trim or use progressive disclosure."
+    echo "FAIL: some skills exceed token budget. Trim or use progressive disclosure."
     return 1
   }
 }
@@ -1107,7 +1146,7 @@ test_no_duplicate_big5_definitions() {
   # Commands/agents should reference, not redefine the full Big 5
   local full_definitions=0
   # Count files with full Big 5 definitions (all 5 checks with descriptions)
-  for f in "$PLUGIN_ROOT/commands/"*.md "$PLUGIN_ROOT/agents/"*.md; do
+  for f in "$PLUGIN_ROOT/skills/"*/SKILL.md "$PLUGIN_ROOT/agents/"*.md; do
     # If file has detailed Big 5 with detection commands, it's a full definition
     if grep -q 'input_validation' "$f" && \
        grep -q 'edge_cases' "$f" && \
@@ -1144,14 +1183,12 @@ test_progressive_disclosure_used() {
 # === Verification Tests ===
 
 test_commands_have_frontmatter() {
-  local missing=0
-  for cmd in "$PLUGIN_ROOT/commands/"*.md; do
-    if ! grep -q "^---" "$cmd" 2>/dev/null; then
-      echo "  Missing frontmatter in: $cmd"
-      missing=1
-    fi
-  done
-  assert_exit_code 0 "$missing" "all commands should have frontmatter"
+  # v8: the commands layer is gone. Guard against reintroduction.
+  [ ! -d "$PLUGIN_ROOT/commands" ] || { echo "FAIL: commands/ directory must not exist (unified skills, v8)"; return 1; }
+  if grep -q '"commands"' "$PLUGIN_ROOT/.claude-plugin/plugin.json"; then
+    echo "FAIL: plugin.json must not register commands (skills are auto-discovered)"
+    return 1
+  fi
 }
 
 test_skills_have_frontmatter() {
@@ -1249,12 +1286,13 @@ test_agentdb_metrics_shows_learnings() {
 }
 
 test_metrics_command_registered() {
-  grep -q "metrics.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+  # skills are auto-discovered from skills/; registration = the skill dir exists
+  [ -f "$PLUGIN_ROOT/skills/metrics/SKILL.md" ]
 }
 
 test_metrics_command_has_frontmatter() {
-  [ -f "$PLUGIN_ROOT/commands/metrics.md" ] || { echo "FAIL: metrics.md not found"; return 1; }
-  head -1 "$PLUGIN_ROOT/commands/metrics.md" | grep -q "^---"
+  [ -f "$PLUGIN_ROOT/skills/metrics/SKILL.md" ] || { echo "FAIL: metrics.md not found"; return 1; }
+  head -1 "$PLUGIN_ROOT/skills/metrics/SKILL.md" | grep -q "^---"
 }
 
 # === Learning Dedup Tests ===
@@ -1336,12 +1374,12 @@ test_migration_010_preserves_unparseable_ts() {
 # === Dreamer Tests ===
 
 test_dream_command_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/commands/dream.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/commands/dream.md" | grep -q "^---"
+  [ -f "$PLUGIN_ROOT/skills/dream/SKILL.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/skills/dream/SKILL.md" | grep -q "^---"
 }
 
 test_dream_command_registered_in_plugin_json() {
-  grep -q "dream.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+  [ -f "$PLUGIN_ROOT/skills/dream/SKILL.md" ]
 }
 
 # --- Version Sync Tests ---
@@ -1356,7 +1394,7 @@ test_version_sync_all() {
   mv=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/.claude-plugin/marketplace.json'))['plugins'][0]['version'])")
   [ "$mv" = "$v" ]                                                 || { echo "FAIL: marketplace.json ($mv) != plugin.json ($v)"; fail=1; }
   grep -qF "<kernel version=\"$v\">" "$PLUGIN_ROOT/CLAUDE.md"      || { echo "FAIL: CLAUDE.md <kernel version> != $v"; fail=1; }
-  grep -qF "KERNEL v$v" "$PLUGIN_ROOT/commands/help.md"            || { echo "FAIL: commands/help.md KERNEL version != $v"; fail=1; }
+  grep -qF "KERNEL v$v" "$PLUGIN_ROOT/skills/help/SKILL.md"            || { echo "FAIL: skills/help/SKILL.md KERNEL version != $v"; fail=1; }
   grep -qF "kernel-marketplace/kernel/$v" "$PLUGIN_ROOT/README.md" || { echo "FAIL: README.md install-path version != $v"; fail=1; }
   return $fail
 }
@@ -1373,11 +1411,11 @@ test_dreamer_agent_has_voice_definitions() {
 }
 
 test_dream_command_has_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/commands/dream.md"
+  grep -q "output_format" "$PLUGIN_ROOT/skills/dream/SKILL.md"
 }
 
 test_dream_command_has_github_integration() {
-  grep -q "github_integration\|GitHub\|gh " "$PLUGIN_ROOT/commands/dream.md"
+  grep -q "github_integration\|GitHub\|gh " "$PLUGIN_ROOT/skills/dream/SKILL.md"
 }
 
 # === Compaction Restore Tests ===
@@ -1484,51 +1522,51 @@ test_breaker_resets() {
 # === Diagnose Tests ===
 
 test_diagnose_command_exists() {
-  [ -f "$PLUGIN_ROOT/commands/diagnose.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/commands/diagnose.md" | grep -q "^---"
+  [ -f "$PLUGIN_ROOT/skills/diagnose/SKILL.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/skills/diagnose/SKILL.md" | grep -q "^---"
 }
 
 test_diagnose_registered() {
-  grep -q "diagnose.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+  [ -f "$PLUGIN_ROOT/skills/diagnose/SKILL.md" ]
 }
 
 test_diagnose_bug_mode() {
-  grep -q 'mode id="bug"' "$PLUGIN_ROOT/commands/diagnose.md"
+  grep -q 'mode id="bug"' "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
 }
 
 test_diagnose_refactor_mode() {
-  grep -q 'mode id="refactor"' "$PLUGIN_ROOT/commands/diagnose.md"
+  grep -q 'mode id="refactor"' "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
 }
 
 test_diagnose_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/commands/diagnose.md"
+  grep -q "output_format" "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
 }
 
 test_diagnose_loads_debug() {
-  grep -q "debug" "$PLUGIN_ROOT/commands/diagnose.md"
+  grep -q "debug" "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
 }
 
 # === Retrospective Tests ===
 
 test_retrospective_command_exists() {
-  [ -f "$PLUGIN_ROOT/commands/retrospective.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/commands/retrospective.md" | grep -q "^---"
+  [ -f "$PLUGIN_ROOT/skills/retrospective/SKILL.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/skills/retrospective/SKILL.md" | grep -q "^---"
 }
 
 test_retrospective_registered() {
-  grep -q "retrospective.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+  [ -f "$PLUGIN_ROOT/skills/retrospective/SKILL.md" ]
 }
 
 test_retrospective_has_agentdb() {
-  grep -q "agentdb" "$PLUGIN_ROOT/commands/retrospective.md"
+  grep -q "agentdb" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
 }
 
 test_retrospective_has_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/commands/retrospective.md"
+  grep -q "output_format" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
 }
 
 test_retrospective_has_clusters() {
-  grep -q "Clusters\|cluster" "$PLUGIN_ROOT/commands/retrospective.md"
+  grep -q "Clusters\|cluster" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
 }
 
 # === GitHub Integration Tests ===
@@ -1585,10 +1623,10 @@ test_agents_have_github_layer() {
 }
 
 test_commands_have_github_layer() {
-  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/ingest.md" &&
-  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/forge.md" &&
-  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/handoff.md" &&
-  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/retrospective.md"
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/skills/ingest/SKILL.md" &&
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/skills/forge/SKILL.md" &&
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/skills/handoff/SKILL.md" &&
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
 }
 
 # === Profile Detection Tests ===
@@ -2294,7 +2332,7 @@ test_warn_hardcoded_sources_common() {
 
 test_forge_has_entropy_measurement() {
   local content
-  content=$(cat "$PLUGIN_ROOT/commands/forge.md")
+  content=$(cat "$PLUGIN_ROOT/skills/forge/SKILL.md")
   assert_contains "$content" "Measure entropy" "forge.md should mention entropy measurement"
 }
 
@@ -2422,12 +2460,1081 @@ test_lifecycle_hooks_guard_main_push() {
   assert_contains "$postcommit" "AUTO-PUSH DISABLED" "post-commit auto-push should stay disabled"
 }
 
+# === Manifest Runtime Tests (kernel-manifest + guard-context) ===
+
+KM="$PLUGIN_ROOT/orchestration/manifest/kernel-manifest"
+FIXTURES="$PLUGIN_ROOT/tests/fixtures/manifests"
+
+test_manifest_schemas_parse_as_json() {
+  local bad=0
+  for s in "$PLUGIN_ROOT/schemas/"*.schema.json; do
+    python3 -c "import json; json.load(open('$s'))" 2>/dev/null || { echo "  bad JSON: $s"; bad=1; }
+  done
+  assert_exit_code 0 "$bad" "all schema files must parse as JSON"
+}
+
+test_manifest_validate_handoff_example() {
+  local output
+  output=$("$KM" validate "$FIXTURES/handoff-example.json" 2>&1)
+  assert_contains "$output" "VALID"
+}
+
+test_manifest_validate_checkpoint_example() {
+  local output
+  output=$("$KM" validate "$FIXTURES/checkpoint-example.json" 2>&1)
+  assert_contains "$output" "VALID"
+}
+
+test_manifest_validate_retrospective_example() {
+  local output
+  output=$("$KM" validate "$FIXTURES/retrospective-result-example.json" 2>&1)
+  assert_contains "$output" "VALID"
+}
+
+test_manifest_validate_rejects_missing_schema_field() {
+  printf '{"identity": {"name": "x"}}\n' > bad.json
+  local ec=0
+  "$KM" validate bad.json >/dev/null 2>&1 || ec=$?
+  [ "$ec" -ne 0 ] || { echo "FAIL: manifest without schema field must be rejected"; return 1; }
+}
+
+test_manifest_validate_rejects_bad_policy_mode() {
+  sed 's/"mode": "bounded"/"mode": "yolo"/' "$FIXTURES/handoff-example.json" > bad-mode.json
+  local ec=0
+  "$KM" validate bad-mode.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "invalid context policy mode must be rejected"
+}
+
+test_manifest_validate_rejects_selector_without_path() {
+  python3 - "$FIXTURES/handoff-example.json" <<'PYEOF'
+import json, sys
+m = json.load(open(sys.argv[1]))
+# strip 'path' from the first required selector -> invalid selector
+m["context"]["required"][0] = {"reason": "no path here"}
+json.dump(m, open("bad-selector.json", "w"))
+PYEOF
+  local ec=0
+  "$KM" validate bad-selector.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "selector without path or git_diff must be rejected"
+}
+
+test_manifest_rejects_duplicate_keys() {
+  # duplicate keys silently last-winning is how 'sealed' degrades to 'advisory'
+  cat > dup.json <<'MEOF'
+{
+  "schema": "kernel.checkpoint/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {"branch": "main", "commit": "abc", "dirty": false},
+  "task": {"goal": "t"},
+  "steps_completed": [],
+  "pending_steps": [],
+  "resume": {"position": "p", "next_operation": "n"},
+  "context": {"policy": {"mode": "sealed", "mode": "advisory"}}
+}
+MEOF
+  local output ec=0
+  output=$("$KM" validate dup.json 2>&1) || ec=$?
+  assert_exit_code 2 "$ec" "duplicate keys must be a parse-level protocol violation" || return 1
+  assert_contains "$output" "duplicate key"
+}
+
+test_manifest_rejects_yaml_manifest() {
+  printf 'schema: kernel.checkpoint/v1\n' > old.yaml
+  local output ec=0
+  output=$("$KM" validate old.yaml 2>&1) || ec=$?
+  assert_exit_code 2 "$ec" "yaml manifests must be rejected with a conversion pointer" || return 1
+  assert_contains "$output" "no longer canonical"
+}
+
+test_manifest_validate_rejects_unknown_keys() {
+  cat > bad.json <<'MEOF'
+{
+  "schema": "kernel.checkpoint/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {"branch": "main", "commit": "abc", "dirty": false},
+  "task": {"goal": "t"},
+  "steps_completed": [],
+  "pending_steps": [],
+  "resume": {"position": "p", "next_operation": "n", "entrypointt": "typo"}
+}
+MEOF
+  local ec=0
+  "$KM" validate bad.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "unknown manifest keys must be rejected"
+}
+
+test_manifest_compile_validates_before_consuming() {
+  cat > bad.json <<'MEOF'
+{
+  "schema": "kernel.checkpoint/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {"branch": "main", "commit": "abc", "dirty": false},
+  "task": {"goal": "t"},
+  "steps_completed": [],
+  "pending_steps": [],
+  "resume": {"position": "p", "next_operation": "n", "entrypointt": "typo"}
+}
+MEOF
+  local ec=0
+  "$KM" compile bad.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "compile must validate before consuming manifest"
+}
+
+test_manifest_activate_validates_before_pointer() {
+  mkdir -p _meta
+  cat > bad.json <<'MEOF'
+{
+  "schema": "kernel.checkpoint/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {"branch": "main", "commit": "abc", "dirty": false},
+  "task": {"goal": "t"},
+  "steps_completed": [],
+  "pending_steps": [],
+  "resume": {"position": "p", "next_operation": "n", "entrypointt": "typo"}
+}
+MEOF
+  local ec=0
+  "$KM" activate bad.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "activate must validate before writing pointer" || return 1
+  [ ! -f _meta/.active-manifest.json ] || { echo "FAIL: invalid activation wrote pointer"; return 1; }
+}
+
+test_manifest_latest_finds_newest() {
+  mkdir -p _meta/handoffs _meta/checkpoints
+  cp "$FIXTURES/checkpoint-example.json" _meta/handoffs/old.json
+  python3 -c "import json;p='_meta/handoffs/old.json';m=json.load(open(p));m['identity']['created']='2026-01-01T00:00:00Z';json.dump(m,open(p,'w'))"
+  sleep 1
+  cp "$FIXTURES/checkpoint-example.json" _meta/checkpoints/new.json
+  python3 -c "import json;p='_meta/checkpoints/new.json';m=json.load(open(p));m['identity']['created']='2026-02-01T00:00:00Z';json.dump(m,open(p,'w'))"
+  local output
+  output=$("$KM" latest --any-branch)
+  assert_contains "$output" "_meta/checkpoints/new.json"
+}
+
+test_manifest_latest_fails_when_empty() {
+  local ec=0
+  "$KM" latest --dir does-not-exist >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "latest with no manifests must fail"
+}
+
+test_manifest_divergence_detects_branch_mismatch() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  cat > m.json <<'MEOF'
+{
+  "schema": "kernel.checkpoint/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {"branch": "other-branch", "commit": "deadbeef", "dirty": false},
+  "task": {"goal": "t"},
+  "steps_completed": [],
+  "pending_steps": [],
+  "resume": {"position": "p", "next_operation": "n"}
+}
+MEOF
+  local output ec=0
+  output=$("$KM" divergence m.json 2>&1) || ec=$?
+  assert_contains "$output" "branch: DIVERGED" || return 1
+  assert_exit_code 1 "$ec" "branch mismatch must exit 1"
+}
+
+test_manifest_divergence_detects_artifact_hash_mismatch() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  echo "content-v1" > pinned.txt
+  local sha head
+  sha=$(python3 -c "import hashlib;print(hashlib.sha256(open('pinned.txt','rb').read()).hexdigest())")
+  head=$(git rev-parse HEAD)
+  cat > m.json <<MEOF
+{
+  "schema": "kernel.handoff/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {
+    "branch": "main",
+    "commit": "$head",
+    "dirty": true,
+    "artifacts": [
+      {"path": "pinned.txt", "sha256": "$sha"}
+    ]
+  },
+  "objective": {"goal": "t", "success_conditions": ["x"]},
+  "workflow": {"phases": [{"name": "p", "status": "required"}]},
+  "context": {"policy": {"mode": "advisory"}},
+  "execution": {"entry_phase": "p"},
+  "resume": {"prompt": "r"}
+}
+MEOF
+  # clean state passes
+  local output ec=0
+  output=$("$KM" divergence m.json 2>&1) || ec=$?
+  assert_exit_code 0 "$ec" "matching hash must pass" || return 1
+  # mutate the artifact -> divergence
+  echo "content-v2" > pinned.txt
+  ec=0
+  output=$("$KM" divergence m.json 2>&1) || ec=$?
+  assert_contains "$output" "hash mismatch" || return 1
+  assert_exit_code 1 "$ec" "hash mismatch must exit 1"
+}
+
+test_manifest_compile_emits_receipt_fields() {
+  echo "some artifact content here" > artifact.md
+  cat > m.json <<'MEOF'
+{
+  "schema": "kernel.checkpoint/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {"branch": "main", "commit": "abc", "dirty": false},
+  "task": {"goal": "t"},
+  "steps_completed": [],
+  "pending_steps": [],
+  "resume": {"position": "p", "next_operation": "n"},
+  "context": {
+    "policy": {"mode": "advisory"},
+    "required": [
+      {"path": "artifact.md"}
+    ],
+    "budget": {"target_tokens": 1000000, "max_tokens": 2000000}
+  }
+}
+MEOF
+  local output
+  output=$("$KM" compile m.json 2>&1)
+  assert_contains "$output" '"schema": "kernel.context-receipt/v1"' || return 1
+  assert_contains "$output" "total_estimated_tokens" || return 1
+  assert_contains "$output" '"status": "within_budget"' || return 1
+  assert_contains "$output" "estimation_method" || return 1
+  assert_contains "$output" "selected_artifacts_tokens"
+}
+
+test_manifest_compile_budget_transitions() {
+  python3 -c "open('big.md','w').write('x'*40000)"
+  cat > m.json <<'MEOF'
+{
+  "schema": "kernel.checkpoint/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {"branch": "main", "commit": "abc", "dirty": false},
+  "task": {"goal": "t"},
+  "steps_completed": [],
+  "pending_steps": [],
+  "resume": {"position": "p", "next_operation": "n"},
+  "context": {
+    "policy": {"mode": "advisory"},
+    "required": [
+      {"path": "big.md"}
+    ],
+    "budget": {"target_tokens": 5000, "max_tokens": 8000}
+  }
+}
+MEOF
+  local output ec=0
+  output=$("$KM" compile m.json 2>&1) || ec=$?
+  assert_contains "$output" '"status": "maximum_exceeded"' || return 1
+  assert_exit_code 3 "$ec" "maximum_exceeded must exit 3" || return 1
+  # widen the max -> target_exceeded
+  sed -i.bak 's/"max_tokens": 8000/"max_tokens": 2000000/' m.json
+  ec=0
+  output=$("$KM" compile m.json 2>&1) || ec=$?
+  assert_contains "$output" '"status": "target_exceeded"' || return 1
+  assert_exit_code 0 "$ec" "target_exceeded must not hard-fail"
+}
+
+test_manifest_compile_selector_types_resolve() {
+  printf '# Title\n\n## Section A\ncontent-a\n\n## Section B\ncontent-b\n' > doc.md
+  printf 'l1\nl2\nl3\nl4\nl5\n' > lines.txt
+  printf 'aaa\nMATCH-ME\nbbb\n' > grepme.txt
+  cat > m.json <<'MEOF'
+{
+  "schema": "kernel.checkpoint/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {"branch": "main", "commit": "abc", "dirty": false},
+  "task": {"goal": "t"},
+  "steps_completed": [],
+  "pending_steps": [],
+  "resume": {"position": "p", "next_operation": "n"},
+  "context": {
+    "policy": {"mode": "advisory"},
+    "required": [
+      {"path": "doc.md", "heading": "## Section A"},
+      {"path": "lines.txt", "lines": "2-3"},
+      {"path": "grepme.txt", "grep": "MATCH-ME", "context": 1}
+    ]
+  }
+}
+MEOF
+  local output
+  output=$("$KM" compile m.json --bundle-out bundle.txt 2>&1)
+  assert_contains "$(cat bundle.txt)" "content-a" || return 1
+  if grep -q "content-b" bundle.txt; then echo "FAIL: heading selector leaked next section"; return 1; fi
+  assert_contains "$(cat bundle.txt)" "l2" || return 1
+  assert_contains "$(cat bundle.txt)" "MATCH-ME" || return 1
+  assert_contains "$output" '"resolved": true'
+}
+
+test_manifest_compile_reports_missing_required() {
+  cat > m.json <<'MEOF'
+{
+  "schema": "kernel.checkpoint/v1",
+  "identity": {"name": "t", "created": "2026-01-01T00:00:00Z"},
+  "provenance": {"branch": "main", "commit": "abc", "dirty": false},
+  "task": {"goal": "t"},
+  "steps_completed": [],
+  "pending_steps": [],
+  "resume": {"position": "p", "next_operation": "n"},
+  "context": {
+    "policy": {"mode": "advisory"},
+    "required": [
+      {"path": "nope-does-not-exist.md"}
+    ]
+  }
+}
+MEOF
+  local output
+  local ec=0
+  output=$("$KM" compile m.json 2>&1) || ec=$?
+  assert_exit_code 4 "$ec" "unresolved required selector must fail closed" || return 1
+  assert_contains "$output" '"resolved": false' || return 1
+  assert_contains "$output" "file missing" || return 1
+  assert_contains "$output" "ERROR: unresolved required selector"
+}
+
+test_manifest_paths_anchor_to_repo_root() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  mkdir -p docs sub _meta
+  echo anchored > docs/a.md
+  local head; head=$(git rev-parse HEAD)
+  cat > m.json <<MEOF
+{"schema":"kernel.checkpoint/v1","identity":{"name":"t","created":"2026-01-01T00:00:00Z"},"provenance":{"branch":"main","commit":"$head","dirty":true,"dirty_tree_sha256":"0000000000000000000000000000000000000000000000000000000000000000"},"task":{"goal":"t"},"steps_completed":[],"pending_steps":[],"resume":{"position":"p","next_operation":"n"},"context":{"policy":{"mode":"advisory"},"required":[{"path":"docs/a.md"}]}}
+MEOF
+  (cd sub && "$KM" compile m.json --bundle-out bundle.txt >/dev/null)
+  assert_contains "$(cat bundle.txt)" "anchored" || return 1
+  (cd sub && "$KM" activate m.json >/dev/null)
+  assert_file_exists "_meta/.active-manifest.json"
+}
+
+test_manifest_rejects_invalid_budget_and_selector_shapes() {
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['budget']={'target_tokens':20,'max_tokens':10}; json.dump(m,open(p,'w'))
+PYEOF
+  local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "target budget above max must fail" || return 1
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['required'][0]['heading']='## X'; m['context']['required'][0]['grep']='X'; json.dump(m,open(p,'w'))
+PYEOF
+  ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "multiple selector refinements must fail"
+}
+
+test_manifest_selector_outcomes_and_hashes() {
+  printf 'one\ntwo\n' > a.md
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'path':'a.md','lines':'2-1'}]; json.dump(m,open(p,'w'))
+PYEOF
+  local output ec=0
+  output=$("$KM" compile m.json --bundle-out bundle.txt 2>&1) || ec=$?
+  assert_exit_code 4 "$ec" "reversed range must fail required selector" || return 1
+  assert_contains "$output" '"outcome": "invalid"' || return 1
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'path':'a.md'}]; json.dump(m,open(p,'w'))
+PYEOF
+  output=$("$KM" compile m.json --bundle-out bundle.txt)
+  assert_contains "$output" '"manifest_sha256"' || return 1
+  assert_contains "$output" '"bundle_sha256"' || return 1
+  assert_contains "$output" '"resolved_sha256"'
+}
+
+test_manifest_checkpoint_requires_dirty_tree_hashes() {
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['provenance']['dirty']=True; m['provenance'].pop('dirty_tree_sha256',None); json.dump(m,open(p,'w'))
+PYEOF
+  local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "dirty checkpoint without tree hash must fail"
+}
+
+test_manifest_divergence_json_invalidates_phases() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  local head; head=$(git rev-parse HEAD)
+  cat > m.json <<MEOF
+{"schema":"kernel.handoff/v1","identity":{"name":"t","created":"2026-01-01T00:00:00Z"},"provenance":{"branch":"other","commit":"$head","dirty":true},"objective":{"goal":"t","success_conditions":["x"]},"workflow":{"phases":[{"name":"research","status":"inherited"}],"invalidation_rules":[{"when":{"event":"branch_diverged"},"invalidates":["research"]}]},"context":{"policy":{"mode":"advisory"}},"execution":{"entry_phase":"research"},"resume":{"prompt":"r"}}
+MEOF
+  local output ec=0; output=$("$KM" divergence m.json --json) || ec=$?
+  assert_exit_code 1 "$ec" "structured divergence keeps hard exit" || return 1
+  assert_contains "$output" '"event": "branch_diverged"' || return 1
+  assert_contains "$output" '"status": "invalidated"'
+}
+
+test_manifest_preflight_is_typed() {
+  touch CLAUDE.md
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['runtime']['preflight']=[{'cmd':'rm -rf /'}]; json.dump(m,open(p,'w'))
+PYEOF
+  local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "raw shell preflight must be rejected" || return 1
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['runtime']['preflight']=[{'check':'path_exists','path':'CLAUDE.md'}]; json.dump(m,open(p,'w'))
+PYEOF
+  "$KM" preflight m.json >/dev/null
+}
+
+test_manifest_latest_uses_identity_not_mtime() {
+  mkdir -p manifests
+  cp "$FIXTURES/checkpoint-example.json" manifests/new.json
+  cp "$FIXTURES/checkpoint-example.json" manifests/old.json
+  python3 - <<'PYEOF'
+import json
+for p,c in [('manifests/new.json','2026-02-01T00:00:00Z'),('manifests/old.json','2026-01-01T00:00:00Z')]:
+ m=json.load(open(p)); m['identity']['created']=c; json.dump(m,open(p,'w'))
+PYEOF
+  touch manifests/new.json; sleep 1; touch manifests/old.json
+  local output; output=$("$KM" latest --dir manifests --any-branch)
+  assert_contains "$output" "new.json"
+}
+
+test_manifest_latest_reports_ambiguity() {
+  mkdir -p manifests
+  cp "$FIXTURES/checkpoint-example.json" manifests/a.json
+  cp "$FIXTURES/checkpoint-example.json" manifests/b.json
+  local output ec=0; output=$("$KM" latest --dir manifests --any-branch 2>&1) || ec=$?
+  assert_exit_code 1 "$ec" "equal lineage candidates must be ambiguous" || return 1
+  assert_contains "$output" "ambiguous"
+}
+
+test_guard_context_bounded_skips_allowlisted_access() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"bounded","forbidden":[],"allowlist":["docs/a.md"]}
+JEOF
+  echo '{"tool_name":"Read","tool_input":{"file_path":"docs/a.md"}}' | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh"
+  [ ! -f _meta/.context-ledger ] || { echo "FAIL: allowlisted read was ledgered"; return 1; }
+}
+
+test_guard_context_bounded_ledgers_valid_json_escaping() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"bounded","forbidden":[],"allowlist":[]}
+JEOF
+  local hook_input
+  hook_input=$(python3 - <<'PYEOF'
+import json
+print(json.dumps({'tool_name':'Read','tool_input':{'file_path':'odd/quote"\\slash\nline\tcontrol.md'}}))
+PYEOF
+  ) || return 1
+  printf '%s\n' "$hook_input" | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" || return 1
+  python3 - <<'PYEOF'
+import json
+lines=open('_meta/.context-ledger').read().splitlines()
+assert len(lines)==1, lines
+entry=json.loads(lines[0])
+assert entry['path']=='odd/quote"\\slash\nline\tcontrol.md', repr(entry['path'])
+PYEOF
+  [ "$?" -eq 0 ] || return 1
+  agentdb init >/dev/null || return 1
+  cp "$FIXTURES/receipt-example.json" receipt.json || return 1
+  "$KM" deactivate --receipt receipt.json >/dev/null || return 1
+  "$KM" validate receipt.json >/dev/null || return 1
+}
+
+test_manifest_deactivate_rejects_ledger_schema_mismatch() {
+  mkdir -p _meta
+  cp "$FIXTURES/receipt-example.json" receipt.json
+  echo '{"path":"x.md","unknown_field":true}' > _meta/.context-ledger
+  echo '{"manifest":"m.json","mode":"bounded","forbidden":[],"allowlist":[]}' > _meta/.active-manifest.json
+  local ec=0; "$KM" deactivate --receipt receipt.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "ledger/schema mismatch must fail deactivate" || return 1
+  assert_file_exists "_meta/.active-manifest.json" "failed deactivate must stay armed"
+}
+
+test_manifest_deactivate_rejects_malformed_ledger_transactionally() {
+  local payload ec before after
+  for payload in '{bad' '' '[]' '{"path":42}' '{"path":"x","unknown":true}'; do
+    rm -rf _meta receipt.json
+    mkdir -p _meta
+    cp "$FIXTURES/receipt-example.json" receipt.json || return 1
+    echo '{"manifest":"m.json","mode":"bounded","forbidden":[],"allowlist":[]}' > _meta/.active-manifest.json
+    printf '%s\n' "$payload" > _meta/.context-ledger
+    before=$(shasum -a 256 receipt.json | awk '{print $1}')
+    ec=0; "$KM" deactivate --receipt receipt.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "invalid ledger payload must fail" || return 1
+    after=$(shasum -a 256 receipt.json | awk '{print $1}')
+    assert_equals "$before" "$after" "receipt must remain byte-identical" || return 1
+    assert_file_exists "_meta/.active-manifest.json" || return 1
+    assert_file_exists "_meta/.context-ledger" || return 1
+  done
+}
+
+test_manifest_deactivate_projection_retry_merges_once() {
+  mkdir -p _meta
+  rm -rf _meta/agentdb
+  cp "$FIXTURES/receipt-example.json" receipt.json || return 1
+  echo '{"manifest":"m.json","mode":"bounded","forbidden":[],"allowlist":[]}' > _meta/.active-manifest.json
+  echo '{"path":"retry-once.md","reason":"test","ts":"2026-01-01T00:00:00Z"}' > _meta/.context-ledger
+  local before after ec attempt
+  before=$(shasum -a 256 receipt.json | awk '{print $1}')
+  for attempt in 1 2; do
+    ec=0; "$KM" deactivate --receipt receipt.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "projection failure $attempt must fail" || return 1
+    after=$(shasum -a 256 receipt.json | awk '{print $1}')
+    assert_equals "$before" "$after" "failed projection must not mutate receipt" || return 1
+    assert_file_exists "_meta/.active-manifest.json" || return 1
+    assert_file_exists "_meta/.context-ledger" || return 1
+  done
+  agentdb init >/dev/null || return 1
+  "$KM" deactivate --receipt receipt.json >/dev/null || return 1
+  python3 - <<'PYEOF' || return 1
+import json
+r=json.load(open('receipt.json'))
+assert sum(x.get('path')=='retry-once.md' for x in r['loads_beyond_manifest']) == 1
+PYEOF
+  [ ! -e _meta/.active-manifest.json ] || { echo "FAIL: pointer remained"; return 1; }
+  [ ! -e _meta/.context-ledger ] || { echo "FAIL: ledger remained"; return 1; }
+  local sessions
+  sessions=$(sqlite3 _meta/agentdb/agent.db "SELECT COUNT(*) FROM graph_receipts")
+  assert_equals "1" "$sessions" "projection retry must create one graph receipt"
+}
+
+test_manifest_divergence_checks_dirty_tree_hash() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  echo one > dirty.txt
+  local head; head=$(git rev-parse HEAD)
+  cat > m.json <<MEOF
+{"schema":"kernel.checkpoint/v1","identity":{"name":"t","created":"2026-01-01T00:00:00Z"},"provenance":{"branch":"main","commit":"$head","dirty":true,"dirty_tree_sha256":"deadbeef"},"task":{"goal":"t"},"steps_completed":[],"pending_steps":[],"resume":{"position":"p","next_operation":"n"}}
+MEOF
+  local output ec=0; output=$("$KM" divergence m.json --json) || ec=$?
+  assert_exit_code 1 "$ec" "dirty tree hash mismatch must diverge" || return 1
+  assert_contains "$output" '"event": "dirty_tree_hash_mismatch"'
+}
+
+test_manifest_schema_fields_name_enforcement_owner() {
+  python3 - "$PLUGIN_ROOT/schemas" <<'PYEOF'
+import json,glob,sys
+bad=[]
+def walk(node,path):
+ if not isinstance(node,dict): return
+ for name,field in (node.get('properties') or {}).items():
+  if 'x-kernel-enforced-by' not in field: bad.append(f'{path}.{name}')
+  walk(field,f'{path}.{name}')
+ item=node.get('items')
+ if isinstance(item,dict): walk(item,path+'[]')
+for p in glob.glob(sys.argv[1]+'/*.schema.json'):
+ walk(json.load(open(p)),'$')
+if bad: print('\n'.join(bad[:20])); raise SystemExit(1)
+PYEOF
+}
+
+test_manifest_committed_state_files_are_checked() {
+  local bad=0 path ec
+  while IFS= read -r path; do
+    case "$path" in
+      *.json)
+        "$KM" validate "$PLUGIN_ROOT/$path" >/dev/null 2>&1 || bad=1
+        local divergence_output
+        ec=0; divergence_output=$("$KM" divergence "$PLUGIN_ROOT/$path" --json 2>/dev/null) || ec=$?
+        manifest_divergence_result_valid "$ec" "$divergence_output" || bad=1
+        ;;
+      *.yaml|*.yml) ec=0; "$KM" validate "$PLUGIN_ROOT/$path" >/dev/null 2>&1 || ec=$?; [ "$ec" -eq 2 ] || bad=1 ;;
+    esac
+  done < <(git -C "$PLUGIN_ROOT" ls-files '_meta/handoffs/*' '_meta/checkpoints/*')
+  assert_exit_code 0 "$bad" "committed canonical manifests validate and YAML is non-authoritative"
+}
+
+manifest_divergence_result_valid() {
+  local ec="$1" output="$2"
+  [ "$ec" -eq 0 ] || [ "$ec" -eq 1 ] || return 1
+  printf '%s' "$output" | python3 -c '
+import json,sys
+try: doc=json.load(sys.stdin)
+except (json.JSONDecodeError, UnicodeDecodeError): raise SystemExit(1)
+if not isinstance(doc,dict): raise SystemExit(1)
+if type(doc.get("hard_divergence")) is not bool: raise SystemExit(1)
+if not isinstance(doc.get("events"),list): raise SystemExit(1)
+if not isinstance(doc.get("phases"),list): raise SystemExit(1)
+for event in doc["events"]:
+ if not isinstance(event,dict) or not isinstance(event.get("event"),str) or not isinstance(event.get("status"),str): raise SystemExit(1)
+for phase in doc["phases"]:
+ if not isinstance(phase,dict) or not isinstance(phase.get("name"),str) or phase.get("status") not in ("inherited","required","invalidated"): raise SystemExit(1)
+'
+}
+
+test_manifest_committed_gate_validates_divergence_protocol() {
+  manifest_divergence_result_valid 1 '{"hard_divergence":true,"events":[{"event":"branch_diverged","status":"diverged"}],"phases":[{"name":"x","status":"invalidated"}]}' || return 1
+  if manifest_divergence_result_valid 1 ''; then echo "FAIL: empty exit1 accepted"; return 1; fi
+  if manifest_divergence_result_valid 1 'Traceback: boom'; then echo "FAIL: non-JSON exit1 accepted"; return 1; fi
+  if manifest_divergence_result_valid 1 '{"hard_divergence":true}'; then echo "FAIL: incomplete protocol accepted"; return 1; fi
+  if manifest_divergence_result_valid 1 '{"hard_divergence":"yes","events":[],"phases":[]}'; then echo "FAIL: wrong protocol types accepted"; return 1; fi
+}
+
+test_manifest_cli_paths_are_rooted_from_subdirs() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  mkdir -p skills manifests
+  cp "$FIXTURES/checkpoint-example.json" manifests/checkpoint.json
+  local root_output sub_output
+  root_output=$("$KM" latest --dir manifests --any-branch)
+  sub_output=$(cd skills && "$KM" latest --dir manifests --any-branch)
+  assert_equals "$root_output" "$sub_output" "latest must be cwd-independent" || return 1
+  (cd skills && "$KM" validate manifests/checkpoint.json >/dev/null)
+}
+
+test_manifest_rejects_paths_outside_repo() {
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  local candidate ec
+  for candidate in /etc/hosts ../escape.md; do
+    python3 - "$candidate" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'path':sys.argv[1]}]; json.dump(m,open(p,'w'))
+PYEOF
+    ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "selector path must stay in repo" || return 1
+  done
+  mkdir -p links
+  ln -s /etc/hosts links/hosts
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'path':'links/hosts'}]; json.dump(m,open(p,'w'))
+PYEOF
+  ec=0; "$KM" compile m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "selector symlink escape must fail" || return 1
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['runtime']['preflight']=[{'check':'path_exists','path':'/etc/passwd'}]; json.dump(m,open(p,'w'))
+PYEOF
+  ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "preflight paths must stay in repo" || return 1
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['provenance']['artifacts']=[{'path':'../escape','sha256':'x'}]; json.dump(m,open(p,'w'))
+PYEOF
+  ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "artifact paths must stay in repo"
+}
+
+test_manifest_rejects_bad_created_timestamp() {
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['identity']['created']='zzzz'; json.dump(m,open(p,'w'))
+PYEOF
+  local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "identity.created must be RFC3339"
+}
+
+test_manifest_created_timestamp_is_strict_rfc3339() {
+  local value ec
+  for value in '2026-01-01T00:00:00+0000' '2026-01-01T00:00:00+00' \
+               '2026-01-01 00:00:00Z' '2026-02-30T00:00:00Z' \
+               '2026-01-01T25:00:00Z' '2026-01-01T00:00:00+24:00' \
+               '2026-01-01t00:00:00z'; do
+    cp "$FIXTURES/checkpoint-example.json" m.json
+    python3 - "$value" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['identity']['created']=sys.argv[1]; json.dump(m,open(p,'w'))
+PYEOF
+    ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "strict RFC3339 must reject $value" || return 1
+  done
+  for value in '2026-01-01T00:00:00Z' '2026-01-01T00:00:00+00:00' '2026-01-01T00:00:00.123456Z'; do
+    cp "$FIXTURES/checkpoint-example.json" m.json
+    python3 - "$value" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['identity']['created']=sys.argv[1]; json.dump(m,open(p,'w'))
+PYEOF
+    "$KM" validate m.json >/dev/null || return 1
+  done
+}
+
+test_manifest_latest_missing_dir_value_is_controlled() {
+  local output ec=0; output=$("$KM" latest --dir 2>&1) || ec=$?
+  assert_exit_code 1 "$ec" "missing --dir value must be usage error" || return 1
+  if [[ "$output" == *Traceback* ]]; then echo "FAIL: traceback leaked"; return 1; fi
+  assert_contains "$output" "--dir requires"
+}
+
+
+test_manifest_git_diff_rejects_option_injection() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  local escaped="$PWD/escaped.diff" value ec
+  for value in "--output=$escaped" 'HEAD --output=x' $'HEAD\n--output=x' 'HEAD..'; do
+    cp "$FIXTURES/checkpoint-example.json" m.json
+    python3 - "$value" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'git_diff':sys.argv[1]}]; json.dump(m,open(p,'w'))
+PYEOF
+    ec=0; "$KM" compile m.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "unsafe git_diff must fail validation" || return 1
+    [ ! -e "$escaped" ] || { echo "FAIL: git_diff created $escaped"; return 1; }
+  done
+  for value in HEAD HEAD~1..HEAD HEAD^...HEAD; do
+    cp "$FIXTURES/checkpoint-example.json" m.json
+    python3 - "$value" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'git_diff':sys.argv[1]}]; json.dump(m,open(p,'w'))
+PYEOF
+    "$KM" validate m.json >/dev/null || return 1
+  done
+}
+
+
+test_manifest_rejects_invalid_invalidation_rules() {
+  local mutation ec
+  for mutation in event phase; do
+    cp "$FIXTURES/handoff-example.json" m.json
+    python3 - "$mutation" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); rule=m['workflow']['invalidation_rules'][0]
+if sys.argv[1]=='event': rule['when']['event']='brnch_diverged'
+else: rule['invalidates']=['does-not-exist']
+json.dump(m,open(p,'w'))
+PYEOF
+    ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "invalid invalidation $mutation must fail" || return 1
+  done
+}
+
+
+test_manifest_skill_pin_enforcement_owner_is_truthful() {
+  local schema="$PLUGIN_ROOT/schemas/kernel.handoff.v1.schema.json"
+  assert_equals "agent" "$(jq -r '.properties.runtime.properties.required_skills.items.properties.version["x-kernel-enforced-by"]' "$schema")" "version pin is agent-enforced" || return 1
+  assert_equals "agent" "$(jq -r '.properties.runtime.properties.required_skills.items.properties.sha256["x-kernel-enforced-by"]' "$schema")" "sha pin is agent-enforced"
+}
+
+
+test_manifest_cli_rejects_bad_options_without_traceback() {
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  local -a cases=(
+    'compile m.json --bundle-out'
+    'compile m.json --receipt-out'
+    'compile m.json --agentdb-tokens'
+    'compile m.json --agentdb-tokens nope'
+    'compile m.json --unknown'
+    'deactivate --receipt'
+    'deactivate --unknown'
+    'latest --unknown'
+    'validate m.json --unknown'
+    'resume m.json --unknown'
+    'activate m.json --unknown'
+    'preflight m.json --unknown'
+    'divergence m.json --unknown'
+  )
+  local case_args output ec
+  for case_args in "${cases[@]}"; do
+    local -a argv
+    read -r -a argv <<< "$case_args"
+    ec=0; output=$("$KM" "${argv[@]}" 2>&1) || ec=$?
+    assert_exit_code 1 "$ec" "bad CLI args must exit 1: $case_args" || return 1
+    if [[ "$output" == *Traceback* ]]; then echo "FAIL: traceback for $case_args"; return 1; fi
+  done
+}
+
+test_guard_context_no_manifest_allows() {
+  local ec=0
+  echo '{"tool_input":{"file_path":"anything.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 0 "$ec" "no active manifest must allow all reads"
+}
+
+test_guard_context_sealed_blocks_forbidden() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["secrets/*","frontend/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_input":{"file_path":"frontend/app.js"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block forbidden path"
+}
+
+test_guard_context_sealed_allows_unforbidden() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["secrets/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_input":{"file_path":"src/app.js"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 0 "$ec" "sealed manifest must allow unforbidden path"
+}
+
+test_guard_context_sealed_blocks_pathless_grep() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["secrets/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_name":"Grep","tool_input":{"pattern":"needle"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block pathless Grep when forbidden globs exist"
+}
+
+test_guard_context_sealed_blocks_root_grep() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["_meta/research/**"]}
+JEOF
+  local ec=0
+  echo '{"tool_name":"Grep","tool_input":{"pattern":"needle","path":"."}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block Grep from repo root when forbidden paths exist"
+}
+
+test_guard_context_sealed_blocks_absolute_read() {
+  mkdir -p _meta frontend
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["frontend/*"]}
+JEOF
+  local ec=0
+  echo "{\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$PWD/frontend/secret.md\"}}" \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block absolute paths into forbidden globs"
+}
+
+test_guard_context_sealed_blocks_dot_prefix_read() {
+  mkdir -p _meta frontend
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["frontend/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_name":"Read","tool_input":{"file_path":"./frontend/secret.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block ./-prefixed forbidden paths"
+}
+
+test_guard_context_sealed_blocks_parent_directory_grep() {
+  mkdir -p _meta frontend src
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["frontend/*"]}
+JEOF
+  (cd src && \
+    echo '{"tool_name":"Grep","tool_input":{"pattern":"needle","path":".."}}' \
+      | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1)
+  local ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block parent-directory Grep that includes forbidden paths"
+}
+
+test_guard_context_sealed_blocks_symlink_read() {
+  mkdir -p _meta frontend links
+  touch frontend/secret.md
+  ln -s ../frontend/secret.md links/secret-link.md
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["frontend/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_name":"Read","tool_input":{"file_path":"links/secret-link.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block symlinks into forbidden paths"
+}
+
+test_guard_context_bounded_ledgers_access() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"bounded","forbidden":[]}
+JEOF
+  local ec=0
+  echo '{"tool_input":{"file_path":"extra/file.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 0 "$ec" "bounded mode must allow" || return 1
+  assert_file_exists "_meta/.context-ledger" "bounded access must be ledgered" || return 1
+  assert_contains "$(cat _meta/.context-ledger)" "extra/file.md"
+}
+
+test_guard_context_fails_closed_on_broken_pointer() {
+  mkdir -p _meta
+  echo 'not json' > _meta/.active-manifest.json
+  local ec=0
+  echo '{"tool_input":{"file_path":"src/app.js"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "unreadable pointer must fail closed (block)"
+}
+
+test_manifest_activate_deactivate_roundtrip() {
+  mkdir -p _meta
+  agentdb init >/dev/null
+  cp "$FIXTURES/handoff-example.json" m.json
+  "$KM" activate m.json >/dev/null
+  assert_file_exists "_meta/.active-manifest.json" || return 1
+  local mode
+  mode=$(jq -r '.mode' _meta/.active-manifest.json)
+  assert_equals "bounded" "$mode" "pointer must carry policy mode" || return 1
+  echo '{"path":"x.md","reason":"test"}' > _meta/.context-ledger
+  cp "$FIXTURES/receipt-example.json" receipt.json
+  "$KM" deactivate --receipt receipt.json >/dev/null
+  [ ! -f _meta/.active-manifest.json ] || { echo "FAIL: pointer not removed"; return 1; }
+  [ ! -f _meta/.context-ledger ] || { echo "FAIL: ledger not removed"; return 1; }
+  assert_contains "$(cat receipt.json)" "loads_beyond_manifest"
+}
+
+test_manifest_deactivate_rewrites_receipt_without_duplicate_keys() {
+  mkdir -p _meta
+  agentdb init >/dev/null
+  cp "$FIXTURES/handoff-example.json" m.json
+  "$KM" activate m.json >/dev/null
+  cp "$FIXTURES/receipt-example.json" receipt.json
+  printf '{"path":"extra/file.md","reason":"test"}\n' > _meta/.context-ledger
+  "$KM" deactivate --receipt receipt.json >/dev/null
+  local count
+  count=$(grep -c '"loads_beyond_manifest"' receipt.json)
+  assert_equals "1" "$count" "deactivate must keep one top-level loads_beyond_manifest key" || return 1
+  assert_contains "$(cat receipt.json)" "extra/file.md" || return 1
+  "$KM" validate receipt.json >/dev/null
+}
+
+test_manifest_checkpoint_resume_position_surfaced() {
+  # The resume block is the contract for where ingest re-enters.
+  local output
+  output=$("$KM" resume "$FIXTURES/checkpoint-example.json" 2>&1)
+  assert_contains "$output" "commit 3 of 5" || return 1
+  assert_contains "$output" "rewrite skills/handoff/SKILL.md" || return 1
+  output=$("$KM" resume "$FIXTURES/handoff-example.json" 2>&1)
+  assert_contains "$output" "entry_phase: migration"
+}
+
+
+test_migration_every_command_has_destination() {
+  # contract table section 3: every former command name resolves to a skill dir
+  local missing=0
+  for name in ingest forge validate tearitapart review handoff retrospective \
+              diagnose dream metrics init help experiment landing-page checkpoint; do
+    [ -f "$PLUGIN_ROOT/skills/$name/SKILL.md" ] || { echo "  no destination: $name"; missing=1; }
+  done
+  assert_exit_code 0 "$missing" "every former command needs a skill destination"
+}
+
+test_migration_no_live_command_references() {
+  # no live file may reference commands/ paths (CHANGELOG + _meta archives excluded)
+  local hits
+  hits=$(grep -rln 'commands/' "$PLUGIN_ROOT" \
+    --include='*.md' --include='*.sh' --include='*.json' 2>/dev/null \
+    | grep -v '_meta/' | grep -v 'CHANGELOG.md' | grep -v '.obsidian' \
+    | grep -v 'tests/run-tests.sh' | grep -v 'docs/MIGRATION-8.md' \
+    | grep -v 'tests/fixtures/manifests/' \
+    | grep -v 'guard-config.sh' || true)
+  # guard-config.sh keeps commands/ in its HOST-project allowlist deliberately;
+  # fixture manifests are example DATA whose narrative strings describe the
+  # migration itself ("commands/ directory removed"), not live references
+  [ -z "$hits" ] || { echo "  live commands/ references:"; echo "$hits"; return 1; }
+}
+
+test_migration_side_effecting_skills_not_ambient() {
+  # forge/init/experiment/landing-page must carry disable-model-invocation: true
+  local bad=0
+  for s in forge init experiment landing-page; do
+    grep -q '^disable-model-invocation: true' "$PLUGIN_ROOT/skills/$s/SKILL.md" || {
+      echo "  $s can fire ambiently (missing disable-model-invocation: true)"; bad=1; }
+  done
+  assert_exit_code 0 "$bad" "side-effecting skills must not fire ambiently"
+}
+
+test_migration_kernel_taxonomy_blocks_parse() {
+  # every SKILL.md frontmatter parses and carries kernel.kind
+  python3 - "$PLUGIN_ROOT" <<'PYINNER'
+import glob, re, sys
+root = sys.argv[1]
+bad = 0
+valid_kinds = {"methodology", "workflow", "state_transition", "validator", "operator"}
+for p in sorted(glob.glob(f"{root}/skills/*/SKILL.md")):
+    text = open(p).read()
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    if not m:
+        print(f"  no frontmatter: {p}"); bad = 1; continue
+    fm = m.group(1)
+    km = re.search(r"^kernel:\n((?:  .*\n?)+)", fm, re.M)
+    if not km:
+        print(f"  no kernel: block: {p}"); bad = 1; continue
+    kind = re.search(r"^  kind: (\S+)", km.group(1), re.M)
+    if not kind or kind.group(1) not in valid_kinds:
+        print(f"  bad kernel.kind: {p}"); bad = 1
+sys.exit(bad)
+PYINNER
+}
+
+test_migration_workflows_reference_skills() {
+  local bad=0
+  for w in "$PLUGIN_ROOT/workflows/"*.md; do
+    if grep -q '^  - command:' "$w"; then echo "  stale command label: $w"; bad=1; fi
+  done
+  assert_exit_code 0 "$bad" "workflow steps must use skill: labels"
+}
+
 run_test_suite() {
   local suite="$1"
   echo ""
   echo -e "${YELLOW}=== $suite ===${NC}"
 
   case "$suite" in
+    manifest)
+      run_test "schemas parse as JSON" test_manifest_schemas_parse_as_json
+      run_test "handoff example validates" test_manifest_validate_handoff_example
+      run_test "checkpoint example validates" test_manifest_validate_checkpoint_example
+      run_test "retrospective-result example validates" test_manifest_validate_retrospective_example
+      run_test "missing schema field rejected" test_manifest_validate_rejects_missing_schema_field
+      run_test "bad policy mode rejected" test_manifest_validate_rejects_bad_policy_mode
+      run_test "selector without path rejected" test_manifest_validate_rejects_selector_without_path
+      run_test "duplicate keys rejected at parse" test_manifest_rejects_duplicate_keys
+      run_test "yaml manifests rejected" test_manifest_rejects_yaml_manifest
+      run_test "unknown manifest keys rejected" test_manifest_validate_rejects_unknown_keys
+      run_test "compile validates before consuming" test_manifest_compile_validates_before_consuming
+      run_test "activate validates before pointer" test_manifest_activate_validates_before_pointer
+      run_test "latest finds newest manifest" test_manifest_latest_finds_newest
+      run_test "latest fails when empty" test_manifest_latest_fails_when_empty
+      run_test "divergence: branch mismatch" test_manifest_divergence_detects_branch_mismatch
+      run_test "divergence: artifact hash mismatch" test_manifest_divergence_detects_artifact_hash_mismatch
+      run_test "compile emits receipt fields" test_manifest_compile_emits_receipt_fields
+      run_test "compile budget transitions" test_manifest_compile_budget_transitions
+      run_test "compile selector types resolve" test_manifest_compile_selector_types_resolve
+      run_test "compile reports missing required" test_manifest_compile_reports_missing_required
+      run_test "paths anchor to repo root" test_manifest_paths_anchor_to_repo_root
+      run_test "budgets and selector shapes validate" test_manifest_rejects_invalid_budget_and_selector_shapes
+      run_test "selector outcomes carry hashes" test_manifest_selector_outcomes_and_hashes
+      run_test "dirty checkpoint requires hash" test_manifest_checkpoint_requires_dirty_tree_hashes
+      run_test "divergence JSON invalidates phases" test_manifest_divergence_json_invalidates_phases
+      run_test "preflight checks are typed" test_manifest_preflight_is_typed
+      run_test "latest uses identity timestamp" test_manifest_latest_uses_identity_not_mtime
+      run_test "latest reports ambiguity" test_manifest_latest_reports_ambiguity
+      run_test "dirty tree hash divergence" test_manifest_divergence_checks_dirty_tree_hash
+      run_test "schema fields name enforcement owner" test_manifest_schema_fields_name_enforcement_owner
+      run_test "committed manifests are checked" test_manifest_committed_state_files_are_checked
+      run_test "committed gate validates divergence protocol" test_manifest_committed_gate_validates_divergence_protocol
+      run_test "CLI paths root from subdirectories" test_manifest_cli_paths_are_rooted_from_subdirs
+      run_test "manifest paths stay in repo" test_manifest_rejects_paths_outside_repo
+      run_test "created timestamp validates" test_manifest_rejects_bad_created_timestamp
+      run_test "created timestamp is strict RFC3339" test_manifest_created_timestamp_is_strict_rfc3339
+      run_test "latest missing dir is controlled" test_manifest_latest_missing_dir_value_is_controlled
+      run_test "git_diff rejects option injection" test_manifest_git_diff_rejects_option_injection
+      run_test "invalidation rules validate targets" test_manifest_rejects_invalid_invalidation_rules
+      run_test "skill pin owner is truthful" test_manifest_skill_pin_enforcement_owner_is_truthful
+      run_test "CLI rejects bad options cleanly" test_manifest_cli_rejects_bad_options_without_traceback
+      run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
+      run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
+      run_test "guard-context: sealed allows unforbidden" test_guard_context_sealed_allows_unforbidden
+      run_test "guard-context: sealed blocks pathless Grep" test_guard_context_sealed_blocks_pathless_grep
+      run_test "guard-context: sealed blocks root Grep" test_guard_context_sealed_blocks_root_grep
+      run_test "guard-context: sealed blocks absolute read" test_guard_context_sealed_blocks_absolute_read
+      run_test "guard-context: sealed blocks dot-prefix read" test_guard_context_sealed_blocks_dot_prefix_read
+      run_test "guard-context: sealed blocks parent-directory Grep" test_guard_context_sealed_blocks_parent_directory_grep
+      run_test "guard-context: sealed blocks symlink read" test_guard_context_sealed_blocks_symlink_read
+      run_test "guard-context: bounded ledgers access" test_guard_context_bounded_ledgers_access
+      run_test "guard-context: bounded skips allowlist" test_guard_context_bounded_skips_allowlisted_access
+      run_test "guard-context: bounded JSON escaping" test_guard_context_bounded_ledgers_valid_json_escaping
+      run_test "deactivate rejects ledger schema mismatch" test_manifest_deactivate_rejects_ledger_schema_mismatch
+      run_test "deactivate rejects malformed ledger transactionally" test_manifest_deactivate_rejects_malformed_ledger_transactionally
+      run_test "deactivate projection retry merges once" test_manifest_deactivate_projection_retry_merges_once
+      run_test "guard-context: fails closed on broken pointer" test_guard_context_fails_closed_on_broken_pointer
+      run_test "activate/deactivate roundtrip" test_manifest_activate_deactivate_roundtrip
+      run_test "deactivate rewrites receipt once" test_manifest_deactivate_rewrites_receipt_without_duplicate_keys
+      run_test "checkpoint resume position surfaced" test_manifest_checkpoint_resume_position_surfaced
+      run_test "migration: every command has destination" test_migration_every_command_has_destination
+      run_test "migration: no live command references" test_migration_no_live_command_references
+      run_test "migration: side-effecting skills not ambient" test_migration_side_effecting_skills_not_ambient
+      run_test "migration: kernel taxonomy blocks parse" test_migration_kernel_taxonomy_blocks_parse
+      run_test "migration: workflows reference skills" test_migration_workflows_reference_skills
+      ;;
     test_gate)
       run_test "test-gate detects + passes" test_test_gate_detects_and_passes
       run_test "test-gate detects + fails" test_test_gate_detects_and_fails
@@ -2549,6 +3656,10 @@ run_test_suite() {
       run_test "session-start validates tier" test_session_start_validates_tier
       run_test "session-end updates session" test_session_end_updates_session
       run_test "session-end validates tokens" test_session_end_validates_tokens
+      run_test "graph-project from receipt" test_graph_project_from_receipt
+      run_test "graph-project idempotent" test_graph_project_idempotent
+      run_test "graph-suggest shadow mode" test_graph_suggest_shadow_mode
+      run_test "graph outcome from write-end" test_graph_outcome_from_write_end
       ;;
     schema_validation)
       run_test "inline schema matches schema.sql" test_inline_schema_matches_schema_sql
@@ -2825,6 +3936,7 @@ main() {
     run_test_suite "learn"
     run_test_suite "version_sync"
     run_test_suite "test_gate"
+    run_test_suite "manifest"
   else
     run_test_suite "$target"
   fi

@@ -1,0 +1,245 @@
+{
+  "$id": "kernel.checkpoint/v1",
+  "title": "KERNEL checkpoint manifest",
+  "description": "Bounded mid-task progress record. Smaller than a handoff: enough to resume after a context reset, not a full session transfer. Produced by /kernel:checkpoint; consumed by /kernel:ingest. A checkpoint never overrides live repository state (authority order: live state > user instruction > manifest).",
+  "type": "object",
+  "required": [
+    "schema",
+    "identity",
+    "provenance",
+    "task",
+    "steps_completed",
+    "pending_steps",
+    "resume"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": [
+        "kernel.checkpoint/v1"
+      ],
+      "x-kernel-enforced-by": "agent"
+    },
+    "identity": {
+      "type": "object",
+      "required": [
+        "name",
+        "created"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
+        },
+        "created": {
+          "type": "string",
+          "description": "ISO 8601 timestamp",
+          "x-kernel-enforced-by": "agent"
+        },
+        "session": {
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
+        }
+      },
+      "x-kernel-enforced-by": "agent"
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "branch",
+        "commit",
+        "dirty"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string",
+          "x-kernel-enforced-by": "divergence"
+        },
+        "commit": {
+          "type": "string",
+          "x-kernel-enforced-by": "divergence"
+        },
+        "dirty": {
+          "type": "boolean",
+          "x-kernel-enforced-by": "divergence"
+        },
+        "dirty_tree_sha256": {
+          "type": "string",
+          "description": "sha256 of `git diff --binary HEAD` when dirty is true",
+          "x-kernel-enforced-by": "divergence"
+        }
+      },
+      "x-kernel-enforced-by": "divergence"
+    },
+    "task": {
+      "type": "object",
+      "required": [
+        "goal"
+      ],
+      "properties": {
+        "goal": {
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
+        },
+        "handoff_ref": {
+          "type": "string",
+          "description": "parent kernel.handoff/v1 file, if this checkpoint refines one",
+          "x-kernel-enforced-by": "agent"
+        },
+        "contract_ref": {
+          "type": "string",
+          "description": "governing _meta/contracts/ file",
+          "x-kernel-enforced-by": "agent"
+        }
+      },
+      "x-kernel-enforced-by": "agent"
+    },
+    "steps_completed": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "step",
+          "evidence"
+        ],
+        "properties": {
+          "step": {
+            "type": "string",
+            "x-kernel-enforced-by": "agent"
+          },
+          "evidence": {
+            "type": "string",
+            "description": "verification evidence, not intent \u2014 a command output, commit sha, passing test",
+            "x-kernel-enforced-by": "agent"
+          }
+        }
+      },
+      "x-kernel-enforced-by": "agent"
+    },
+    "current_outputs": {
+      "type": "array",
+      "description": "files produced so far",
+      "items": {
+        "type": "string"
+      },
+      "x-kernel-enforced-by": "agent"
+    },
+    "pending_steps": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "x-kernel-enforced-by": "agent"
+    },
+    "resume": {
+      "type": "object",
+      "required": [
+        "position",
+        "next_operation"
+      ],
+      "properties": {
+        "position": {
+          "type": "string",
+          "description": "exact place in the work, e.g. 'commit 3 of 5: state skills rewritten, tests not yet retargeted'",
+          "x-kernel-enforced-by": "agent"
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "skill or phase to re-enter",
+          "x-kernel-enforced-by": "agent"
+        },
+        "next_operation": {
+          "type": "string",
+          "description": "the literal first action to take on resume",
+          "x-kernel-enforced-by": "agent"
+        }
+      },
+      "x-kernel-enforced-by": "agent"
+    },
+    "context": {
+      "type": "object",
+      "description": "optional bounded context spec, same policy semantics as kernel.handoff/v1",
+      "properties": {
+        "policy": {
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "sealed",
+                "bounded",
+                "advisory"
+              ],
+              "x-kernel-enforced-by": "hook"
+            }
+          },
+          "x-kernel-enforced-by": "hook"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
+              },
+              "lines": {
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
+              },
+              "heading": {
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
+              },
+              "grep": {
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
+              },
+              "context": {
+                "type": "integer",
+                "x-kernel-enforced-by": "compiler"
+              },
+              "git_diff": {
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
+              },
+              "reason": {
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
+              }
+            }
+          },
+          "x-kernel-enforced-by": "compiler"
+        },
+        "forbidden": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "hook"
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "target_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "x-kernel-enforced-by": "compiler"
+            },
+            "max_tokens": {
+              "type": "integer",
+              "minimum": 1,
+              "x-kernel-enforced-by": "compiler"
+            }
+          },
+          "x-kernel-enforced-by": "compiler"
+        }
+      },
+      "x-kernel-enforced-by": "compiler"
+    }
+  }
+}

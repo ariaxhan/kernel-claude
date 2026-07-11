@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "7.23.0",
-  "description": "Claude Code learns from itself. KERNEL gives your agent persistent memory (AgentDB), multi-agent orchestration (15 agents, tiered routing), and a scientific experiment engine that proves which rules actually work. Your agent remembers failures across sessions, coordinates parallel work without merge conflicts, and evolves its own methodology through hypothesis testing. 19 skills, 14 commands, auto-adapting project profiles. The plugin stays general-purpose: project-specific session overlays live in the consuming repo's own hooks, not here.",
+  "version": "8.0.0",
+  "description": "Claude Code learns from itself. KERNEL gives your agent persistent memory (AgentDB), multi-agent orchestration (15 agents, tiered routing), and a scientific experiment engine that proves which rules actually work. Your agent remembers failures across sessions, coordinates parallel work without merge conflicts, and evolves its own methodology through hypothesis testing. v8: one unified skill system (methodology, workflows, state transitions, validators, operators) with yaml-first resumable manifests, context budgets, and hook-enforced context policies; auto-adapting project profiles. The plugin stays general-purpose: project-specific session overlays live in the consuming repo's own hooks, not here.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"
@@ -19,21 +19,5 @@
     "validation",
     "memory",
     "methodology"
-  ],
-  "commands": [
-    "./commands/ingest.md",
-    "./commands/forge.md",
-    "./commands/validate.md",
-    "./commands/tearitapart.md",
-    "./commands/review.md",
-    "./commands/handoff.md",
-    "./commands/init.md",
-    "./commands/help.md",
-    "./commands/dream.md",
-    "./commands/diagnose.md",
-    "./commands/metrics.md",
-    "./commands/retrospective.md",
-    "./commands/experiment.md",
-    "./commands/landing-page.md"
   ]
 }

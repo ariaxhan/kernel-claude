@@ -1,11 +1,16 @@
 ---
-name: kernel:metrics
+name: metrics
 description: "Observability dashboard. Session stats, agent tracking, hook performance, learning health. Triggers: metrics, stats, dashboard, observability."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob
+kernel:
+  kind: workflow
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
-<command id="metrics">
+<skill id="metrics">
 
 <purpose>
 Surface actionable insights from KERNEL telemetry. Wraps `agentdb metrics` with analysis and recommendations.
@@ -40,4 +45,4 @@ agentdb health
 </ask_user>
 </on_start>
 
-</command>
+</skill>

@@ -28,3 +28,7 @@ _meta/.breakers/
 _meta/.compact-marker
 _meta/.cache/
 _meta/.test-status
+
+# Manifest runtime state (kernel-manifest activate/deactivate)
+_meta/.active-manifest.json
+_meta/.context-ledger

@@ -1,10 +1,15 @@
 ---
-name: design
-description: "Frontend aesthetics and UI implementation. Break generic AI aesthetic patterns. Create distinctive, surprising interfaces. Supports mood variants that guide aesthetic direction without constraining execution. Triggers: design, frontend, ui, styling, css, visual, theme, component, layout, abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal."
+name: frontend
+description: "Frontend aesthetics and UI implementation. Break generic AI aesthetic patterns. Create distinctive, surprising interfaces. Supports mood variants that guide aesthetic direction without constraining execution. Triggers: frontend, ui, styling, css, visual, theme, component, layout, aesthetic, abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal."
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
-<skill id="design">
+<skill id="frontend">
 
 <purpose>
 Break distributional convergence. Every generation must feel intentional and distinct.
@@ -74,7 +79,7 @@ Each defines sensory direction and emotional target—not specs.
 </core>
 
 <reference>
-Skill-specific: skills/design/reference/design-research.md
+Skill-specific: skills/frontend/reference/design-research.md
 </reference>
 
 </principles>

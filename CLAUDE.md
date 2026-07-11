@@ -1,4 +1,4 @@
-<kernel version="7.23.0">
+<kernel version="8.0.0">
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->
@@ -145,54 +145,48 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
 </git>
 
 <!-- ============================================ -->
-<!-- COMMANDS                                     -->
+<!-- WORKFLOW SKILLS                                     -->
 <!-- ============================================ -->
 
-<commands>
-  <command id="/kernel:ingest" purpose="Universal entry. Research → classify → scope → define success → execute → learn." file="commands/ingest.md">
-    Load: orchestration, build skills. Spawn researcher for unfamiliar tech.
-    Mandatory: Check _meta/research/ before new work. Write research after learning.
-  </command>
-  <command id="/kernel:forge" purpose="Autonomous engine. Heat/hammer/quench/anneal until antifragile. Run overnight." file="commands/forge.md">
-    Entropy-tested development: generate approaches, implement, adversarial attack, iterate.
-    Stops after 3 structural failures or 10 iterations. Full audit trail.
-  </command>
-  <command id="/kernel:validate" purpose="Pre-commit/pre-PR verification loop. Build → types → lint → tests → security → diff. Blocks on failure." file="commands/validate.md">
-    Spawns validator agent. Load: testing, security skills.
-  </command>
-  <command id="/kernel:tearitapart" purpose="Critical pre-implementation review. Finds gaps before coding starts. Verdict: PROCEED/REVISE/RETHINK." file="commands/tearitapart.md">
-    Load: architecture, testing, security skills. Reference: architecture-research, testing-research.
-  </command>
-  <command id="/kernel:handoff" purpose="Context handoff brief for session continuity. Writes to _meta/handoffs/." file="commands/handoff.md">
-    Load: context-mgmt skill. Reference: context-research.md.
-  </command>
-  <command id="/kernel:review" purpose="Code review for PRs or staged changes. >80% confidence threshold. Verdict: APPROVE/REQUEST CHANGES/COMMENT." file="commands/review.md">
-    Spawns reviewer agent. Load: testing, security skills.
-  </command>
-  <command id="/kernel:dream" purpose="Creative exploration. 3 perspectives + 4-persona stress test. Integrity-scored." file="commands/dream.md">
-    Minimalist/maximalist/pragmatist perspectives. Council probes each for flaws.
-  </command>
-  <command id="/kernel:diagnose" purpose="Systematic debugging + refactor analysis. Diagnosis before prescription." file="commands/diagnose.md">
-    Bug mode: reproduce → trace → isolate → hypothesize → diagnose.
-    Refactor mode: map → trace deps → coupling → risks → diagnose.
-  </command>
-  <command id="/kernel:retrospective" purpose="Cross-session learning synthesis. Finds patterns, resolves contradictions, promotes insights into project artifacts." file="commands/retrospective.md">
-    Groups learnings, merges duplicates, archives stale, promotes via the artifact ladder
-    (hook > agent > skill > prose), scaffolds the artifact in the host project's .claude/,
-    doesn't just recommend. Audits project fit: missing artifacts created, dormant ones flagged.
-  </command>
-  <command id="/kernel:metrics" purpose="Observability dashboard. Sessions, agents, hooks, learnings." file="commands/metrics.md">
-    Wraps agentdb metrics + health with actionable insights.
-  </command>
-  <command id="/kernel:experiment" purpose="Scientific experimentation mode. Every rule is a hypothesis until proven. Seed, test, graduate, or kill rules based on evidence." file="commands/experiment.md">
-    Subcommands: seed, list, test, verdict, report, graduate, kill.
-    Load: quality skill always. Testing + eval skills for test subcommand.
-  </command>
-  <command id="/kernel:landing-page" purpose="Guided landing page generator. Interview → scaffold → enforce → deploy. Static HTML/CSS for Cloudflare Pages. All rules are hypotheses." file="commands/landing-page.md">
-    Interview → generate content.js + tokens.css + semantic HTML + CF deployment config.
-    Load: quality, design skills. Reference: _meta/research/ai-landing-page-failures-2026.md.
-  </command>
-  <rule>Commands must load relevant skills and reference research before executing.</rule>
+<workflow_skills>
+<!-- One primitive: skills. kind (kernel: frontmatter block) distinguishes workflow /
+     state_transition / validator / operator / methodology. Former commands keep their
+     /kernel:<name> invocation; definitions live at skills/<name>/SKILL.md. -->
+
+  <skill id="ingest" kind="workflow" file="skills/ingest/SKILL.md">Unified entry for new AND resumed work. New: research → classify → scope → execute (human confirms phases). Resume: manifest validate → divergence → bounded context compile + receipt → resume at phase. Authority: live repo state > user instruction > manifest > chronicle > inferred history.</skill>
+  <skill id="forge" kind="workflow" no-ambient="true" file="skills/forge/SKILL.md">Autonomous engine. Heat/hammer/quench/temper/anneal until antifragile. Requires max_budget_usd. Explicit invocation only.</skill>
+  <skill id="dream" kind="workflow" file="skills/dream/SKILL.md">Creative exploration. 3 perspectives + 4-persona stress test. Integrity-scored.</skill>
+  <skill id="diagnose" kind="workflow" file="skills/diagnose/SKILL.md">Systematic debugging + refactor analysis. Diagnosis before prescription.</skill>
+  <skill id="metrics" kind="workflow" file="skills/metrics/SKILL.md">Observability dashboard. Sessions, agents, hooks, learnings.</skill>
+  <skill id="experiment" kind="workflow" no-ambient="true" file="skills/experiment/SKILL.md">Autonomous experimentation engine + methodology (merged v8). Every rule is a hypothesis: seed, test, graduate, kill.</skill>
+
+  <skill id="validate" kind="validator" file="skills/validate/SKILL.md">Pre-commit verification loop. Build → types → lint → tests → security. Blocks on failure.</skill>
+  <skill id="tearitapart" kind="validator" file="skills/tearitapart/SKILL.md">Critical pre-implementation review. Verdict: PROCEED/REVISE/RETHINK.</skill>
+  <skill id="review" kind="validator" file="skills/review/SKILL.md">Code review, >80% confidence threshold. APPROVE/REQUEST CHANGES/COMMENT.</skill>
+
+  <skill id="handoff" kind="state_transition" file="skills/handoff/SKILL.md">Compiles the authoritative kernel.handoff/v1 JSON manifest (canonical; yaml/md renders are not sources of truth). Pins provenance, phases, context policy + budget.</skill>
+  <skill id="checkpoint" kind="state_transition" file="skills/checkpoint/SKILL.md">Bounded mid-task kernel.checkpoint/v1 manifest: safe context resets without full handoff ceremony. Steps completed with evidence, exact resume position.</skill>
+  <skill id="retrospective" kind="state_transition" file="skills/retrospective/SKILL.md">Cross-session learning synthesis; promotes via artifact ladder (hook > agent > skill > prose) AND emits a validated kernel.retrospective-result/v1 mutation record.</skill>
+
+  <skill id="init" kind="operator" no-ambient="true" file="skills/init/SKILL.md">Global KERNEL setup. Run once per machine.</skill>
+  <skill id="landing-page" kind="operator" no-ambient="true" file="skills/landing-page/SKILL.md">Guided landing page generator: interview → scaffold → enforce → deploy.</skill>
+  <skill id="help" kind="methodology" file="skills/help/SKILL.md">KERNEL reference + live plugin status.</skill>
+
+  <rule>Workflow skills must load relevant methodology skills and reference research before executing.</rule>
+  <rule>no-ambient skills carry disable-model-invocation: true — side-effecting or expensive operations never fire without an explicit invocation (test-enforced).</rule>
+
+  <manifest_runtime>
+    JSON is the canonical machine-readable state representation (stdlib parser, duplicate
+    keys rejected — the manifest's meaning never depends on machine config). Schemas in schemas/:
+    kernel.handoff/v1 · kernel.checkpoint/v1 · kernel.retrospective-result/v1 ·
+    kernel.context-receipt/v1. CLI: orchestration/manifest/kernel-manifest
+    (validate | latest | divergence | preflight | compile | resume | activate | deactivate).
+    Context policies: sealed (forbidden globs hook-blocked) | bounded (extra loads
+    ledgered) | advisory. Enforcement: hooks/scripts/guard-context.sh reads the
+    activated manifest — the manifest feeds the hooks, the hooks feed the receipts (I0.15).
+    Grounding: EXP-L21 — load-bearing context is flat (~50-70k/decision); resumes
+    reconstruct bounded state from manifests, never inherit whole conversations.
+  </manifest_runtime>
 
   <workflows>
     Declarative workflow definitions in workflows/ directory.
@@ -200,7 +194,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     Each step has: agent, output, skip_if, retry, on_failure.
     See: workflows/feature.md, workflows/bugfix.md, workflows/refactor.md
   </workflows>
-</commands>
+</workflow_skills>
 
 <!-- ============================================ -->
 <!-- SKILLS                                       -->
@@ -233,7 +227,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
 
   <!-- WORKFLOW -->
   <skill id="git" triggers="commit, branch, merge, PR">Atomic commits, conventional messages, branch strategies, merge protocols.</skill>
-  <skill id="design" triggers="UI, frontend, styling, visual">/design command. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
+  <skill id="frontend" triggers="UI, frontend, styling, visual">/kernel:frontend skill. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
   <skill id="app-dev" triggers="app, mobile, store submission, build, deploy, fastlane">Mobile/web build pipeline: fastlane-first local builds, store submission, pre-submission checklists. EAS only as a stated exception.</skill>
 
   <!-- EXPERIMENTATION -->
@@ -242,7 +236,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <rule>Load relevant skill before acting. Match triggers to task. Reference research docs when methodology applies.</rule>
 </skills>
 
-<!-- Design: skills/design/SKILL.md. Load for frontend work. -->
+<!-- Frontend: skills/frontend/SKILL.md. Load for frontend work. -->
 <!-- Output validation: rules/kernel.md -->
 
 <anti_patterns>

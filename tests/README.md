@@ -21,6 +21,7 @@ principle: real deps, minimal mocks, edge cases first
 
 ## Test Suites
 
+# 282 tests total across the suites below.
 ```yaml
 suites:
   agentdb:
@@ -38,12 +39,12 @@ suites:
       - empty db auto-init
 
   hooks:
-    count: 7
+    count: 12
     tests:
-      - session-start output, agent file creation
-      - detect-secrets clean file
-      - hooks.json structure
-      - workflow presence, testing philosophy
+      - session-start/session-end lifecycle, tier validation
+      - detect-secrets clean file, hooks.json structure
+      - schema parity (inline vs schema.sql), migration applies
+      - agentdb emit records/validates events
 
   security:
     count: 6
@@ -63,15 +64,35 @@ suites:
     count: 5
     tests:
       - metrics runs, custom days, shows learnings
-      - metrics command registered, has frontmatter
+      - metrics skill registered, has frontmatter
 
   verify:
     count: 7
     tests:
-      - frontmatter in commands, skills, agents
+      # v8: commands layer is gone. "commands have frontmatter" now asserts
+      # the commands dir does NOT exist and plugin.json registers no commands.
+      - no commands dir; skills + agents have frontmatter
       - hooks.json valid
-      - ingest has research, auto has loop
-      - structured format (XML/YAML)
+      - ingest has research step, forge has loop control
+      - structured format (XML/YAML), token budgets
+
+  manifest:
+    count: 27
+    tests:
+      # v8 JSON manifest runtime + guard-context hook + migration guards
+      - schemas parse; handoff/checkpoint/retrospective examples validate
+      - validate rejects bad schema/policy/selector
+      - latest, structured divergence, typed preflight, compile (integrity hashes, budget, selectors)
+      - guard-context: sealed blocks/allows, bounded ledgers, fails closed
+      - migration: every command has a destination, no live command refs,
+        side-effecting skills not ambient, taxonomy blocks parse
+
+  test_gate:
+    count: 11
+    tests:
+      - test-gate detects/passes/fails, red recovers, honors override
+      - autopush postcommit disabled, install opt-in, sweep red gate
+      - session-end runs gate, session-start surfaces red, pre-compact gate
 ```
 
 ## Adding Tests

@@ -2,6 +2,11 @@
 name: architecture
 description: "System architecture and design patterns. Modular design, interface stability, dependency management, AI-code health nexus. Triggers: architecture, design, structure, modules, dependencies, coupling, system design."
 allowed-tools: Read, Grep, Glob, Task
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="architecture">

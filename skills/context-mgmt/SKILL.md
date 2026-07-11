@@ -2,6 +2,11 @@
 name: context-mgmt
 description: "Context engineering and token management. Compaction strategies, progressive disclosure, structured note-taking via AgentDB. Triggers: tokens, compaction, memory, handoff, summarize, context window."
 allowed-tools: Read, Bash, Task
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="context-mgmt">
@@ -22,7 +27,7 @@ Use native /context command to check usage. This skill is for methodology.
 <reference>
 Skill-specific: skills/context-mgmt/reference/context-mgmt-research.md
 Architecture: _meta/research/context-graph-architecture.md
-Graph tracking: orchestration/agentdb/migrations/002_graph_tracking.sql
+Graph telemetry (shadow): JSON receipts → `agentdb graph-project` / `graph-suggest` (see orchestration/agentdb/graph-project.py). Canonical JSON manifests remain authoritative.
 </reference>
 
 <core_principles>

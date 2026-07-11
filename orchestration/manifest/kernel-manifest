@@ -1,0 +1,795 @@
+#!/usr/bin/env python3
+"""kernel-manifest — KERNEL manifest runtime (canonical JSON).
+
+Subcommands:
+  validate   <file>                       schema-validate a manifest (exit 0 ok, 1 invalid, 2 unparseable)
+  latest     [--dir D ...]                newest manifest path across dirs (default: _meta/checkpoints _meta/handoffs)
+  divergence <file>                       live git state vs manifest provenance (exit 1 on hard divergence)
+  compile    <file> [--bundle-out P] [--receipt-out P] [--agentdb-tokens N]
+                                          resolve context selectors, emit kernel.context-receipt/v1 JSON
+  activate   <file>                       write _meta/.active-manifest.json (arms guard-context hook)
+  deactivate [--receipt P]                merge _meta/.context-ledger into receipt, remove state files
+
+Manifests are canonical JSON (.json). Parsed with the stdlib json module only — no
+parser fallback chain, so the manifest's meaning never depends on machine configuration.
+Duplicate keys are a protocol violation (exit 2), never last-value-wins. YAML/markdown
+renders of a manifest are non-authoritative views.
+Token counts are chars/4 estimates; directional, not exact (documented in every receipt).
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import hashlib
+import fnmatch
+import tempfile
+from datetime import datetime, timezone
+
+PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SCHEMA_DIR = os.path.join(PLUGIN_ROOT, "schemas")
+
+def find_repo_root():
+    proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    return os.path.realpath(proc.stdout.strip()) if proc.returncode == 0 else os.path.realpath(os.getcwd())
+
+
+REPO_ROOT = find_repo_root()
+ACTIVE_POINTER = os.path.join(REPO_ROOT, "_meta", ".active-manifest.json")
+CONTEXT_LEDGER = os.path.join(REPO_ROOT, "_meta", ".context-ledger")
+
+
+def repo_path(path):
+    return path if os.path.isabs(path) else os.path.join(REPO_ROOT, path)
+
+
+def cli_path(path):
+    """CLI-relative paths are always interpreted from the repository root."""
+    return os.path.realpath(repo_path(path))
+
+
+def validate_repo_path(path, field, errors):
+    """Manifest-sourced paths may not escape the repository, including via symlink."""
+    if not isinstance(path, str) or not path:
+        errors.append(f"{field}: expected non-empty repository-relative path")
+        return
+    if os.path.isabs(path) or os.path.normpath(path).startswith(".."):
+        errors.append(f"{field}: path must be repository-relative and may not contain '..'")
+        return
+    resolved = os.path.realpath(os.path.join(REPO_ROOT, path))
+    try:
+        contained = os.path.commonpath([REPO_ROOT, resolved]) == REPO_ROOT
+    except ValueError:
+        contained = False
+    if not contained:
+        errors.append(f"{field}: path resolves outside repository")
+
+# ---------- manifest loading (canonical JSON) ----------
+
+def _reject_duplicate_keys(pairs):
+    seen = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError(f"duplicate key '{key}' (silent last-wins is a protocol violation)")
+        seen[key] = value
+    return seen
+
+
+def load_manifest_file(path):
+    """Parse a canonical JSON manifest. Duplicate keys fail loudly (exit 2)."""
+    if path.endswith((".yaml", ".yml")):
+        die(2, f"{path}: YAML manifests are no longer canonical (v8: JSON only). Convert once:\n"
+               "  ruby -ryaml -rjson -e 'puts JSON.pretty_generate(YAML.safe_load(ARGF.read))' "
+               "old.yaml > new.json")
+    try:
+        path = cli_path(path)
+        with open(path, encoding="utf-8") as f:
+            return json.load(f, object_pairs_hook=_reject_duplicate_keys)
+    except OSError as e:
+        die(2, f"{path}: cannot read manifest: {e}")
+    except ValueError as e:
+        die(2, f"{path}: invalid JSON manifest: {e}")
+
+
+def dump_json(obj):
+    return json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
+
+
+def die(code, msg):
+    print(f"kernel-manifest: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def require_exact_args(command, args, count):
+    if len(args) != count:
+        die(1, f"'{command}' expects exactly {count} argument(s)")
+
+# ---------- subset schema validator ----------
+# Supports: type, required, properties, enum, items, minimum, maximum, unknown-key rejection.
+# Custom rule (not expressible in the subset): context selectors need path or git_diff.
+
+def validate_node(node, schema, path, errors):
+    t = schema.get("type")
+    if t == "object":
+        if not isinstance(node, dict):
+            errors.append(f"{path}: expected object, got {type(node).__name__}")
+            return
+        for req in schema.get("required", []):
+            if req not in node:
+                errors.append(f"{path}: missing required key '{req}'")
+        allowed = set(schema.get("properties", {}).keys())
+        for key in node.keys():
+            if allowed and key not in allowed:
+                errors.append(f"{path}: unknown key '{key}'")
+        for key, sub in schema.get("properties", {}).items():
+            if key in node:
+                validate_node(node[key], sub, f"{path}.{key}", errors)
+    elif t == "array":
+        if not isinstance(node, list):
+            errors.append(f"{path}: expected array, got {type(node).__name__}")
+            return
+        item_schema = schema.get("items")
+        if item_schema:
+            for i, item in enumerate(node):
+                validate_node(item, item_schema, f"{path}[{i}]", errors)
+    elif t == "string":
+        if not isinstance(node, str):
+            errors.append(f"{path}: expected string, got {type(node).__name__}")
+            return
+        if "enum" in schema and node not in schema["enum"]:
+            errors.append(f"{path}: '{node}' not in {schema['enum']}")
+    elif t == "integer":
+        if isinstance(node, bool) or not isinstance(node, int):
+            errors.append(f"{path}: expected integer, got {type(node).__name__}")
+            return
+        if "minimum" in schema and node < schema["minimum"]:
+            errors.append(f"{path}: {node} < minimum {schema['minimum']}")
+        if "maximum" in schema and node > schema["maximum"]:
+            errors.append(f"{path}: {node} > maximum {schema['maximum']}")
+    elif t == "boolean":
+        if not isinstance(node, bool):
+            errors.append(f"{path}: expected boolean, got {type(node).__name__}")
+
+
+def validate_selectors(manifest, errors):
+    ctx = manifest.get("context", {})
+    if not isinstance(ctx, dict):
+        return
+    for group in ("required", "optional"):
+        for i, sel in enumerate(ctx.get(group) or []):
+            if not isinstance(sel, dict):
+                continue
+            sources = sum(bool(sel.get(k)) for k in ("path", "git_diff"))
+            refinements = sum(bool(sel.get(k)) for k in ("lines", "heading", "grep"))
+            if sources != 1:
+                errors.append(f"context.{group}[{i}]: selector needs exactly one of 'path' or 'git_diff'")
+            if refinements > 1:
+                errors.append(f"context.{group}[{i}]: selector allows at most one refinement")
+            if refinements and not sel.get("path"):
+                errors.append(f"context.{group}[{i}]: refinement requires 'path'")
+            if sel.get("git_diff") and not valid_git_diff_spec(sel["git_diff"]):
+                errors.append(f"context.{group}[{i}].git_diff: unsafe or invalid revision expression")
+
+
+REVISION_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/@{}^~+\-]*")
+SUPPORTED_DIVERGENCE_EVENTS = {
+    "branch_unknown", "branch_match", "branch_diverged",
+    "commit_match", "commit_advanced", "commit_diverged", "commit_unknown",
+    "dirty_match", "dirty_changed", "dirty_tree_hash_match", "dirty_tree_hash_mismatch",
+    "artifact_missing", "artifact_match", "artifact_hash_mismatch",
+}
+
+
+def valid_git_diff_spec(value):
+    if not isinstance(value, str) or not value or value.startswith("-"):
+        return False
+    parts = re.split(r"(\.\.\.?)", value)
+    if len(parts) == 1:
+        return bool(REVISION_TOKEN_RE.fullmatch(parts[0]))
+    return (len(parts) == 3 and parts[1] in ("..", "...")
+            and bool(REVISION_TOKEN_RE.fullmatch(parts[0]))
+            and bool(REVISION_TOKEN_RE.fullmatch(parts[2])))
+
+
+def validate_invariants(manifest, errors):
+    ctx = manifest.get("context") or {}
+    budget = ctx.get("budget") or {}
+    target, maximum = budget.get("target_tokens"), budget.get("max_tokens")
+    mode = ((ctx.get("policy") or {}).get("mode"))
+    if target is not None and maximum is not None and target > maximum:
+        errors.append("context.budget: target_tokens must be <= max_tokens")
+    if mode in ("sealed", "bounded") and maximum is None:
+        errors.append(f"context.budget.max_tokens: required for {mode} mode")
+    if manifest.get("schema") == "kernel.checkpoint/v1":
+        prov = manifest.get("provenance") or {}
+        if prov.get("dirty") and not prov.get("dirty_tree_sha256"):
+            errors.append("provenance.dirty_tree_sha256: required when dirty is true")
+    created = ((manifest.get("identity") or {}).get("created"))
+    if created is not None:
+        try:
+            if not isinstance(created, str) or not re.fullmatch(
+                r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})",
+                created,
+            ):
+                raise ValueError("strict RFC3339 lexical form required")
+            parsed = datetime.fromisoformat(created.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError("timezone required")
+        except (AttributeError, ValueError):
+            errors.append("identity.created: must be an RFC3339 timestamp with timezone")
+    for group in ("required", "optional"):
+        for i, selector in enumerate(ctx.get(group) or []):
+            if isinstance(selector, dict) and selector.get("path"):
+                validate_repo_path(selector["path"], f"context.{group}[{i}].path", errors)
+    for i, artifact in enumerate((manifest.get("provenance") or {}).get("artifacts") or []):
+        if isinstance(artifact, dict) and artifact.get("path"):
+            validate_repo_path(artifact["path"], f"provenance.artifacts[{i}].path", errors)
+    for i, check in enumerate((manifest.get("runtime") or {}).get("preflight") or []):
+        if isinstance(check, dict) and check.get("check") == "path_exists":
+            validate_repo_path(check.get("path"), f"runtime.preflight[{i}].path", errors)
+    workflow = manifest.get("workflow") or {}
+    phase_names = {phase.get("name") for phase in workflow.get("phases") or [] if isinstance(phase, dict)}
+    for i, rule in enumerate(workflow.get("invalidation_rules") or []):
+        if not isinstance(rule, dict):
+            continue
+        event_name = (rule.get("when") or {}).get("event")
+        if event_name not in SUPPORTED_DIVERGENCE_EVENTS:
+            errors.append(f"workflow.invalidation_rules[{i}].when.event: unsupported divergence event '{event_name}'")
+        for target in rule.get("invalidates") or []:
+            if target not in phase_names:
+                errors.append(f"workflow.invalidation_rules[{i}].invalidates: unknown phase '{target}'")
+
+
+def schema_for(manifest):
+    sid = manifest.get("schema", "")
+    fname = sid.replace("/", ".") + ".schema.json"  # kernel.handoff/v1 -> kernel.handoff.v1.schema.json
+    path = os.path.join(SCHEMA_DIR, fname)
+    if not os.path.isfile(path):
+        die(1, f"unknown schema '{sid}' (no {fname} in {SCHEMA_DIR})")
+    return json.load(open(path))
+
+
+def validate_manifest(manifest, path):
+    if not isinstance(manifest, dict):
+        die(1, f"{path}: manifest root must be a mapping")
+    schema = schema_for(manifest)
+    errors = []
+    validate_node(manifest, schema, "$", errors)
+    if manifest.get("schema") in ("kernel.handoff/v1", "kernel.checkpoint/v1"):
+        validate_selectors(manifest, errors)
+        validate_invariants(manifest, errors)
+    if errors:
+        for e in errors:
+            print(f"INVALID {e}")
+        die(1, f"{path}: {len(errors)} schema violation(s) against {manifest.get('schema')}")
+    return manifest
+
+
+def load_and_validate(path):
+    return validate_manifest(load_manifest_file(path), path)
+
+
+def cmd_validate(args):
+    require_exact_args("validate", args, 1)
+    path = args[0]
+    manifest = load_and_validate(path)
+    print(f"VALID {path} ({manifest.get('schema')})")
+
+# ---------- latest ----------
+
+def cmd_latest(args):
+    dirs = []
+    any_branch = "--any-branch" in args
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--dir":
+            if i + 1 >= len(args):
+                die(1, "--dir requires a directory value")
+            dirs.append(args[i + 1])
+            i += 1
+        elif a == "--any-branch":
+            pass
+        else:
+            die(1, f"latest: unknown option or argument '{a}'")
+        i += 1
+    if not dirs:
+        dirs = ["_meta/checkpoints", "_meta/handoffs"]
+    candidates = []
+    _, live_branch = git("branch", "--show-current")
+    for d in dirs:
+        absolute_dir = cli_path(d)
+        if os.path.isdir(absolute_dir):
+            for f in os.listdir(absolute_dir):
+                if f.endswith(".json") and not f.startswith("."):
+                    display_dir = d if not os.path.isabs(d) else absolute_dir
+                    p = os.path.join(display_dir, f)
+                    try:
+                        manifest = load_and_validate(p)
+                        created = (manifest.get("identity") or {}).get("created")
+                        branch = (manifest.get("provenance") or {}).get("branch")
+                        if not created or (not any_branch and branch != live_branch):
+                            continue
+                        candidates.append((created, p, manifest))
+                    except SystemExit:
+                        continue
+    if not candidates:
+        die(1, f"no manifests found in {dirs}")
+    candidates.sort(reverse=True)
+    newest = [item for item in candidates if item[0] == candidates[0][0]]
+    if len(newest) > 1:
+        handoff_paths = {p for _, p, m in newest if m.get("schema") == "kernel.handoff/v1"}
+        lineage = [item for item in newest
+                   if item[2].get("schema") == "kernel.checkpoint/v1"
+                   and ((item[2].get("task") or {}).get("handoff_ref") in handoff_paths)]
+        if len(lineage) == 1:
+            newest = lineage
+        else:
+            die(1, "ambiguous latest manifests: " + ", ".join(sorted(p for _, p, _ in newest)))
+    print(newest[0][1])
+
+# ---------- divergence ----------
+
+def git(*argv):
+    proc = subprocess.run(["git"] + list(argv), capture_output=True, text=True)
+    return proc.returncode, proc.stdout.strip()
+
+
+def cmd_divergence(args):
+    if not args or len(args) > 2 or (len(args) == 2 and args[1] != "--json"):
+        die(1, "divergence usage: divergence <manifest> [--json]")
+    path = args[0]
+    json_mode = "--json" in args
+    manifest = load_and_validate(path)
+    prov = manifest.get("provenance", {})
+    hard = False
+    events = []
+
+    def event(kind, status, **extra):
+        nonlocal hard
+        events.append({"event": kind, "status": status, **extra})
+        if status == "diverged":
+            hard = True
+
+    rc, branch = git("branch", "--show-current")
+    want = prov.get("branch", "")
+    if rc != 0:
+        event("branch_unknown", "diverged")
+    elif branch == want:
+        event("branch_match", "match", branch=branch)
+    else:
+        event("branch_diverged", "diverged", expected=want, actual=branch)
+
+    commit = prov.get("commit", "")
+    rc, head = git("rev-parse", "HEAD")
+    if commit and rc == 0:
+        if head == commit:
+            event("commit_match", "match", commit=head)
+        else:
+            rc2, _ = git("merge-base", "--is-ancestor", commit, "HEAD")
+            if rc2 == 0:
+                rc3, n = git("rev-list", "--count", f"{commit}..HEAD")
+                event("commit_advanced", "warn", count=n.strip() if rc3 == 0 else None)
+            else:
+                event("commit_diverged", "diverged", expected=commit, actual=head)
+    else:
+        event("commit_unknown", "diverged")
+
+    rc, status = git("status", "--porcelain")
+    live_dirty = bool(status)
+    want_dirty = bool(prov.get("dirty", False))
+    if live_dirty == want_dirty:
+        event("dirty_match", "match", dirty=live_dirty)
+    else:
+        event("dirty_changed", "warn", expected=want_dirty, actual=live_dirty)
+    want_tree_sha = prov.get("dirty_tree_sha256")
+    if want_tree_sha:
+        proc = subprocess.run(["git", "diff", "--binary", "HEAD"], cwd=REPO_ROOT, capture_output=True)
+        got_tree_sha = hashlib.sha256(proc.stdout).hexdigest() if proc.returncode == 0 else ""
+        if got_tree_sha == want_tree_sha:
+            event("dirty_tree_hash_match", "match", sha256=got_tree_sha)
+        else:
+            event("dirty_tree_hash_mismatch", "diverged", expected=want_tree_sha, actual=got_tree_sha)
+
+    for art in prov.get("artifacts") or []:
+        p, want_sha = art.get("path", ""), art.get("sha256", "")
+        absolute = repo_path(p)
+        if not os.path.isfile(absolute):
+            event("artifact_missing", "diverged", path=p)
+            continue
+        got = hashlib.sha256(open(absolute, "rb").read()).hexdigest()
+        if got == want_sha:
+            event("artifact_match", "match", path=p)
+        else:
+            event("artifact_hash_mismatch", "diverged", path=p, expected=want_sha, actual=got)
+
+    phases = json.loads(json.dumps((manifest.get("workflow") or {}).get("phases") or []))
+    for rule in (manifest.get("workflow") or {}).get("invalidation_rules") or []:
+        when = rule.get("when") or {}
+        for ev in events:
+            if ev["event"] != when.get("event"):
+                continue
+            if when.get("path_glob") and not fnmatch.fnmatch(ev.get("path", ""), when["path_glob"]):
+                continue
+            for phase in phases:
+                if phase.get("name") in (rule.get("invalidates") or []):
+                    phase["status"] = "invalidated"
+
+    if json_mode:
+        print(dump_json({"events": events, "phases": phases, "hard_divergence": hard}), end="")
+    else:
+        for ev in events:
+            label = ev["event"].split("_", 1)[0]
+            detail = f" ({ev.get('path')}{' hash mismatch' if ev['event'] == 'artifact_hash_mismatch' else ''})" if ev.get("path") else ""
+            print(f"{label}: {ev['status'].upper()}{detail}")
+
+    if hard:
+        die(1, "divergence detected — live state wins; invalidate inherited phases per manifest workflow.invalidation_rules")
+    print("divergence: CLEAN")
+
+
+def cmd_preflight(args):
+    require_exact_args("preflight", args, 1)
+    manifest = load_and_validate(args[0])
+    allowed_argv = {("git", "status", "--short"), ("git", "diff", "--check")}
+    for check in (manifest.get("runtime") or {}).get("preflight") or []:
+        kind = check.get("check")
+        if kind == "current_branch":
+            rc, actual = git("branch", "--show-current")
+            ok = rc == 0 and actual == check.get("expected")
+        elif kind == "path_exists":
+            ok = os.path.exists(repo_path(check.get("path", "")))
+        elif kind == "argv":
+            argv = tuple(check.get("argv") or [])
+            if argv not in allowed_argv:
+                die(1, f"preflight argv not allowlisted: {list(argv)}")
+            ok = subprocess.run(argv, cwd=REPO_ROOT, check=False).returncode == 0
+        else:
+            die(1, f"unknown preflight check '{kind}'")
+        if not ok:
+            die(1, f"preflight failed: {kind}")
+    print("preflight: PASS")
+
+# ---------- compile (context selectors -> bundle + receipt) ----------
+
+def estimate(text):
+    return max(0, round(len(text) / 4))
+
+
+def resolve_selector(sel):
+    """Return (summary, outcome, content_or_None, note)."""
+    if sel.get("git_diff"):
+        spec = sel["git_diff"]
+        if not valid_git_diff_spec(spec):
+            return (f"git_diff:{spec}", "invalid", None, "unsafe git revision expression")
+        rc, out = git("diff", spec, "--")
+        if rc != 0:
+            return (f"git_diff:{sel['git_diff']}", "invalid", None, "git diff failed")
+        return (f"git_diff:{sel['git_diff']}", "resolved" if out else "empty", out, "")
+    path = sel.get("path", "")
+    absolute = repo_path(path)
+    if not os.path.isfile(absolute):
+        return (path, "missing", None, "file missing")
+    text = open(absolute, encoding="utf-8", errors="replace").read()
+    if sel.get("lines"):
+        m = re.match(r"^(\d+)-(\d+)$", str(sel["lines"]))
+        if not m:
+            return (f"{path}:{sel['lines']}", "invalid", None, "bad line range")
+        a, b = int(m.group(1)), int(m.group(2))
+        if a < 1 or b < a:
+            return (f"{path}:{a}-{b}", "invalid", None, "invalid line range")
+        text = "\n".join(text.splitlines()[a - 1:b])
+        return (f"{path}:{a}-{b}", "resolved" if text else "empty", text, "")
+    if sel.get("heading"):
+        lines = text.splitlines()
+        want = sel["heading"].strip()
+        level = len(want) - len(want.lstrip("#"))
+        out, capturing = [], False
+        for line in lines:
+            if line.strip() == want:
+                capturing = True
+                out.append(line)
+                continue
+            if capturing and re.match(r"^#{1,%d}\s" % max(level, 1), line):
+                break
+            if capturing:
+                out.append(line)
+        if not capturing:
+            return (f"{path} :: {want}", "missing", None, "heading not found")
+        content = "\n".join(out)
+        return (f"{path} :: {want}", "resolved" if content else "empty", content, "")
+    if sel.get("grep"):
+        n = int(sel.get("context", 3))
+        try:
+            pat = re.compile(sel["grep"])
+        except re.error as exc:
+            return (f"{path}?{sel['grep']}", "invalid", None, f"bad grep regex: {exc}")
+        lines = text.splitlines()
+        keep = set()
+        for i, line in enumerate(lines):
+            if pat.search(line):
+                keep.update(range(max(0, i - n), min(len(lines), i + n + 1)))
+        if not keep:
+            return (f"{path}?{sel['grep']}", "empty", None, "no matches")
+        out = [lines[i] for i in sorted(keep)][:2000]
+        content = "\n".join(out)
+        return (f"{path}?{sel['grep']}", "resolved", content, "")
+    return (path, "resolved" if text else "empty", text, "")
+
+
+def skill_tokens(names):
+    total = 0
+    for name in names or []:
+        if isinstance(name, dict):
+            name = name.get("name", "")
+        p = os.path.join(PLUGIN_ROOT, "skills", str(name), "SKILL.md")
+        if os.path.isfile(p):
+            total += estimate(open(p, encoding="utf-8").read())
+    return total
+
+
+def cmd_compile(args):
+    path = args[0]
+    bundle_out = receipt_out = None
+    agentdb_tokens = 0
+    i = 1
+    seen = set()
+    while i < len(args):
+        a = args[i]
+        if a not in ("--bundle-out", "--receipt-out", "--agentdb-tokens"):
+            die(1, f"compile: unknown option or argument '{a}'")
+        if a in seen:
+            die(1, f"compile: duplicate option '{a}'")
+        seen.add(a)
+        if i + 1 >= len(args):
+            die(1, f"compile: {a} requires a value")
+        value = args[i + 1]
+        if a == "--bundle-out":
+            bundle_out = value
+        elif a == "--receipt-out":
+            receipt_out = value
+        elif a == "--agentdb-tokens":
+            try:
+                agentdb_tokens = int(value)
+            except ValueError:
+                die(1, f"compile: --agentdb-tokens requires an integer, got '{value}'")
+            if agentdb_tokens < 0:
+                die(1, "compile: --agentdb-tokens must be >= 0")
+        i += 2
+
+    manifest = load_and_validate(path)
+    ctx = manifest.get("context", {}) or {}
+    budget = ctx.get("budget", {}) or {}
+    runtime = manifest.get("runtime", {}) or {}
+
+    selections, bundle_parts, selected_tokens, unresolved_required = [], [], 0, []
+    for group in ("required", "optional"):
+        for sel in ctx.get(group) or []:
+            summary, outcome, content, note = resolve_selector(sel)
+            ok = outcome == "resolved"
+            tok = estimate(content) if ok else 0
+            selected_tokens += tok
+            selections.append({"selector": f"[{group}] {summary}", "resolved": ok,
+                               "outcome": outcome, "estimated_tokens": tok,
+                               **({"resolved_sha256": hashlib.sha256(content.encode()).hexdigest()} if ok else {}),
+                               **({"note": note} if note else {})})
+            if ok:
+                bundle_parts.append(f"===== [{group}] {summary} =====\n{content}\n")
+            if not ok and group == "required":
+                unresolved_required.append(f"{summary} ({note})")
+                print(f"WARN: required selector unresolved: {summary} ({note})", file=sys.stderr)
+
+    bundle = "".join(bundle_parts)
+    project_instr = 0
+    for p in ("CLAUDE.md", ".claude/CLAUDE.md"):
+        absolute = repo_path(p)
+        if os.path.isfile(absolute):
+            project_instr += estimate(open(absolute, encoding="utf-8", errors="replace").read())
+
+    manifest_tokens = estimate(open(cli_path(path), encoding="utf-8").read())
+    always = skill_tokens(["quality", "testing", "git"])  # ingest's always-set
+    workflow_sk = skill_tokens(runtime.get("required_skills"))
+    domain_sk = skill_tokens(runtime.get("optional_skills"))
+
+    total = manifest_tokens + project_instr + always + workflow_sk + domain_sk + selected_tokens + agentdb_tokens
+    target = int(budget.get("target_tokens") or 0)
+    maximum = int(budget.get("max_tokens") or 0)
+    if maximum and total > maximum:
+        status = "maximum_exceeded"
+    elif target and total > target:
+        status = "target_exceeded"
+    else:
+        status = "within_budget"
+
+    receipt = {
+        "schema": "kernel.context-receipt/v1",
+        "manifest": path,
+        "manifest_sha256": hashlib.sha256(open(cli_path(path), "rb").read()).hexdigest(),
+        "bundle_sha256": hashlib.sha256(bundle.encode()).hexdigest(),
+        "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "manifest_tokens": manifest_tokens,
+        "project_instructions_tokens": project_instr,
+        "always_skills_tokens": always,
+        "workflow_skills_tokens": workflow_sk,
+        "domain_skills_tokens": domain_sk,
+        "selected_artifacts_tokens": selected_tokens,
+        "agentdb_tokens": agentdb_tokens,
+        "total_estimated_tokens": total,
+        "target_budget_tokens": target,
+        "maximum_budget_tokens": maximum,
+        "status": status,
+        "estimation_method": "chars/4 (directional; structural overhead undercounted; agentdb_tokens=0 unless --agentdb-tokens provided)",
+        "selections": selections,
+        "loads_beyond_manifest": [],
+    }
+    out = dump_json(receipt)
+    if bundle_out:
+        with open(cli_path(bundle_out), "w", encoding="utf-8") as f:
+            f.write(bundle)
+    if receipt_out:
+        with open(cli_path(receipt_out), "w", encoding="utf-8") as f:
+            f.write(out)
+    print(out, end="")
+    if unresolved_required:
+        for item in unresolved_required:
+            print(f"ERROR: unresolved required selector: {item}", file=sys.stderr)
+        sys.exit(4)
+    if status == "maximum_exceeded":
+        sys.exit(3)
+
+# ---------- resume (surface the re-entry point) ----------
+
+def cmd_resume(args):
+    """Print the machine-readable resume point of a manifest."""
+    require_exact_args("resume", args, 1)
+    manifest = load_and_validate(args[0])
+    sid = manifest.get("schema", "")
+    if sid == "kernel.checkpoint/v1":
+        r = manifest.get("resume", {}) or {}
+        print(f"position: {r.get('position', '')}")
+        print(f"entrypoint: {r.get('entrypoint', '')}")
+        print(f"next_operation: {r.get('next_operation', '')}")
+    elif sid == "kernel.handoff/v1":
+        ex = manifest.get("execution", {}) or {}
+        print(f"entry_phase: {ex.get('entry_phase', '')}")
+        print(f"entrypoint: {ex.get('entrypoint', '')}")
+        print(f"prompt: {(manifest.get('resume') or {}).get('prompt', '')}")
+    else:
+        die(1, f"'{sid}' has no resume semantics")
+
+# ---------- activate / deactivate (hook bridge) ----------
+
+def cmd_activate(args):
+    require_exact_args("activate", args, 1)
+    path = args[0]
+    manifest = load_and_validate(path)
+    ctx = manifest.get("context", {}) or {}
+    pointer = {
+        "manifest": path,
+        "schema": manifest.get("schema", ""),
+        "mode": ((ctx.get("policy") or {}).get("mode")) or "advisory",
+        "forbidden": ctx.get("forbidden") or [],
+        "allowlist": sorted({sel.get("path") for group in ("required", "optional")
+                             for sel in (ctx.get(group) or []) if sel.get("path")}),
+        "activated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    os.makedirs(os.path.dirname(ACTIVE_POINTER), exist_ok=True)
+    with open(ACTIVE_POINTER, "w", encoding="utf-8") as f:
+        json.dump(pointer, f, indent=2)
+    print(f"activated {path} (mode={pointer['mode']}, forbidden={len(pointer['forbidden'])} globs)")
+
+
+def cmd_deactivate(args):
+    receipt_path = None
+    if args:
+        if len(args) != 2 or args[0] != "--receipt":
+            die(1, "deactivate usage: deactivate [--receipt <path>]")
+        receipt_path = args[1]
+    if receipt_path:
+        receipt_path = cli_path(receipt_path)
+    ledger_exists = os.path.isfile(CONTEXT_LEDGER)
+    if ledger_exists and (not receipt_path or not os.path.isfile(receipt_path)):
+        die(1, "context ledger exists but no readable --receipt was provided; runtime state remains active")
+
+    entries = []
+    if ledger_exists:
+        allowed = {"path", "reason", "estimated_tokens", "ts"}
+        with open(CONTEXT_LEDGER, encoding="utf-8") as ledger:
+            for line_number, raw in enumerate(ledger, 1):
+                line = raw.rstrip("\r\n")
+                if not line:
+                    die(1, f"context ledger line {line_number}: blank entries are invalid")
+                try:
+                    entry = json.loads(line, object_pairs_hook=_reject_duplicate_keys)
+                except (json.JSONDecodeError, ValueError) as exc:
+                    die(1, f"context ledger line {line_number}: invalid JSON: {exc}")
+                if not isinstance(entry, dict):
+                    die(1, f"context ledger line {line_number}: expected JSON object")
+                unknown = set(entry) - allowed
+                if unknown:
+                    die(1, f"context ledger line {line_number}: unknown field(s): {sorted(unknown)}")
+                if not isinstance(entry.get("path"), str) or not entry["path"]:
+                    die(1, f"context ledger line {line_number}: path must be a non-empty string")
+                if "reason" in entry and not isinstance(entry["reason"], str):
+                    die(1, f"context ledger line {line_number}: reason must be a string")
+                if "ts" in entry and not isinstance(entry["ts"], str):
+                    die(1, f"context ledger line {line_number}: ts must be a string")
+                if "estimated_tokens" in entry and (isinstance(entry["estimated_tokens"], bool)
+                                                      or not isinstance(entry["estimated_tokens"], int)):
+                    die(1, f"context ledger line {line_number}: estimated_tokens must be an integer")
+                entries.append(entry)
+
+    staged_path = None
+    if receipt_path and os.path.isfile(receipt_path):
+        receipt = load_and_validate(receipt_path)
+        receipt["loads_beyond_manifest"] = (receipt.get("loads_beyond_manifest") or []) + entries
+        fd, staged_path = tempfile.mkstemp(
+            prefix=os.path.basename(receipt_path) + ".staged.",
+            suffix=".json",
+            dir=os.path.dirname(receipt_path),
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as staged:
+                staged.write(dump_json(receipt))
+                staged.flush()
+                os.fsync(staged.fileno())
+            load_and_validate(staged_path)
+
+            graph_script = os.path.join(PLUGIN_ROOT, "orchestration", "agentdb", "graph-project.py")
+            if not os.path.isfile(graph_script):
+                die(1, "receipt projection unavailable; canonical receipt and runtime state unchanged")
+            env = os.environ.copy()
+            env["KERNEL_RECEIPT_IDENTITY_PATH"] = receipt_path
+            proc = subprocess.run(
+                [sys.executable, graph_script, "project", staged_path],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            if proc.returncode != 0:
+                die(1, f"receipt projection failed; canonical receipt and runtime state unchanged: {proc.stderr.strip()[:300]}")
+            os.replace(staged_path, receipt_path)
+            staged_path = None
+            if entries:
+                print(f"merged {len(entries)} ledger entrie(s) into {receipt_path}")
+        finally:
+            if staged_path and os.path.exists(staged_path):
+                os.remove(staged_path)
+
+    for p in (ACTIVE_POINTER, CONTEXT_LEDGER):
+        if os.path.isfile(p):
+            os.remove(p)
+    print("deactivated")
+
+# ---------- main ----------
+
+COMMANDS = {
+    "validate": (cmd_validate, 1),
+    "latest": (cmd_latest, 0),
+    "divergence": (cmd_divergence, 1),
+    "preflight": (cmd_preflight, 1),
+    "compile": (cmd_compile, 1),
+    "resume": (cmd_resume, 1),
+    "activate": (cmd_activate, 1),
+    "deactivate": (cmd_deactivate, 0),
+}
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
+        print(__doc__)
+        sys.exit(0)
+    cmd = sys.argv[1]
+    if cmd not in COMMANDS:
+        die(1, f"unknown subcommand '{cmd}' (try --help)")
+    fn, min_args = COMMANDS[cmd]
+    rest = sys.argv[2:]
+    if len(rest) < min_args:
+        die(1, f"'{cmd}' needs at least {min_args} argument(s)")
+    fn(rest)
+
+
+if __name__ == "__main__":
+    main()

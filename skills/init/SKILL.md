@@ -1,11 +1,17 @@
 ---
-name: kernel:init
+name: init
 description: "Initialize KERNEL globally. Sets up Vaults, symlinks, CLI, database."
 user-invocable: true
 allowed-tools: Bash
+disable-model-invocation: true
+kernel:
+  kind: operator
+  version: 1
+  side_effects: writes_repo
+  confirmation: always
 ---
 
-<command id="init">
+<skill id="init">
 
 <purpose>
 Global KERNEL setup. Run once per machine. Detects existing Vaults or creates ~/Vaults.
@@ -119,4 +125,4 @@ export PATH="$VAULTS/.local/bin:$PATH" && agentdb init && echo "Done. Restart te
 - **wrong Vaults**: `export KERNEL_VAULTS="$HOME/path/to/Vaults"` in ~/.zshrc
 </troubleshooting>
 
-</command>
+</skill>

@@ -2,6 +2,11 @@
 name: performance
 description: "Performance optimization and profiling. Measure before optimizing, identify bottlenecks, avoid premature optimization. Triggers: performance, speed, slow, optimize, latency, throughput, profiling, benchmark."
 allowed-tools: Bash, Read, Grep
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="performance">

@@ -2,6 +2,11 @@
 name: ship
 description: "Release-gate sequence: validate → review → push → tag. Wraps kernel:git mechanics with the pre-ship safety chain. Triggers: ship, release, push to main, ready to merge, deploy."
 allowed-tools: Read, Bash, Task, Edit
+kernel:
+  kind: operator
+  version: 1
+  side_effects: writes_remote
+  confirmation: on_side_effect
 ---
 
 <skill id="ship">

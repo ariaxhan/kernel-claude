@@ -1,11 +1,17 @@
 ---
-name: kernel:landing-page
+name: landing-page
 description: "Guided landing page generator. Interview → scaffold → enforce → deploy. Static HTML/CSS optimized for Cloudflare Pages. All architectural decisions are hypotheses until proven by /kernel:experiment."
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, WebSearch, WebFetch
+disable-model-invocation: true
+kernel:
+  kind: operator
+  version: 1
+  side_effects: deploys
+  confirmation: on_side_effect
 ---
 
-<command id="landing-page">
+<skill id="landing-page">
 
 <purpose>
 Generate a properly architected static landing page from a guided interview.
@@ -23,9 +29,9 @@ Every rule below is a HYPOTHESIS. Run /kernel:experiment to prove or disprove.
 </purpose>
 
 <skill_load>
-always: skills/quality/SKILL.md, skills/design/SKILL.md
+always: skills/quality/SKILL.md, skills/frontend/SKILL.md
 on_domain:
-  frontend: skills/design/SKILL.md
+  frontend: skills/frontend/SKILL.md
 reference: _meta/research/ai-landing-page-failures-2026.md
 </skill_load>
 
@@ -920,4 +926,4 @@ agentdb learn pattern "landing-page generation" "generated {project} with {secti
 ```
 </on_end>
 
-</command>
+</skill>

@@ -2,6 +2,11 @@
 name: e2e
 description: "End-to-end testing with Playwright. Page Object Model, flaky test strategies, CI integration. Triggers: e2e, playwright, browser, end-to-end, integration-test, ui-test."
 allowed-tools: Read, Bash, Write, Edit, Grep, Glob
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="e2e">

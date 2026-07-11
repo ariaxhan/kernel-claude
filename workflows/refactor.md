@@ -1,7 +1,7 @@
 ---
 name: Refactor
 trigger:
-  - command: /kernel:ingest
+  - skill: /kernel:ingest
   - issue_label: refactor
   - task_type: refactor
 tier: auto  # determined at classify step
@@ -24,7 +24,7 @@ tier: auto  # determined at classify step
    - agent: orchestrator (you)
    - output: contract with goal, files, tier, done_when
    - constraint: behavior-preserving only, no new features
-   - requires: human confirmation (ingest mode) OR auto-proceed (auto mode)
+   - requires: human confirmation (ingest mode) OR auto-proceed (forge mode)
 
 4. **Implement** -- Apply behavior-preserving transformations
    - agent: surgeon

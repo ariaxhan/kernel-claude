@@ -2,7 +2,7 @@
 
 **Type:** reference | **Load:** on-demand
 
-When to invoke commands, spawn agents, or change execution mode. The routing layer.
+When to invoke skills, spawn agents, or change execution mode. The routing layer.
 
 ---
 

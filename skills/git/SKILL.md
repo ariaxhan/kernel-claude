@@ -2,6 +2,11 @@
 name: git
 description: "Git workflow and version control best practices. Atomic commits, conventional messages, branch strategies, recovery moves. Triggers: commit, branch, merge, rebase, git, push, pull, PR, version control."
 allowed-tools: Bash, Read
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="git">

@@ -1,11 +1,16 @@
 ---
-name: kernel:validate
+name: validate
 description: "Pre-commit verification. Build, types, lint, tests, security scan. Blocks on failure. Triggers: validate, check, verify, pre-commit, ship."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob
+kernel:
+  kind: validator
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
-<command id="validate">
+<skill id="validate">
 
 <purpose>
 Run before shipping. Catches issues before PR review.
@@ -126,4 +131,4 @@ agentdb write-end '{"command":"validate","status":"ready|not_ready","checks":{"b
 ```
 </on_complete>
 
-</command>
+</skill>
