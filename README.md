@@ -64,17 +64,21 @@ Breaking changes:
 
 ### Roll back without deleting data
 
-For one session, check out the verified 7.23 release commit separately and run:
+From any directory, clone the repository and check out the verified 7.23 release
+commit. Use the installed KERNEL 8 selector before starting the older plugin:
 
 ```bash
-git worktree add /path/to/kernel-claude-7.23 54a0053
-claude --plugin-dir /path/to/kernel-claude-7.23
+git clone https://github.com/ariaxhan/kernel-claude.git "$HOME/kernel-claude-7.23"
+git -C "$HOME/kernel-claude-7.23" checkout 54a0053
+V8_SELECTOR="$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current/scripts/select-runtime.sh"
+"$V8_SELECTOR" "$HOME/kernel-claude-7.23"
+claude --plugin-dir "$HOME/kernel-claude-7.23"
 ```
 
 To deliberately select a validated local or cached runtime for the helper links:
 
 ```bash
-scripts/select-runtime.sh /path/to/kernel-claude-7.23
+"$HOME/.claude/plugins/cache/kernel-marketplace/kernel/8.0.0/scripts/select-runtime.sh" /path/to/kernel-claude-7.23
 ```
 
 That explicit selection may move `current` backward; normal old sessions cannot. It does not convert KERNEL 8 JSON state to KERNEL 7 YAML. Do not delete the plugin cache or remove the marketplace as a normal rollback step.

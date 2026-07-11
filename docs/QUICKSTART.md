@@ -65,8 +65,11 @@ was removed.
 For a session-only rollback:
 
 ```bash
-git worktree add /path/to/kernel-claude-7.23 54a0053
-claude --plugin-dir /path/to/kernel-claude-7.23
+git clone https://github.com/ariaxhan/kernel-claude.git "$HOME/kernel-claude-7.23"
+git -C "$HOME/kernel-claude-7.23" checkout 54a0053
+V8_SELECTOR="$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current/scripts/select-runtime.sh"
+"$V8_SELECTOR" "$HOME/kernel-claude-7.23"
+claude --plugin-dir "$HOME/kernel-claude-7.23"
 ```
 
 For an explicit helper-runtime selection:

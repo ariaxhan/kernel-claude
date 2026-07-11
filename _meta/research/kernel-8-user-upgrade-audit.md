@@ -216,4 +216,3 @@ A durable rollback may use a separate marketplace registration pinned to `ariaxh
 - Claude Code, Create plugins and local `--plugin-dir` testing: https://code.claude.com/docs/en/plugins
 - Claude Code, Desktop: https://code.claude.com/docs/en/desktop
 - Claude Code, VS Code integration: https://code.claude.com/docs/en/ide-integrations
-
