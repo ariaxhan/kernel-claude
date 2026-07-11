@@ -53,6 +53,7 @@ jobs:
           fail=0
           MV=$(jq -r '.plugins[0].version' .claude-plugin/marketplace.json)
           [ "$MV" = "$V" ] || { echo "FAIL: marketplace.json ($MV) != $V"; fail=1; }
+          grep -qF "<kernel version=\"$V\">" AGENTS.md            || { echo "FAIL: AGENTS.md <kernel version> != $V"; fail=1; }
           grep -qF "<kernel version=\"$V\">" CLAUDE.md           || { echo "FAIL: CLAUDE.md <kernel version> != $V"; fail=1; }
           grep -qF "KERNEL v$V" skills/help/SKILL.md             || { echo "FAIL: skills/help/SKILL.md KERNEL version != $V"; fail=1; }
           if [ "$fail" -ne 0 ]; then

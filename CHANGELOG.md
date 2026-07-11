@@ -2,7 +2,7 @@
 
 All notable changes to KERNEL are documented in this file.
 
-## [8.0.0] - 2026-07-10
+## [8.0.0] - 2026-07-11
 
 KERNEL 8 unifies its public operations as skills, makes strict JSON the canonical
 resumable state format, and adds a safe runtime selector so plugin updates cannot quietly
@@ -51,6 +51,10 @@ leave AgentDB, hooks, and orchestration pinned to 7.23.
   recovery uses `codex plugin remove` then `codex plugin add`. These flows were exercised
   against the current CLI in a disposable Codex home instead of inferred from Claude's
   slash commands.
+- **Cross-loader security tests.** Claude and Codex hook payloads exercise the installed
+  entry points separately. Config guards reject dot-segment traversal before allowlist
+  checks, and the ship methodology now requires an explicit resource ceiling for
+  heavyweight verification.
 - **Context graph (shadow telemetry).** Receipt-derived projection only:
   `orchestration/agentdb/graph-project.py` + `agentdb graph-project|graph-suggest`.
   `kernel-manifest deactivate --receipt` auto-projects; `write-end` records outcome.
@@ -64,6 +68,9 @@ leave AgentDB, hooks, and orchestration pinned to 7.23.
   **retrospective** additionally emits a validated machine-readable mutation record.
 - `/kernel:init` now uses validated shared runtime helpers, creates missing links only
   after confirmation, and never moves or replaces the whole `~/.claude` directory.
+- `/kernel:retrospective` now queries the current AgentDB learning columns and records
+  evidence for resolved contradictions. This release's loader, path-validation, install,
+  and bounded-test lessons were promoted into the testing, security, and ship skills.
 - README, setup, migration, help, governance, workflows, metadata, and CI now describe
   the same supported surfaces, update/reload behavior, JSON state, and data boundaries.
 
