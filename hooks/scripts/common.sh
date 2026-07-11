@@ -87,6 +87,22 @@ print(os.path.normpath(target if os.path.isabs(target) else os.path.join(os.path
 PY
 }
 
+kernel_owned_numbered_target() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import os, re, sys
+target, cache, suffix = map(os.path.normpath, sys.argv[1:])
+prefix = cache + os.sep
+if not target.startswith(prefix):
+    raise SystemExit(1)
+rest = target[len(prefix):].split(os.sep)
+expected = suffix.split(os.sep)
+if len(rest) != len(expected) + 1 or rest[1:] != expected:
+    raise SystemExit(1)
+if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', rest[0]):
+    raise SystemExit(1)
+PY
+}
+
 kernel_repair_host_link() {
   local dest="$1" wanted="$2" cache="$3" suffix="$4" raw lexical
   if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then return 0; fi
@@ -98,7 +114,7 @@ kernel_repair_host_link() {
     echo "kernel: kept malformed link $dest; run /kernel:init to resolve it" >&2; return 1;
   }
   [ "$lexical" = "$wanted" ] && return 0
-  if [[ "$lexical" =~ ^${cache//./\\.}/(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)/${suffix}$ ]]; then
+  if kernel_owned_numbered_target "$lexical" "$cache" "$suffix"; then
     kernel_atomic_link "$wanted" "$dest" || {
       echo "kernel: could not repair $dest; run /kernel:init" >&2; return 1;
     }
@@ -107,6 +123,17 @@ kernel_repair_host_link() {
   fi
   echo "kernel: kept unrelated link $dest; run /kernel:init to resolve it" >&2
   return 1
+}
+
+kernel_init_host_link() {
+  local dest="$1" wanted="$2" cache="$3" suffix="$4"
+  if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
+    mkdir -p "$(dirname "$dest")" || return 1
+    kernel_atomic_link "$wanted" "$dest" || return 1
+    echo "KERNEL created helper link: $dest"
+    return 0
+  fi
+  kernel_repair_host_link "$dest" "$wanted" "$cache" "$suffix"
 }
 
 kernel_reconcile_runtime() {

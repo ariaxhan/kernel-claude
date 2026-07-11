@@ -650,7 +650,7 @@ make_runtime_fixture() {
   local root="$1" version="$2"
   mkdir -p "$root/.claude-plugin" "$root/hooks/scripts" "$root/orchestration/agentdb"
   printf '{"name":"kernel","version":"%s"}\n' "$version" > "$root/.claude-plugin/plugin.json"
-  : > "$root/hooks/scripts/common.sh"
+  cp "$PLUGIN_ROOT/hooks/scripts/common.sh" "$root/hooks/scripts/common.sh"
   : > "$root/orchestration/agentdb/agentdb"
   chmod +x "$root/orchestration/agentdb/agentdb"
 }
@@ -761,8 +761,25 @@ test_runtime_failed_replacement_leaves_original() {
 }
 
 test_runtime_startup_arms_reconciliation() {
-  grep -q 'kernel_reconcile_runtime' "$PLUGIN_ROOT/hooks/scripts/common.sh"
-  grep -q '_kernel_hook_start' "$PLUGIN_ROOT/hooks/scripts/session-start.sh"
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/7.23.0/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_RUNTIME_ROOT="$cache/8.0.0" _kernel_hook_start
+  assert_equals "$cache/current/hooks" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
+}
+
+test_select_runtime_supports_explicit_local_rollback() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/8.0.0" "$cache/current"
+  ln -s "$cache/8.0.0/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  local local_root="$TEST_DIR/local kernel 7"
+  make_runtime_fixture "$local_root" 7.23.0
+  local output
+  output=$(KERNEL_CACHE_DIR="$cache" KERNEL_VAULTS="$KERNEL_VAULTS" "$PLUGIN_ROOT/scripts/select-runtime.sh" "$local_root")
+  assert_equals "$local_root" "$(readlink "$cache/current")"
+  assert_contains "$output" "KERNEL runtime: 7.23.0"
 }
 
 # === Security Hook Tests ===
@@ -1516,8 +1533,38 @@ test_version_sync_all() {
   [ "$mv" = "$v" ]                                                 || { echo "FAIL: marketplace.json ($mv) != plugin.json ($v)"; fail=1; }
   grep -qF "<kernel version=\"$v\">" "$PLUGIN_ROOT/CLAUDE.md"      || { echo "FAIL: CLAUDE.md <kernel version> != $v"; fail=1; }
   grep -qF "KERNEL v$v" "$PLUGIN_ROOT/skills/help/SKILL.md"            || { echo "FAIL: skills/help/SKILL.md KERNEL version != $v"; fail=1; }
-  grep -qF "kernel-marketplace/kernel/$v" "$PLUGIN_ROOT/README.md" || { echo "FAIL: README.md install-path version != $v"; fail=1; }
   return $fail
+}
+
+test_release_docs_reject_stale_live_claims() {
+  local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md AGENTS.md CLAUDE.md skills/help/SKILL.md skills/init/SKILL.md workflows/feature.md workflows/bugfix.md workflows/refactor.md)
+  local pattern='Cursor shares|without the kernel: prefix|yaml-first|YAML is the canonical|All v7 invocations work unchanged|ln -sfn|push to main|no new tests needed|commands/\*\.md'
+  ! grep -En "$pattern" "${files[@]/#/$PLUGIN_ROOT/}"
+}
+
+test_release_changelog_v8_is_current_and_history_preserved() {
+  local v8
+  v8=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
+  [[ "$v8" == *"strict JSON"* ]] && [[ "$v8" == *"preflight"* ]] && [[ "$v8" == *"select-runtime.sh"* ]]
+  grep -q '^## \[7.23.0\] - 2026-07-06' "$PLUGIN_ROOT/CHANGELOG.md"
+}
+
+test_release_metadata_and_inventory_are_truthful() {
+  local skills agents
+  skills=$(find "$PLUGIN_ROOT/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
+  agents=$(find "$PLUGIN_ROOT/agents" -maxdepth 1 -name '*.md' ! -name README.md | wc -l | tr -d ' ')
+  assert_equals 33 "$skills" "skill inventory"
+  assert_equals 15 "$agents" "agent inventory"
+  python3 - "$PLUGIN_ROOT" <<'PY'
+import json, pathlib, sys
+r=pathlib.Path(sys.argv[1])
+p=json.loads((r/'.claude-plugin/plugin.json').read_text())
+m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
+assert p['version']==m['version']=='8.0.0'
+for x in (p,m):
+    assert 'JSON' in x['description'] and '33 skills' in x['description'] and '15 specialized agent' in x['description']
+PY
+  grep -q 'validate | latest | divergence | preflight | compile | resume | activate | deactivate' "$PLUGIN_ROOT/README.md"
 }
 
 test_dreamer_agent_exists_with_frontmatter() {
@@ -3716,6 +3763,7 @@ run_test_suite() {
       run_test "authority monotonic with explicit rollback" test_runtime_authority_is_monotonic_but_override_can_rollback
       run_test "failed replacement preserves original" test_runtime_failed_replacement_leaves_original
       run_test "startup arms reconciliation" test_runtime_startup_arms_reconciliation
+      run_test "rollback tool selects a lower local runtime" test_select_runtime_supports_explicit_local_rollback
       ;;
     security)
       run_test "no hardcoded secrets" test_no_hardcoded_secrets_in_plugin
@@ -3923,6 +3971,11 @@ run_test_suite() {
     version_sync)
       run_test "all canonical version declarations in sync" test_version_sync_all
       ;;
+    release_docs)
+      run_test "active docs reject stale claims" test_release_docs_reject_stale_live_claims
+      run_test "8.0 changelog current and 7.x history preserved" test_release_changelog_v8_is_current_and_history_preserved
+      run_test "metadata and inventory truthful" test_release_metadata_and_inventory_are_truthful
+      ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
       run_test "reviewer has confidence scoring" test_reviewer_has_confidence_scoring
@@ -4065,6 +4118,8 @@ main() {
     run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"
+    run_test_suite "runtime_upgrade"
+    run_test_suite "release_docs"
     run_test_suite "test_gate"
     run_test_suite "manifest"
   else
