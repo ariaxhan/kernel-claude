@@ -1982,10 +1982,12 @@ test_release_docs_explain_codex_invocation_and_boundaries() {
 }
 
 test_release_changelog_v8_is_current_and_history_preserved() {
-  local v802 v801 v800
+  local v810 v802 v801 v800
+  v810=$(awk '/^## \[8\.1\.0\]/{on=1} /^## \[8\.0\.2\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v802=$(awk '/^## \[8\.0\.2\]/{on=1} /^## \[8\.0\.1\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v801=$(awk '/^## \[8\.0\.1\]/{on=1} /^## \[8\.0\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v800=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
+  [[ "$v810" == *"49 canonical Git repositories"* ]] && [[ "$v810" == *"does **not** claim"* ]] || return 1
   [[ "$v802" == *"async"* ]] && [[ "$v802" == *"Codex"* ]] || return 1
   [[ "$v801" == *"incomplete"* ]] && [[ "$v801" == *"Codex"* ]] && [[ "$v801" == *"368"* ]] || return 1
   [[ "$v800" == *"strict JSON"* ]] && [[ "$v800" == *"preflight"* ]] && [[ "$v800" == *"select-runtime.sh"* ]] || return 1
@@ -2009,16 +2011,16 @@ test_release_metadata_and_inventory_are_truthful() {
   local skills agents
   skills=$(find "$PLUGIN_ROOT/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
   agents=$(find "$PLUGIN_ROOT/agents" -maxdepth 1 -name '*.md' ! -name README.md | wc -l | tr -d ' ')
-  assert_equals 33 "$skills" "skill inventory"
+  assert_equals 34 "$skills" "skill inventory"
   assert_equals 15 "$agents" "agent inventory"
   python3 - "$PLUGIN_ROOT" <<'PY'
 import json, pathlib, sys
 r=pathlib.Path(sys.argv[1])
 p=json.loads((r/'.claude-plugin/plugin.json').read_text())
 m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
-assert p['version']==m['version']=='8.0.2'
+assert p['version']==m['version']=='8.1.0'
 for x in (p,m):
-    assert 'JSON' in x['description'] and '33 skills' in x['description'] and '15 specialized agent' in x['description']
+    assert 'JSON' in x['description'] and '34 skills' in x['description'] and '15 specialized agent' in x['description']
 PY
   grep -q 'validate | latest | divergence | preflight | compile | resume | activate | deactivate' "$PLUGIN_ROOT/README.md"
 }
