@@ -2491,7 +2491,7 @@ test_manifest_latest_fails_when_empty() {
 }
 
 test_manifest_divergence_detects_branch_mismatch() {
-  git init -q -b main . && git commit -q --allow-empty -m init
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
   cat > m.yaml <<'MEOF'
 schema: kernel.checkpoint/v1
 identity: {name: t, created: "2026-01-01T00:00:00Z"}
@@ -2508,7 +2508,7 @@ MEOF
 }
 
 test_manifest_divergence_detects_artifact_hash_mismatch() {
-  git init -q -b main . && git commit -q --allow-empty -m init
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
   echo "content-v1" > pinned.txt
   local sha head
   sha=$(python3 -c "import hashlib;print(hashlib.sha256(open('pinned.txt','rb').read()).hexdigest())")

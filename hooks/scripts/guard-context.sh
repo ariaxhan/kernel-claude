@@ -46,6 +46,7 @@ if [ "$MODE" = "sealed" ]; then
   # Block access to any forbidden glob
   while IFS= read -r glob; do
     [ -z "$glob" ] && continue
+    # shellcheck disable=SC2254  # unquoted on purpose: forbidden entries ARE globs (e.g. frontend/*)
     case "$TARGET" in
       $glob)
         echo "BLOCKED by sealed manifest: '$TARGET' matches forbidden glob '$glob'" >&2
