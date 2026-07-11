@@ -349,6 +349,35 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(1, data["counts"]["scoped_claude_only"])
             self.assertEqual(5, data["canonical_repo_count"])
 
+    def test_discovery_keeps_nested_repos_gitfiles_and_dedupes_worktrees(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = git_repo(Path(td) / "vaults")
+            nested = git_repo(root / "projects/nested")
+            separate_git = root / ".git/modules/submodule-like"
+            separate_git.parent.mkdir(parents=True)
+            submodule = root / "projects/submodule-like"
+            submodule.parent.mkdir(parents=True, exist_ok=True)
+            result = run("git", "init", "-q", f"--separate-git-dir={separate_git}", str(submodule))
+            self.assertEqual(0, result.returncode, result.stderr)
+            run("git", "-C", str(nested), "-c", "user.email=test@example.com", "-c", "user.name=Test",
+                "commit", "--allow-empty", "-qm", "init")
+            worktree = root / "copies/nested-copy"
+            worktree.parent.mkdir(parents=True)
+            result = run("git", "-C", str(nested), "worktree", "add", "-q", "--detach", str(worktree))
+            self.assertEqual(0, result.returncode, result.stderr)
+            for cache_path in (root / "node_modules/fake", root / ".cache/fake",
+                               root / ".codex/plugins/cache/fake", root / "vendor/fake",
+                               root / "worktrees/fake"):
+                git_repo(cache_path)
+            before = snapshot_tree(root)
+            audit = run(sys.executable, str(SYNC), "audit", str(root), "--json")
+            self.assertEqual(0, audit.returncode, audit.stderr)
+            data = json.loads(audit.stdout)
+            self.assertEqual(3, data["canonical_repo_count"])
+            paths = {Path(item["path"]).name for item in data["repositories"]}
+            self.assertEqual({"vaults", "nested", "submodule-like"}, paths)
+            self.assertEqual(before, snapshot_tree(root))
+
     def test_missing_both_is_noop_until_init(self):
         with tempfile.TemporaryDirectory() as td:
             repo = git_repo(Path(td) / "repo")

@@ -610,6 +610,38 @@
         "id": "CP-20260711113647-69396-14957",
         "ts": "2026-07-11T18:36:47.358Z",
         "type": "checkpoint"
+      },
+      {
+        "agent": "adversary",
+        "content": "{\n  \"result\": \"pass\",\n  \"evidence\": \"{\\\"tested\\\":[\\\"30 focused governance tests\\\",\\\"governance suite\\\",\\\"generator byte check\\\",\\\"session hook shell syntax\\\",\\\"manifest-aware generated current and stale states\\\",\\\"identical native pair adoption\\\",\\\"hard-kill partial init resume\\\",\\\"unrelated partial init refusal\\\",\\\"backup symlink refusal\\\",\\\"journal code absence\\\"],\\\"evidence\\\":\\\"All focused fixtures pass; successful adoption audits generated_current, source edit audits generated_stale, identical pair migrates with backups, init resumes only exact recognized partial states, backup symlinks fail before writes, and no destructive recovery implementation remains\\\",\\\"issues\\\":[]}\"\n}",
+        "contract_id": "",
+        "id": "VD-20260711113755-71098-32647",
+        "ts": "2026-07-11T18:37:55.592Z",
+        "type": "verdict"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711104258-18886-29532\",\"agent\":\"reviewer\",\"commit\":\"9bd63fa\",\"verdict\":\"APPROVE\",\"confidence\":97,\"did\":\"verified final governance state-machine fixes and all prior focused safety regressions\",\"next\":\"run parent release gates and merge if green\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711113755-71086-27195",
+        "ts": "2026-07-11T18:37:55.617Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"goal\":\"Make governance-sync audit discover all nested canonical repos under a Git Vaults root\",\"constraints\":{\"files\":[\"scripts/governance-sync.py\",\"tests/test_governance.py\",\"tests/run-tests.sh\"]},\"failure\":\"Vaults live audit count != canonical inventory; .git/cache/vendor traversed; linked worktrees duplicated; nested scope lost; audit mutates files\",\"tier\":3,\"branch\":\"refactor/generated-governance\",\"max_budget_usd\":2,\"parent\":\"CR-20260711103753-6855-28536\"}",
+        "contract_id": "CR-20260711113907-73010-16487",
+        "id": "CR-20260711113907-73010-16487",
+        "ts": "2026-07-11T18:39:07.567Z",
+        "type": "contract"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711113907-73010-16487\",\"agent\":\"surgeon\",\"did\":\"fixed recursive Git root discovery while pruning internals/caches and canonicalizing linked worktrees\",\"tested\":[\"discovery fixture nested root+gitfile+linked worktree+caches+read-only\",\"governance state suite 31/31\",\"live Vaults audit 49 canonical repos matching scout\",\"diff check\",\"python compile\"],\"next\":\"reviewer final audit\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711114134-78058-928",
+        "ts": "2026-07-11T18:41:34.626Z",
+        "type": "checkpoint"
       }
     ],
     "context_sessions": [
