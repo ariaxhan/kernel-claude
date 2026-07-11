@@ -18,16 +18,20 @@ missing Claude or Codex adapter from one declared source. It never edits a confl
 
 ## Audit first
 
-Resolve the installed plugin root once. Claude Code and Codex compatibility loading
-provide `CLAUDE_PLUGIN_ROOT`; the fallback is valid when the skill runs from its own
-installed `skills/governance-sync` directory:
+Resolve the installed script once. Claude Code and Codex compatibility loading
+provide `CLAUDE_PLUGIN_ROOT`; otherwise use the direct relative path from the
+documented installed `skills/governance-sync` working directory:
 
 ```bash
-KERNEL_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd ../.. && pwd -P)}"
-test -f "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py"
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then
+  KERNEL_GOVERNANCE_SYNC="$CLAUDE_PLUGIN_ROOT/scripts/governance-sync.py"
+else
+  KERNEL_GOVERNANCE_SYNC="../../scripts/governance-sync.py"
+fi
+test -f "$KERNEL_GOVERNANCE_SYNC"
 ```
 
-Run `python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" audit <root> --json`.
+Run `python3 "$KERNEL_GOVERNANCE_SYNC" audit <root> --json`.
 The audit discovers
 canonical Git roots, ignores caches, deduplicates linked worktrees, and reports:
 missing both, Claude-only, AGENTS-only, both identical, generated current, generated
@@ -41,9 +45,9 @@ Show the exact repository, source, target, and backup directory. Continue only a
 the user confirms one command:
 
 ```text
-python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" adopt REPO --source CLAUDE.md --backup-dir REPO/.kernel-governance-backups/adopt
-python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" generate REPO --backup-dir REPO/.kernel-governance-backups/generate
-python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" check REPO
+python3 "$KERNEL_GOVERNANCE_SYNC" adopt REPO --source CLAUDE.md --backup-dir REPO/.kernel-governance-backups/adopt
+python3 "$KERNEL_GOVERNANCE_SYNC" generate REPO --backup-dir REPO/.kernel-governance-backups/generate
+python3 "$KERNEL_GOVERNANCE_SYNC" check REPO
 ```
 
 `AGENTS.md` and `.claude/CLAUDE.md` are also valid sources. The manifest pins the
@@ -61,6 +65,6 @@ that drift without changing anything, and rerunning the write operation converge
 There is no background lock, journal, rollback, or cleanup of unknown temporary files.
 An existing backup-directory symlink is always rejected before path resolution.
 
-Use `python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" init REPO --backup-dir
+Use `python3 "$KERNEL_GOVERNANCE_SYNC" init REPO --backup-dir
 REPO/.kernel-governance-backups/init` only when the user explicitly wants governance
 created in a repository where both native files are absent.
