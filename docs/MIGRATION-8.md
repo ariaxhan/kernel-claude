@@ -20,6 +20,14 @@ Start a new session if Claude Code says a monitor or component cannot reload. VS
 may request a restart. Third-party marketplace auto-update is off by default; users
 who enabled it still need to reload when prompted.
 
+Codex users continue through its Claude-marketplace compatibility loader in 8.0.
+KERNEL does not add a native `.codex-plugin` manifest in this release: Codex's native
+validator rejects Claude's explicit-only skill marker, and removing that marker would
+let four side-effecting workflows run without an explicit invocation. The shared hook
+file is constrained to the top-level fields accepted by both loaders. If Codex reports
+`unknown field version` for `hooks/hooks.json`, it is reading a 7.23 cache; upgrade and
+restart Codex rather than editing that cache.
+
 ## Automatic helper migration
 
 Claude Code installs 8.0 beside 7.23 in a versioned cache. KERNEL validates the root

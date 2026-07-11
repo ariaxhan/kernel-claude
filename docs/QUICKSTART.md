@@ -4,6 +4,11 @@ KERNEL adds durable memory, resumable JSON state, engineering workflows, and sep
 verification roles to Claude Code. It supports Claude Code Terminal, Desktop local/SSH
 sessions, and VS Code. Plugin skills always use the `kernel:` namespace.
 
+Codex CLI and the Codex app can load KERNEL through their Claude-marketplace
+compatibility loader. KERNEL 8 does not claim native Codex-manifest support because
+the native validator does not preserve Claude's explicit-only marker for the four
+side-effecting skills. The compatibility path keeps that safety rule intact.
+
 ## Install
 
 Requirements: Git, SQLite 3, `jq`, Python 3, and Bash.
@@ -87,6 +92,8 @@ Do not clear the plugin cache or remove the marketplace as a normal update step.
 - Wrong Vaults: export `KERNEL_VAULTS` to the existing root, then rerun init.
 - Host-link warning: inspect the exact path. Init refuses regular files, directories,
   malformed links, and unrelated links instead of replacing them.
+- Codex `unknown field version` warning for `hooks/hooks.json`: restart Codex after
+  upgrading to KERNEL 8; the warning means Codex is still reading a 7.23 cache.
 - Reinstall only after update/reload fails:
 
 ```text

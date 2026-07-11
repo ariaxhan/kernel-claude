@@ -1,6 +1,6 @@
 # KERNEL 8
 
-KERNEL is a Claude Code plugin that gives coding sessions durable project memory, bounded handoffs, repeatable engineering workflows, and independent checks before risky changes ship.
+KERNEL is a Claude Code plugin that gives coding sessions durable project memory, bounded handoffs, repeatable engineering workflows, and independent checks before risky changes ship. Codex can load the same package through its Claude-marketplace compatibility path.
 
 It is for people who use Claude Code on real repositories and want work to survive session boundaries without turning the agent loose. It does not replace source control, tests, human review, or project-specific instructions. KERNEL records evidence and enforces process; it cannot prove a product is correct by itself.
 
@@ -9,8 +9,15 @@ It is for people who use Claude Code on real repositories and want work to survi
 - Claude Code in a terminal.
 - Claude Code Desktop local and SSH sessions. Remote sessions do not support plugins.
 - Claude Code in VS Code, which uses the same plugin configuration and may ask for a restart after changes.
+- Codex CLI and the Codex app through Codex's legacy Claude-plugin compatibility loader.
 
 KERNEL skills are namespaced: `/kernel:ingest`, `/kernel:validate`, and so on. Cursor and Claude chat Personal plugins are not supported installation targets here.
+
+KERNEL 8 intentionally does not ship a native `.codex-plugin` manifest yet. Claude's
+explicit-only skill marker and Codex's native plugin validator currently disagree;
+keeping the compatibility loader preserves the safety rule instead of quietly making
+side-effecting skills start on their own. The shared `hooks/hooks.json` is regression-
+tested against both loaders.
 
 ## Install
 
@@ -126,6 +133,10 @@ KERNEL hooks can inspect repository state, run configured checks, and write thes
 ## Troubleshooting and recovery
 
 Skills missing after update: run `/reload-plugins`; start a new session if prompted.
+
+Codex reports `unknown field version` for `hooks/hooks.json`: the session is still
+loading an older cached KERNEL release. Upgrade the marketplace, then restart Codex so
+it reads KERNEL 8. Do not hand-edit the numbered cache.
 
 Helper-link warning: inspect the exact path printed by KERNEL, then run `/kernel:init`. Init will not overwrite a regular file, directory, or unrelated link without a separate manual decision.
 

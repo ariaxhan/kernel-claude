@@ -41,6 +41,11 @@ leave AgentDB, hooks, and orchestration pinned to 7.23.
   version, and helpers without deleting cache or project data.
 - **Release and migration tests** cover upgrades, rollback, malformed caches, broken and
   relative links, user-owned objects, atomic failure, data preservation, and live docs.
+- **Claude/Codex hook compatibility gate.** `hooks/hooks.json` now has a regression test
+  that permits only the shared loaders' top-level `description` and `hooks` fields. This
+  prevents the old top-level `version` field from breaking Codex startup. Native Codex
+  manifest packaging remains deferred because its validator conflicts with Claude's
+  explicit-only marker for side-effecting skills; Codex uses its compatibility loader.
 - **Context graph (shadow telemetry).** Receipt-derived projection only:
   `orchestration/agentdb/graph-project.py` + `agentdb graph-project|graph-suggest`.
   `kernel-manifest deactivate --receipt` auto-projects; `write-end` records outcome.

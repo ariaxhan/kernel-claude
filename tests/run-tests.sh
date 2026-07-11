@@ -1222,6 +1222,20 @@ for event in data.get('hooks', {}).keys():
   assert_exit_code 0 "$invalid" "all hook events should be valid Claude Code events"
 }
 
+test_hooks_json_cross_loader_schema() {
+  local hooks_file="$PLUGIN_ROOT/hooks/hooks.json"
+  python3 - "$hooks_file" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+data = json.loads(path.read_text())
+assert set(data) <= {"description", "hooks"}, (
+    f"Codex accepts only description/hooks at the hooks root, got {sorted(data)}"
+)
+assert isinstance(data.get("hooks"), dict) and data["hooks"], "hooks must be a non-empty object"
+assert "version" not in data, "top-level version breaks the Codex hooks loader"
+PY
+}
+
 # === Input Validation Tests ===
 
 test_agentdb_numeric_injection_tier() {
@@ -3852,6 +3866,7 @@ run_test_suite() {
       run_test "detect-secrets clean file" test_detect_secrets_clean
       run_test "hooks.json has SessionStart" test_hooks_json_has_session_start
       run_test "hooks.json has SessionEnd" test_hooks_json_has_session_end
+      run_test "hooks.json supports Claude and Codex loaders" test_hooks_json_cross_loader_schema
       run_test "session-start has compact quick reference" test_session_start_workflow_present
       run_test "session-start points at skill routing" test_session_start_skill_routing
       run_test "session-start has no scripted interrupts" test_session_start_no_scripted_interrupts
