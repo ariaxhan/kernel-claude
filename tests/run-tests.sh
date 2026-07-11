@@ -1988,6 +1988,7 @@ test_methodology_carries_cross_loader_release_lessons() {
 test_retrospective_contradictions_have_mutation_evidence() {
   python3 - "$PLUGIN_ROOT/_meta/reports/retrospective-2026-07-11.json" <<'PY'
 import json
+import re
 import sys
 
 report = json.load(open(sys.argv[1]))
@@ -1998,10 +1999,32 @@ backed = [
     and "contradiction" in mutation.get("reason", "").lower()
     and mutation.get("evidence")
 ]
-if len(backed) < expected:
+if len(backed) != expected:
     raise SystemExit(
-        f"contradictions_resolved={expected}, but only {len(backed)} learning mutations carry contradiction evidence"
+        f"contradictions_resolved={expected}, but {len(backed)} learning mutations carry contradiction evidence"
     )
+
+paths = []
+for mutation in backed:
+    if mutation.get("status") != "applied":
+        raise SystemExit("counted contradiction mutation must have status=applied")
+    if mutation.get("op") != "modify":
+        raise SystemExit("counted contradiction mutation must have op=modify")
+    path = mutation.get("path", "")
+    if not re.fullmatch(r"agentdb://learnings/LRN-[0-9]{14}-[0-9]+-[0-9]+", path):
+        raise SystemExit(f"invalid contradiction learning path: {path!r}")
+    paths.append(path)
+if len(paths) != len(set(paths)):
+    raise SystemExit("contradiction learning paths must be unique")
+
+target = "agentdb://learnings/LRN-20260710185543-1035-14087"
+if paths != [target]:
+    raise SystemExit(f"expected exact resolved learning {target}, got {paths}")
+evidence = backed[0]["evidence"]
+if "Claude Code invokes /kernel:<skill>" not in evidence:
+    raise SystemExit("contradiction evidence is missing Claude /kernel:<skill> truth")
+if "Codex 0.144.1 invokes $kernel:<skill>" not in evidence:
+    raise SystemExit("contradiction evidence is missing Codex $kernel:<skill> truth")
 PY
 }
 
