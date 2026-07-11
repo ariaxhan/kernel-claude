@@ -189,8 +189,11 @@ kernel_reconcile_runtime() {
 }
 
 kernel_init_agentdb() {
-  local vaults="$1" cache="$2" agentdb
+  local vaults="$1" cache="$2" selected agentdb
   kernel_safe_path "$vaults" && kernel_safe_path "$cache" || return 1
+  [ -L "$cache/current" ] || return 1
+  selected=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$cache/current") || return 1
+  kernel_validate_runtime_root "$selected" >/dev/null || return 1
   agentdb="$cache/current/orchestration/agentdb/agentdb"
   [ -f "$agentdb" ] || return 1
   AGENTDB_ROOT="$vaults" "$agentdb" init
@@ -202,6 +205,7 @@ update_current_symlink() { kernel_update_current; }
 # Detect Vaults location - env var takes priority, then checks filesystem
 detect_vaults() {
   # Explicit override always wins (for testing + custom setups)
+  kernel_safe_path "$HOME" || { echo "kernel: refusing unsafe HOME path" >&2; return 1; }
   if [ -n "${KERNEL_VAULTS:-}" ] && ! kernel_safe_path "$KERNEL_VAULTS"; then
     echo "kernel: refusing unsafe KERNEL_VAULTS path" >&2
     return 1
