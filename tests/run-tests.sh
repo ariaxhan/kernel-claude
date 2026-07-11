@@ -2949,6 +2949,54 @@ test_manifest_deactivate_rejects_ledger_schema_mismatch() {
   assert_file_exists "_meta/.active-manifest.json" "failed deactivate must stay armed"
 }
 
+test_manifest_deactivate_rejects_malformed_ledger_transactionally() {
+  local payload ec before after
+  for payload in '{bad' '' '[]' '{"path":42}' '{"path":"x","unknown":true}'; do
+    rm -rf _meta receipt.json
+    mkdir -p _meta
+    cp "$FIXTURES/receipt-example.json" receipt.json || return 1
+    echo '{"manifest":"m.json","mode":"bounded","forbidden":[],"allowlist":[]}' > _meta/.active-manifest.json
+    printf '%s\n' "$payload" > _meta/.context-ledger
+    before=$(shasum -a 256 receipt.json | awk '{print $1}')
+    ec=0; "$KM" deactivate --receipt receipt.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "invalid ledger payload must fail" || return 1
+    after=$(shasum -a 256 receipt.json | awk '{print $1}')
+    assert_equals "$before" "$after" "receipt must remain byte-identical" || return 1
+    assert_file_exists "_meta/.active-manifest.json" || return 1
+    assert_file_exists "_meta/.context-ledger" || return 1
+  done
+}
+
+test_manifest_deactivate_projection_retry_merges_once() {
+  mkdir -p _meta
+  rm -rf _meta/agentdb
+  cp "$FIXTURES/receipt-example.json" receipt.json || return 1
+  echo '{"manifest":"m.json","mode":"bounded","forbidden":[],"allowlist":[]}' > _meta/.active-manifest.json
+  echo '{"path":"retry-once.md","reason":"test","ts":"2026-01-01T00:00:00Z"}' > _meta/.context-ledger
+  local before after ec attempt
+  before=$(shasum -a 256 receipt.json | awk '{print $1}')
+  for attempt in 1 2; do
+    ec=0; "$KM" deactivate --receipt receipt.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "projection failure $attempt must fail" || return 1
+    after=$(shasum -a 256 receipt.json | awk '{print $1}')
+    assert_equals "$before" "$after" "failed projection must not mutate receipt" || return 1
+    assert_file_exists "_meta/.active-manifest.json" || return 1
+    assert_file_exists "_meta/.context-ledger" || return 1
+  done
+  agentdb init >/dev/null || return 1
+  "$KM" deactivate --receipt receipt.json >/dev/null || return 1
+  python3 - <<'PYEOF' || return 1
+import json
+r=json.load(open('receipt.json'))
+assert sum(x.get('path')=='retry-once.md' for x in r['loads_beyond_manifest']) == 1
+PYEOF
+  [ ! -e _meta/.active-manifest.json ] || { echo "FAIL: pointer remained"; return 1; }
+  [ ! -e _meta/.context-ledger ] || { echo "FAIL: ledger remained"; return 1; }
+  local sessions
+  sessions=$(sqlite3 _meta/agentdb/agent.db "SELECT COUNT(*) FROM graph_receipts")
+  assert_equals "1" "$sessions" "projection retry must create one graph receipt"
+}
+
 test_manifest_divergence_checks_dirty_tree_hash() {
   git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
   echo one > dirty.txt
@@ -3473,6 +3521,8 @@ run_test_suite() {
       run_test "guard-context: bounded skips allowlist" test_guard_context_bounded_skips_allowlisted_access
       run_test "guard-context: bounded JSON escaping" test_guard_context_bounded_ledgers_valid_json_escaping
       run_test "deactivate rejects ledger schema mismatch" test_manifest_deactivate_rejects_ledger_schema_mismatch
+      run_test "deactivate rejects malformed ledger transactionally" test_manifest_deactivate_rejects_malformed_ledger_transactionally
+      run_test "deactivate projection retry merges once" test_manifest_deactivate_projection_retry_merges_once
       run_test "guard-context: fails closed on broken pointer" test_guard_context_fails_closed_on_broken_pointer
       run_test "activate/deactivate roundtrip" test_manifest_activate_deactivate_roundtrip
       run_test "deactivate rewrites receipt once" test_manifest_deactivate_rewrites_receipt_without_duplicate_keys

@@ -219,8 +219,9 @@ def sql_escape(value: str) -> str:
 
 
 def project_receipt(conn: sqlite3.Connection, receipt_path: str) -> str:
-    abs_receipt = os.path.abspath(receipt_path)
-    receipt = load_receipt(abs_receipt)
+    source_receipt = os.path.abspath(receipt_path)
+    abs_receipt = os.path.abspath(os.environ.get("KERNEL_RECEIPT_IDENTITY_PATH") or source_receipt)
+    receipt = load_receipt(source_receipt)
     if receipt.get("schema") != "kernel.context-receipt/v1":
         raise ValueError(f"not a context receipt: {receipt_path}")
 

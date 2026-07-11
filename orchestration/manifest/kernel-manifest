@@ -24,6 +24,7 @@ import subprocess
 import sys
 import hashlib
 import fnmatch
+import tempfile
 from datetime import datetime, timezone
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -687,35 +688,76 @@ def cmd_deactivate(args):
         receipt_path = args[1]
     if receipt_path:
         receipt_path = cli_path(receipt_path)
-    if os.path.isfile(CONTEXT_LEDGER) and receipt_path and os.path.isfile(receipt_path):
-        entries = []
-        for line in open(CONTEXT_LEDGER, encoding="utf-8"):
-            line = line.strip()
-            if line:
+    ledger_exists = os.path.isfile(CONTEXT_LEDGER)
+    if ledger_exists and (not receipt_path or not os.path.isfile(receipt_path)):
+        die(1, "context ledger exists but no readable --receipt was provided; runtime state remains active")
+
+    entries = []
+    if ledger_exists:
+        allowed = {"path", "reason", "estimated_tokens", "ts"}
+        with open(CONTEXT_LEDGER, encoding="utf-8") as ledger:
+            for line_number, raw in enumerate(ledger, 1):
+                line = raw.rstrip("\r\n")
+                if not line:
+                    die(1, f"context ledger line {line_number}: blank entries are invalid")
                 try:
-                    entries.append(json.loads(line))
-                except json.JSONDecodeError:
-                    entries.append({"path": line, "reason": "unstructured ledger line"})
-        if entries:
-            receipt = load_and_validate(receipt_path)
-            receipt["loads_beyond_manifest"] = (receipt.get("loads_beyond_manifest") or []) + entries
-            tmp = f"{receipt_path}.tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                f.write(dump_json(receipt))
-            load_and_validate(tmp)
-            os.replace(tmp, receipt_path)
-            print(f"merged {len(entries)} ledger entrie(s) into {receipt_path}")
+                    entry = json.loads(line, object_pairs_hook=_reject_duplicate_keys)
+                except (json.JSONDecodeError, ValueError) as exc:
+                    die(1, f"context ledger line {line_number}: invalid JSON: {exc}")
+                if not isinstance(entry, dict):
+                    die(1, f"context ledger line {line_number}: expected JSON object")
+                unknown = set(entry) - allowed
+                if unknown:
+                    die(1, f"context ledger line {line_number}: unknown field(s): {sorted(unknown)}")
+                if not isinstance(entry.get("path"), str) or not entry["path"]:
+                    die(1, f"context ledger line {line_number}: path must be a non-empty string")
+                if "reason" in entry and not isinstance(entry["reason"], str):
+                    die(1, f"context ledger line {line_number}: reason must be a string")
+                if "ts" in entry and not isinstance(entry["ts"], str):
+                    die(1, f"context ledger line {line_number}: ts must be a string")
+                if "estimated_tokens" in entry and (isinstance(entry["estimated_tokens"], bool)
+                                                      or not isinstance(entry["estimated_tokens"], int)):
+                    die(1, f"context ledger line {line_number}: estimated_tokens must be an integer")
+                entries.append(entry)
+
+    staged_path = None
     if receipt_path and os.path.isfile(receipt_path):
-        graph_script = os.path.join(PLUGIN_ROOT, "orchestration", "agentdb", "graph-project.py")
-        if os.path.isfile(graph_script):
+        receipt = load_and_validate(receipt_path)
+        receipt["loads_beyond_manifest"] = (receipt.get("loads_beyond_manifest") or []) + entries
+        fd, staged_path = tempfile.mkstemp(
+            prefix=os.path.basename(receipt_path) + ".staged.",
+            suffix=".json",
+            dir=os.path.dirname(receipt_path),
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as staged:
+                staged.write(dump_json(receipt))
+                staged.flush()
+                os.fsync(staged.fileno())
+            load_and_validate(staged_path)
+
+            graph_script = os.path.join(PLUGIN_ROOT, "orchestration", "agentdb", "graph-project.py")
+            if not os.path.isfile(graph_script):
+                die(1, "receipt projection unavailable; canonical receipt and runtime state unchanged")
+            env = os.environ.copy()
+            env["KERNEL_RECEIPT_IDENTITY_PATH"] = receipt_path
             proc = subprocess.run(
-                [sys.executable, graph_script, "project", receipt_path],
+                [sys.executable, graph_script, "project", staged_path],
                 check=False,
                 capture_output=True,
                 text=True,
+                env=env,
             )
             if proc.returncode != 0:
-                die(1, f"receipt projection failed; runtime state left active: {proc.stderr.strip()[:300]}")
+                die(1, f"receipt projection failed; canonical receipt and runtime state unchanged: {proc.stderr.strip()[:300]}")
+            os.replace(staged_path, receipt_path)
+            staged_path = None
+            if entries:
+                print(f"merged {len(entries)} ledger entrie(s) into {receipt_path}")
+        finally:
+            if staged_path and os.path.exists(staged_path):
+                os.remove(staged_path)
+
     for p in (ACTIVE_POINTER, CONTEXT_LEDGER):
         if os.path.isfile(p):
             os.remove(p)
