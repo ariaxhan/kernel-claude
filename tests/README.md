@@ -79,7 +79,7 @@ suites:
   manifest:
     count: 27
     tests:
-      # v8 YAML manifest runtime + guard-context hook + migration guards
+      # v8 JSON manifest runtime + guard-context hook + migration guards
       - schemas parse; handoff/checkpoint/retrospective examples validate
       - validate rejects bad schema/policy/selector
       - latest, divergence, compile (receipt fields, budget, selectors)

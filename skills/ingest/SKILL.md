@@ -92,7 +92,7 @@ Workflow steps guide the phase sequence. Human confirms at each step (ingest mod
      ```
      Legacy markdown handoffs (_meta/handoffs/*.md) remain readable this release:
      parse goal/decisions/next-steps from prose, note "legacy handoff (deprecated,
-     no validation/divergence/budget)" and suggest regenerating as YAML. Removal
+     no validation/divergence/budget)" and suggest regenerating as JSON. Removal
      path: docs/MIGRATION-8.md.
 
   2. **Validate** — a manifest that does not validate is not resumed:
@@ -112,7 +112,7 @@ Workflow steps guide the phase sequence. Human confirms at each step (ingest mod
 
   5. **Compile bounded context** — read the bundle, not the raw tree:
      ```bash
-     "$KM" compile <manifest> --bundle-out /tmp/resume-bundle.md --receipt-out _meta/reports/receipt-{date}.yaml
+     "$KM" compile <manifest> --bundle-out /tmp/resume-bundle.md --receipt-out _meta/reports/receipt-{date}.json
      ```
      The receipt (kernel.context-receipt/v1) reports estimated tokens per layer and
      status: within_budget → proceed · target_exceeded → drop optional selectors,
@@ -136,7 +136,7 @@ Workflow steps guide the phase sequence. Human confirms at each step (ingest mod
 
   8. **Complete**: when outputs.required are verified,
      ```bash
-     "$KM" deactivate --receipt _meta/reports/receipt-{date}.yaml
+     "$KM" deactivate --receipt _meta/reports/receipt-{date}.json
      ```
      Deactivate projects the receipt into AgentDB's observational context graph (shadow
      telemetry). Then outputs.completion (usually agentdb write-end), which records session

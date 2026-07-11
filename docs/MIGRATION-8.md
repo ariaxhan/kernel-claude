@@ -1,7 +1,7 @@
 # KERNEL 8.0 — the unified skill architecture
 
 KERNEL 8.0 removes the commands layer. Every kernel operation is now a **skill**, and
-YAML manifests are the canonical machine-readable representation of resumable state.
+JSON manifests are the canonical machine-readable representation of resumable state.
 
 ## What changed for you: almost nothing
 
@@ -42,17 +42,17 @@ Side-effecting skills (`forge`, `init`, `experiment`, `landing-page`) carry
 `disable-model-invocation: true` — they can never fire ambiently, only when you type them
 (test-enforced).
 
-### 2. YAML-first state (the four state operations)
+### 2. JSON-first state (the four state operations)
 
 | operation | emits | purpose |
 |---|---|---|
-| `/kernel:handoff` | `_meta/handoffs/*.yaml` (`kernel.handoff/v1`) | full session transfer: provenance, decisions, phases, context policy + budget |
-| `/kernel:checkpoint` | `_meta/checkpoints/*.yaml` (`kernel.checkpoint/v1`) | bounded mid-task save: steps done (with evidence), exact resume position |
-| `/kernel:ingest` | `_meta/reports/receipt-*.yaml` (`kernel.context-receipt/v1`) | unified entry; validates + resumes manifests, compiles bounded context |
-| `/kernel:retrospective` | `_meta/reports/retrospective-*.yaml` (`kernel.retrospective-result/v1`) | learning synthesis + machine-readable infrastructure mutation record |
+| `/kernel:handoff` | `_meta/handoffs/*.json` (`kernel.handoff/v1`) | full session transfer: provenance, decisions, phases, context policy + budget |
+| `/kernel:checkpoint` | `_meta/checkpoints/*.json` (`kernel.checkpoint/v1`) | bounded mid-task save: steps done (with evidence), exact resume position |
+| `/kernel:ingest` | `_meta/reports/receipt-*.json` (`kernel.context-receipt/v1`) | unified entry; validates + resumes manifests, compiles bounded context |
+| `/kernel:retrospective` | `_meta/reports/retrospective-*.json` (`kernel.retrospective-result/v1`) | learning synthesis + machine-readable infrastructure mutation record |
 
-The YAML file is canonical. Markdown renderings are annotated
-`RENDERED FROM <yaml> — NOT AUTHORITATIVE`.
+The JSON file is canonical. YAML/markdown renderings are annotated
+`RENDERED FROM <json> — NOT AUTHORITATIVE`.
 
 **Legacy markdown handoffs** (`_meta/handoffs/*.md`) are still readable by
 `/kernel:ingest` in 8.x, flagged deprecated (no validation, no divergence detection, no
@@ -60,7 +60,7 @@ budget). They stop being read in 9.0. Regenerate important ones with `/kernel:ha
 
 ### 3. The manifest runtime
 
-`orchestration/manifest/kernel-manifest` (python3; YAML parsing via pyyaml, falling back
+`orchestration/manifest/kernel-manifest` (python3; stdlib JSON parsing, duplicate keys rejected
 to system ruby; with neither, validation fails LOUDLY — a sealed resume treats that as
 blocking):
 
@@ -79,7 +79,7 @@ instruction > manifest > chronicle > inferred conversation history. Divergence
 (branch/commit/pinned-artifact-hash) flips inherited workflow phases back to `required`
 per the manifest's `invalidation_rules`.
 
-### 4. Context policies — YAML feeds hooks, hooks feed receipts
+### 4. Context policies — manifests feed hooks, hooks feed receipts
 
 ```yaml
 context:
@@ -116,7 +116,7 @@ directional, and the receipt says so.
 **Why**: EXP-L21 measured that what a decision needs stays flat (~50-70k tokens) while
 an accumulating transcript forces attention over 7-11x that by late session (median
 attention efficiency 18.6%, decaying to ~11%). Resumes reconstruct bounded state; they
-do not inherit conversations. Deferred to a later release: yaml-path/json-path/symbol
+do not inherit conversations. Deferred to a later release: json-path/symbol
 selectors, rerun-verified (EXP-L21b) selector quality, boot-layer slimming.
 
 ### 6. The experiment collision, resolved
@@ -132,7 +132,7 @@ Run these in a live Claude Code session after updating:
 
 1. `/kernel:` <kbd>tab</kbd> — all former commands + `checkpoint` appear as skills.
 2. `/kernel:help` — renders the unified reference, no stale "commands" table.
-3. `/kernel:handoff` on a real task — emits `.yaml`, and
+3. `/kernel:handoff` on a real task — emits `.json`, and
    `kernel-manifest validate` passes on it.
 4. `/kernel:ingest` in a repo with a manifest — reports "Resuming {manifest}" with a
    receipt line, not a prose re-read of the old session.

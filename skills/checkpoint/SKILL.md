@@ -1,6 +1,6 @@
 ---
 name: checkpoint
-description: "Persist bounded mid-task progress as a kernel.checkpoint/v1 YAML manifest so a fresh session or context reset can resume at the exact position without a full handoff. Triggers: checkpoint, save progress, context reset, compact soon, long task."
+description: "Persist bounded mid-task progress as a kernel.checkpoint/v1 JSON manifest so a fresh session or context reset can resume at the exact position without a full handoff. Triggers: checkpoint, save progress, context reset, compact soon, long task."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob, Write
 kernel:
@@ -35,7 +35,7 @@ Ending the session / transferring to a future session with decisions and policy 
    git branch --show-current && git rev-parse HEAD && git status --short
    ```
 
-2. Write `_meta/checkpoints/{task}-{timestamp}.yaml` per
+2. Write `_meta/checkpoints/{task}-{timestamp}.json` per
    schemas/kernel.checkpoint.v1.schema.json:
    - task: goal + handoff_ref/contract_ref if they exist
    - steps_completed: each with EVIDENCE (commit sha, test output, command result),
@@ -51,12 +51,12 @@ Ending the session / transferring to a future session with decisions and policy 
 
 3. Validate — MANDATORY:
    ```bash
-   "${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest" validate _meta/checkpoints/{file}.yaml
+   "${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest" validate _meta/checkpoints/{file}.json
    ```
 
 4. Record:
    ```bash
-   agentdb write-end '{"skill":"checkpoint","saved_to":"_meta/checkpoints/{file}.yaml","position":"..."}'
+   agentdb write-end '{"skill":"checkpoint","saved_to":"_meta/checkpoints/{file}.json","position":"..."}'
    ```
 
 Resume path: `/kernel:ingest` discovers the newest manifest automatically
@@ -67,7 +67,7 @@ explicit path.
 <hard_stops>
 - steps_completed without evidence → not a checkpoint, a hope. Add evidence or move the
   step to pending_steps.
-- unvalidated yaml → does not exist. Validate before reporting done.
+- unvalidated json → does not exist. Validate before reporting done.
 </hard_stops>
 
 </skill>

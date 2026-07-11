@@ -68,7 +68,7 @@ sentence in a doc is honor-system; an artifact fires on its own.
    - If non-local profile: surface promoted patterns to GitHub Discussions (Learnings category)
 
 6. Emit the machine-readable mutation record — MANDATORY, not optional:
-   Write `_meta/reports/retrospective-{date}.yaml` per
+   Write `_meta/reports/retrospective-{date}.json` per
    schemas/kernel.retrospective-result.v1.schema.json:
    - analyzed: learnings/clusters/merged/archived/contradictions_resolved counts
    - mutations[]: every artifact created/modified/removed/promoted —
@@ -77,14 +77,14 @@ sentence in a doc is honor-system; an artifact fires on its own.
    - project_fit: missing[] and dormant[] (prune candidates need explicit approval)
    Then validate:
    ```bash
-   "${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest" validate _meta/reports/retrospective-{date}.yaml
+   "${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest" validate _meta/reports/retrospective-{date}.json
    ```
    Future handoffs reference this file via provenance.retrospective_refs, so resumed
    work knows which infrastructure mutations it depends on.
 
 7. Write synthesis to AgentDB:
    ```bash
-   agentdb write-end '{"did":"retrospective","clusters":N,"merged":N,"archived":N,"promoted":N,"artifacts":["path1","path2"],"mutation_record":"_meta/reports/retrospective-{date}.yaml"}'
+   agentdb write-end '{"did":"retrospective","clusters":N,"merged":N,"archived":N,"promoted":N,"artifacts":["path1","path2"],"mutation_record":"_meta/reports/retrospective-{date}.json"}'
    ```
 </execution>
 
@@ -111,7 +111,7 @@ sentence in a doc is honor-system; an artifact fires on its own.
 - Active: {N} | Stale: {N} | Reinforced: {N}
 
 ### Mutation Record
-- `_meta/reports/retrospective-{date}.yaml` (kernel.retrospective-result/v1, validated)
+- `_meta/reports/retrospective-{date}.json` (kernel.retrospective-result/v1, validated)
 </output_format>
 
 </skill>

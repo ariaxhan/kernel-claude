@@ -1,0 +1,174 @@
+{
+  "schema": "kernel.handoff/v1",
+  "identity": {
+    "name": "yaml-skill-unification",
+    "created": "2026-07-10T18:00:00Z",
+    "session": "example-session",
+    "tier": 3
+  },
+  "provenance": {
+    "branch": "feat/yaml-skill-unification",
+    "commit": "0000000000000000000000000000000000000000",
+    "dirty": false,
+    "artifacts": [
+      {
+        "path": "schemas/kernel.handoff.v1.schema.json",
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "purpose": "the schema this manifest validates against"
+      }
+    ],
+    "retrospective_refs": [
+      "_meta/reports/retrospective-2026-07-01.json"
+    ]
+  },
+  "objective": {
+    "goal": "Migrate kernel commands to unified yaml-first skills",
+    "success_conditions": [
+      "commands/ directory removed",
+      "all tests green"
+    ],
+    "non_goals": [
+      "merging tradition into kernel"
+    ]
+  },
+  "contract": {
+    "ref": "_meta/contracts/yaml-skill-unification-2026-07-10.md",
+    "invariants": [
+      "I0.5: never --no-verify"
+    ],
+    "assumptions": [
+      "plugin skills surface as /kernel:<dirname>"
+    ],
+    "decisions_accepted": [
+      {
+        "decision": "no compatibility aliases",
+        "rationale": "invocation strings are identical before and after"
+      }
+    ],
+    "alternatives_rejected": [
+      {
+        "alternative": "keep commands as thin wrappers",
+        "reason": "perpetuates dual architecture"
+      }
+    ]
+  },
+  "workflow": {
+    "phases": [
+      {
+        "name": "recon",
+        "status": "inherited",
+        "evidence": "contract section 1 records the verified inventory"
+      },
+      {
+        "name": "schemas",
+        "status": "inherited",
+        "evidence": "schema files exist and validate"
+      },
+      {
+        "name": "migration",
+        "status": "required"
+      },
+      {
+        "name": "verification",
+        "status": "required"
+      }
+    ],
+    "invalidation_rules": [
+      {
+        "trigger": "artifact hash mismatch: schemas/*.json",
+        "invalidates": [
+          "schemas"
+        ]
+      },
+      {
+        "trigger": "branch diverged",
+        "invalidates": [
+          "recon",
+          "schemas",
+          "migration"
+        ]
+      }
+    ]
+  },
+  "runtime": {
+    "required_skills": [
+      {
+        "name": "quality"
+      },
+      {
+        "name": "testing"
+      }
+    ],
+    "optional_skills": [
+      "orchestration"
+    ],
+    "preflight": [
+      {
+        "cmd": "git branch --show-current",
+        "expect": "feat/yaml-skill-unification"
+      },
+      {
+        "cmd": "ls schemas/"
+      }
+    ]
+  },
+  "context": {
+    "policy": {
+      "mode": "bounded"
+    },
+    "required": [
+      {
+        "path": "_meta/contracts/yaml-skill-unification-2026-07-10.md",
+        "heading": "## 3. Migration table (every command has a destination)",
+        "reason": "the binding migration map"
+      },
+      {
+        "path": "tests/run-tests.sh",
+        "grep": "PLUGIN_ROOT/commands",
+        "context": 2,
+        "reason": "remaining command references to retarget"
+      }
+    ],
+    "optional": [
+      {
+        "path": "CHANGELOG.md",
+        "lines": "1-40"
+      }
+    ],
+    "forbidden": [
+      "_meta/chronicles/*",
+      "frontend/*"
+    ],
+    "budget": {
+      "target_tokens": 60000,
+      "max_tokens": 90000
+    }
+  },
+  "execution": {
+    "entry_phase": "migration",
+    "entrypoint": "retarget tests/run-tests.sh command paths to skills",
+    "stop_conditions": [
+      "any test suite failure not caused by this migration",
+      "3 consecutive failed attempts at the same gate (anchor-drift, I0.13)"
+    ],
+    "checkpoints": [
+      "after each coherent commit"
+    ]
+  },
+  "open_threads": [
+    "dependabot PR 144 pending (unrelated)"
+  ],
+  "warnings": [
+    "do not recreate command files as aliases; rejected in contract"
+  ],
+  "outputs": {
+    "required": [
+      "tests/run-tests.sh green",
+      "docs/MIGRATION-8.md"
+    ],
+    "completion": "kernel-manifest deactivate + agentdb write-end"
+  },
+  "resume": {
+    "prompt": "/kernel:ingest resume from _meta/handoffs/yaml-skill-unification-2026-07-10.yaml"
+  }
+}

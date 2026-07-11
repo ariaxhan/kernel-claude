@@ -66,12 +66,12 @@ agentdb read-start
 | `/kernel:retrospective` | Cross-session learning synthesis | When 5+ learnings accumulated. Clusters, deduplicates, promotes patterns into project hooks/agents/skills. |
 | `/kernel:metrics` | Observability dashboard | Check session stats, agent success rates, hook health, learning utilization. |
 
-## State Operations (kind: state_transition) — yaml-first
+## State Operations (kind: state_transition) — json-first
 
 | Skill | Emits | When to use |
 |-------|-------|-------------|
-| `/kernel:handoff` | `kernel.handoff/v1` yaml manifest | Ending a session. Pins provenance, decisions, phases, context policy + budget. |
-| `/kernel:checkpoint` | `kernel.checkpoint/v1` yaml manifest | MID-task save: safe context reset without full handoff ceremony. |
+| `/kernel:handoff` | `kernel.handoff/v1` json manifest | Ending a session. Pins provenance, decisions, phases, context policy + budget. |
+| `/kernel:checkpoint` | `kernel.checkpoint/v1` json manifest | MID-task save: safe context reset without full handoff ceremony. |
 | `/kernel:retrospective` | `kernel.retrospective-result/v1` mutation record | 5+ learnings accumulated; promotes via artifact ladder. |
 | `/kernel:ingest` (resume) | `kernel.context-receipt/v1` | Resuming: validates the manifest, checks divergence, compiles bounded context. |
 

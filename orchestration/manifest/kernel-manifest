@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""kernel-manifest — KERNEL yaml manifest runtime.
+"""kernel-manifest — KERNEL manifest runtime (canonical JSON).
 
 Subcommands:
-  validate   <file>                       schema-validate a manifest (exit 0 ok, 1 invalid, 2 unparseable/no parser)
+  validate   <file>                       schema-validate a manifest (exit 0 ok, 1 invalid, 2 unparseable)
   latest     [--dir D ...]                newest manifest path across dirs (default: _meta/checkpoints _meta/handoffs)
   divergence <file>                       live git state vs manifest provenance (exit 1 on hard divergence)
   compile    <file> [--bundle-out P] [--receipt-out P] [--agentdb-tokens N]
-                                          resolve context selectors, emit kernel.context-receipt/v1 YAML
+                                          resolve context selectors, emit kernel.context-receipt/v1 JSON
   activate   <file>                       write _meta/.active-manifest.json (arms guard-context hook)
   deactivate [--receipt P]                merge _meta/.context-ledger into receipt, remove state files
 
-YAML parsing chain: pyyaml -> ruby -ryaml (JSON bridge) -> explicit failure (exit 2).
-Fallback-first: a sealed resume must treat exit 2 as BLOCKING, never as a silent pass.
+Manifests are canonical JSON (.json). Parsed with the stdlib json module only — no
+parser fallback chain, so the manifest's meaning never depends on machine configuration.
+Duplicate keys are a protocol violation (exit 2), never last-value-wins. YAML/markdown
+renders of a manifest are non-authoritative views.
 Token counts are chars/4 estimates; directional, not exact (documented in every receipt).
 """
 
@@ -28,75 +30,39 @@ SCHEMA_DIR = os.path.join(PLUGIN_ROOT, "schemas")
 ACTIVE_POINTER = "_meta/.active-manifest.json"
 CONTEXT_LEDGER = "_meta/.context-ledger"
 
-# ---------- yaml loading (parse chain) ----------
+# ---------- manifest loading (canonical JSON) ----------
 
-def load_yaml(path):
-    """Parse YAML via pyyaml, else ruby Psych, else fail loudly (exit 2)."""
-    text = open(path, encoding="utf-8").read()
+def _reject_duplicate_keys(pairs):
+    seen = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError(f"duplicate key '{key}' (silent last-wins is a protocol violation)")
+        seen[key] = value
+    return seen
+
+
+def load_manifest_file(path):
+    """Parse a canonical JSON manifest. Duplicate keys fail loudly (exit 2)."""
+    if path.endswith((".yaml", ".yml")):
+        die(2, f"{path}: YAML manifests are no longer canonical (v8: JSON only). Convert once:\n"
+               "  ruby -ryaml -rjson -e 'puts JSON.pretty_generate(YAML.safe_load(ARGF.read))' "
+               "old.yaml > new.json")
     try:
-        import yaml  # type: ignore
-        return yaml.safe_load(text)
-    except ImportError:
-        pass
-    try:
-        proc = subprocess.run(
-            ["ruby", "-ryaml", "-rjson", "-e",
-             "puts JSON.generate(YAML.safe_load(STDIN.read, permitted_classes: [], aliases: false))"],
-            input=text, capture_output=True, text=True, timeout=30)
-        if proc.returncode == 0:
-            return json.loads(proc.stdout)
-        die(2, f"ruby YAML parse failed for {path}: {proc.stderr.strip()[:300]}")
-    except FileNotFoundError:
-        pass
-    die(2, "no YAML parser available (need python3+pyyaml or ruby). "
-           "Sealed resumes MUST treat this as blocking; do not proceed unvalidated.")
+        with open(path, encoding="utf-8") as f:
+            return json.load(f, object_pairs_hook=_reject_duplicate_keys)
+    except OSError as e:
+        die(2, f"{path}: cannot read manifest: {e}")
+    except ValueError as e:
+        die(2, f"{path}: invalid JSON manifest: {e}")
+
+
+def dump_json(obj):
+    return json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
 
 
 def die(code, msg):
     print(f"kernel-manifest: {msg}", file=sys.stderr)
     sys.exit(code)
-
-# ---------- minimal yaml emitter (controlled data only) ----------
-
-def emit_yaml(obj, indent=0):
-    """Emit YAML for dict/list/str/int/bool/None trees. Receipts + pointers only."""
-    pad = "  " * indent
-    lines = []
-    if isinstance(obj, dict):
-        for k, v in obj.items():
-            if isinstance(v, (dict, list)) and v:
-                lines.append(f"{pad}{k}:")
-                lines.append(emit_yaml(v, indent + 1))
-            elif isinstance(v, list):
-                lines.append(f"{pad}{k}: []")
-            elif isinstance(v, dict):
-                lines.append(f"{pad}{k}: {{}}")
-            else:
-                lines.append(f"{pad}{k}: {scalar(v)}")
-    elif isinstance(obj, list):
-        for item in obj:
-            if isinstance(item, (dict, list)) and item:
-                body = emit_yaml(item, indent + 1)
-                first, _, rest = body.partition("\n")
-                lines.append(f"{pad}- {first.strip()}" + (f"\n{rest}" if rest else ""))
-            else:
-                lines.append(f"{pad}- {scalar(item)}")
-    else:
-        lines.append(f"{pad}{scalar(obj)}")
-    return "\n".join(lines)
-
-
-def scalar(v):
-    if v is None:
-        return "null"
-    if isinstance(v, bool):
-        return "true" if v else "false"
-    if isinstance(v, (int, float)):
-        return str(v)
-    s = str(v)
-    if s == "" or re.search(r'[:#\[\]{}&*!|>\'"%@`]|^\s|\s$|^-|^\d', s) or "\n" in s:
-        return json.dumps(s)
-    return s
 
 # ---------- subset schema validator ----------
 # Supports: type, required, properties, enum, items, minimum, maximum, unknown-key rejection.
@@ -180,7 +146,7 @@ def validate_manifest(manifest, path):
 
 
 def load_and_validate(path):
-    return validate_manifest(load_yaml(path), path)
+    return validate_manifest(load_manifest_file(path), path)
 
 
 def cmd_validate(args):
@@ -202,7 +168,7 @@ def cmd_latest(args):
     for d in dirs:
         if os.path.isdir(d):
             for f in os.listdir(d):
-                if f.endswith((".yaml", ".yml")):
+                if f.endswith(".json") and not f.startswith("."):
                     p = os.path.join(d, f)
                     candidates.append((os.path.getmtime(p), p))
     if not candidates:
@@ -410,7 +376,7 @@ def cmd_compile(args):
         "selections": selections,
         "loads_beyond_manifest": [],
     }
-    out = emit_yaml(receipt) + "\n"
+    out = dump_json(receipt)
     if bundle_out:
         with open(bundle_out, "w", encoding="utf-8") as f:
             f.write("".join(bundle_parts))
@@ -483,7 +449,7 @@ def cmd_deactivate(args):
             receipt["loads_beyond_manifest"] = (receipt.get("loads_beyond_manifest") or []) + entries
             tmp = f"{receipt_path}.tmp"
             with open(tmp, "w", encoding="utf-8") as f:
-                f.write(emit_yaml(receipt) + "\n")
+                f.write(dump_json(receipt))
             load_and_validate(tmp)
             os.replace(tmp, receipt_path)
             print(f"merged {len(entries)} ledger entrie(s) into {receipt_path}")

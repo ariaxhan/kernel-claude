@@ -1,0 +1,191 @@
+{
+  "schema": "kernel.handoff/v1",
+  "identity": {
+    "name": "yaml-skill-unification",
+    "created": "2026-07-10T21:45:00Z",
+    "session": "fable-commission-2026-07-10",
+    "tier": 3
+  },
+  "provenance": {
+    "branch": "feat/yaml-skill-unification",
+    "commit": "12397dedd6b82305f0f0703c15cc2b284c5fc49c",
+    "dirty": false,
+    "artifacts": [
+      {
+        "path": "_meta/contracts/yaml-skill-unification-2026-07-10.md",
+        "sha256": "760d41d3f23ce0a7c890d807b327f140dff2bcc28fc3ccf99f0cd459ad0e9177",
+        "purpose": "binding migration contract"
+      },
+      {
+        "path": "schemas/kernel.handoff.v1.schema.json",
+        "sha256": "f168686567aafe4b146a636b21d78844dbf6c2b922c5736921883c86294b282c",
+        "purpose": "the schema this manifest validates against"
+      }
+    ]
+  },
+  "objective": {
+    "goal": "Finish the yaml-skill-unification commission (docs, release, chronicle)",
+    "success_conditions": [
+      "docs/MIGRATION-8.md exists with smoke-test instructions and tradition boundary",
+      "README + QUICKSTART speak unified-skill language",
+      "version 8.0.0 synced everywhere (version_sync test green)",
+      "chronicle written in Vaults/_meta/chronicles/2026/",
+      "full suite green"
+    ],
+    "non_goals": [
+      "merging tradition into kernel",
+      "rewriting methodology skill bodies"
+    ]
+  },
+  "contract": {
+    "ref": "_meta/contracts/yaml-skill-unification-2026-07-10.md",
+    "invariants": [
+      "I0.5: never --no-verify",
+      "I0.8: push after every commit"
+    ],
+    "decisions_accepted": [
+      {
+        "decision": "no compatibility aliases",
+        "rationale": "invocation strings identical before/after; aliases perpetuate dual architecture"
+      },
+      {
+        "decision": "experiment merged engine-into-skill",
+        "rationale": "one /kernel:experiment, engine body + methodology gates"
+      }
+    ],
+    "alternatives_rejected": [
+      {
+        "alternative": "keep commands as thin wrappers pointing at skills",
+        "reason": "dual architecture with zero user benefit"
+      }
+    ]
+  },
+  "workflow": {
+    "phases": [
+      {
+        "name": "recon",
+        "status": "inherited",
+        "evidence": "contract section 1 (verified inventory, 255-test baseline)"
+      },
+      {
+        "name": "runtime",
+        "status": "inherited",
+        "evidence": "commit f80b215, manifest suite 22/22"
+      },
+      {
+        "name": "migration",
+        "status": "inherited",
+        "evidence": "commit c23e6cb, suite 277/277, commands/ deleted"
+      },
+      {
+        "name": "state_skills",
+        "status": "inherited",
+        "evidence": "commit 12397de, suite 282/282"
+      },
+      {
+        "name": "docs_release",
+        "status": "required"
+      },
+      {
+        "name": "chronicle",
+        "status": "required"
+      }
+    ],
+    "invalidation_rules": [
+      {
+        "trigger": "artifact hash mismatch: _meta/contracts/yaml-skill-unification-2026-07-10.md",
+        "invalidates": [
+          "recon",
+          "migration"
+        ]
+      },
+      {
+        "trigger": "branch diverged",
+        "invalidates": [
+          "recon",
+          "runtime",
+          "migration",
+          "state_skills"
+        ]
+      }
+    ]
+  },
+  "runtime": {
+    "required_skills": [
+      {
+        "name": "git"
+      },
+      {
+        "name": "quality"
+      }
+    ],
+    "preflight": [
+      {
+        "cmd": "git branch --show-current",
+        "expect": "feat/yaml-skill-unification"
+      },
+      {
+        "cmd": "ls schemas/"
+      }
+    ]
+  },
+  "context": {
+    "policy": {
+      "mode": "bounded"
+    },
+    "required": [
+      {
+        "path": "_meta/contracts/yaml-skill-unification-2026-07-10.md",
+        "heading": "## 7. Files to modify",
+        "reason": "remaining docs/release file list"
+      },
+      {
+        "path": "_meta/contracts/yaml-skill-unification-2026-07-10.md",
+        "heading": "## 12. Commit plan",
+        "reason": "remaining commits"
+      },
+      {
+        "path": "CHANGELOG.md",
+        "lines": "1-30",
+        "reason": "changelog entry format"
+      }
+    ],
+    "forbidden": [
+      "frontend/*",
+      ".obsidian/*"
+    ],
+    "budget": {
+      "target_tokens": 30000,
+      "max_tokens": 60000
+    }
+  },
+  "execution": {
+    "entry_phase": "docs_release",
+    "entrypoint": "write docs/MIGRATION-8.md, then update README.md + docs/QUICKSTART.md, then scripts/bump-version.sh 8.0.0",
+    "stop_conditions": [
+      "version_sync test failure after bump",
+      "any suite regression"
+    ],
+    "checkpoints": [
+      "after the release commit"
+    ]
+  },
+  "open_threads": [
+    "feat/aggressive-promotion is unmerged and unPR'd; this branch stacks on it (merge order)"
+  ],
+  "warnings": [
+    "manifests are canonical JSON now; yaml versions of this handoff are historical",
+    "do not recreate command files as aliases (rejected)"
+  ],
+  "outputs": {
+    "required": [
+      "docs/MIGRATION-8.md",
+      "CHANGELOG.md 8.0.0 entry",
+      "chronicle in Vaults/_meta/chronicles/2026/"
+    ],
+    "completion": "kernel-manifest deactivate + agentdb write-end"
+  },
+  "resume": {
+    "prompt": "/kernel:ingest resume from _meta/handoffs/yaml-skill-unification-2026-07-10.json"
+  }
+}

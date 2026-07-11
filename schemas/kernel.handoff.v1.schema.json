@@ -1,7 +1,7 @@
 {
   "$id": "kernel.handoff/v1",
   "title": "KERNEL handoff manifest",
-  "description": "Authoritative resumable session manifest. The YAML file is canonical; any markdown rendering is non-authoritative. Consumed by /kernel:ingest; produced by /kernel:handoff. Validated by orchestration/manifest/kernel-manifest (subset validator: type, required, properties, enum, items, additionalProperties).",
+  "description": "Authoritative resumable session manifest. The JSON file is canonical; any YAML or markdown rendering is non-authoritative. Consumed by /kernel:ingest; produced by /kernel:handoff. Validated by orchestration/manifest/kernel-manifest (subset validator: type, required, properties, enum, items, additionalProperties; duplicate keys rejected at parse).",
   "type": "object",
   "required": [
     "schema",

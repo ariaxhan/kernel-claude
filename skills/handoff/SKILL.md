@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: "Compile session state into an authoritative kernel.handoff/v1 YAML manifest for bounded resume. Saves provenance, decisions, workflow phases, context policy, next steps. Triggers: handoff, save, pause, context, continue later."
+description: "Compile session state into an authoritative kernel.handoff/v1 JSON manifest for bounded resume. Saves provenance, decisions, workflow phases, context policy, next steps. Triggers: handoff, save, pause, context, continue later."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob, Write
 kernel:
@@ -15,11 +15,11 @@ kernel:
 <skill id="handoff">
 
 <purpose>
-Compile the current task into an authoritative, resumable YAML manifest.
-The YAML file is CANONICAL. A markdown rendering may be generated for humans but is
+Compile the current task into an authoritative, resumable JSON manifest.
+The JSON file is CANONICAL. A markdown rendering may be generated for humans but is
 never a second source of truth.
 
-Why yaml-first + bounded (EXP-L21): what a decision needs is flat (~50-70k tokens)
+Why manifest-first + bounded (EXP-L21): what a decision needs is flat (~50-70k tokens)
 regardless of session length; the accumulating transcript is almost pure decoration by
 late session. A handoff that says "read the conversation" recreates the waste. A handoff
 that pins exact selectors + phases lets the next session reconstruct ONLY the load-bearing
@@ -69,7 +69,7 @@ push: push current branch to remote — a local-only handoff is stranded work
 </phase>
 
 <phase id="4_compile" name="COMPILE THE MANIFEST">
-Write `_meta/handoffs/{name}-{date}.yaml` conforming to schemas/kernel.handoff.v1.schema.json.
+Write `_meta/handoffs/{name}-{date}.json` conforming to schemas/kernel.handoff.v1.schema.json.
 
 Context section — the attention budget is the design center:
 - policy.mode: advisory (default) | bounded (extra loads must be justified + ledgered)
@@ -85,19 +85,19 @@ Execution section: entry_phase, entrypoint (the literal first operation), stop_c
 checkpoints (when to emit kernel.checkpoint/v1 during the resumed work).
 
 Resume section: one-line continuation prompt:
-  `/kernel:ingest resume from _meta/handoffs/{file}.yaml`
+  `/kernel:ingest resume from _meta/handoffs/{file}.json`
 
-Quote every sha/commit string in the YAML (an all-digit sha parses as an integer and
+JSON strings are always quoted, so sha/commit fields cannot type-drift (the old YAML
 fails validation).
 </phase>
 
 <phase id="5_validate" name="VALIDATE — MANDATORY">
 ```bash
-"${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest" validate _meta/handoffs/{file}.yaml
+"${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest" validate _meta/handoffs/{file}.json
 ```
 A handoff that does not validate DOES NOT EXIST. Fix and re-validate before reporting done.
 Optional human rendering: a .md next to it, first line
-`# RENDERED FROM {file}.yaml — NOT AUTHORITATIVE`.
+`# RENDERED FROM {file}.json — NOT AUTHORITATIVE`.
 </phase>
 
 <delivery>
@@ -108,7 +108,7 @@ Optional human rendering: a .md next to it, first line
 
 <on_complete>
 ```bash
-agentdb write-end '{"skill":"handoff","saved_to":"_meta/handoffs/{file}.yaml","branch":"X","tier":N}'
+agentdb write-end '{"skill":"handoff","saved_to":"_meta/handoffs/{file}.json","branch":"X","tier":N}'
 # If non-local profile: post handoff summary to GitHub Discussions (Agent Logs category)
 # Suggest /kernel:retrospective if learnings accumulated across sessions
 ```

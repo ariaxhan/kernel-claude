@@ -2,7 +2,7 @@
 # PreToolUse hook: enforce manifest context policy (sealed | bounded | advisory)
 # Events: PreToolUse (matcher: Read|Grep|Glob)
 #
-# The yaml<->hook symbiosis: /kernel:ingest activates a manifest via
+# The manifest<->hook symbiosis: /kernel:ingest activates a manifest via
 # `kernel-manifest activate`, which writes _meta/.active-manifest.json.
 # This hook reads that pointer and enforces the manifest's context policy:
 #   sealed  -> BLOCK (exit 2) access to paths matching context.forbidden globs

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Project kernel.context-receipt/v1 YAML into AgentDB graph tables (shadow telemetry).
+"""Project kernel.context-receipt/v1 JSON into AgentDB graph tables (shadow telemetry).
 
-YAML manifests + receipts remain authoritative for resume and policy. This module
+JSON manifests + receipts remain authoritative for resume and policy. This module
 only derives observational co-load patterns for advisory suggestions — never auto-loads
 context or mutates manifests.
 
 Usage:
-  graph-project.py project <receipt.yaml>
+  graph-project.py project <receipt.json>
   graph-project.py project-all [--dir _meta/reports]
   graph-project.py outcome-from-checkpoint '<json>'
   graph-project.py suggest <task_type> [--min-sessions N]
@@ -19,7 +19,6 @@ import json
 import os
 import re
 import sqlite3
-import subprocess
 import sys
 from datetime import datetime, timezone
 from itertools import combinations
@@ -47,62 +46,31 @@ def db_path(root: str) -> str:
     return os.path.join(root, "_meta", "agentdb", "agent.db")
 
 
-def load_yaml_text(text: str) -> Any:
-    try:
-        import yaml  # type: ignore
-
-        return yaml.safe_load(text)
-    except ImportError:
-        pass
-    proc = subprocess.run(
-        [
-            "ruby",
-            "-ryaml",
-            "-rjson",
-            "-e",
-            "puts JSON.generate(YAML.safe_load(STDIN.read, permitted_classes: [], aliases: false))",
-        ],
-        input=text,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    if proc.returncode == 0:
-        return json.loads(proc.stdout)
-    raise RuntimeError(f"no YAML parser available: {proc.stderr.strip()[:200]}")
+def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    seen: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in seen:
+            raise ValueError(f"duplicate key '{key}'")
+        seen[key] = value
+    return seen
 
 
-def load_yaml_documents(path: str) -> list[dict[str, Any]]:
-    text = open(path, encoding="utf-8").read()
-    docs: list[dict[str, Any]] = []
-    try:
-        import yaml  # type: ignore
+def load_json_file(path: str) -> Any:
+    with open(path, encoding="utf-8") as f:
+        return json.load(f, object_pairs_hook=_reject_duplicate_keys)
 
-        for doc in yaml.safe_load_all(text):
-            if isinstance(doc, dict):
-                docs.append(doc)
-    except ImportError:
-        doc = load_yaml_text(text)
-        if isinstance(doc, dict):
-            docs.append(doc)
-    if not docs:
+
+def load_receipt(path: str) -> dict[str, Any]:
+    doc = load_json_file(path)
+    if not isinstance(doc, dict):
         raise ValueError(f"empty or unparseable receipt: {path}")
-    return docs
-
-
-def merge_receipt(documents: list[dict[str, Any]]) -> dict[str, Any]:
-    receipt = dict(documents[0])
-    loads = list(receipt.get("loads_beyond_manifest") or [])
-    for doc in documents[1:]:
-        loads.extend(doc.get("loads_beyond_manifest") or [])
-    receipt["loads_beyond_manifest"] = loads
-    return receipt
+    return doc
 
 
 def load_manifest(path: str) -> dict[str, Any] | None:
     if not path or not os.path.isfile(path):
         return None
-    doc = load_yaml_text(open(path, encoding="utf-8").read())
+    doc = load_json_file(path)
     return doc if isinstance(doc, dict) else None
 
 
@@ -252,8 +220,7 @@ def sql_escape(value: str) -> str:
 
 def project_receipt(conn: sqlite3.Connection, receipt_path: str) -> str:
     abs_receipt = os.path.abspath(receipt_path)
-    documents = load_yaml_documents(abs_receipt)
-    receipt = merge_receipt(documents)
+    receipt = load_receipt(abs_receipt)
     if receipt.get("schema") != "kernel.context-receipt/v1":
         raise ValueError(f"not a context receipt: {receipt_path}")
 
@@ -334,7 +301,7 @@ def project_all(root: str, directory: str) -> int:
     if not os.path.isdir(directory):
         return 0
     for name in sorted(os.listdir(directory)):
-        if not name.startswith("receipt") or not name.endswith((".yaml", ".yml")):
+        if not name.startswith("receipt") or not name.endswith(".json"):
             continue
         path = os.path.join(directory, name)
         try:
@@ -412,7 +379,7 @@ def suggest(conn: sqlite3.Connection, task_type: str, min_sessions: int) -> int:
     print("## Context graph suggestions (shadow mode — advisory only)")
     print(f"Task type: {task_type}")
     print(f"Telemetry: {scoped} scoped session(s), {total} total (need {min_sessions}+ before auto-load is considered)")
-    print("YAML manifests remain authoritative. These suggestions never change ingest behavior.")
+    print("JSON manifests remain authoritative. These suggestions never change ingest behavior.")
     print("")
 
     if scoped == 0 and task_type != "unknown":
@@ -491,7 +458,7 @@ def main(argv: list[str]) -> int:
 
         if cmd == "project":
             if not args:
-                print("usage: graph-project.py project <receipt.yaml>", file=sys.stderr)
+                print("usage: graph-project.py project <receipt.json>", file=sys.stderr)
                 return 1
             session_id = project_receipt(conn, args[0])
             print(f"projected {args[0]} -> {session_id}")

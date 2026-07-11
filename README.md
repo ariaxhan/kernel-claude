@@ -58,7 +58,7 @@ The experiment engine treats every rule as a hypothesis. It seeds them from your
 
 ### One Primitive: Skills That Load On-Demand
 
-Everything is a skill (v8): methodology skills (testing, security, debug, api, backend, architecture, ...) load when relevant, not at startup; workflow skills (`/kernel:ingest`, `/kernel:forge`) orchestrate them; state-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit validated YAML manifests so resumed sessions reconstruct bounded task state instead of inheriting whole conversations. Side-effecting skills can never fire ambiently. Details: docs/MIGRATION-8.md.
+Everything is a skill (v8): methodology skills (testing, security, debug, api, backend, architecture, ...) load when relevant, not at startup; workflow skills (`/kernel:ingest`, `/kernel:forge`) orchestrate them; state-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit validated JSON manifests so resumed sessions reconstruct bounded task state instead of inheriting whole conversations. Side-effecting skills can never fire ambiently. Details: docs/MIGRATION-8.md.
 
 ---
 
@@ -94,7 +94,7 @@ Everything is a skill (v8): methodology skills (testing, security, debug, api, b
 | `/kernel:validate` | `/validate` | Pre-commit quality gates |
 | `/kernel:tearitapart` | `/tearitapart` | Critical pre-implementation review |
 | `/kernel:review` | `/review` | Code review for PRs |
-| `/kernel:handoff` | `/handoff` | Save progress for next session — emits a canonical `kernel.handoff/v1` YAML manifest |
+| `/kernel:handoff` | `/handoff` | Save progress for next session — emits a canonical `kernel.handoff/v1` JSON manifest |
 | `/kernel:checkpoint` | `/checkpoint` | Bounded mid-task save — `kernel.checkpoint/v1` manifest for safe context resets |
 | `/kernel:landing-page` | `/landing-page` | Guided landing page generator — interview, scaffold, enforce, deploy |
 | `/kernel:init` | `/init` | Setup (run once per project) |
@@ -166,7 +166,7 @@ SQLite database at `_meta/agentdb/agent.db`. Stores learnings, events, errors, h
 
 ### Context Graph (Observational, Receipt-Derived)
 
-Inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtocol/adna) — but **YAML manifests stay authoritative** for resume, policy, and safety. After `/kernel:ingest` compiles a manifest, the `kernel.context-receipt/v1` YAML records what context was actually loaded. `agentdb graph-project` derives nodes and co-load edges from those receipts (automatic on `kernel-manifest deactivate`). `agentdb graph-suggest` surfaces **shadow-mode** advisory patterns only; it never auto-loads context or overrides manifest selectors until experiment-backed promotion (50+ comparable sessions). The graph observes; manifests decide.
+Inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtocol/adna) — but **JSON manifests stay authoritative** for resume, policy, and safety. After `/kernel:ingest` compiles a manifest, the `kernel.context-receipt/v1` JSON records what context was actually loaded. `agentdb graph-project` derives nodes and co-load edges from those receipts (automatic on `kernel-manifest deactivate`). `agentdb graph-suggest` surfaces **shadow-mode** advisory patterns only; it never auto-loads context or overrides manifest selectors until experiment-backed promotion (50+ comparable sessions). The graph observes; manifests decide.
 
 ### Experiment Engine
 
@@ -174,7 +174,7 @@ Inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtocol/adna) — bu
 
 ### Manifest Runtime (v8)
 
-YAML manifests are the canonical machine-readable representation of resumable state. State-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit schema-validated manifests (`schemas/`: `kernel.handoff/v1`, `kernel.checkpoint/v1`, `kernel.retrospective-result/v1`, `kernel.context-receipt/v1`) instead of prose. The CLI at `orchestration/manifest/kernel-manifest` (`validate | latest | divergence | compile | resume | activate | deactivate`) drives resume: a fresh session compiles bounded task state from the manifest rather than inheriting a whole transcript. Context policies — **sealed** (forbidden globs are hook-blocked, fails closed), **bounded** (extra loads are ledgered into a receipt), **advisory** — are enforced by `hooks/scripts/guard-context.sh` reading the activated manifest (I0.15: hooks, not honor-system). Grounding: EXP-L21 showed load-bearing context stays flat (~50–70k tokens/decision) while attended context grows 7–11x per session, so resumes reconstruct minimal state instead of replaying history.
+JSON manifests are the canonical machine-readable representation of resumable state. State-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit schema-validated manifests (`schemas/`: `kernel.handoff/v1`, `kernel.checkpoint/v1`, `kernel.retrospective-result/v1`, `kernel.context-receipt/v1`) instead of prose. The CLI at `orchestration/manifest/kernel-manifest` (`validate | latest | divergence | compile | resume | activate | deactivate`) drives resume: a fresh session compiles bounded task state from the manifest rather than inheriting a whole transcript. Context policies — **sealed** (forbidden globs are hook-blocked, fails closed), **bounded** (extra loads are ledgered into a receipt), **advisory** — are enforced by `hooks/scripts/guard-context.sh` reading the activated manifest (I0.15: hooks, not honor-system). Grounding: EXP-L21 showed load-bearing context stays flat (~50–70k tokens/decision) while attended context grows 7–11x per session, so resumes reconstruct minimal state instead of replaying history.
 
 ---
 

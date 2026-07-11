@@ -1,0 +1,36 @@
+{
+  "schema": "kernel.context-receipt/v1",
+  "manifest": "tests/fixtures/manifests/handoff-example.json",
+  "created": "2026-07-10T12:00:00Z",
+  "manifest_tokens": 500,
+  "project_instructions_tokens": 1000,
+  "always_skills_tokens": 800,
+  "workflow_skills_tokens": 400,
+  "domain_skills_tokens": 0,
+  "selected_artifacts_tokens": 200,
+  "agentdb_tokens": 0,
+  "total_estimated_tokens": 2900,
+  "target_budget_tokens": 30000,
+  "maximum_budget_tokens": 60000,
+  "status": "within_budget",
+  "estimation_method": "chars/4 (test fixture)",
+  "selections": [
+    {
+      "selector": "[required] tests/fixtures/manifests/handoff-example.json :: ## Objective",
+      "resolved": true,
+      "estimated_tokens": 120
+    },
+    {
+      "selector": "[required] CHANGELOG.md:1-10",
+      "resolved": true,
+      "estimated_tokens": 80
+    }
+  ],
+  "loads_beyond_manifest": [
+    {
+      "path": "_meta/research/context-graph-architecture.md",
+      "reason": "bounded ledger test entry",
+      "estimated_tokens": 150
+    }
+  ]
+}
