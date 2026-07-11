@@ -21,6 +21,8 @@ tested against both loaders.
 
 ## Install
 
+### Claude Code
+
 In Claude Code:
 
 ```text
@@ -41,15 +43,41 @@ readlink "$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current"
 
 Then run `/kernel:help` in a new Claude Code session.
 
+### Codex CLI or app
+
+In a terminal:
+
+```bash
+codex plugin marketplace add ariaxhan/kernel-claude
+codex plugin add kernel@kernel-marketplace
+```
+
+Restart the Codex session or app after installation. Verify with:
+
+```bash
+codex plugin list
+```
+
 ## Upgrading from 7.23.0
 
 KERNEL 8 is a major release. Update explicitly:
+
+Claude Code:
 
 ```text
 /plugin marketplace update kernel-marketplace
 /plugin update kernel@kernel-marketplace
 /reload-plugins
 ```
+
+Codex:
+
+```bash
+codex plugin marketplace upgrade kernel-marketplace
+```
+
+Restart Codex after the upgrade. Current Codex refreshes the installed plugin cache
+as part of the marketplace upgrade; there is no `codex plugin update` command.
 
 Start a new session if Claude Code says a component or monitor could not reload. VS Code may show a restart banner.
 
@@ -144,11 +172,24 @@ Wrong Vaults: set `KERNEL_VAULTS` to the existing Vaults root before init or sta
 
 Normal reinstall, only after update/reload fails:
 
+Claude Code:
+
 ```text
 /plugin uninstall kernel@kernel-marketplace --keep-data
 /plugin install kernel@kernel-marketplace
 /reload-plugins
 ```
+
+Codex:
+
+```bash
+codex plugin marketplace upgrade kernel-marketplace
+codex plugin remove kernel@kernel-marketplace
+codex plugin add kernel@kernel-marketplace
+```
+
+Restart Codex after reinstalling. `remove` deletes KERNEL's installed cache entry;
+it does not remove the marketplace or project data.
 
 Do not remove the marketplace or clear `~/.claude/plugins/cache` as routine maintenance. Those are destructive recovery steps with wider effects.
 

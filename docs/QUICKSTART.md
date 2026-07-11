@@ -13,12 +13,24 @@ side-effecting skills. The compatibility path keeps that safety rule intact.
 
 Requirements: Git, SQLite 3, `jq`, Python 3, and Bash.
 
+Claude Code:
+
 ```text
 /plugin marketplace add ariaxhan/kernel-claude
 /plugin install kernel@kernel-marketplace
 /reload-plugins
 /kernel:init
 ```
+
+Codex CLI or app:
+
+```bash
+codex plugin marketplace add ariaxhan/kernel-claude
+codex plugin add kernel@kernel-marketplace
+```
+
+Restart Codex after installation and verify with `codex plugin list`. Run KERNEL init
+explicitly from the installed skill before expecting host helper links.
 
 Init asks you to confirm the Vaults path before it writes. Detection checks a valid
 `KERNEL_VAULTS` first, then `~/Documents/Vaults`, `~/Vaults`, and
@@ -51,11 +63,22 @@ Common skills:
 
 ## Update from 7.23.0
 
+Claude Code:
+
 ```text
 /plugin marketplace update kernel-marketplace
 /plugin update kernel@kernel-marketplace
 /reload-plugins
 ```
+
+Codex:
+
+```bash
+codex plugin marketplace upgrade kernel-marketplace
+```
+
+Restart Codex after upgrading. The marketplace upgrade refreshes an installed plugin
+cache too; Codex has no separate `plugin update` command.
 
 Start a new session if Claude Code cannot reload a component; VS Code may request a
 restart. Startup validates the loaded KERNEL runtime, advances `current` only forward,
@@ -96,11 +119,23 @@ Do not clear the plugin cache or remove the marketplace as a normal update step.
   upgrading to KERNEL 8; the warning means Codex is still reading a 7.23 cache.
 - Reinstall only after update/reload fails:
 
+Claude Code:
+
 ```text
 /plugin uninstall kernel@kernel-marketplace --keep-data
 /plugin install kernel@kernel-marketplace
 /reload-plugins
 ```
+
+Codex:
+
+```bash
+codex plugin marketplace upgrade kernel-marketplace
+codex plugin remove kernel@kernel-marketplace
+codex plugin add kernel@kernel-marketplace
+```
+
+Restart Codex after reinstalling. Do not remove the marketplace or project data.
 
 Contributor setup uses `claude --plugin-dir ./`; never replace a numbered installed
 cache directory with a development symlink.

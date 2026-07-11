@@ -46,6 +46,11 @@ leave AgentDB, hooks, and orchestration pinned to 7.23.
   prevents the old top-level `version` field from breaking Codex startup. Native Codex
   manifest packaging remains deferred because its validator conflicts with Claude's
   explicit-only marker for side-effecting skills; Codex uses its compatibility loader.
+- **Executable Codex lifecycle docs.** Install uses `codex plugin marketplace add` plus
+  `codex plugin add`; normal updates use `codex plugin marketplace upgrade`; targeted
+  recovery uses `codex plugin remove` then `codex plugin add`. These flows were exercised
+  against the current CLI in a disposable Codex home instead of inferred from Claude's
+  slash commands.
 - **Context graph (shadow telemetry).** Receipt-derived projection only:
   `orchestration/agentdb/graph-project.py` + `agentdb graph-project|graph-suggest`.
   `kernel-manifest deactivate --receipt` auto-projects; `write-end` records outcome.

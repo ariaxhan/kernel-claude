@@ -10,11 +10,22 @@ Commit or checkpoint current work. Note the current plugin version and run
 
 ## Update
 
+Claude Code:
+
 ```text
 /plugin marketplace update kernel-marketplace
 /plugin update kernel@kernel-marketplace
 /reload-plugins
 ```
+
+Codex CLI or app:
+
+```bash
+codex plugin marketplace upgrade kernel-marketplace
+```
+
+Restart Codex after upgrading. The current CLI refreshes installed cache contents
+during marketplace upgrade and does not provide a `codex plugin update` command.
 
 Start a new session if Claude Code says a monitor or component cannot reload. VS Code
 may request a restart. Third-party marketplace auto-update is off by default; users
@@ -103,6 +114,18 @@ the older target does not need to contain KERNEL 8 functions. It validates plugi
 files. It refuses unsafe host objects and reports the selected root. Do not remove the
 marketplace or clear the whole plugin cache as normal rollback. If reinstall is needed,
 use `/plugin uninstall kernel@kernel-marketplace --keep-data` before reinstalling.
+
+Codex recovery is separate from Claude Code. If upgrade completed but the installed
+cache is still wrong, refresh only KERNEL's installed entry:
+
+```bash
+codex plugin marketplace upgrade kernel-marketplace
+codex plugin remove kernel@kernel-marketplace
+codex plugin add kernel@kernel-marketplace
+```
+
+Restart Codex afterward. `codex plugin remove` deletes the installed KERNEL cache
+entry, not the configured marketplace or project data.
 
 ## Contributor development
 

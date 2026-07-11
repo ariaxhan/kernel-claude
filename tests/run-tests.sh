@@ -1663,6 +1663,20 @@ test_release_docs_rollback_works_outside_a_checkout() {
   done
 }
 
+test_release_docs_separate_claude_and_codex_lifecycle() {
+  local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md) file content
+  for file in "${files[@]}"; do
+    content=$(cat "$PLUGIN_ROOT/$file")
+    [[ "$content" == *"/plugin marketplace update kernel-marketplace"* ]] || return 1
+    [[ "$content" == *"codex plugin marketplace upgrade kernel-marketplace"* ]] || return 1
+    [[ "$content" == *"codex plugin remove kernel@kernel-marketplace"* ]] || return 1
+    [[ "$content" == *"codex plugin add kernel@kernel-marketplace"* ]] || return 1
+    ! grep -Eq '^codex plugin update( |$)' "$PLUGIN_ROOT/$file" || return 1
+  done
+  grep -q 'codex plugin marketplace add ariaxhan/kernel-claude' "$PLUGIN_ROOT/README.md"
+  grep -q 'codex plugin marketplace add ariaxhan/kernel-claude' "$PLUGIN_ROOT/docs/QUICKSTART.md"
+}
+
 test_release_changelog_v8_is_current_and_history_preserved() {
   local v8
   v8=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
@@ -4104,6 +4118,7 @@ run_test_suite() {
       run_test "8.0 changelog current and 7.x history preserved" test_release_changelog_v8_is_current_and_history_preserved
       run_test "metadata and inventory truthful" test_release_metadata_and_inventory_are_truthful
       run_test "rollback works outside a checkout" test_release_docs_rollback_works_outside_a_checkout
+      run_test "Claude and Codex lifecycle commands are separate" test_release_docs_separate_claude_and_codex_lifecycle
       ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
