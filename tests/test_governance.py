@@ -270,6 +270,38 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         return json.loads(result.stdout)["repositories"][0]["state"]
 
+    def test_installed_skill_entrypoint_resolves_plugin_root_from_skill_cwd(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            installed = base / "cache/kernel-marketplace/kernel/8.1.1"
+            skill_dir = installed / "skills/governance-sync"
+            (installed / "scripts").mkdir(parents=True)
+            skill_dir.mkdir(parents=True)
+            shutil.copy2(SYNC, installed / "scripts/governance-sync.py")
+            shutil.copy2(ROOT / "skills/governance-sync/SKILL.md", skill_dir / "SKILL.md")
+            audited = git_repo(base / "audited")
+
+            old = run(sys.executable, "scripts/governance-sync.py", "audit", str(audited),
+                      "--json", cwd=skill_dir)
+            self.assertNotEqual(0, old.returncode)
+
+            shell = (
+                'KERNEL_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd ../.. && pwd -P)}"; '
+                'python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" audit "$AUDIT_ROOT" --json'
+            )
+            for loader_env in ({"CLAUDE_PLUGIN_ROOT": str(installed)}, {}):
+                env = os.environ.copy()
+                env.pop("CLAUDE_PLUGIN_ROOT", None)
+                env.update(loader_env)
+                env["AUDIT_ROOT"] = str(audited)
+                result = run("bash", "-c", shell, cwd=skill_dir, env=env)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual(1, json.loads(result.stdout)["canonical_repo_count"])
+
+            skill = (skill_dir / "SKILL.md").read_text()
+            self.assertNotIn("python3 scripts/governance-sync.py", skill)
+            self.assertIn('$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py', skill)
+
     def test_manifest_aware_generated_state_machine(self):
         with tempfile.TemporaryDirectory() as td:
             repo = git_repo(Path(td) / "repo")

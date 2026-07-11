@@ -18,7 +18,17 @@ missing Claude or Codex adapter from one declared source. It never edits a confl
 
 ## Audit first
 
-Run `python3 scripts/governance-sync.py audit <root> --json`. The audit discovers
+Resolve the installed plugin root once. Claude Code and Codex compatibility loading
+provide `CLAUDE_PLUGIN_ROOT`; the fallback is valid when the skill runs from its own
+installed `skills/governance-sync` directory:
+
+```bash
+KERNEL_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd ../.. && pwd -P)}"
+test -f "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py"
+```
+
+Run `python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" audit <root> --json`.
+The audit discovers
 canonical Git roots, ignores caches, deduplicates linked worktrees, and reports:
 missing both, Claude-only, AGENTS-only, both identical, generated current, generated
 stale, incomplete generation, conflict, and scoped `.claude` states. Generated states
@@ -31,9 +41,9 @@ Show the exact repository, source, target, and backup directory. Continue only a
 the user confirms one command:
 
 ```text
-python3 scripts/governance-sync.py adopt REPO --source CLAUDE.md --backup-dir REPO/.kernel-governance-backups/adopt
-python3 scripts/governance-sync.py generate REPO --backup-dir REPO/.kernel-governance-backups/generate
-python3 scripts/governance-sync.py check REPO
+python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" adopt REPO --source CLAUDE.md --backup-dir REPO/.kernel-governance-backups/adopt
+python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" generate REPO --backup-dir REPO/.kernel-governance-backups/generate
+python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" check REPO
 ```
 
 `AGENTS.md` and `.claude/CLAUDE.md` are also valid sources. The manifest pins the
@@ -51,5 +61,6 @@ that drift without changing anything, and rerunning the write operation converge
 There is no background lock, journal, rollback, or cleanup of unknown temporary files.
 An existing backup-directory symlink is always rejected before path resolution.
 
-Use `init REPO --backup-dir BACKUPS` only when the user explicitly wants governance
+Use `python3 "$KERNEL_PLUGIN_ROOT/scripts/governance-sync.py" init REPO --backup-dir
+REPO/.kernel-governance-backups/init` only when the user explicitly wants governance
 created in a repository where both native files are absent.

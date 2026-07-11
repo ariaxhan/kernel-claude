@@ -2,6 +2,22 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.1.1] - 2026-07-11
+
+KERNEL 8.1.1 fixes the installed entrypoint for the new governance-sync operator.
+The 8.1.0 documentation used a repository-root-relative `scripts/governance-sync.py`
+path, but installed skills execute from `skills/governance-sync`, so the documented
+audit, adopt, generate, check, and init commands failed before reaching the script.
+
+### Fixed
+- Resolve the installed plugin root from `CLAUDE_PLUGIN_ROOT`, which is supplied by
+  Claude Code and the Codex compatibility loader, with a skill-directory fallback for
+  direct installed-layout execution.
+- Route every governance-sync command example through the resolved absolute script
+  path instead of assuming the current directory is the plugin root.
+- Add an armed disposable installed-cache test that runs from
+  `skills/governance-sync` through both the loader environment and fallback paths.
+
 ## [8.1.0] - 2026-07-11
 
 KERNEL 8.1 adds one canonical governance source for its Claude Code and Codex

@@ -2001,11 +2001,13 @@ PY
 }
 
 test_release_changelog_v8_is_current_and_history_preserved() {
-  local v810 v802 v801 v800
+  local v811 v810 v802 v801 v800
+  v811=$(awk '/^## \[8\.1\.1\]/{on=1} /^## \[8\.1\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v810=$(awk '/^## \[8\.1\.0\]/{on=1} /^## \[8\.0\.2\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v802=$(awk '/^## \[8\.0\.2\]/{on=1} /^## \[8\.0\.1\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v801=$(awk '/^## \[8\.0\.1\]/{on=1} /^## \[8\.0\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v800=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
+  [[ "$v811" == *"8.1.0 documentation"* ]] && [[ "$v811" == *"failed before reaching the script"* ]] || return 1
   [[ "$v810" == *"49 canonical Git repositories"* ]] && [[ "$v810" == *"does **not** claim"* ]] || return 1
   [[ "$v802" == *"async"* ]] && [[ "$v802" == *"Codex"* ]] || return 1
   [[ "$v801" == *"incomplete"* ]] && [[ "$v801" == *"Codex"* ]] && [[ "$v801" == *"368"* ]] || return 1
@@ -2037,7 +2039,7 @@ import json, pathlib, sys
 r=pathlib.Path(sys.argv[1])
 p=json.loads((r/'.claude-plugin/plugin.json').read_text())
 m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
-assert p['version']==m['version']=='8.1.0'
+assert p['version']==m['version']=='8.1.1'
 for x in (p,m):
     assert 'JSON' in x['description'] and '34 skills' in x['description'] and '15 specialized agent' in x['description']
 PY
