@@ -2,6 +2,39 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.1.0] - 2026-07-11
+
+KERNEL 8.1 adds one canonical governance source for its Claude Code and Codex
+instruction adapters, plus an explicit operator for auditing and safely adopting the
+same pattern in other Git repositories.
+
+### Added
+- Added `governance/kernel.md.tmpl` and an allowlisted, deterministic generator for
+  readable checked-in `CLAUDE.md`, `AGENTS.md`, and the static SessionStart guidance.
+  CI and the canonical version-bump process reject generated drift.
+- Added explicit-only `/kernel:governance-sync` and `$kernel:governance-sync`
+  operations to audit, adopt, generate, initialize, and check native repository
+  instructions. Existing conflicts, symlinks, hardlinks, unsafe paths, and unrelated
+  partial files are refused instead of overwritten.
+- Added manifest- and provenance-aware audit states for generated-current,
+  generated-stale, incomplete, and conflicting adapters while preserving nested
+  instruction scopes and deduplicating linked Git worktrees.
+
+### Changed
+- Governance writes are crash-consistent per file: each completed replacement is a
+  whole fsynced file, an interruption leaves visible drift, `check` remains read-only,
+  and rerunning the explicit operation converges the remaining files. KERNEL does not
+  maintain a hidden governance lock, recovery journal, or background migration.
+- Context receipts count `CLAUDE.md`, `.claude/CLAUDE.md`, and `AGENTS.md` without
+  double-counting byte-identical instruction files.
+
+### Verification
+- The read-only Vaults audit completed across **49 canonical Git repositories** with
+  zero traversal errors. This is an inventory and classification result only; KERNEL
+  8.1 does **not** claim those repositories were migrated or modified.
+- Generator, governance state-machine, manifest, version, release-documentation, and
+  full bounded test gates pass for the release candidate.
+
 ## [8.0.2] - 2026-07-11
 
 KERNEL 8.0.2 fixes cross-client advisory hooks that Codex skipped whenever the shared

@@ -7,8 +7,8 @@
 # in tests/run-tests.sh):
 #   .claude-plugin/plugin.json        "version"
 #   .claude-plugin/marketplace.json   plugins[0].version
-#   AGENTS.md                         <kernel version="X.Y.Z">
-#   CLAUDE.md                         <kernel version="X.Y.Z">
+#   governance/kernel.md.tmpl         <kernel version="X.Y.Z">
+#   AGENTS.md + CLAUDE.md             generated from the canonical template
 #   skills/help/SKILL.md              KERNEL vX.Y.Z
 #
 # NOT touched here (human-authored per release, intentionally version-specific prose):
@@ -39,8 +39,7 @@ def sub(path, pattern, repl):
 
 sub('.claude-plugin/plugin.json',      r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(")',     rf'\g<1>{new}\g<2>')
 sub('.claude-plugin/marketplace.json', r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(")',     rf'\g<1>{new}\g<2>')
-sub('AGENTS.md',                       r'(<kernel version=")[0-9]+\.[0-9]+\.[0-9]+(">)',  rf'\g<1>{new}\g<2>')
-sub('CLAUDE.md',                       r'(<kernel version=")[0-9]+\.[0-9]+\.[0-9]+(">)',  rf'\g<1>{new}\g<2>')
+sub('governance/kernel.md.tmpl',       r'(<kernel version=")[0-9]+\.[0-9]+\.[0-9]+(">)',  rf'\g<1>{new}\g<2>')
 sub('skills/help/SKILL.md',            r'(KERNEL v)[0-9]+\.[0-9]+\.[0-9]+',               rf'\g<1>{new}')
 
 # validate JSON still parses and carries the new version
@@ -49,3 +48,5 @@ assert json.load(open('.claude-plugin/marketplace.json'))['plugins'][0]['version
 print(f"OK: all canonical declarations at {new}")
 print("Remember (human-authored): update the description highlight + add a CHANGELOG entry.")
 PY
+
+python3 scripts/generate-governance.py

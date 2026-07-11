@@ -120,6 +120,7 @@ if [ -n "$HEALTH_WARNINGS" ]; then
   echo ""
 fi
 
+# BEGIN GENERATED KERNEL AMBIENT
 cat << 'KERNEL_CONTEXT'
 ## KERNEL quick reference
 
@@ -133,8 +134,9 @@ agentdb wtf                                        # confused? full ref: agentdb
 Tier by reversibility x silence x blast radius (T1 execute, T2 plan+verify, T3 confirm); file count is only a weak hint.
 Tier 2+: create an AgentDB contract, run tearitapart, delegate implementation to a surgeon, then use an adversary/reviewer to verify. The coordinating agent does not implement.
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
-AGENTS.md is contributor source-of-truth. This SessionStart output carries the essential rules because Codex plugin users do not receive that file automatically.
+Native repo governance lives in CLAUDE.md for Claude and AGENTS.md for Codex. This SessionStart output carries the essential shared rules because plugin users do not receive either repository file automatically.
 KERNEL_CONTEXT
+# END GENERATED KERNEL AMBIENT
 
 # =============================================================================
 # AGENTDB CONTEXT (if initialized)

@@ -582,10 +582,15 @@ def cmd_compile(args):
 
     bundle = "".join(bundle_parts)
     project_instr = 0
-    for p in ("CLAUDE.md", ".claude/CLAUDE.md"):
+    instruction_hashes = set()
+    for p in ("CLAUDE.md", ".claude/CLAUDE.md", "AGENTS.md"):
         absolute = repo_path(p)
         if os.path.isfile(absolute):
-            project_instr += estimate(open(absolute, encoding="utf-8", errors="replace").read())
+            instruction_text = open(absolute, encoding="utf-8", errors="replace").read()
+            instruction_hash = hashlib.sha256(instruction_text.encode()).hexdigest()
+            if instruction_hash not in instruction_hashes:
+                instruction_hashes.add(instruction_hash)
+                project_instr += estimate(instruction_text)
 
     manifest_tokens = estimate(open(cli_path(path), encoding="utf-8").read())
     always = skill_tokens(["quality", "testing", "git"])  # ingest's always-set

@@ -1,4 +1,7 @@
-<kernel version="8.0.2">
+<!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
+     source-sha256: f1469861ec86c58e0b7638711927fe827100b2606236c4f50340f990dac8a7f0; adapter: codex -->
+<kernel version="8.1.0">
+
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->
@@ -6,7 +9,7 @@
 <!--
   THIS FILE IS NOT LOADED FOR PLUGIN USERS.
 
-  When kernel-Codex is installed as a Codex plugin, this AGENTS.md
+  When KERNEL is installed as a Codex plugin, this AGENTS.md
   is NOT injected into conversation context. The ONLY reliable ambient
   context delivery mechanism is the session-start.sh hook output.
 
@@ -61,7 +64,7 @@ Location: _meta/agentdb/agent.db
 
   <rule>Tier by reversibility × silence × blast radius. File count is only a weak hint. Ambiguous = assume higher tier.</rule>
   <rule>IF tier >= 2: create contract, spawn agents, read AgentDB. DO NOT write code.</rule>
-  <rule>IF tier >= 2: run /kernel:tearitapart before implementation.</rule>
+  <rule>IF tier >= 2: run $kernel:tearitapart before implementation.</rule>
 </tiers>
 
 <!-- ============================================ -->
@@ -151,7 +154,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
 <workflow_skills>
 <!-- One primitive: skills. kind (kernel: frontmatter block) distinguishes workflow /
      state_transition / validator / operator / methodology. Former commands keep their
-     /kernel:<name> invocation; definitions live at skills/<name>/SKILL.md. -->
+     $kernel:<name> invocation; definitions live at skills/<name>/SKILL.md. -->
 
   <skill id="ingest" kind="workflow" file="skills/ingest/SKILL.md">Unified entry for new AND resumed work. New: research → classify → scope → execute (human confirms phases). Resume: manifest validate → divergence → bounded context compile + receipt → resume at phase. Authority: live repo state > user instruction > manifest > chronicle > inferred history.</skill>
   <skill id="forge" kind="workflow" no-ambient="true" file="skills/forge/SKILL.md">Autonomous engine. Heat/hammer/quench/temper/anneal until antifragile. Requires max_budget_usd. Explicit invocation only.</skill>
@@ -171,18 +174,20 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <skill id="init" kind="operator" no-ambient="true" file="skills/init/SKILL.md">Global KERNEL setup. Run once per machine.</skill>
   <skill id="landing-page" kind="operator" no-ambient="true" file="skills/landing-page/SKILL.md">Guided landing page generator: interview → scaffold → enforce → deploy.</skill>
   <skill id="help" kind="methodology" file="skills/help/SKILL.md">KERNEL reference + live plugin status.</skill>
+  <skill id="governance-sync" kind="operator" no-ambient="true" file="skills/governance-sync/SKILL.md">Explicit audit and safe native instruction adapter generation across Git repositories.</skill>
 
   <rule>Workflow skills must load relevant methodology skills and reference research before executing.</rule>
   <rule>no-ambient skills carry disable-model-invocation: true — side-effecting or expensive operations never fire without an explicit invocation (test-enforced).</rule>
 
   <manifest_runtime>
-    Strict JSON is the canonical machine-readable state representation. Schemas in schemas/:
+    JSON is the canonical machine-readable state representation (stdlib parser, duplicate
+    keys rejected — the manifest's meaning never depends on machine config). Schemas in schemas/:
     kernel.handoff/v1 · kernel.checkpoint/v1 · kernel.retrospective-result/v1 ·
     kernel.context-receipt/v1. CLI: orchestration/manifest/kernel-manifest
-    (validate | latest | divergence | compile | resume | activate | deactivate).
+    (validate | latest | divergence | preflight | compile | resume | activate | deactivate).
     Context policies: sealed (forbidden globs hook-blocked) | bounded (extra loads
     ledgered) | advisory. Enforcement: hooks/scripts/guard-context.sh reads the
-    activated manifest — JSON feeds the hooks, and hooks feed the receipts (I0.15).
+    activated manifest — the manifest feeds the hooks, the hooks feed the receipts (I0.15).
     Grounding: EXP-L21 — load-bearing context is flat (~50-70k/decision); resumes
     reconstruct bounded state from manifests, never inherit whole conversations.
   </manifest_runtime>
@@ -226,7 +231,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
 
   <!-- WORKFLOW -->
   <skill id="git" triggers="commit, branch, merge, PR">Atomic commits, conventional messages, branch strategies, merge protocols.</skill>
-  <skill id="frontend" triggers="UI, frontend, styling, visual">/kernel:frontend skill. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
+  <skill id="frontend" triggers="UI, frontend, styling, visual">$kernel:frontend skill. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
   <skill id="app-dev" triggers="app, mobile, store submission, build, deploy, fastlane">Mobile/web build pipeline: fastlane-first local builds, store submission, pre-submission checklists. EAS only as a stated exception.</skill>
 
   <!-- EXPERIMENTATION -->
@@ -252,7 +257,9 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <block action="report_done_off_commit">"Done" = verified live, not committed. Committed ≠ pushed ≠ deployed ≠ working. Run a verification command (deploy check, curl the served asset, the passing test, the exercised path) before claiming done. Un-headless-verifiable → "deployed, your check," never "it works."</block>
   <block action="trust_agent_summary">Receipts describe intent. Files describe reality. Read the file before approving the checkpoint.</block>
   <block action="self_score_high_stakes_eval">Spawn blind-evaluator for any user-facing or high-stakes eval. Self-scoring inflates ~36% structurally.</block>
-  <block action="autonomous_loop_without_budget_cap">/kernel:forge and tier 2+ multi-agent spawns require max_budget_usd. Stuck retries silently burn 3-4 figures.</block>
+  <block action="autonomous_loop_without_budget_cap">$kernel:forge and tier 2+ multi-agent spawns require max_budget_usd. Stuck retries silently burn 3-4 figures.</block>
+  <block action="verify_sub_computation_only">A green sub-computation is not a green control flow. Drive the armed path end-to-end (wired hook, registered handler, fresh runtime); echo-test every wrapper param once (silently dropped params run defaults while reporting your value); name the live call site that reaches new code, built-but-unreachable is not shipped.</block>
+  <block action="promote_learning_to_prose">A pattern reinforced 2+ (or once, if the failure is quiet/expensive) becomes an artifact: hook if enforceable, agent if it's a role, skill if it's methodology. AGENTS.md prose is the last resort, not the default. Project-specific artifacts scaffold into the host project, not the plugin.</block>
 </anti_patterns>
 
 <!-- ============================================ -->
@@ -261,14 +268,14 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
 
 <invariants>
   <!-- These three are the highest-leverage NEXUS I0 rules. The full I0 list lives in
-       CodingVault/.Codex/AGENTS.md; these are the subset that catch the most plugin-relevant
+       CodingVault/AGENTS.md; these are the subset that catch the most plugin-relevant
        failures and so are mirrored here for visibility. -->
 
   <invariant id="I0.13" name="anchor-drift-stop">
     Anchor-drift means the agent has lost the thread: repeated failed gates, repeated patch
     churn on the same file, 3+ low-information replies in a row, or a supervising agent /
     human flagging incoherence. When anchor-drift triggers: STOP. Do not "one more try."
-    Invoke /kernel:handoff, write state + next action, then /clear before continuing.
+    Invoke $kernel:handoff, write state + next action, then /clear before continuing.
     Self-detection is unreliable, accept external triggers (user signal, supervising agent
     intervention, gate failure) as canonical.
   </invariant>
@@ -284,7 +291,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     Critical safety (destructive command guards, secret detection, push-to-main confirmation)
     is enforced by external hooks, not by agent honor-system instructions. The agent cannot
     reliably bypass its own rules, but the hook can. If a safety property matters, encode it
-    as a PreToolUse / PreCommit hook in `hooks/scripts/`, not as a AGENTS.md sentence.
+    as a PreToolUse / PreCommit hook in `hooks/scripts/`, not as prose in AGENTS.md.
     Hook carve-outs are documented in <git><hook_carve_outs>.
   </invariant>
 </invariants>

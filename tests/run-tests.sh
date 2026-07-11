@@ -128,6 +128,10 @@ test_agentdb_init() {
   assert_file_exists "$TEST_PROJECT/_meta/agentdb/agent.db"
 }
 
+test_generated_governance() {
+  python3 "$PLUGIN_ROOT/tests/test_governance.py"
+}
+
 test_agentdb_init_idempotent() {
   agentdb init >/dev/null
   local output
@@ -1977,11 +1981,32 @@ test_release_docs_explain_codex_invocation_and_boundaries() {
   done
 }
 
+test_release_docs_explicit_only_inventory_is_derived() {
+  python3 - "$PLUGIN_ROOT" <<'PY'
+import pathlib, re, sys
+root = pathlib.Path(sys.argv[1])
+actual = {
+    skill.parent.name
+    for skill in (root / "skills").glob("*/SKILL.md")
+    if re.search(r"^disable-model-invocation:\s*true\s*$", skill.read_text(), re.M)
+}
+for relative in ("docs/QUICKSTART.md", "docs/MIGRATION-8.md"):
+    text = (root / relative).read_text()
+    match = re.search(r"Explicit-only skills \((\d+)\):\s*(.*?)\.", text, re.S)
+    assert match, f"{relative}: explicit-only inventory missing"
+    documented = set(re.findall(r"`([a-z0-9-]+)`", match.group(2)))
+    assert int(match.group(1)) == len(actual), (relative, match.group(1), actual)
+    assert documented == actual, (relative, documented, actual)
+PY
+}
+
 test_release_changelog_v8_is_current_and_history_preserved() {
-  local v802 v801 v800
+  local v810 v802 v801 v800
+  v810=$(awk '/^## \[8\.1\.0\]/{on=1} /^## \[8\.0\.2\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v802=$(awk '/^## \[8\.0\.2\]/{on=1} /^## \[8\.0\.1\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v801=$(awk '/^## \[8\.0\.1\]/{on=1} /^## \[8\.0\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v800=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
+  [[ "$v810" == *"49 canonical Git repositories"* ]] && [[ "$v810" == *"does **not** claim"* ]] || return 1
   [[ "$v802" == *"async"* ]] && [[ "$v802" == *"Codex"* ]] || return 1
   [[ "$v801" == *"incomplete"* ]] && [[ "$v801" == *"Codex"* ]] && [[ "$v801" == *"368"* ]] || return 1
   [[ "$v800" == *"strict JSON"* ]] && [[ "$v800" == *"preflight"* ]] && [[ "$v800" == *"select-runtime.sh"* ]] || return 1
@@ -2005,16 +2030,16 @@ test_release_metadata_and_inventory_are_truthful() {
   local skills agents
   skills=$(find "$PLUGIN_ROOT/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
   agents=$(find "$PLUGIN_ROOT/agents" -maxdepth 1 -name '*.md' ! -name README.md | wc -l | tr -d ' ')
-  assert_equals 33 "$skills" "skill inventory"
+  assert_equals 34 "$skills" "skill inventory"
   assert_equals 15 "$agents" "agent inventory"
   python3 - "$PLUGIN_ROOT" <<'PY'
 import json, pathlib, sys
 r=pathlib.Path(sys.argv[1])
 p=json.loads((r/'.claude-plugin/plugin.json').read_text())
 m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
-assert p['version']==m['version']=='8.0.2'
+assert p['version']==m['version']=='8.1.0'
 for x in (p,m):
-    assert 'JSON' in x['description'] and '33 skills' in x['description'] and '15 specialized agent' in x['description']
+    assert 'JSON' in x['description'] and '34 skills' in x['description'] and '15 specialized agent' in x['description']
 PY
   grep -q 'validate | latest | divergence | preflight | compile | resume | activate | deactivate' "$PLUGIN_ROOT/README.md"
 }
@@ -3435,6 +3460,9 @@ MEOF
 
 test_manifest_compile_emits_receipt_fields() {
   echo "some artifact content here" > artifact.md
+  printf 'same native instructions\n' > CLAUDE.md
+  cp CLAUDE.md AGENTS.md
+  cp CLAUDE.md .claude/CLAUDE.md
   cat > m.json <<'MEOF'
 {
   "schema": "kernel.checkpoint/v1",
@@ -3459,7 +3487,10 @@ MEOF
   assert_contains "$output" "total_estimated_tokens" || return 1
   assert_contains "$output" '"status": "within_budget"' || return 1
   assert_contains "$output" "estimation_method" || return 1
-  assert_contains "$output" "selected_artifacts_tokens"
+  assert_contains "$output" "selected_artifacts_tokens" || return 1
+  local instruction_tokens
+  instruction_tokens=$(printf '%s' "$output" | python3 -c 'import json,sys; print(json.load(sys.stdin)["project_instructions_tokens"])')
+  assert_equals "6" "$instruction_tokens" "identical AGENTS/CLAUDE content must count once"
 }
 
 test_manifest_compile_budget_transitions() {
@@ -4228,6 +4259,9 @@ run_test_suite() {
   echo -e "${YELLOW}=== $suite ===${NC}"
 
   case "$suite" in
+    governance)
+      run_test "generated governance adapters and operator" test_generated_governance
+      ;;
     manifest)
       run_test "schemas parse as JSON" test_manifest_schemas_parse_as_json
       run_test "handoff example validates" test_manifest_validate_handoff_example
@@ -4609,6 +4643,7 @@ run_test_suite() {
       run_test "rollback works outside a checkout" test_release_docs_rollback_works_outside_a_checkout
       run_test "Claude and Codex lifecycle commands are separate" test_release_docs_separate_claude_and_codex_lifecycle
       run_test "Codex invocation and lifecycle boundaries are documented" test_release_docs_explain_codex_invocation_and_boundaries
+      run_test "explicit-only skill inventory is derived" test_release_docs_explicit_only_inventory_is_derived
       ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
@@ -4752,6 +4787,7 @@ main() {
     run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"
+    run_test_suite "governance"
     run_test_suite "runtime_upgrade"
     run_test_suite "release_docs"
     run_test_suite "test_gate"

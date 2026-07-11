@@ -35,6 +35,8 @@ jobs:
         run: jq --version
       - name: Run test suite
         run: ./tests/run-tests.sh
+      - name: Verify generated governance adapters
+        run: python3 scripts/generate-governance.py --check
 
   version-sync:
     runs-on: ubuntu-latest

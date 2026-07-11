@@ -140,7 +140,11 @@ Useful skill groups:
 - Methods: `build`, `testing`, `debug`, `security`, `architecture`, `git`, `frontend`, and more
 - Setup/reference: `init`, `help`, `landing-page`
 
-There are 33 skills and 15 specialized Claude Code agent definitions in this release.
+There are 34 skills and 15 specialized Claude Code agent definitions in this release.
+
+`governance-sync` is explicit-only. It audits Git repositories for `CLAUDE.md` /
+`AGENTS.md` gaps and can generate a missing native adapter after showing conflicts,
+provenance hashes, and a backup destination. It never rewrites a conflict.
 Codex loads the skills and SessionStart rules, but it does not register those 15
 Claude agent files as native Codex agents; KERNEL maps the same roles onto Codex's
 available subagents during orchestration. Use `/kernel:help` in Claude Code or

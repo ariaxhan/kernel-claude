@@ -1,0 +1,24 @@
+{
+  "outputs": {
+    "claude": "CLAUDE.md",
+    "codex": "AGENTS.md"
+  },
+  "tokens": {
+    "CLIENT_NAME": {
+      "claude": "Claude Code",
+      "codex": "Codex"
+    },
+    "HOST_GOVERNANCE_PATH": {
+      "claude": "CodingVault/.claude/CLAUDE.md",
+      "codex": "CodingVault/AGENTS.md"
+    },
+    "INSTRUCTION_FILE": {
+      "claude": "CLAUDE.md",
+      "codex": "AGENTS.md"
+    },
+    "INVOKE_PREFIX": {
+      "claude": "/kernel:",
+      "codex": "$kernel:"
+    }
+  }
+}
