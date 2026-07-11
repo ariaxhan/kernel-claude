@@ -119,7 +119,9 @@ was removed.
 
 ## Codex behavior boundaries
 
-Codex loads all 33 KERNEL skills, with explicit calls written as `$kernel:<name>`.
+Codex loads all 34 KERNEL skills, with explicit calls written as `$kernel:<name>`.
+Use `$kernel:governance-sync` (or Claude's `/kernel:governance-sync`) to audit native
+instruction coverage. Writes require explicit confirmation and a backup directory.
 The four side-effecting skills (`init`, `forge`, `experiment`, and `landing-page`)
 also carry Codex-native policy that forbids automatic invocation.
 

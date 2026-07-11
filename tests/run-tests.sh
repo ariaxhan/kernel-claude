@@ -128,6 +128,10 @@ test_agentdb_init() {
   assert_file_exists "$TEST_PROJECT/_meta/agentdb/agent.db"
 }
 
+test_generated_governance() {
+  python3 "$PLUGIN_ROOT/tests/test_governance.py"
+}
+
 test_agentdb_init_idempotent() {
   agentdb init >/dev/null
   local output
@@ -3435,6 +3439,9 @@ MEOF
 
 test_manifest_compile_emits_receipt_fields() {
   echo "some artifact content here" > artifact.md
+  printf 'same native instructions\n' > CLAUDE.md
+  cp CLAUDE.md AGENTS.md
+  cp CLAUDE.md .claude/CLAUDE.md
   cat > m.json <<'MEOF'
 {
   "schema": "kernel.checkpoint/v1",
@@ -3459,7 +3466,10 @@ MEOF
   assert_contains "$output" "total_estimated_tokens" || return 1
   assert_contains "$output" '"status": "within_budget"' || return 1
   assert_contains "$output" "estimation_method" || return 1
-  assert_contains "$output" "selected_artifacts_tokens"
+  assert_contains "$output" "selected_artifacts_tokens" || return 1
+  local instruction_tokens
+  instruction_tokens=$(printf '%s' "$output" | python3 -c 'import json,sys; print(json.load(sys.stdin)["project_instructions_tokens"])')
+  assert_equals "6" "$instruction_tokens" "identical AGENTS/CLAUDE content must count once"
 }
 
 test_manifest_compile_budget_transitions() {
@@ -4228,6 +4238,9 @@ run_test_suite() {
   echo -e "${YELLOW}=== $suite ===${NC}"
 
   case "$suite" in
+    governance)
+      run_test "generated governance adapters and operator" test_generated_governance
+      ;;
     manifest)
       run_test "schemas parse as JSON" test_manifest_schemas_parse_as_json
       run_test "handoff example validates" test_manifest_validate_handoff_example
@@ -4752,6 +4765,7 @@ main() {
     run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"
+    run_test_suite "governance"
     run_test_suite "runtime_upgrade"
     run_test_suite "release_docs"
     run_test_suite "test_gate"
