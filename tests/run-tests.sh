@@ -819,6 +819,22 @@ test_runtime_rejects_helper_escape_and_special_files() {
   ! kernel_validate_runtime_root "$bad"
 }
 
+test_runtime_rejects_symlinked_version_root() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  local external="$TEST_DIR/external-valid-runtime"
+  make_runtime_fixture "$external" 9.0.0
+  ln -s "$external" "$cache/9.0.0"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local current_before; current_before=$(readlink "$cache/current" 2>/dev/null || true)
+  if kernel_validate_runtime_root "$cache/9.0.0" >/dev/null; then
+    echo "symlinked cache version root was accepted"
+    return 1
+  fi
+  kernel_validate_runtime_root "$cache/8.0.0" >/dev/null
+  assert_equals "$current_before" "$(readlink "$cache/current" 2>/dev/null || true)" "validation must not mutate current"
+}
+
 test_runtime_rejects_control_paths_and_traversal_links() {
   runtime_fixture
   local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
@@ -1621,6 +1637,16 @@ test_release_docs_reject_stale_live_claims() {
   local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md AGENTS.md CLAUDE.md skills/help/SKILL.md skills/init/SKILL.md workflows/feature.md workflows/bugfix.md workflows/refactor.md)
   local pattern='Cursor shares|without the kernel: prefix|yaml-first|YAML is the canonical|All v7 invocations work unchanged|ln -sfn|push to main|no new tests needed|commands/\*\.md'
   ! grep -En "$pattern" "${files[@]/#/$PLUGIN_ROOT/}"
+}
+
+test_release_docs_rollback_works_outside_a_checkout() {
+  local files=("$PLUGIN_ROOT/README.md" "$PLUGIN_ROOT/docs/QUICKSTART.md" "$PLUGIN_ROOT/docs/MIGRATION-8.md") file
+  for file in "${files[@]}"; do
+    grep -q 'git clone https://github.com/ariaxhan/kernel-claude.git' "$file" || return 1
+    grep -q 'checkout 54a0053' "$file" || return 1
+    grep -q 'plugins/cache/kernel-marketplace/kernel/current/scripts/select-runtime.sh' "$file" || return 1
+    ! grep -q 'git worktree add' "$file" || return 1
+  done
 }
 
 test_release_changelog_v8_is_current_and_history_preserved() {
@@ -3847,6 +3873,7 @@ run_test_suite() {
       run_test "rollback tool selects a lower local runtime" test_select_runtime_supports_explicit_local_rollback
       run_test "rollback tool accepts real legacy common" test_select_runtime_accepts_real_legacy_common
       run_test "helper escapes and special files rejected" test_runtime_rejects_helper_escape_and_special_files
+      run_test "symlinked cache version root rejected" test_runtime_rejects_symlinked_version_root
       run_test "control paths and traversal links rejected" test_runtime_rejects_control_paths_and_traversal_links
       run_test "atomic link cleans only matching symlink residue" test_atomic_link_scavenges_only_matching_symlink_residue
       run_test "init AgentDB targets selected Vaults" test_init_agentdb_targets_selected_vaults
@@ -4061,6 +4088,7 @@ run_test_suite() {
       run_test "active docs reject stale claims" test_release_docs_reject_stale_live_claims
       run_test "8.0 changelog current and 7.x history preserved" test_release_changelog_v8_is_current_and_history_preserved
       run_test "metadata and inventory truthful" test_release_metadata_and_inventory_are_truthful
+      run_test "rollback works outside a checkout" test_release_docs_rollback_works_outside_a_checkout
       ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol

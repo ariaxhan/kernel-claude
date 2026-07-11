@@ -41,7 +41,7 @@ kernel_validate_runtime_root() {
   python3 - "$root" "$cache" <<'PY'
 import json, os, pathlib, re, stat, sys
 root, cache = sys.argv[1:]
-if not os.path.isdir(root): raise SystemExit(1)
+if os.path.islink(root) or not os.path.isdir(root): raise SystemExit(1)
 real_root = os.path.realpath(root)
 required = ['.claude-plugin/plugin.json', 'hooks/scripts/common.sh', 'orchestration/agentdb/agentdb']
 for rel in required:
