@@ -1,0 +1,66 @@
+{
+  "$id": "kernel.retrospective-result/v1",
+  "title": "KERNEL retrospective mutation record",
+  "description": "Machine-readable record of what a retrospective changed. The human-readable synthesis remains the primary narrative; this file is the authoritative mutation ledger other manifests can reference (provenance.retrospective_refs).",
+  "type": "object",
+  "required": ["schema", "identity", "analyzed", "mutations"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["kernel.retrospective-result/v1"] },
+
+    "identity": {
+      "type": "object",
+      "required": ["created"],
+      "properties": {
+        "created": { "type": "string", "description": "ISO 8601 timestamp" },
+        "session": { "type": "string" },
+        "scope": { "type": "string", "description": "project path or 'cross-project'" }
+      }
+    },
+
+    "analyzed": {
+      "type": "object",
+      "required": ["learnings"],
+      "properties": {
+        "learnings": { "type": "integer", "description": "total learnings reviewed" },
+        "clusters": { "type": "integer" },
+        "merged": { "type": "integer" },
+        "archived": { "type": "integer" },
+        "contradictions_resolved": { "type": "integer" }
+      }
+    },
+
+    "mutations": {
+      "type": "array",
+      "description": "every infrastructure change this retrospective made or proposed",
+      "items": {
+        "type": "object",
+        "required": ["op", "artifact_type", "path", "reason"],
+        "properties": {
+          "op": { "type": "string", "enum": ["create", "modify", "remove", "promote"] },
+          "artifact_type": { "type": "string", "enum": ["hook", "agent", "skill", "prose", "learning"] },
+          "path": { "type": "string" },
+          "reason": { "type": "string" },
+          "evidence": { "type": "string" },
+          "reinforced": { "type": "integer", "description": "reinforcement count that justified promotion" },
+          "status": { "type": "string", "enum": ["applied", "scaffolded", "proposed", "rejected"] }
+        }
+      }
+    },
+
+    "project_fit": {
+      "type": "object",
+      "properties": {
+        "missing": {
+          "type": "array",
+          "description": "recurring patterns with no artifact",
+          "items": { "type": "string" }
+        },
+        "dormant": {
+          "type": "array",
+          "description": "artifacts that never fire; prune candidates (require explicit human approval)",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -2420,12 +2420,339 @@ test_lifecycle_hooks_guard_main_push() {
   assert_contains "$postcommit" "AUTO-PUSH DISABLED" "post-commit auto-push should stay disabled"
 }
 
+# === Manifest Runtime Tests (kernel-manifest + guard-context) ===
+
+KM="$PLUGIN_ROOT/orchestration/manifest/kernel-manifest"
+FIXTURES="$PLUGIN_ROOT/tests/fixtures/manifests"
+
+test_manifest_schemas_parse_as_json() {
+  local bad=0
+  for s in "$PLUGIN_ROOT/schemas/"*.schema.json; do
+    python3 -c "import json; json.load(open('$s'))" 2>/dev/null || { echo "  bad JSON: $s"; bad=1; }
+  done
+  assert_exit_code 0 "$bad" "all schema files must parse as JSON"
+}
+
+test_manifest_validate_handoff_example() {
+  local output
+  output=$("$KM" validate "$FIXTURES/handoff-example.yaml" 2>&1)
+  assert_contains "$output" "VALID"
+}
+
+test_manifest_validate_checkpoint_example() {
+  local output
+  output=$("$KM" validate "$FIXTURES/checkpoint-example.yaml" 2>&1)
+  assert_contains "$output" "VALID"
+}
+
+test_manifest_validate_retrospective_example() {
+  local output
+  output=$("$KM" validate "$FIXTURES/retrospective-result-example.yaml" 2>&1)
+  assert_contains "$output" "VALID"
+}
+
+test_manifest_validate_rejects_missing_schema_field() {
+  printf 'identity:\n  name: x\n' > bad.yaml
+  local ec=0
+  "$KM" validate bad.yaml >/dev/null 2>&1 || ec=$?
+  [ "$ec" -ne 0 ] || { echo "FAIL: manifest without schema field must be rejected"; return 1; }
+}
+
+test_manifest_validate_rejects_bad_policy_mode() {
+  sed 's/mode: bounded/mode: yolo/' "$FIXTURES/handoff-example.yaml" > bad-mode.yaml
+  local ec=0
+  "$KM" validate bad-mode.yaml >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "invalid context policy mode must be rejected"
+}
+
+test_manifest_validate_rejects_selector_without_path() {
+  python3 - "$FIXTURES/handoff-example.yaml" <<'PYEOF'
+import sys
+text = open(sys.argv[1]).read()
+# strip 'path:' from the first required selector -> invalid selector
+text = text.replace("    - path: _meta/contracts/yaml-skill-unification-2026-07-10.md\n", "    - reason: no path here\n", 1)
+text = text.replace('      heading: "## 3. Migration table (every command has a destination)"\n', "", 1)
+open("bad-selector.yaml", "w").write(text)
+PYEOF
+  local ec=0
+  "$KM" validate bad-selector.yaml >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "selector without path or git_diff must be rejected"
+}
+
+test_manifest_latest_finds_newest() {
+  mkdir -p _meta/handoffs _meta/checkpoints
+  printf 'schema: kernel.handoff/v1\n' > _meta/handoffs/old.yaml
+  sleep 1
+  printf 'schema: kernel.checkpoint/v1\n' > _meta/checkpoints/new.yaml
+  local output
+  output=$("$KM" latest)
+  assert_contains "$output" "_meta/checkpoints/new.yaml"
+}
+
+test_manifest_latest_fails_when_empty() {
+  local ec=0
+  "$KM" latest --dir does-not-exist >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "latest with no manifests must fail"
+}
+
+test_manifest_divergence_detects_branch_mismatch() {
+  git init -q -b main . && git commit -q --allow-empty -m init
+  cat > m.yaml <<'MEOF'
+schema: kernel.checkpoint/v1
+identity: {name: t, created: "2026-01-01T00:00:00Z"}
+provenance: {branch: other-branch, commit: "deadbeef", dirty: false}
+task: {goal: t}
+steps_completed: []
+pending_steps: []
+resume: {position: p, next_operation: n}
+MEOF
+  local output ec=0
+  output=$("$KM" divergence m.yaml 2>&1) || ec=$?
+  assert_contains "$output" "branch: DIVERGED" || return 1
+  assert_exit_code 1 "$ec" "branch mismatch must exit 1"
+}
+
+test_manifest_divergence_detects_artifact_hash_mismatch() {
+  git init -q -b main . && git commit -q --allow-empty -m init
+  echo "content-v1" > pinned.txt
+  local sha head
+  sha=$(python3 -c "import hashlib;print(hashlib.sha256(open('pinned.txt','rb').read()).hexdigest())")
+  head=$(git rev-parse HEAD)
+  cat > m.yaml <<MEOF
+schema: kernel.handoff/v1
+identity: {name: t, created: "2026-01-01T00:00:00Z"}
+provenance:
+  branch: main
+  commit: "$head"
+  dirty: true
+  artifacts:
+    - {path: pinned.txt, sha256: "$sha"}
+objective: {goal: t, success_conditions: [x]}
+workflow: {phases: [{name: p, status: required}]}
+context: {policy: {mode: advisory}}
+execution: {entry_phase: p}
+resume: {prompt: r}
+MEOF
+  # clean state passes
+  local output ec=0
+  output=$("$KM" divergence m.yaml 2>&1) || ec=$?
+  assert_exit_code 0 "$ec" "matching hash must pass" || return 1
+  # mutate the artifact -> divergence
+  echo "content-v2" > pinned.txt
+  ec=0
+  output=$("$KM" divergence m.yaml 2>&1) || ec=$?
+  assert_contains "$output" "hash mismatch" || return 1
+  assert_exit_code 1 "$ec" "hash mismatch must exit 1"
+}
+
+test_manifest_compile_emits_receipt_fields() {
+  echo "some artifact content here" > artifact.md
+  cat > m.yaml <<'MEOF'
+schema: kernel.checkpoint/v1
+identity: {name: t, created: "2026-01-01T00:00:00Z"}
+provenance: {branch: main, commit: "abc", dirty: false}
+task: {goal: t}
+steps_completed: []
+pending_steps: []
+resume: {position: p, next_operation: n}
+context:
+  policy: {mode: advisory}
+  required:
+    - {path: artifact.md}
+  budget: {target_tokens: 1000000, max_tokens: 2000000}
+MEOF
+  local output
+  output=$("$KM" compile m.yaml 2>&1)
+  assert_contains "$output" "schema: kernel.context-receipt/v1" || return 1
+  assert_contains "$output" "total_estimated_tokens" || return 1
+  assert_contains "$output" "status: within_budget" || return 1
+  assert_contains "$output" "estimation_method" || return 1
+  assert_contains "$output" "selected_artifacts_tokens"
+}
+
+test_manifest_compile_budget_transitions() {
+  python3 -c "open('big.md','w').write('x'*40000)"
+  cat > m.yaml <<'MEOF'
+schema: kernel.checkpoint/v1
+identity: {name: t, created: "2026-01-01T00:00:00Z"}
+provenance: {branch: main, commit: "abc", dirty: false}
+task: {goal: t}
+steps_completed: []
+pending_steps: []
+resume: {position: p, next_operation: n}
+context:
+  policy: {mode: advisory}
+  required:
+    - {path: big.md}
+  budget: {target_tokens: 5000, max_tokens: 8000}
+MEOF
+  local output ec=0
+  output=$("$KM" compile m.yaml 2>&1) || ec=$?
+  assert_contains "$output" "status: maximum_exceeded" || return 1
+  assert_exit_code 3 "$ec" "maximum_exceeded must exit 3" || return 1
+  # widen the max -> target_exceeded
+  sed -i.bak 's/max_tokens: 8000/max_tokens: 2000000/' m.yaml
+  ec=0
+  output=$("$KM" compile m.yaml 2>&1) || ec=$?
+  assert_contains "$output" "status: target_exceeded" || return 1
+  assert_exit_code 0 "$ec" "target_exceeded must not hard-fail"
+}
+
+test_manifest_compile_selector_types_resolve() {
+  printf '# Title\n\n## Section A\ncontent-a\n\n## Section B\ncontent-b\n' > doc.md
+  printf 'l1\nl2\nl3\nl4\nl5\n' > lines.txt
+  printf 'aaa\nMATCH-ME\nbbb\n' > grepme.txt
+  cat > m.yaml <<'MEOF'
+schema: kernel.checkpoint/v1
+identity: {name: t, created: "2026-01-01T00:00:00Z"}
+provenance: {branch: main, commit: "abc", dirty: false}
+task: {goal: t}
+steps_completed: []
+pending_steps: []
+resume: {position: p, next_operation: n}
+context:
+  policy: {mode: advisory}
+  required:
+    - {path: doc.md, heading: "## Section A"}
+    - {path: lines.txt, lines: "2-3"}
+    - {path: grepme.txt, grep: "MATCH-ME", context: 1}
+MEOF
+  local output
+  output=$("$KM" compile m.yaml --bundle-out bundle.txt 2>&1)
+  assert_contains "$(cat bundle.txt)" "content-a" || return 1
+  if grep -q "content-b" bundle.txt; then echo "FAIL: heading selector leaked next section"; return 1; fi
+  assert_contains "$(cat bundle.txt)" "l2" || return 1
+  assert_contains "$(cat bundle.txt)" "MATCH-ME" || return 1
+  assert_contains "$output" "resolved: true"
+}
+
+test_manifest_compile_reports_missing_required() {
+  cat > m.yaml <<'MEOF'
+schema: kernel.checkpoint/v1
+identity: {name: t, created: "2026-01-01T00:00:00Z"}
+provenance: {branch: main, commit: "abc", dirty: false}
+task: {goal: t}
+steps_completed: []
+pending_steps: []
+resume: {position: p, next_operation: n}
+context:
+  policy: {mode: advisory}
+  required:
+    - {path: nope-does-not-exist.md}
+MEOF
+  local output
+  output=$("$KM" compile m.yaml 2>&1)
+  assert_contains "$output" "resolved: false" || return 1
+  assert_contains "$output" "file missing"
+}
+
+test_guard_context_no_manifest_allows() {
+  local ec=0
+  echo '{"tool_input":{"file_path":"anything.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 0 "$ec" "no active manifest must allow all reads"
+}
+
+test_guard_context_sealed_blocks_forbidden() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.yaml","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["secrets/*","frontend/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_input":{"file_path":"frontend/app.js"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block forbidden path"
+}
+
+test_guard_context_sealed_allows_unforbidden() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.yaml","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["secrets/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_input":{"file_path":"src/app.js"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 0 "$ec" "sealed manifest must allow unforbidden path"
+}
+
+test_guard_context_bounded_ledgers_access() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.yaml","schema":"kernel.handoff/v1","mode":"bounded","forbidden":[]}
+JEOF
+  local ec=0
+  echo '{"tool_input":{"file_path":"extra/file.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 0 "$ec" "bounded mode must allow" || return 1
+  assert_file_exists "_meta/.context-ledger" "bounded access must be ledgered" || return 1
+  assert_contains "$(cat _meta/.context-ledger)" "extra/file.md"
+}
+
+test_guard_context_fails_closed_on_broken_pointer() {
+  mkdir -p _meta
+  echo 'not json' > _meta/.active-manifest.json
+  local ec=0
+  echo '{"tool_input":{"file_path":"src/app.js"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "unreadable pointer must fail closed (block)"
+}
+
+test_manifest_activate_deactivate_roundtrip() {
+  mkdir -p _meta
+  cp "$FIXTURES/handoff-example.yaml" m.yaml
+  "$KM" activate m.yaml >/dev/null
+  assert_file_exists "_meta/.active-manifest.json" || return 1
+  local mode
+  mode=$(jq -r '.mode' _meta/.active-manifest.json)
+  assert_equals "bounded" "$mode" "pointer must carry policy mode" || return 1
+  echo '{"path":"x.md","reason":"test"}' > _meta/.context-ledger
+  printf 'schema: kernel.context-receipt/v1\n' > receipt.yaml
+  "$KM" deactivate --receipt receipt.yaml >/dev/null
+  [ ! -f _meta/.active-manifest.json ] || { echo "FAIL: pointer not removed"; return 1; }
+  [ ! -f _meta/.context-ledger ] || { echo "FAIL: ledger not removed"; return 1; }
+  assert_contains "$(cat receipt.yaml)" "loads_beyond_manifest"
+}
+
+test_manifest_checkpoint_resume_position_surfaced() {
+  # The resume block is the contract for where ingest re-enters.
+  local output
+  output=$("$KM" resume "$FIXTURES/checkpoint-example.yaml" 2>&1)
+  assert_contains "$output" "commit 3 of 5" || return 1
+  assert_contains "$output" "rewrite skills/handoff/SKILL.md" || return 1
+  output=$("$KM" resume "$FIXTURES/handoff-example.yaml" 2>&1)
+  assert_contains "$output" "entry_phase: migration"
+}
+
 run_test_suite() {
   local suite="$1"
   echo ""
   echo -e "${YELLOW}=== $suite ===${NC}"
 
   case "$suite" in
+    manifest)
+      run_test "schemas parse as JSON" test_manifest_schemas_parse_as_json
+      run_test "handoff example validates" test_manifest_validate_handoff_example
+      run_test "checkpoint example validates" test_manifest_validate_checkpoint_example
+      run_test "retrospective-result example validates" test_manifest_validate_retrospective_example
+      run_test "missing schema field rejected" test_manifest_validate_rejects_missing_schema_field
+      run_test "bad policy mode rejected" test_manifest_validate_rejects_bad_policy_mode
+      run_test "selector without path rejected" test_manifest_validate_rejects_selector_without_path
+      run_test "latest finds newest manifest" test_manifest_latest_finds_newest
+      run_test "latest fails when empty" test_manifest_latest_fails_when_empty
+      run_test "divergence: branch mismatch" test_manifest_divergence_detects_branch_mismatch
+      run_test "divergence: artifact hash mismatch" test_manifest_divergence_detects_artifact_hash_mismatch
+      run_test "compile emits receipt fields" test_manifest_compile_emits_receipt_fields
+      run_test "compile budget transitions" test_manifest_compile_budget_transitions
+      run_test "compile selector types resolve" test_manifest_compile_selector_types_resolve
+      run_test "compile reports missing required" test_manifest_compile_reports_missing_required
+      run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
+      run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
+      run_test "guard-context: sealed allows unforbidden" test_guard_context_sealed_allows_unforbidden
+      run_test "guard-context: bounded ledgers access" test_guard_context_bounded_ledgers_access
+      run_test "guard-context: fails closed on broken pointer" test_guard_context_fails_closed_on_broken_pointer
+      run_test "activate/deactivate roundtrip" test_manifest_activate_deactivate_roundtrip
+      run_test "checkpoint resume position surfaced" test_manifest_checkpoint_resume_position_surfaced
+      ;;
     test_gate)
       run_test "test-gate detects + passes" test_test_gate_detects_and_passes
       run_test "test-gate detects + fails" test_test_gate_detects_and_fails
@@ -2823,6 +3150,7 @@ main() {
     run_test_suite "learn"
     run_test_suite "version_sync"
     run_test_suite "test_gate"
+    run_test_suite "manifest"
   else
     run_test_suite "$target"
   fi

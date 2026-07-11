@@ -1,0 +1,46 @@
+# Example kernel.checkpoint/v1 manifest — validated by tests.
+schema: kernel.checkpoint/v1
+
+identity:
+  name: yaml-skill-unification-c3
+  created: "2026-07-10T20:00:00Z"
+  session: example-session
+
+provenance:
+  branch: feat/yaml-skill-unification
+  commit: "0000000000000000000000000000000000000000"
+  dirty: true
+
+task:
+  goal: Migrate kernel commands to unified yaml-first skills
+  handoff_ref: _meta/handoffs/yaml-skill-unification-2026-07-10.yaml
+  contract_ref: _meta/contracts/yaml-skill-unification-2026-07-10.md
+
+steps_completed:
+  - step: schemas + kernel-manifest CLI shipped
+    evidence: "commit 2 sha, tests/run-tests.sh manifest section green"
+  - step: commands migrated to skills
+    evidence: "commit 3 sha, 0 files under commands/"
+
+current_outputs:
+  - schemas/kernel.handoff.v1.schema.json
+  - orchestration/manifest/kernel-manifest
+
+pending_steps:
+  - rewrite handoff/checkpoint/ingest/retrospective skill bodies
+  - docs + version bump
+
+resume:
+  position: "commit 3 of 5 done; state-transition skill bodies not yet rewritten"
+  entrypoint: kernel:ingest
+  next_operation: "rewrite skills/handoff/SKILL.md to emit kernel.handoff/v1"
+
+context:
+  policy:
+    mode: advisory
+  required:
+    - path: _meta/contracts/yaml-skill-unification-2026-07-10.md
+      heading: "## 8. Behavior contracts for the four state operations"
+  budget:
+    target_tokens: 40000
+    max_tokens: 70000

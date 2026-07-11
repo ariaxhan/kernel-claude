@@ -1,0 +1,467 @@
+{
+  "$id": "kernel.handoff/v1",
+  "title": "KERNEL handoff manifest",
+  "description": "Authoritative resumable session manifest. The YAML file is canonical; any markdown rendering is non-authoritative. Consumed by /kernel:ingest; produced by /kernel:handoff. Validated by orchestration/manifest/kernel-manifest (subset validator: type, required, properties, enum, items, additionalProperties).",
+  "type": "object",
+  "required": [
+    "schema",
+    "identity",
+    "provenance",
+    "objective",
+    "workflow",
+    "context",
+    "execution",
+    "resume"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": [
+        "kernel.handoff/v1"
+      ]
+    },
+    "identity": {
+      "type": "object",
+      "required": [
+        "name",
+        "created"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "description": "ISO 8601 timestamp"
+        },
+        "session": {
+          "type": "string",
+          "description": "originating session id"
+        },
+        "tier": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": [
+        "branch",
+        "commit",
+        "dirty"
+      ],
+      "properties": {
+        "branch": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string",
+          "description": "full sha of HEAD at handoff time"
+        },
+        "dirty": {
+          "type": "boolean"
+        },
+        "artifacts": {
+          "type": "array",
+          "description": "files this handoff pins; hash mismatch at resume = divergence",
+          "items": {
+            "type": "object",
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "retrospective_refs": {
+          "type": "array",
+          "description": "kernel.retrospective-result/v1 files whose mutations this work depends on",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "objective": {
+      "type": "object",
+      "required": [
+        "goal",
+        "success_conditions"
+      ],
+      "properties": {
+        "goal": {
+          "type": "string"
+        },
+        "success_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "non_goals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "contract": {
+      "type": "object",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "path to the governing _meta/contracts/ file"
+        },
+        "invariants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "decisions_accepted": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "decision"
+            ],
+            "properties": {
+              "decision": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "alternatives_rejected": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "alternative"
+            ],
+            "properties": {
+              "alternative": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "required": [
+        "phases"
+      ],
+      "properties": {
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "status"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "inherited",
+                  "required",
+                  "invalidated"
+                ]
+              },
+              "evidence": {
+                "type": "string",
+                "description": "why an inherited phase may be trusted"
+              }
+            }
+          }
+        },
+        "invalidation_rules": {
+          "type": "array",
+          "description": "live-state triggers that flip inherited phases to required",
+          "items": {
+            "type": "object",
+            "required": [
+              "trigger",
+              "invalidates"
+            ],
+            "properties": {
+              "trigger": {
+                "type": "string",
+                "description": "e.g. 'artifact hash mismatch: schemas/*.json'"
+              },
+              "invalidates": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "properties": {
+        "required_skills": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer",
+                "description": "kernel.version of the skill when pinned"
+              },
+              "sha256": {
+                "type": "string",
+                "description": "hash of SKILL.md when practical"
+              }
+            }
+          }
+        },
+        "optional_skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "preflight": {
+          "type": "array",
+          "description": "checks ingest runs before resuming; failure = stop and report",
+          "items": {
+            "type": "object",
+            "required": [
+              "cmd"
+            ],
+            "properties": {
+              "cmd": {
+                "type": "string"
+              },
+              "expect": {
+                "type": "string",
+                "description": "substring expected in output; omit = exit 0 suffices"
+              }
+            }
+          }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "required": [
+        "policy"
+      ],
+      "properties": {
+        "policy": {
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "sealed",
+                "bounded",
+                "advisory"
+              ]
+            }
+          }
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "description": "context selector v1. Must contain 'path' or 'git_diff'; refinement keys (lines|heading|grep) apply to 'path'. Enforced in validator code, not schema (subset validator has no oneOf). Deferred: yaml_path, json_path, symbol.",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "lines": {
+                "type": "string",
+                "description": "'A-B' inclusive line range"
+              },
+              "heading": {
+                "type": "string",
+                "description": "markdown heading text; loads that section"
+              },
+              "grep": {
+                "type": "string",
+                "description": "pattern; loads matches with context"
+              },
+              "context": {
+                "type": "integer",
+                "description": "surrounding lines for grep (default 3)"
+              },
+              "git_diff": {
+                "type": "string",
+                "description": "'revA..revB'; loads the diff instead of a file"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "optional": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "description": "context selector v1. Must contain 'path' or 'git_diff'; refinement keys (lines|heading|grep) apply to 'path'. Enforced in validator code, not schema (subset validator has no oneOf). Deferred: yaml_path, json_path, symbol.",
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "lines": {
+                "type": "string",
+                "description": "'A-B' inclusive line range"
+              },
+              "heading": {
+                "type": "string",
+                "description": "markdown heading text; loads that section"
+              },
+              "grep": {
+                "type": "string",
+                "description": "pattern; loads matches with context"
+              },
+              "context": {
+                "type": "integer",
+                "description": "surrounding lines for grep (default 3)"
+              },
+              "git_diff": {
+                "type": "string",
+                "description": "'revA..revB'; loads the diff instead of a file"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "forbidden": {
+          "type": "array",
+          "description": "glob patterns; sealed mode blocks access via guard-context hook",
+          "items": {
+            "type": "string"
+          }
+        },
+        "budget": {
+          "type": "object",
+          "properties": {
+            "target_tokens": {
+              "type": "integer"
+            },
+            "max_tokens": {
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "entry_phase"
+      ],
+      "properties": {
+        "entry_phase": {
+          "type": "string"
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "the exact first operation to perform"
+        },
+        "stop_conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "checkpoints": {
+          "type": "array",
+          "description": "points at which a kernel.checkpoint/v1 should be emitted",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "open_threads": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "failed approaches; do not re-explore",
+      "items": {
+        "type": "string"
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "properties": {
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "completion": {
+          "type": "string",
+          "description": "the operation that closes this manifest (e.g. 'kernel-manifest deactivate + agentdb write-end')"
+        }
+      }
+    },
+    "resume": {
+      "type": "object",
+      "required": [
+        "prompt"
+      ],
+      "properties": {
+        "prompt": {
+          "type": "string",
+          "description": "one-line continuation prompt for the next session"
+        }
+      }
+    }
+  }
+}

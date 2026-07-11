@@ -1,0 +1,502 @@
+#!/usr/bin/env python3
+"""kernel-manifest — KERNEL yaml manifest runtime.
+
+Subcommands:
+  validate   <file>                       schema-validate a manifest (exit 0 ok, 1 invalid, 2 unparseable/no parser)
+  latest     [--dir D ...]                newest manifest path across dirs (default: _meta/checkpoints _meta/handoffs)
+  divergence <file>                       live git state vs manifest provenance (exit 1 on hard divergence)
+  compile    <file> [--bundle-out P] [--receipt-out P] [--agentdb-tokens N]
+                                          resolve context selectors, emit kernel.context-receipt/v1 YAML
+  activate   <file>                       write _meta/.active-manifest.json (arms guard-context hook)
+  deactivate [--receipt P]                merge _meta/.context-ledger into receipt, remove state files
+
+YAML parsing chain: pyyaml -> ruby -ryaml (JSON bridge) -> explicit failure (exit 2).
+Fallback-first: a sealed resume must treat exit 2 as BLOCKING, never as a silent pass.
+Token counts are chars/4 estimates; directional, not exact (documented in every receipt).
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+import hashlib
+from datetime import datetime, timezone
+
+PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+SCHEMA_DIR = os.path.join(PLUGIN_ROOT, "schemas")
+ACTIVE_POINTER = "_meta/.active-manifest.json"
+CONTEXT_LEDGER = "_meta/.context-ledger"
+
+# ---------- yaml loading (parse chain) ----------
+
+def load_yaml(path):
+    """Parse YAML via pyyaml, else ruby Psych, else fail loudly (exit 2)."""
+    text = open(path, encoding="utf-8").read()
+    try:
+        import yaml  # type: ignore
+        return yaml.safe_load(text)
+    except ImportError:
+        pass
+    try:
+        proc = subprocess.run(
+            ["ruby", "-ryaml", "-rjson", "-e",
+             "puts JSON.generate(YAML.safe_load(STDIN.read, permitted_classes: [], aliases: false))"],
+            input=text, capture_output=True, text=True, timeout=30)
+        if proc.returncode == 0:
+            return json.loads(proc.stdout)
+        die(2, f"ruby YAML parse failed for {path}: {proc.stderr.strip()[:300]}")
+    except FileNotFoundError:
+        pass
+    die(2, "no YAML parser available (need python3+pyyaml or ruby). "
+           "Sealed resumes MUST treat this as blocking; do not proceed unvalidated.")
+
+
+def die(code, msg):
+    print(f"kernel-manifest: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+# ---------- minimal yaml emitter (controlled data only) ----------
+
+def emit_yaml(obj, indent=0):
+    """Emit YAML for dict/list/str/int/bool/None trees. Receipts + pointers only."""
+    pad = "  " * indent
+    lines = []
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(v, (dict, list)) and v:
+                lines.append(f"{pad}{k}:")
+                lines.append(emit_yaml(v, indent + 1))
+            elif isinstance(v, list):
+                lines.append(f"{pad}{k}: []")
+            elif isinstance(v, dict):
+                lines.append(f"{pad}{k}: {{}}")
+            else:
+                lines.append(f"{pad}{k}: {scalar(v)}")
+    elif isinstance(obj, list):
+        for item in obj:
+            if isinstance(item, (dict, list)) and item:
+                body = emit_yaml(item, indent + 1)
+                first, _, rest = body.partition("\n")
+                lines.append(f"{pad}- {first.strip()}" + (f"\n{rest}" if rest else ""))
+            else:
+                lines.append(f"{pad}- {scalar(item)}")
+    else:
+        lines.append(f"{pad}{scalar(obj)}")
+    return "\n".join(lines)
+
+
+def scalar(v):
+    if v is None:
+        return "null"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return str(v)
+    s = str(v)
+    if s == "" or re.search(r'[:#\[\]{}&*!|>\'"%@`]|^\s|\s$|^-|^\d', s) or "\n" in s:
+        return json.dumps(s)
+    return s
+
+# ---------- subset schema validator ----------
+# Supports: type, required, properties, enum, items, minimum, maximum.
+# Custom rule (not expressible in the subset): context selectors need path or git_diff.
+
+def validate_node(node, schema, path, errors):
+    t = schema.get("type")
+    if t == "object":
+        if not isinstance(node, dict):
+            errors.append(f"{path}: expected object, got {type(node).__name__}")
+            return
+        for req in schema.get("required", []):
+            if req not in node:
+                errors.append(f"{path}: missing required key '{req}'")
+        for key, sub in schema.get("properties", {}).items():
+            if key in node:
+                validate_node(node[key], sub, f"{path}.{key}", errors)
+    elif t == "array":
+        if not isinstance(node, list):
+            errors.append(f"{path}: expected array, got {type(node).__name__}")
+            return
+        item_schema = schema.get("items")
+        if item_schema:
+            for i, item in enumerate(node):
+                validate_node(item, item_schema, f"{path}[{i}]", errors)
+    elif t == "string":
+        if not isinstance(node, str):
+            errors.append(f"{path}: expected string, got {type(node).__name__}")
+            return
+        if "enum" in schema and node not in schema["enum"]:
+            errors.append(f"{path}: '{node}' not in {schema['enum']}")
+    elif t == "integer":
+        if isinstance(node, bool) or not isinstance(node, int):
+            errors.append(f"{path}: expected integer, got {type(node).__name__}")
+            return
+        if "minimum" in schema and node < schema["minimum"]:
+            errors.append(f"{path}: {node} < minimum {schema['minimum']}")
+        if "maximum" in schema and node > schema["maximum"]:
+            errors.append(f"{path}: {node} > maximum {schema['maximum']}")
+    elif t == "boolean":
+        if not isinstance(node, bool):
+            errors.append(f"{path}: expected boolean, got {type(node).__name__}")
+
+
+def validate_selectors(manifest, errors):
+    ctx = manifest.get("context", {})
+    if not isinstance(ctx, dict):
+        return
+    for group in ("required", "optional"):
+        for i, sel in enumerate(ctx.get(group) or []):
+            if isinstance(sel, dict) and not (sel.get("path") or sel.get("git_diff")):
+                errors.append(f"context.{group}[{i}]: selector needs 'path' or 'git_diff'")
+
+
+def schema_for(manifest):
+    sid = manifest.get("schema", "")
+    fname = sid.replace("/", ".") + ".schema.json"  # kernel.handoff/v1 -> kernel.handoff.v1.schema.json
+    path = os.path.join(SCHEMA_DIR, fname)
+    if not os.path.isfile(path):
+        die(1, f"unknown schema '{sid}' (no {fname} in {SCHEMA_DIR})")
+    return json.load(open(path))
+
+
+def cmd_validate(args):
+    path = args[0]
+    manifest = load_yaml(path)
+    if not isinstance(manifest, dict):
+        die(1, f"{path}: manifest root must be a mapping")
+    schema = schema_for(manifest)
+    errors = []
+    validate_node(manifest, schema, "$", errors)
+    if manifest.get("schema") in ("kernel.handoff/v1", "kernel.checkpoint/v1"):
+        validate_selectors(manifest, errors)
+    if errors:
+        for e in errors:
+            print(f"INVALID {e}")
+        die(1, f"{path}: {len(errors)} schema violation(s) against {manifest.get('schema')}")
+    print(f"VALID {path} ({manifest.get('schema')})")
+
+# ---------- latest ----------
+
+def cmd_latest(args):
+    dirs = []
+    it = iter(args)
+    for a in it:
+        if a == "--dir":
+            dirs.append(next(it))
+    if not dirs:
+        dirs = ["_meta/checkpoints", "_meta/handoffs"]
+    candidates = []
+    for d in dirs:
+        if os.path.isdir(d):
+            for f in os.listdir(d):
+                if f.endswith((".yaml", ".yml")):
+                    p = os.path.join(d, f)
+                    candidates.append((os.path.getmtime(p), p))
+    if not candidates:
+        die(1, f"no manifests found in {dirs}")
+    candidates.sort(reverse=True)
+    print(candidates[0][1])
+
+# ---------- divergence ----------
+
+def git(*argv):
+    proc = subprocess.run(["git"] + list(argv), capture_output=True, text=True)
+    return proc.returncode, proc.stdout.strip()
+
+
+def cmd_divergence(args):
+    path = args[0]
+    manifest = load_yaml(path)
+    prov = manifest.get("provenance", {})
+    hard = False
+
+    rc, branch = git("branch", "--show-current")
+    want = prov.get("branch", "")
+    if rc != 0:
+        print("branch: UNKNOWN (not a git repo?)"); hard = True
+    elif branch == want:
+        print(f"branch: MATCH ({branch})")
+    else:
+        print(f"branch: DIVERGED (manifest={want} live={branch})"); hard = True
+
+    commit = prov.get("commit", "")
+    rc, head = git("rev-parse", "HEAD")
+    if commit and rc == 0:
+        if head == commit:
+            print(f"commit: MATCH ({head[:12]})")
+        else:
+            rc2, _ = git("merge-base", "--is-ancestor", commit, "HEAD")
+            if rc2 == 0:
+                rc3, n = git("rev-list", "--count", f"{commit}..HEAD")
+                print(f"commit: ADVANCED ({n.strip() if rc3==0 else '?'} commits since manifest)")
+            else:
+                print(f"commit: DIVERGED (manifest {commit[:12]} is not an ancestor of HEAD {head[:12]})")
+                hard = True
+    else:
+        print("commit: UNKNOWN"); hard = True
+
+    rc, status = git("status", "--porcelain")
+    live_dirty = bool(status)
+    want_dirty = bool(prov.get("dirty", False))
+    if live_dirty == want_dirty:
+        print(f"dirty: MATCH ({live_dirty})")
+    else:
+        print(f"dirty: WARN (manifest={want_dirty} live={live_dirty})")
+
+    for art in prov.get("artifacts") or []:
+        p, want_sha = art.get("path", ""), art.get("sha256", "")
+        if not os.path.isfile(p):
+            print(f"artifact: DIVERGED ({p} missing)"); hard = True
+            continue
+        got = hashlib.sha256(open(p, "rb").read()).hexdigest()
+        if got == want_sha:
+            print(f"artifact: MATCH ({p})")
+        else:
+            print(f"artifact: DIVERGED ({p} hash mismatch)"); hard = True
+
+    if hard:
+        die(1, "divergence detected — live state wins; invalidate inherited phases per manifest workflow.invalidation_rules")
+    print("divergence: CLEAN")
+
+# ---------- compile (context selectors -> bundle + receipt) ----------
+
+def estimate(text):
+    return max(0, round(len(text) / 4))
+
+
+def resolve_selector(sel):
+    """Return (summary, content_or_None, note)."""
+    if sel.get("git_diff"):
+        rc, out = git("diff", sel["git_diff"])
+        if rc != 0:
+            return (f"git_diff:{sel['git_diff']}", None, "git diff failed")
+        return (f"git_diff:{sel['git_diff']}", out, "")
+    path = sel.get("path", "")
+    if not os.path.isfile(path):
+        return (path, None, "file missing")
+    text = open(path, encoding="utf-8", errors="replace").read()
+    if sel.get("lines"):
+        m = re.match(r"^(\d+)-(\d+)$", str(sel["lines"]))
+        if not m:
+            return (f"{path}:{sel['lines']}", None, "bad line range")
+        a, b = int(m.group(1)), int(m.group(2))
+        text = "\n".join(text.splitlines()[a - 1:b])
+        return (f"{path}:{a}-{b}", text, "")
+    if sel.get("heading"):
+        lines = text.splitlines()
+        want = sel["heading"].strip()
+        level = len(want) - len(want.lstrip("#"))
+        out, capturing = [], False
+        for line in lines:
+            if line.strip() == want:
+                capturing = True
+                out.append(line)
+                continue
+            if capturing and re.match(r"^#{1,%d}\s" % max(level, 1), line):
+                break
+            if capturing:
+                out.append(line)
+        if not capturing:
+            return (f"{path} :: {want}", None, "heading not found")
+        return (f"{path} :: {want}", "\n".join(out), "")
+    if sel.get("grep"):
+        n = int(sel.get("context", 3))
+        pat = re.compile(sel["grep"])
+        lines = text.splitlines()
+        keep = set()
+        for i, line in enumerate(lines):
+            if pat.search(line):
+                keep.update(range(max(0, i - n), min(len(lines), i + n + 1)))
+        if not keep:
+            return (f"{path}?{sel['grep']}", None, "no matches")
+        out = [lines[i] for i in sorted(keep)][:2000]
+        return (f"{path}?{sel['grep']}", "\n".join(out), "")
+    return (path, text, "")
+
+
+def skill_tokens(names):
+    total = 0
+    for name in names or []:
+        if isinstance(name, dict):
+            name = name.get("name", "")
+        p = os.path.join(PLUGIN_ROOT, "skills", str(name), "SKILL.md")
+        if os.path.isfile(p):
+            total += estimate(open(p, encoding="utf-8").read())
+    return total
+
+
+def cmd_compile(args):
+    path = args[0]
+    bundle_out = receipt_out = None
+    agentdb_tokens = 0
+    it = iter(args[1:])
+    for a in it:
+        if a == "--bundle-out":
+            bundle_out = next(it)
+        elif a == "--receipt-out":
+            receipt_out = next(it)
+        elif a == "--agentdb-tokens":
+            agentdb_tokens = int(next(it))
+
+    manifest = load_yaml(path)
+    ctx = manifest.get("context", {}) or {}
+    budget = ctx.get("budget", {}) or {}
+    runtime = manifest.get("runtime", {}) or {}
+
+    selections, bundle_parts, selected_tokens = [], [], 0
+    for group in ("required", "optional"):
+        for sel in ctx.get(group) or []:
+            summary, content, note = resolve_selector(sel)
+            ok = content is not None
+            tok = estimate(content) if ok else 0
+            selected_tokens += tok
+            selections.append({"selector": f"[{group}] {summary}", "resolved": ok,
+                               "estimated_tokens": tok, **({"note": note} if note else {})})
+            if ok:
+                bundle_parts.append(f"===== [{group}] {summary} =====\n{content}\n")
+            if not ok and group == "required":
+                print(f"WARN: required selector unresolved: {summary} ({note})", file=sys.stderr)
+
+    project_instr = 0
+    for p in ("CLAUDE.md", ".claude/CLAUDE.md"):
+        if os.path.isfile(p):
+            project_instr += estimate(open(p, encoding="utf-8", errors="replace").read())
+
+    manifest_tokens = estimate(open(path, encoding="utf-8").read())
+    always = skill_tokens(["quality", "testing", "git"])  # ingest's always-set
+    workflow_sk = skill_tokens(runtime.get("required_skills"))
+    domain_sk = skill_tokens(runtime.get("optional_skills"))
+
+    total = manifest_tokens + project_instr + always + workflow_sk + domain_sk + selected_tokens + agentdb_tokens
+    target = int(budget.get("target_tokens") or 0)
+    maximum = int(budget.get("max_tokens") or 0)
+    if maximum and total > maximum:
+        status = "maximum_exceeded"
+    elif target and total > target:
+        status = "target_exceeded"
+    else:
+        status = "within_budget"
+
+    receipt = {
+        "schema": "kernel.context-receipt/v1",
+        "manifest": path,
+        "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "manifest_tokens": manifest_tokens,
+        "project_instructions_tokens": project_instr,
+        "always_skills_tokens": always,
+        "workflow_skills_tokens": workflow_sk,
+        "domain_skills_tokens": domain_sk,
+        "selected_artifacts_tokens": selected_tokens,
+        "agentdb_tokens": agentdb_tokens,
+        "total_estimated_tokens": total,
+        "target_budget_tokens": target,
+        "maximum_budget_tokens": maximum,
+        "status": status,
+        "estimation_method": "chars/4 (directional; structural overhead undercounted; agentdb_tokens=0 unless --agentdb-tokens provided)",
+        "selections": selections,
+        "loads_beyond_manifest": [],
+    }
+    out = emit_yaml(receipt) + "\n"
+    if bundle_out:
+        with open(bundle_out, "w", encoding="utf-8") as f:
+            f.write("".join(bundle_parts))
+    if receipt_out:
+        with open(receipt_out, "w", encoding="utf-8") as f:
+            f.write(out)
+    print(out, end="")
+    if status == "maximum_exceeded":
+        sys.exit(3)
+
+# ---------- resume (surface the re-entry point) ----------
+
+def cmd_resume(args):
+    """Print the machine-readable resume point of a manifest."""
+    manifest = load_yaml(args[0])
+    sid = manifest.get("schema", "")
+    if sid == "kernel.checkpoint/v1":
+        r = manifest.get("resume", {}) or {}
+        print(f"position: {r.get('position', '')}")
+        print(f"entrypoint: {r.get('entrypoint', '')}")
+        print(f"next_operation: {r.get('next_operation', '')}")
+    elif sid == "kernel.handoff/v1":
+        ex = manifest.get("execution", {}) or {}
+        print(f"entry_phase: {ex.get('entry_phase', '')}")
+        print(f"entrypoint: {ex.get('entrypoint', '')}")
+        print(f"prompt: {(manifest.get('resume') or {}).get('prompt', '')}")
+    else:
+        die(1, f"'{sid}' has no resume semantics")
+
+# ---------- activate / deactivate (hook bridge) ----------
+
+def cmd_activate(args):
+    path = args[0]
+    manifest = load_yaml(path)
+    ctx = manifest.get("context", {}) or {}
+    pointer = {
+        "manifest": path,
+        "schema": manifest.get("schema", ""),
+        "mode": ((ctx.get("policy") or {}).get("mode")) or "advisory",
+        "forbidden": ctx.get("forbidden") or [],
+        "activated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    os.makedirs(os.path.dirname(ACTIVE_POINTER), exist_ok=True)
+    with open(ACTIVE_POINTER, "w", encoding="utf-8") as f:
+        json.dump(pointer, f, indent=2)
+    print(f"activated {path} (mode={pointer['mode']}, forbidden={len(pointer['forbidden'])} globs)")
+
+
+def cmd_deactivate(args):
+    receipt_path = None
+    it = iter(args)
+    for a in it:
+        if a == "--receipt":
+            receipt_path = next(it)
+    if os.path.isfile(CONTEXT_LEDGER) and receipt_path and os.path.isfile(receipt_path):
+        entries = []
+        for line in open(CONTEXT_LEDGER, encoding="utf-8"):
+            line = line.strip()
+            if line:
+                try:
+                    entries.append(json.loads(line))
+                except json.JSONDecodeError:
+                    entries.append({"path": line, "reason": "unstructured ledger line"})
+        if entries:
+            with open(receipt_path, "a", encoding="utf-8") as f:
+                f.write("# merged from _meta/.context-ledger at deactivate\n")
+                f.write(emit_yaml({"loads_beyond_manifest": entries}) + "\n")
+            print(f"merged {len(entries)} ledger entrie(s) into {receipt_path}")
+    for p in (ACTIVE_POINTER, CONTEXT_LEDGER):
+        if os.path.isfile(p):
+            os.remove(p)
+    print("deactivated")
+
+# ---------- main ----------
+
+COMMANDS = {
+    "validate": (cmd_validate, 1),
+    "latest": (cmd_latest, 0),
+    "divergence": (cmd_divergence, 1),
+    "compile": (cmd_compile, 1),
+    "resume": (cmd_resume, 1),
+    "activate": (cmd_activate, 1),
+    "deactivate": (cmd_deactivate, 0),
+}
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help", "help"):
+        print(__doc__)
+        sys.exit(0)
+    cmd = sys.argv[1]
+    if cmd not in COMMANDS:
+        die(1, f"unknown subcommand '{cmd}' (try --help)")
+    fn, min_args = COMMANDS[cmd]
+    rest = sys.argv[2:]
+    if len(rest) < min_args:
+        die(1, f"'{cmd}' needs at least {min_args} argument(s)")
+    fn(rest)
+
+
+if __name__ == "__main__":
+    main()

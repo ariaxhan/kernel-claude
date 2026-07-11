@@ -1,0 +1,56 @@
+{
+  "$id": "kernel.context-receipt/v1",
+  "title": "KERNEL context receipt",
+  "description": "Emitted by `kernel-manifest compile` when ingest assembles a bounded runtime from a manifest. Token counts are chars/4 ESTIMATES (estimation_method documents this); treat as directional, not exact. Grounding: EXP-L21 measured load-bearing context flat at ~47-71k/decision while attended context grew 7-11x — the receipt is how a resume proves it stayed near the flat line.",
+  "type": "object",
+  "required": ["schema", "manifest", "total_estimated_tokens", "status", "estimation_method"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["kernel.context-receipt/v1"] },
+    "manifest": { "type": "string", "description": "path of the manifest this receipt was compiled from" },
+    "created": { "type": "string" },
+
+    "manifest_tokens": { "type": "integer" },
+    "project_instructions_tokens": { "type": "integer", "description": "CLAUDE.md chain + session-start hook block (boot layer)" },
+    "always_skills_tokens": { "type": "integer" },
+    "workflow_skills_tokens": { "type": "integer" },
+    "domain_skills_tokens": { "type": "integer" },
+    "selected_artifacts_tokens": { "type": "integer", "description": "sum over resolved context selectors" },
+    "agentdb_tokens": { "type": "integer" },
+    "total_estimated_tokens": { "type": "integer" },
+
+    "target_budget_tokens": { "type": "integer" },
+    "maximum_budget_tokens": { "type": "integer" },
+    "status": { "type": "string", "enum": ["within_budget", "target_exceeded", "maximum_exceeded"] },
+
+    "estimation_method": { "type": "string", "description": "e.g. 'chars/4 (directional; structural overhead undercounted)'" },
+
+    "selections": {
+      "type": "array",
+      "description": "per-selector resolution results",
+      "items": {
+        "type": "object",
+        "required": ["selector", "resolved", "estimated_tokens"],
+        "properties": {
+          "selector": { "type": "string", "description": "human-readable selector summary" },
+          "resolved": { "type": "boolean" },
+          "estimated_tokens": { "type": "integer" },
+          "note": { "type": "string", "description": "e.g. 'file missing', 'heading not found'" }
+        }
+      }
+    },
+
+    "loads_beyond_manifest": {
+      "type": "array",
+      "description": "bounded-mode ledger: context loaded beyond the manifest, each with an explicit reason. Populated from _meta/.context-ledger at deactivate time. Sealed mode: must stay empty.",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": { "type": "string" },
+          "reason": { "type": "string" },
+          "estimated_tokens": { "type": "integer" }
+        }
+      }
+    }
+  }
+}

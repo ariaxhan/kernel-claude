@@ -1,0 +1,39 @@
+# Example kernel.retrospective-result/v1 mutation record — validated by tests.
+schema: kernel.retrospective-result/v1
+
+identity:
+  created: "2026-07-10T21:00:00Z"
+  session: example-session
+  scope: kernel-claude
+
+analyzed:
+  learnings: 42
+  clusters: 6
+  merged: 4
+  archived: 3
+  contradictions_resolved: 1
+
+mutations:
+  - op: promote
+    artifact_type: hook
+    path: .claude/hooks/guard-context.sh
+    reason: sealed-context enforcement is a safety property (I0.15 hooks not honor-system)
+    evidence: "EXP-L21: attended context grew 7-11x over flat load-bearing need"
+    reinforced: 4
+    status: scaffolded
+  - op: modify
+    artifact_type: skill
+    path: skills/handoff/SKILL.md
+    reason: handoff emits yaml manifest instead of markdown prose
+    status: applied
+  - op: remove
+    artifact_type: prose
+    path: CLAUDE.md
+    reason: commands block superseded by unified skills section
+    status: applied
+
+project_fit:
+  missing:
+    - recurring manual resume flow with no checkpoint artifact
+  dormant:
+    - skills/e2e (no invocation in 60 days; prune candidate, needs human approval)
