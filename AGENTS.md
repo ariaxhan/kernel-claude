@@ -1,5 +1,5 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: 5dbacc72f21d20abd715f0375033e27071a97eb33f69974c828b463ae08bfb9c; adapter: codex -->
+     source-sha256: d4d6d020ca1b00ee6d62d50983c33292ee51f2b44cd3489ad03428a25ca60863; adapter: codex -->
 <kernel version="8.0.2">
 
 
@@ -291,7 +291,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     Critical safety (destructive command guards, secret detection, push-to-main confirmation)
     is enforced by external hooks, not by agent honor-system instructions. The agent cannot
     reliably bypass its own rules, but the hook can. If a safety property matters, encode it
-    as a PreToolUse / PreCommit hook in `hooks/scripts/`, not as an AGENTS.md sentence.
+    as a PreToolUse / PreCommit hook in `hooks/scripts/`, not as prose in AGENTS.md.
     Hook carve-outs are documented in <git><hook_carve_outs>.
   </invariant>
 </invariants>

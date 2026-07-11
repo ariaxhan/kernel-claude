@@ -442,16 +442,48 @@
         "id": "CP-20260711105322-59371-11467",
         "ts": "2026-07-11T17:53:22.706Z",
         "type": "checkpoint"
+      },
+      {
+        "agent": "adversary",
+        "content": "{\n  \"result\": \"fail\",\n  \"evidence\": \"{\\\"tested\\\":[\\\"8 checked-in governance unit tests\\\",\\\"governance suite\\\",\\\"generator --check\\\",\\\"bash -n session-start\\\",\\\"version sync\\\",\\\"manifest 65/65\\\",\\\"path traversal fixture\\\",\\\"output symlink fixture\\\",\\\"ambient heredoc injection fixture\\\",\\\"source update backup fixture\\\",\\\"manifest symlink fixture\\\",\\\"nested scoped instruction fixture\\\"],\\\"evidence\\\":\\\"All nominal tests pass, but disposable fixtures proved out-of-repo write, external symlink overwrite, executable heredoc injection, update deadlock, manifest symlink overwrite, and invisible nested scope\\\",\\\"issues\\\":[\\\"generator output path escapes root\\\",\\\"generator follows output symlinks\\\",\\\"ambient block permits KERNEL_CONTEXT shell injection\\\",\\\"governance-sync update cannot generate using adopt backup directory\\\",\\\"manifest symlink overwrite\\\",\\\"nested scoped instructions invisible\\\",\\\"generated CLAUDE grammar error\\\"]}\"\n}",
+        "contract_id": "",
+        "id": "VD-20260711105645-69043-24911",
+        "ts": "2026-07-11T17:56:45.419Z",
+        "type": "verdict"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711104258-18886-29532\",\"agent\":\"reviewer\",\"verdict\":\"REQUEST_CHANGES\",\"confidence\":99,\"did\":\"reviewed every diff and reproduced six armed-path failures\",\"next\":\"fix containment, symlink refusal, heredoc safety, backup sequencing, nested scope audit; add regression fixtures\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711105645-69030-2621",
+        "ts": "2026-07-11T17:56:45.462Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"goal\":\"Harden generated governance against path escape, symlink overwrite, shell injection, backup deadlock, and invisible nested scopes\",\"constraints\":{\"files\":[\"scripts/generate-governance.py\",\"scripts/governance-sync.py\",\"tests/test_governance_generation.py\",\"tests/run-tests.sh\",\"governance/KERNEL.md.tmpl\",\"CLAUDE.md\",\"AGENTS.md\",\"hooks/scripts/session-start.sh\"]},\"failure\":\"Any path escapes repo; any symlink/nonregular followed; ambient shell injection/backslash corruption; adopt-generate deadlock; nested scope omitted; generated grammar regression; armed fixtures fail\",\"tier\":3,\"branch\":\"refactor/generated-governance\",\"max_budget_usd\":4,\"parent\":\"CR-20260711104258-18886-29532\"}",
+        "contract_id": "CR-20260711105647-69185-24795",
+        "id": "CR-20260711105647-69185-24795",
+        "ts": "2026-07-11T17:56:47.621Z",
+        "type": "contract"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711105647-69185-24795\",\"agent\":\"surgeon\",\"did\":\"hardened governance generation and sync against path escape, symlink, heredoc injection, partial preflight, backup phase, and nested scope failures\",\"tested\":[\"armed governance repros 16/16\",\"manifest 65/65\",\"full 378/378\",\"generator byte check\",\"python compile\",\"diff check\"],\"next\":\"reviewer re-review\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711110122-2015-26291",
+        "ts": "2026-07-11T18:01:22.626Z",
+        "type": "checkpoint"
       }
     ],
     "context_sessions": [
       {
-        "ended_at": null,
+        "ended_at": "2026-07-11T17:53:23.034Z",
         "id": "SES-20260710205337-63380-12380",
         "nodes_loaded": null,
         "outcome": null,
         "started_at": "2026-07-11T03:53:37.303Z",
-        "success": null,
+        "success": 0,
         "task_type": "feature",
         "tier": 1,
         "tokens_used": null
@@ -479,12 +511,12 @@
         "tokens_used": null
       },
       {
-        "ended_at": null,
+        "ended_at": "2026-07-11T17:56:45.792Z",
         "id": "RCP-acb531bc4f8ed573",
         "nodes_loaded": "[\"CHANGELOG.md\", \"CLAUDE.md\", \"_meta/research/context-graph-architecture.md\", \"skills/git/SKILL.md\", \"skills/quality/SKILL.md\", \"skills/testing/SKILL.md\", \"tests/fixtures/manifests/handoff-example.yaml\"]",
         "outcome": "{\"receipt\": \"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/fixtures/manifests/receipt-example.yaml\", \"manifest\": \"tests/fixtures/manifests/handoff-example.yaml\", \"status\": \"within_budget\", \"projected_by\": \"graph-project\"}",
         "started_at": "2026-07-10T12:00:00Z",
-        "success": null,
+        "success": 0,
         "task_type": "unknown",
         "tier": 1,
         "tokens_used": 2900

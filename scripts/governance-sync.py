@@ -34,6 +34,31 @@ def read_bytes(path):
         die(str(exc))
 
 
+def exists_any(path):
+    return path.exists() or path.is_symlink()
+
+
+def safe_repo_path(repo, relative, label, missing_ok=False):
+    if relative not in SOURCES and relative not in {"CLAUDE.md", "AGENTS.md", MANIFEST}:
+        die(f"unsafe {label} path: {relative}")
+    path = repo / relative
+    cursor = path
+    while cursor != repo:
+        if cursor.is_symlink():
+            die(f"{label} must not use symlinks: {relative}")
+        cursor = cursor.parent
+    if exists_any(path) and not path.is_file():
+        die(f"{label} must be a regular non-symlink file: {relative}")
+    if not missing_ok and not path.is_file():
+        die(f"{label} must be a regular non-symlink file: {relative}")
+    try:
+        if os.path.commonpath([str(repo), str(path.resolve(strict=False))]) != str(repo):
+            die(f"{label} resolves outside repository: {relative}")
+    except (OSError, ValueError) as exc:
+        die(f"cannot resolve {label}: {exc}")
+    return path
+
+
 def git(repo, *args):
     return subprocess.run(["git", "-C", str(repo), *args], text=True, capture_output=True)
 
@@ -89,10 +114,30 @@ def classify(repo):
     return "missing_both"
 
 
+def nested_scopes(repo):
+    scopes = []
+    for current, dirs, files in os.walk(repo):
+        relative_dir = Path(current).relative_to(repo)
+        dirs[:] = sorted(d for d in dirs if d not in IGNORED and not d.startswith(".codex"))
+        if relative_dir == Path("."):
+            continue
+        names = set(files)
+        if "CLAUDE.md" not in names and "AGENTS.md" not in names:
+            continue
+        claude = "CLAUDE.md" in names
+        agents = "AGENTS.md" in names
+        if claude and agents:
+            state = "both_identical" if read_bytes(Path(current) / "CLAUDE.md") == read_bytes(Path(current) / "AGENTS.md") else "drift"
+        else:
+            state = "claude_only" if claude else "agents_only"
+        scopes.append({"path": relative_dir.as_posix(), "state": state})
+    return scopes
+
+
 def audit(args):
     root = args.path.resolve()
     repos = discover(root)
-    records = [{"path": str(repo), "state": classify(repo)} for repo in repos]
+    records = [{"path": str(repo), "state": classify(repo), "nested_scopes": nested_scopes(repo)} for repo in repos]
     payload = {
         "root": str(root),
         "canonical_repo_count": len(records),
@@ -107,20 +152,34 @@ def audit(args):
         print(f"canonical repositories: {len(records)}")
 
 
-def backup(path, backup_dir, repo):
-    if not path.exists() and not path.is_symlink():
-        return
-    backup_dir.mkdir(parents=True, exist_ok=True)
+def backup_target(path, backup_dir, repo):
     relative = path.relative_to(repo).as_posix().replace("/", "__")
-    target = backup_dir / f"{repo.name}__{relative}"
-    if target.exists():
-        die(f"backup already exists, refusing overwrite: {target}")
-    if path.is_symlink():
-        target.symlink_to(os.readlink(path))
-    elif path.is_file():
-        shutil.copy2(path, target)
-    else:
-        die(f"refusing non-file governance path: {path}")
+    return backup_dir / f"{repo.name}__{relative}"
+
+
+def preflight_backups(paths, backup_dir, repo):
+    if exists_any(backup_dir) and (backup_dir.is_symlink() or not backup_dir.is_dir()):
+        die(f"backup directory must be a regular directory: {backup_dir}")
+    plans = []
+    for path in paths:
+        if not exists_any(path):
+            continue
+        if path.is_symlink() or not path.is_file():
+            die(f"refusing non-regular backup source: {path}")
+        target = backup_target(path, backup_dir, repo)
+        if exists_any(target):
+            if target.is_symlink() or not target.is_file() or read_bytes(target) != read_bytes(path):
+                die(f"backup already exists with different content: {target}")
+            continue
+        plans.append((path, target))
+    return plans
+
+
+def perform_backups(plans, backup_dir):
+    if plans:
+        backup_dir.mkdir(parents=True, exist_ok=True)
+    for source, target in plans:
+        shutil.copy2(source, target)
 
 
 def manifest_path(repo):
@@ -128,7 +187,7 @@ def manifest_path(repo):
 
 
 def load_manifest(repo):
-    path = manifest_path(repo)
+    path = safe_repo_path(repo, MANIFEST, "manifest")
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -145,7 +204,8 @@ def load_manifest(repo):
 
 
 def write_manifest(repo, data):
-    manifest_path(repo).write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    path = safe_repo_path(repo, MANIFEST, "manifest", missing_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def output_for(source):
@@ -157,11 +217,9 @@ def adopt(args):
     source_name = args.source
     if source_name not in SOURCES:
         die(f"unsupported source: {source_name}")
-    source = repo / source_name
-    if not source.is_file() or source.is_symlink():
-        die(f"source must be a regular file: {source_name}")
+    source = safe_repo_path(repo, source_name, "source")
     output_name = output_for(source_name)
-    output = repo / output_name
+    output = safe_repo_path(repo, output_name, "output", missing_ok=True)
     if output.is_file() and read_bytes(output) != read_bytes(source):
         if not manifest_path(repo).is_file():
             die(f"conflict: {output_name} differs; reconcile manually")
@@ -169,45 +227,44 @@ def adopt(args):
         if (previous["source"] != source_name or previous["output"] != output_name
                 or previous["output_sha256"] != digest(read_bytes(output))):
             die(f"conflict: {output_name} differs from its recorded generated hash")
-    if output.exists() and not output.is_file():
-        die(f"conflict: {output_name} is not a regular file")
-    backup(source, args.backup_dir.resolve(), repo)
-    if output.exists():
-        backup(output, args.backup_dir.resolve(), repo)
-    if manifest_path(repo).exists():
-        backup(manifest_path(repo), args.backup_dir.resolve(), repo)
+    backup_dir = args.backup_dir.resolve()
+    backups = preflight_backups([source, output, manifest_path(repo)], backup_dir, repo)
     source_hash = digest(read_bytes(source))
     output_hash = digest(read_bytes(output)) if output.is_file() else None
-    write_manifest(repo, {
+    manifest = {
         "schema": SCHEMA,
         "generator_version": 1,
         "source": source_name,
         "source_sha256": source_hash,
         "output": output_name,
         "output_sha256": output_hash,
-    })
+    }
+    perform_backups(backups, backup_dir)
+    write_manifest(repo, manifest)
     print(f"adopted {source_name}; adapter target {output_name}")
 
 
 def generate(args):
     repo = require_repo(args.repo)
     data = load_manifest(repo)
-    source = repo / data["source"]
-    output = repo / data["output"]
+    source = safe_repo_path(repo, data["source"], "source")
+    output = safe_repo_path(repo, data["output"], "output", missing_ok=True)
     content = read_bytes(source)
     current_source_hash = digest(content)
     if current_source_hash != data["source_sha256"]:
         die("source hash changed; run adopt with a fresh backup after reviewing the edit")
-    if output.exists() or output.is_symlink():
-        if not output.is_file() or output.is_symlink():
-            die(f"refusing non-regular adapter: {data['output']}")
+    backup_dir = args.backup_dir.resolve()
+    backups = []
+    if exists_any(output):
         current_output_hash = digest(read_bytes(output))
         if data["output_sha256"] is None or current_output_hash != data["output_sha256"]:
             die(f"adapter was edited outside the generator: {data['output']}")
         if read_bytes(output) == content:
             print("adapter current")
             return
-        backup(output, args.backup_dir.resolve(), repo)
+        backups = preflight_backups([output], backup_dir, repo)
+    safe_repo_path(repo, MANIFEST, "manifest")
+    perform_backups(backups, backup_dir)
     output.write_bytes(content)
     data["output_sha256"] = digest(content)
     write_manifest(repo, data)
@@ -224,8 +281,8 @@ def check(args):
     if not path.is_file():
         die(f"{state}: {MANIFEST} required to declare source and provenance")
     data = load_manifest(repo)
-    source = repo / data["source"]
-    output = repo / data["output"]
+    source = safe_repo_path(repo, data["source"], "source")
+    output = safe_repo_path(repo, data["output"], "output")
     if not source.is_file() or digest(read_bytes(source)) != data["source_sha256"]:
         die("source missing or hash stale")
     if not output.is_file() or digest(read_bytes(output)) != data["output_sha256"]:
@@ -239,12 +296,22 @@ def init_repo(args):
     repo = require_repo(args.repo)
     if classify(repo) != "missing_both" or manifest_path(repo).exists():
         die("init requires a repository with no governance files or manifest")
-    args.backup_dir.mkdir(parents=True, exist_ok=True)
-    source = repo / "CLAUDE.md"
-    source.write_text("# Project governance\n\nAdd shared Claude and Codex instructions here.\n", encoding="utf-8")
-    args.source = "CLAUDE.md"
-    adopt(args)
-    generate(args)
+    source = safe_repo_path(repo, "CLAUDE.md", "source", missing_ok=True)
+    output = safe_repo_path(repo, "AGENTS.md", "output", missing_ok=True)
+    safe_repo_path(repo, MANIFEST, "manifest", missing_ok=True)
+    backup_dir = args.backup_dir.resolve()
+    preflight_backups([], backup_dir, repo)
+    content = b"# Project governance\n\nAdd shared Claude and Codex instructions here.\n"
+    source_hash = digest(content)
+    manifest = {
+        "schema": SCHEMA, "generator_version": 1,
+        "source": "CLAUDE.md", "source_sha256": source_hash,
+        "output": "AGENTS.md", "output_sha256": source_hash,
+    }
+    source.write_bytes(content)
+    output.write_bytes(content)
+    write_manifest(repo, manifest)
+    print("initialized CLAUDE.md and AGENTS.md")
 
 
 def parser():

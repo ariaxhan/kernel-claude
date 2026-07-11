@@ -304,7 +304,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     Critical safety (destructive command guards, secret detection, push-to-main confirmation)
     is enforced by external hooks, not by agent honor-system instructions. The agent cannot
     reliably bypass its own rules, but the hook can. If a safety property matters, encode it
-    as a PreToolUse / PreCommit hook in `hooks/scripts/`, not as an {{INSTRUCTION_FILE}} sentence.
+    as a PreToolUse / PreCommit hook in `hooks/scripts/`, not as prose in {{INSTRUCTION_FILE}}.
     Hook carve-outs are documented in <git><hook_carve_outs>.
   </invariant>
 </invariants>

@@ -29,8 +29,8 @@ Show the exact repository, source, target, and backup directory. Continue only a
 the user confirms one command:
 
 ```text
-python3 scripts/governance-sync.py adopt REPO --source CLAUDE.md --backup-dir BACKUPS
-python3 scripts/governance-sync.py generate REPO --backup-dir BACKUPS
+python3 scripts/governance-sync.py adopt REPO --source CLAUDE.md --backup-dir BACKUPS/adopt
+python3 scripts/governance-sync.py generate REPO --backup-dir BACKUPS/generate
 python3 scripts/governance-sync.py check REPO
 ```
 
@@ -38,7 +38,9 @@ python3 scripts/governance-sync.py check REPO
 source path, source hash, output, output hash, and generator version. Scoped sources
 stay where they are; only the missing root-native adapter is generated. A regular
 file conflict, unrecorded edit, stale hash, malformed manifest, symlink, or existing
-backup stops the operation.
+backup with different content stops the operation. Identical backups are idempotent.
+Use separate `BACKUPS/adopt` and `BACKUPS/generate` phases so an approved source
+update preserves both the pre-adoption state and the adapter it replaces.
 
 Use `init REPO --backup-dir BACKUPS` only when the user explicitly wants governance
 created in a repository where both native files are absent.
