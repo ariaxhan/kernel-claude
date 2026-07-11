@@ -5,9 +5,8 @@
 source "$(dirname "$0")/common.sh"
 
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.file_path // .path // ""' 2>/dev/null)
-
-# Only validate JSON files
+while IFS= read -r RECORD; do
+FILE_PATH=$(printf '%s' "$RECORD" | jq -r '.path // empty' 2>/dev/null)
 case "$FILE_PATH" in
   *.json)
     if [ -f "$FILE_PATH" ]; then
@@ -26,5 +25,6 @@ case "$FILE_PATH" in
     fi
     ;;
 esac
+done < <(kernel_hook_file_records "$INPUT")
 
 exit 0

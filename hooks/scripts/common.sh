@@ -247,6 +247,51 @@ get_project_root() {
   echo "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 }
 
+# Emit one compact JSON record per affected file: {path, content}. Claude
+# Write/Edit produces one record. Codex apply_patch preserves file order, keeps
+# added content scoped to its file, and treats Move to as the effective path.
+kernel_hook_file_records() {
+  printf '%s' "$1" | jq -c '
+    def finish:
+      if .current == null then .
+      else .records += [(.current | .content = (.content | join("\n")))]
+           | .current = null
+      end;
+    if (.tool_input.patch | type) == "string" then
+      (reduce (.tool_input.patch | split("\n")[]) as $line
+        ({records: [], current: null};
+         if ($line | test("^\\*\\*\\* (Add File|Update File|Delete File): ")) then
+           finish
+           | .current = {path: ($line | sub("^\\*\\*\\* (Add File|Update File|Delete File): "; "")), content: []}
+         elif ($line | startswith("*** Move to: ")) and .current != null then
+           .current.path = ($line | sub("^\\*\\*\\* Move to: "; ""))
+         elif ($line | startswith("+")) and .current != null then
+           .current.content += [$line[1:]]
+         else . end)
+       | finish | .records[])
+    else
+      {path: (.tool_input.file_path // .tool_input.path // .file_path // .path // ""),
+       content: (.tool_input.content // .tool_input.new_string // .content // .new_string // "")}
+    end
+  ' 2>/dev/null || true
+}
+
+kernel_hook_file_path() {
+  kernel_hook_file_records "$1" | head -1 | jq -r '.path // empty' 2>/dev/null || true
+}
+
+kernel_hook_content() {
+  kernel_hook_file_records "$1" | head -1 | jq -r '.content // empty' 2>/dev/null || true
+}
+
+kernel_hook_error() {
+  printf '%s' "$1" | jq -r '
+    (if (.error | type) == "string" then .error
+     elif (.error.message | type) == "string" then .error.message
+     else .message // .tool_error // "unknown error" end)
+  ' 2>/dev/null || printf '%s\n' 'unknown error'
+}
+
 # The shared Vaults continuity service owns compaction only for a session whose
 # active project is the Vaults root itself. Nested repositories keep KERNEL's
 # deterministic fallback because root-level host hooks may not be loaded there.

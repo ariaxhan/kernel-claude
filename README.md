@@ -117,7 +117,7 @@ claude --plugin-dir "$HOME/kernel-claude-7.23"
 To deliberately select a validated local or cached runtime for the helper links:
 
 ```bash
-"$HOME/.claude/plugins/cache/kernel-marketplace/kernel/8.0.1/scripts/select-runtime.sh" /path/to/kernel-claude-7.23
+"$HOME/.claude/plugins/cache/kernel-marketplace/kernel/8.0.2/scripts/select-runtime.sh" /path/to/kernel-claude-7.23
 ```
 
 That explicit selection may move `current` backward; normal old sessions cannot. It does not convert KERNEL 8 JSON state to KERNEL 7 YAML. Do not delete the plugin cache or remove the marketplace as a normal rollback step.
@@ -163,6 +163,11 @@ must be invoked explicitly with `$kernel:handoff`. Some workflows can use GitHub
 the project profile enables it. KERNEL does not promise that all processing stays
 local when you invoke a workflow that uses external tools. Review host permissions
 and the repository's own instructions before granting access.
+
+KERNEL 8.0.2 declares its six advisory hooks as synchronous so Codex executes them
+instead of skipping them. They remain non-blocking in outcome: an internal logging or
+validation failure returns success and cannot reject the tool operation. The critical
+secret, configuration, command, and context guards remain separate blocking gates.
 
 When the active project root exactly matches the Vaults root and the shared continuity
 engine plus an executable Claude or Codex adapter are present, that Vaults service owns

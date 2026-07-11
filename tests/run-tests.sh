@@ -1332,6 +1332,199 @@ assert "version" not in data, "top-level version breaks the Codex hooks loader"
 PY
 }
 
+test_advisory_hooks_are_synchronous_and_complete() {
+  python3 - "$PLUGIN_ROOT/hooks/hooks.json" <<'PY'
+import json, sys
+data=json.load(open(sys.argv[1]))
+def _walk(x):
+    if isinstance(x, dict):
+        yield x
+        for value in x.values(): yield from _walk(value)
+    elif isinstance(x, list):
+        for value in x: yield from _walk(value)
+assert not any('async' in obj for obj in _walk(data)), 'shared hook manifest must contain no async keys'
+PY
+}
+
+test_six_advisory_hook_commands_are_retained() {
+  python3 - "$PLUGIN_ROOT/hooks/hooks.json" <<'PY'
+import json, sys
+data=json.load(open(sys.argv[1]))
+commands=[]
+def walk(x):
+    if isinstance(x, dict):
+        if x.get('type') == 'command': commands.append(x.get('command'))
+        for value in x.values(): walk(value)
+    elif isinstance(x, list):
+        for value in x: walk(value)
+walk(data)
+expected=[
+  '${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autopush.sh install',
+  '${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-structure.sh',
+  '${CLAUDE_PLUGIN_ROOT}/hooks/scripts/warn-hardcoded.sh',
+  '${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-write.sh',
+  '${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-json-schema.sh',
+  '${CLAUDE_PLUGIN_ROOT}/hooks/scripts/capture-error.sh',
+]
+for command in expected:
+    assert commands.count(command) == 1, (command, commands)
+PY
+}
+
+test_log_write_consumes_claude_and_codex_payloads() {
+  local root="$TEST_DIR/log-write-project"
+  mkdir -p "$root"
+  printf '%s\n' '{"tool_name":"Write","tool_input":{"file_path":"src/claude.ts"}}' \
+    | CLAUDE_PROJECT_DIR="$root" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+      "$PLUGIN_ROOT/hooks/scripts/log-write.sh" >/dev/null 2>&1 || return 1
+  printf '%s\n' '{"tool_name":"apply_patch","tool_input":{"patch":"*** Begin Patch\n*** Update File: src/codex.ts\n+changed\n*** End Patch"}}' \
+    | CLAUDE_PROJECT_DIR="$root" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+      "$PLUGIN_ROOT/hooks/scripts/log-write.sh" >/dev/null 2>&1 || return 1
+  grep -q '"tool":"Write","file":"src/claude.ts"' "$root/_meta/logs/actions.jsonl" || return 1
+  grep -q '"tool":"apply_patch","file":"src/codex.ts"' "$root/_meta/logs/actions.jsonl"
+}
+
+test_log_write_is_advisory_and_leaves_no_child() {
+  local root="$TEST_DIR/log-write-project" fake="$TEST_DIR/fake-plugin" pid
+  mkdir -p "$root" "$fake/orchestration/agentdb"
+  cat > "$fake/orchestration/agentdb/agentdb" <<'SH'
+#!/bin/bash
+echo $$ > "${KERNEL_TEST_CHILD_PID:?}"
+sleep 0.3
+exit "${KERNEL_TEST_AGENTDB_EXIT:-0}"
+SH
+  chmod +x "$fake/orchestration/agentdb/agentdb"
+  printf '%s\n' '{"tool_name":"Write","tool_input":{"file_path":"src/file.ts"}}' \
+    | KERNEL_TEST_CHILD_PID="$TEST_DIR/child.pid" CLAUDE_PROJECT_DIR="$root" CLAUDE_PLUGIN_ROOT="$fake" \
+      "$PLUGIN_ROOT/hooks/scripts/log-write.sh" >/dev/null 2>&1 || return 1
+  pid=$(cat "$TEST_DIR/child.pid")
+  ! kill -0 "$pid" 2>/dev/null || { echo "FAIL: log-write child survived hook exit"; return 1; }
+  local ec=0
+  printf '%s\n' '{"tool_name":"Write","tool_input":{"file_path":"src/file.ts"}}' \
+    | KERNEL_TEST_CHILD_PID="$TEST_DIR/child.pid" KERNEL_TEST_AGENTDB_EXIT=9 \
+      CLAUDE_PROJECT_DIR="$root" CLAUDE_PLUGIN_ROOT="$fake" \
+      "$PLUGIN_ROOT/hooks/scripts/log-write.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 0 "$ec" "advisory hook must not block on AgentDB failure"
+}
+
+test_advisory_scripts_consume_dual_loader_payloads() {
+  local root="$TEST_DIR/advisory" bad_agent="$TEST_DIR/advisory/agents/bad.md"
+  local css="$TEST_DIR/advisory/app.css" bad_json="$TEST_DIR/advisory/bad.json" output payload patch
+  mkdir -p "$(dirname "$bad_agent")" "$TEST_PROJECT/_meta/agentdb"
+  echo 'missing frontmatter' > "$bad_agent"
+  echo 'body { color: red; }' > "$css"
+  echo '{bad' > "$bad_json"
+
+  payload=$(jq -n --arg p "$bad_agent" '{tool_name:"Write",tool_input:{file_path:$p,content:"missing frontmatter"}}')
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" 2>&1)
+  assert_contains "$output" "$bad_agent" "Claude structure payload path must be consumed" || return 1
+  printf -v patch '*** Begin Patch\n*** Update File: %s\n+missing frontmatter\n*** End Patch' "$bad_agent"
+  payload=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{patch:$patch}}')
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" 2>&1)
+  assert_contains "$output" "$bad_agent" "Codex structure payload path must be consumed" || return 1
+
+  payload=$(jq -n --arg p "$css" '{tool_name:"Write",tool_input:{file_path:$p,content:"color: #abcdef; margin: 12px;"}}')
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" 2>&1)
+  assert_contains "$output" "$css" "Claude content must be consumed" || return 1
+  printf -v patch '*** Begin Patch\n*** Update File: %s\n+color: #abcdef; margin: 12px;\n*** End Patch' "$css"
+  payload=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{patch:$patch}}')
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" 2>&1)
+  assert_contains "$output" "$css" "Codex patch content must be consumed" || return 1
+
+  printf -v patch '*** Begin Patch\n*** Update File: %s\n+{bad\n*** End Patch' "$bad_json"
+  for payload in \
+    "$(jq -n --arg p "$bad_json" '{tool_name:"Write",tool_input:{file_path:$p}}')" \
+    "$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{patch:$patch}}')"; do
+    output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/validate-json-schema.sh" 2>&1)
+    assert_contains "$output" "$bad_json" "JSON validator path must be consumed" || return 1
+  done
+
+  KERNEL_VAULTS="$TEST_PROJECT" AGENTDB_ROOT="$TEST_PROJECT" agentdb init >/dev/null
+  payload=$(jq -n --arg p "$css" '{tool_name:"Write",tool_input:{file_path:$p},error:"claude failure"}')
+  printf '%s\n' "$payload" | KERNEL_VAULTS="$TEST_PROJECT" AGENTDB_ROOT="$TEST_PROJECT" \
+    "$PLUGIN_ROOT/hooks/scripts/capture-error.sh" >/dev/null 2>&1 || return 1
+  printf -v patch '*** Begin Patch\n*** Update File: %s\n+change\n*** End Patch' "$css"
+  payload=$(jq -n --arg patch "$patch" \
+    '{tool_name:"apply_patch",tool_input:{patch:$patch},error:{message:"codex failure"}}')
+  printf '%s\n' "$payload" | KERNEL_VAULTS="$TEST_PROJECT" AGENTDB_ROOT="$TEST_PROJECT" \
+    "$PLUGIN_ROOT/hooks/scripts/capture-error.sh" >/dev/null 2>&1 || return 1
+  assert_contains "$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT group_concat(error, '|') FROM errors;")" "claude failure" || return 1
+  assert_contains "$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT group_concat(error, '|') FROM errors;")" "codex failure"
+}
+
+test_advisory_scripts_fail_open_without_false_positives() {
+  local script ec output root="$TEST_DIR/advisory-safe"
+  mkdir -p "$root"
+  echo '{"ok":true}' > "$root/valid.json"
+  for script in validate-structure.sh warn-hardcoded.sh validate-json-schema.sh capture-error.sh; do
+    ec=0
+    printf '{malformed\n' | KERNEL_VAULTS="$root/missing-vault" CLAUDE_PROJECT_DIR="$root" \
+      "$PLUGIN_ROOT/hooks/scripts/$script" >/dev/null 2>&1 || ec=$?
+    assert_exit_code 0 "$ec" "$script must stay advisory on malformed/downstream failure" || return 1
+  done
+  output=$(jq -n --arg p "$root/valid.json" '{tool_name:"Write",tool_input:{file_path:$p,content:"const color = theme.primary;"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" 2>&1)
+  assert_equals "" "$output" "safe advisory payload must not warn"
+}
+
+test_multifile_patch_records_are_isolated_and_complete() {
+  local root="$TEST_DIR/multifile" css="$TEST_DIR/multifile/safe.css"
+  local json="$TEST_DIR/multifile/later.json" agent="$TEST_DIR/multifile/agents/later.md"
+  local moved="$TEST_DIR/multifile/moved.json" patch payload output
+  mkdir -p "$(dirname "$agent")" "$TEST_PROJECT/_meta/agentdb"
+  echo 'body { color: var(--theme); }' > "$css"
+  echo '{bad' > "$json"
+  echo 'missing frontmatter' > "$agent"
+  echo '{bad' > "$moved"
+  printf -v patch '*** Begin Patch\n*** Update File: %s\n+body { color: var(--theme); }\n*** Update File: %s\n+{"color":"#abcdef"}\n*** Update File: %s\n+missing frontmatter\n*** Update File: old.txt\n*** Move to: %s\n+{bad\n*** End Patch' "$css" "$json" "$agent" "$moved"
+  payload=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{patch:$patch},error:{message:"multi failure"}}')
+
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" 2>&1)
+  assert_equals "" "$output" "JSON content must not be attributed to the CSS record" || return 1
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/validate-json-schema.sh" 2>&1)
+  assert_contains "$output" "$json" "later JSON file must be validated" || return 1
+  assert_contains "$output" "$moved" "rename destination must be the effective path" || return 1
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" 2>&1)
+  assert_contains "$output" "$agent" "later agent file must be structurally checked" || return 1
+
+  KERNEL_VAULTS="$TEST_PROJECT" AGENTDB_ROOT="$TEST_PROJECT" agentdb init >/dev/null
+  printf '%s\n' "$payload" | KERNEL_VAULTS="$TEST_PROJECT" AGENTDB_ROOT="$TEST_PROJECT" \
+    "$PLUGIN_ROOT/hooks/scripts/capture-error.sh" >/dev/null 2>&1 || return 1
+  assert_equals "4" "$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM errors WHERE error='multi failure';")" "capture-error must record every patch file"
+}
+
+test_log_write_multifile_and_json_roundtrip() {
+  local root="$TEST_DIR/log-json" patch payload weird log
+  mkdir -p "$root"
+  printf -v patch '*** Begin Patch\n*** Update File: first.css\n+safe\n*** Update File: old.json\n*** Move to: later.json\n+{}\n*** End Patch'
+  payload=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{patch:$patch}}')
+  printf '%s\n' "$payload" | CLAUDE_PROJECT_DIR="$root" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+    "$PLUGIN_ROOT/hooks/scripts/log-write.sh" >/dev/null 2>&1 || return 1
+  log="$root/_meta/logs/actions.jsonl"
+  assert_equals "2" "$(wc -l < "$log" | tr -d ' ')" "log-write must log every patch record" || return 1
+  assert_equals "first.css,later.json" "$(jq -rs 'map(.file)|join(",")' "$log")" "rename must log destination in order" || return 1
+
+  weird=$'quote" slash\\ line\nnext'
+  payload=$(jq -n --arg p "$weird" '{tool_name:"Write",tool_input:{file_path:$p,content:"safe"}}')
+  printf '%s\n' "$payload" | CLAUDE_PROJECT_DIR="$root" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+    "$PLUGIN_ROOT/hooks/scripts/log-write.sh" >/dev/null 2>&1 || return 1
+  jq -e . "$log" >/dev/null || return 1
+  assert_equals "$weird" "$(tail -1 "$log" | jq -r .file)" "quote/backslash/newline must round-trip through valid JSON"
+}
+
+test_critical_guard_scripts_unchanged_for_802() {
+  local expected actual file
+  while read -r expected file; do
+    actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
+    assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
+  done <<'EOF'
+16fb49cbedb3bdc875c4add7cb1de0c993e6528fa4d9d520fc9ee2cba6641a93 guard-bash.sh
+79b46dabd8c9e890d503548cddd98358ec59d888ada4e738e34b05b7ca4f1da1 guard-config.sh
+d3611267b4f135c5b96e8a4a8af60f296b196efc135e3dfbef63d7683065608c detect-secrets.sh
+dbf6680d56dfd5676a420f69f75dcfc5405f0fd53879063859a43b4dcaa5085b guard-context.sh
+EOF
+}
+
 # === Input Validation Tests ===
 
 test_agentdb_numeric_injection_tier() {
@@ -1785,16 +1978,18 @@ test_release_docs_explain_codex_invocation_and_boundaries() {
 }
 
 test_release_changelog_v8_is_current_and_history_preserved() {
-  local v801 v800
+  local v802 v801 v800
+  v802=$(awk '/^## \[8\.0\.2\]/{on=1} /^## \[8\.0\.1\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v801=$(awk '/^## \[8\.0\.1\]/{on=1} /^## \[8\.0\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v800=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
+  [[ "$v802" == *"async"* ]] && [[ "$v802" == *"Codex"* ]] || return 1
   [[ "$v801" == *"incomplete"* ]] && [[ "$v801" == *"Codex"* ]] && [[ "$v801" == *"368"* ]] || return 1
   [[ "$v800" == *"strict JSON"* ]] && [[ "$v800" == *"preflight"* ]] && [[ "$v800" == *"select-runtime.sh"* ]] || return 1
   grep -q '^## \[7.23.0\] - 2026-07-06' "$PLUGIN_ROOT/CHANGELOG.md"
 }
 
 test_release_docs_use_current_801_runtime() {
-  grep -q 'kernel/8\.0\.1/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
+  grep -q 'kernel/8\.0\.2/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
   ! grep -q 'kernel/8\.0\.0/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
   # Historical 8.0.0 release and upgrade references remain valid outside active runtime commands.
   grep -q '^## \[8\.0\.0\] - 2026-07-11' "$PLUGIN_ROOT/CHANGELOG.md"
@@ -1817,7 +2012,7 @@ import json, pathlib, sys
 r=pathlib.Path(sys.argv[1])
 p=json.loads((r/'.claude-plugin/plugin.json').read_text())
 m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
-assert p['version']==m['version']=='8.0.1'
+assert p['version']==m['version']=='8.0.2'
 for x in (p,m):
     assert 'JSON' in x['description'] and '33 skills' in x['description'] and '15 specialized agent' in x['description']
 PY
@@ -4145,6 +4340,15 @@ run_test_suite() {
       run_test "hooks.json has SessionStart" test_hooks_json_has_session_start
       run_test "hooks.json has SessionEnd" test_hooks_json_has_session_end
       run_test "hooks.json supports Claude and Codex loaders" test_hooks_json_cross_loader_schema
+      run_test "advisory hooks are synchronous and complete" test_advisory_hooks_are_synchronous_and_complete
+      run_test "six advisory hook commands are retained" test_six_advisory_hook_commands_are_retained
+      run_test "log-write consumes Claude and Codex payloads" test_log_write_consumes_claude_and_codex_payloads
+      run_test "log-write is advisory and leaves no child" test_log_write_is_advisory_and_leaves_no_child
+      run_test "advisory scripts consume dual-loader payloads" test_advisory_scripts_consume_dual_loader_payloads
+      run_test "advisory scripts fail open without false positives" test_advisory_scripts_fail_open_without_false_positives
+      run_test "multifile patch records are isolated and complete" test_multifile_patch_records_are_isolated_and_complete
+      run_test "log-write multifile and JSON round-trip" test_log_write_multifile_and_json_roundtrip
+      run_test "critical guard scripts unchanged for 8.0.2" test_critical_guard_scripts_unchanged_for_802
       run_test "session-start has compact quick reference" test_session_start_workflow_present
       run_test "session-start points at skill routing" test_session_start_skill_routing
       run_test "session-start has no scripted interrupts" test_session_start_no_scripted_interrupts
