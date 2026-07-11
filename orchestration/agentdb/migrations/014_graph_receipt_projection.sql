@@ -1,6 +1,6 @@
 -- Migration: 014_graph_receipt_projection
--- Purpose: Dedup table for context graph projected from kernel.context-receipt/v1 YAML.
--- Graph telemetry is derived from manifest receipts (observational); YAML remains authoritative.
+-- Purpose: Dedup table for context graph projected from kernel.context-receipt/v1 JSON.
+-- Graph telemetry is derived from manifest receipts (observational); canonical JSON remains authoritative.
 
 BEGIN TRANSACTION;
 

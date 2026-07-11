@@ -2088,7 +2088,7 @@ case "${1:-help}" in
     echo "  verdict <p|f> <evidence>  QA result"
     echo ""
     echo "CONTEXT GRAPH (derived from manifest receipts — shadow/advisory):"
-    echo "  graph-project [receipt.yaml|--all]  Project receipt YAML into nodes/edges"
+    echo "  graph-project [receipt.json|--all]  Project canonical JSON receipt into nodes/edges"
     echo "  graph-suggest <task_type> [--min-sessions N]  Advisory co-load suggestions (never auto-loads)"
     echo ""
     echo "LEGACY GRAPH (manual test hooks — prefer graph-project from receipts):"

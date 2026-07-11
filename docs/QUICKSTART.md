@@ -246,7 +246,7 @@ If skills don't appear, make sure:
 |---------|--------------|
 | `/kernel:ingest` | Universal entry point. Classifies your task, determines scope, routes to the right agent. |
 | `/kernel:validate` | Pre-commit verification. Runs build, types, lint, tests, security scan. Blocks if anything fails. |
-| `/kernel:handoff` | Saves your progress as a YAML manifest so you can pick up exactly where you left off. |
+| `/kernel:handoff` | Saves your progress as a canonical JSON manifest so you can pick up exactly where you left off. |
 | `/kernel:checkpoint` | Bounded mid-task save. Records exact resume position for a safe context reset without a full handoff. |
 | `/kernel:review` | Code review for PRs or staged changes. Reports issues with >80% confidence. |
 | `/kernel:tearitapart` | Critical pre-implementation review. Finds problems before you write code. |
