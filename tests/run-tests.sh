@@ -2895,6 +2895,15 @@ PYEOF
   assert_contains "$output" "new.json"
 }
 
+test_manifest_latest_reports_ambiguity() {
+  mkdir -p manifests
+  cp "$FIXTURES/checkpoint-example.json" manifests/a.json
+  cp "$FIXTURES/checkpoint-example.json" manifests/b.json
+  local output ec=0; output=$("$KM" latest --dir manifests --any-branch 2>&1) || ec=$?
+  assert_exit_code 1 "$ec" "equal lineage candidates must be ambiguous" || return 1
+  assert_contains "$output" "ambiguous"
+}
+
 test_guard_context_bounded_skips_allowlisted_access() {
   mkdir -p _meta
   cat > _meta/.active-manifest.json <<'JEOF'
@@ -3207,6 +3216,7 @@ run_test_suite() {
       run_test "divergence JSON invalidates phases" test_manifest_divergence_json_invalidates_phases
       run_test "preflight checks are typed" test_manifest_preflight_is_typed
       run_test "latest uses identity timestamp" test_manifest_latest_uses_identity_not_mtime
+      run_test "latest reports ambiguity" test_manifest_latest_reports_ambiguity
       run_test "dirty tree hash divergence" test_manifest_divergence_checks_dirty_tree_hash
       run_test "schema fields name enforcement owner" test_manifest_schema_fields_name_enforcement_owner
       run_test "committed manifests are checked" test_manifest_committed_state_files_are_checked

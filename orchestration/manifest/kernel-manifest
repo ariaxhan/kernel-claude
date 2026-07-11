@@ -214,13 +214,23 @@ def cmd_latest(args):
                         branch = (manifest.get("provenance") or {}).get("branch")
                         if not created or (not any_branch and branch != live_branch):
                             continue
-                        candidates.append((created, p))
+                        candidates.append((created, p, manifest))
                     except SystemExit:
                         continue
     if not candidates:
         die(1, f"no manifests found in {dirs}")
     candidates.sort(reverse=True)
-    print(candidates[0][1])
+    newest = [item for item in candidates if item[0] == candidates[0][0]]
+    if len(newest) > 1:
+        handoff_paths = {p for _, p, m in newest if m.get("schema") == "kernel.handoff/v1"}
+        lineage = [item for item in newest
+                   if item[2].get("schema") == "kernel.checkpoint/v1"
+                   and ((item[2].get("task") or {}).get("handoff_ref") in handoff_paths)]
+        if len(lineage) == 1:
+            newest = lineage
+        else:
+            die(1, "ambiguous latest manifests: " + ", ".join(sorted(p for _, p, _ in newest)))
+    print(newest[0][1])
 
 # ---------- divergence ----------
 
