@@ -13,7 +13,8 @@
     "010_normalize_timestamps",
     "011_drop_sync_log",
     "012_learnings_fts",
-    "013_learning_load_count"
+    "013_learning_load_count",
+    "014_graph_receipt_projection"
   ],
   "tables": {
     "compaction_events": [],
@@ -361,10 +362,390 @@
         "id": "CP-20260710185701-19370-7006",
         "ts": "2026-07-11T01:57:01.686Z",
         "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"did\":\"Reviewed kernel-claude plugin: v8.0.0 on feat/yaml-skill-unification, uncommitted design→frontend rename + docs polish\",\"next\":\"Commit remaining frontend rename + open/merge PR to main; EXP-L21b verification; boot-layer audit\",\"blocked\":\"gh API forbidden from this environment — could not confirm PR/CI live status\"}",
+        "contract_id": null,
+        "id": "CP-20260710204924-35949-18275",
+        "ts": "2026-07-11T03:49:24.339Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"did\":\"Audited aDNA context graph: schema+CLI exist, 0 rows, hooks never wire it; README overclaims\",\"next\":\"Either wire graph into hooks or demote README claim to aspirational/scaffolding\",\"blocked\":\"\"}",
+        "contract_id": null,
+        "id": "CP-20260710205025-52067-12081",
+        "ts": "2026-07-11T03:50:25.349Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"skill\":\"architecture\",\"decision\":\"Keep YAML manifests authoritative; derive an optional observational context graph from manifest receipts only after sufficient telemetry, never use graph as workflow state\",\"coupling_reduced\":true,\"adr\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260710205127-55686-29599",
+        "ts": "2026-07-11T03:51:27.090Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"agent\":\"main-53184\",\"event\":\"session-end\",\"branch\":\"feat/yaml-skill-unification\",\"uncommitted_files\":2}",
+        "contract_id": null,
+        "id": "CP-20260710205239-59371-16108",
+        "ts": "2026-07-11T03:52:39.983Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"did\":\"finished task\",\"next\":\"\",\"blocked\":\"\"}",
+        "contract_id": null,
+        "id": "CP-20260710205340-64003-1864",
+        "ts": "2026-07-11T03:53:40.698Z",
+        "type": "checkpoint"
       }
     ],
-    "context_sessions": [],
-    "edges": [],
+    "context_sessions": [
+      {
+        "ended_at": null,
+        "id": "SES-20260710205337-63380-12380",
+        "nodes_loaded": null,
+        "outcome": null,
+        "started_at": "2026-07-11T03:53:37.303Z",
+        "success": null,
+        "task_type": "feature",
+        "tier": 1,
+        "tokens_used": null
+      },
+      {
+        "ended_at": "2026-07-11T03:53:38.130Z",
+        "id": "SES-20260710205338-63534-877",
+        "nodes_loaded": "[\"skills/build\"]",
+        "outcome": "{\"did\":\"fixed bug\"}",
+        "started_at": "2026-07-11T03:53:38.068Z",
+        "success": 1,
+        "task_type": "bug",
+        "tier": 1,
+        "tokens_used": 500
+      },
+      {
+        "ended_at": null,
+        "id": "SES-20260710205338-63644-18083",
+        "nodes_loaded": null,
+        "outcome": null,
+        "started_at": "2026-07-11T03:53:38.512Z",
+        "success": null,
+        "task_type": "feature",
+        "tier": 1,
+        "tokens_used": null
+      },
+      {
+        "ended_at": null,
+        "id": "RCP-acb531bc4f8ed573",
+        "nodes_loaded": "[\"CHANGELOG.md\", \"CLAUDE.md\", \"_meta/research/context-graph-architecture.md\", \"skills/git/SKILL.md\", \"skills/quality/SKILL.md\", \"skills/testing/SKILL.md\", \"tests/fixtures/manifests/handoff-example.yaml\"]",
+        "outcome": "{\"receipt\": \"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/fixtures/manifests/receipt-example.yaml\", \"manifest\": \"tests/fixtures/manifests/handoff-example.yaml\", \"status\": \"within_budget\", \"projected_by\": \"graph-project\"}",
+        "started_at": "2026-07-10T12:00:00Z",
+        "success": null,
+        "task_type": "unknown",
+        "tier": 1,
+        "tokens_used": 2900
+      }
+    ],
+    "edges": [
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CHANGELOG.md",
+        "target_path": "CLAUDE.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CLAUDE.md",
+        "target_path": "CHANGELOG.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CHANGELOG.md",
+        "target_path": "_meta/research/context-graph-architecture.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "_meta/research/context-graph-architecture.md",
+        "target_path": "CHANGELOG.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CHANGELOG.md",
+        "target_path": "skills/git/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/git/SKILL.md",
+        "target_path": "CHANGELOG.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CHANGELOG.md",
+        "target_path": "skills/quality/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/quality/SKILL.md",
+        "target_path": "CHANGELOG.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CHANGELOG.md",
+        "target_path": "skills/testing/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/testing/SKILL.md",
+        "target_path": "CHANGELOG.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CHANGELOG.md",
+        "target_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "target_path": "CHANGELOG.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CLAUDE.md",
+        "target_path": "_meta/research/context-graph-architecture.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "_meta/research/context-graph-architecture.md",
+        "target_path": "CLAUDE.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CLAUDE.md",
+        "target_path": "skills/git/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/git/SKILL.md",
+        "target_path": "CLAUDE.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CLAUDE.md",
+        "target_path": "skills/quality/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/quality/SKILL.md",
+        "target_path": "CLAUDE.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CLAUDE.md",
+        "target_path": "skills/testing/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/testing/SKILL.md",
+        "target_path": "CLAUDE.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "CLAUDE.md",
+        "target_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "target_path": "CLAUDE.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "_meta/research/context-graph-architecture.md",
+        "target_path": "skills/git/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/git/SKILL.md",
+        "target_path": "_meta/research/context-graph-architecture.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "_meta/research/context-graph-architecture.md",
+        "target_path": "skills/quality/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/quality/SKILL.md",
+        "target_path": "_meta/research/context-graph-architecture.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "_meta/research/context-graph-architecture.md",
+        "target_path": "skills/testing/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/testing/SKILL.md",
+        "target_path": "_meta/research/context-graph-architecture.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "_meta/research/context-graph-architecture.md",
+        "target_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "target_path": "_meta/research/context-graph-architecture.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/git/SKILL.md",
+        "target_path": "skills/quality/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/quality/SKILL.md",
+        "target_path": "skills/git/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/git/SKILL.md",
+        "target_path": "skills/testing/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/testing/SKILL.md",
+        "target_path": "skills/git/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/git/SKILL.md",
+        "target_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "target_path": "skills/git/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/quality/SKILL.md",
+        "target_path": "skills/testing/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/testing/SKILL.md",
+        "target_path": "skills/quality/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/quality/SKILL.md",
+        "target_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "target_path": "skills/quality/SKILL.md",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "skills/testing/SKILL.md",
+        "target_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "weight": 1.0
+      },
+      {
+        "last_observed": "2026-07-11T03:53:112191Z",
+        "relation": "loads",
+        "source_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "target_path": "skills/testing/SKILL.md",
+        "weight": 1.0
+      }
+    ],
     "errors": [
       {
         "context": null,
@@ -392,6 +773,15 @@
         "id": 3,
         "tool": "Bash",
         "ts": "2026-07-10T15:13:02.850Z"
+      },
+      {
+        "context": null,
+        "domain": "testing",
+        "error": "Exit code 128\nfatal: pathspec 'skills/design' did not match any files",
+        "file": "",
+        "id": 4,
+        "tool": "Bash",
+        "ts": "2026-07-11T03:51:28.370Z"
       }
     ],
     "events": [
@@ -6224,10 +6614,488 @@
         "metadata": "{\"exit_code\":0}",
         "session_id": "sess-20260710181013-53184",
         "ts": "2026-07-11T01:56:41.006Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 48,
+        "event": "post-compact-restore",
+        "id": 584,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710181013-53184",
+        "ts": "2026-07-11T03:26:53.035Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 31,
+        "event": "log-write",
+        "id": 585,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/.github/workflows/test.yml\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:29:44.699Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 31,
+        "event": "log-write",
+        "id": 586,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/hooks/scripts/guard-context.sh\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:30:01.986Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 40,
+        "event": "log-write",
+        "id": 587,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/hooks/scripts/guard-context.sh\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:30:29.350Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 53,
+        "event": "post-compact-restore",
+        "id": 588,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710181013-53184",
+        "ts": "2026-07-11T03:32:14.034Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 60,
+        "event": "post-compact-restore",
+        "id": 589,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710181013-53184",
+        "ts": "2026-07-11T03:39:16.278Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 590,
+        "metadata": "{\"branch\":\"feat/yaml-skill-unification\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260710203947-97325",
+        "ts": "2026-07-11T03:39:51.297Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 4018,
+        "event": "session-start",
+        "id": 591,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710203947-97325",
+        "ts": "2026-07-11T03:39:51.318Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 40,
+        "event": "post-compact-restore",
+        "id": 592,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710203947-97325",
+        "ts": "2026-07-11T03:40:03.937Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 114,
+        "event": "post-compact-restore",
+        "id": 593,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710203947-97325",
+        "ts": "2026-07-11T03:44:17.077Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 45,
+        "event": "log-write",
+        "id": 594,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/AGENTS.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:44:33.351Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 47,
+        "event": "log-write",
+        "id": 595,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/docs/QUICKSTART.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:44:34.859Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 44,
+        "event": "log-write",
+        "id": 596,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/_meta/reference/context-discipline.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:44:36.835Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 41,
+        "event": "log-write",
+        "id": 597,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/_meta/reference/heuristics.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:44:38.065Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 42,
+        "event": "log-write",
+        "id": 598,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/README.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:44:45.385Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 46,
+        "event": "log-write",
+        "id": 599,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/README.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:44:57.702Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 41,
+        "event": "log-write",
+        "id": 600,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/rules/kernel.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:45:06.637Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 42,
+        "event": "log-write",
+        "id": 601,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/rules/kernel.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:45:07.599Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 37,
+        "event": "log-write",
+        "id": 602,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/README.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:45:45.019Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 39,
+        "event": "log-write",
+        "id": 603,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/workflows/bugfix.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:45:54.761Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 40,
+        "event": "log-write",
+        "id": 604,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/workflows/feature.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:45:56.743Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 40,
+        "event": "log-write",
+        "id": 605,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/workflows/refactor.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:45:58.033Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 36,
+        "event": "log-write",
+        "id": 606,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/docs/QUICKSTART.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:46:06.108Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 39,
+        "event": "log-write",
+        "id": 607,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/docs/QUICKSTART.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:46:09.209Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 39,
+        "event": "post-compact-restore",
+        "id": 608,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710203947-97325",
+        "ts": "2026-07-11T03:46:18.528Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 42,
+        "event": "log-write",
+        "id": 609,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/frontend/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:33.762Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 42,
+        "event": "log-write",
+        "id": 610,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/frontend/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:34.764Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 40,
+        "event": "log-write",
+        "id": 611,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/frontend/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:36.061Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 46,
+        "event": "log-write",
+        "id": 612,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/CLAUDE.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:40.948Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 42,
+        "event": "log-write",
+        "id": 613,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/CLAUDE.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:42.409Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 44,
+        "event": "log-write",
+        "id": 614,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/AGENTS.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:44.955Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 37,
+        "event": "log-write",
+        "id": 615,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/AGENTS.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:46.889Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 36,
+        "event": "log-write",
+        "id": 616,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/ingest/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:48.401Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 43,
+        "event": "log-write",
+        "id": 617,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/landing-page/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:49.941Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 43,
+        "event": "log-write",
+        "id": 618,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/landing-page/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:52.085Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 40,
+        "event": "log-write",
+        "id": 619,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/forge/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:53.405Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 41,
+        "event": "log-write",
+        "id": 620,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/skills/dream/SKILL.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:47:54.335Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 40,
+        "event": "log-write",
+        "id": 621,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/.claude/CLAUDE.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:48:16.023Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 40,
+        "event": "log-write",
+        "id": 622,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/CHANGELOG.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:48:21.933Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 623,
+        "metadata": "{\"branch\":\"feat/yaml-skill-unification\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260710204901-29515",
+        "ts": "2026-07-11T03:49:02.583Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 898,
+        "event": "session-start",
+        "id": 624,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710204901-29515",
+        "ts": "2026-07-11T03:49:02.605Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 42,
+        "event": "log-write",
+        "id": 625,
+        "metadata": "{\"exit_code\":0,\"file\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/README.md\"}",
+        "session_id": "",
+        "ts": "2026-07-11T03:49:39.696Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": null,
+        "event": "session:start",
+        "id": 626,
+        "metadata": "{\"branch\":\"feat/yaml-skill-unification\",\"profile\":\"github-oss\",\"project\":\"/Users/slowember/Documents/Vaults/CodingVault/kernel-claude\"}",
+        "session_id": "sess-20260710205117-55180",
+        "ts": "2026-07-11T03:51:18.018Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 870,
+        "event": "session-start",
+        "id": 627,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710205117-55180",
+        "ts": "2026-07-11T03:51:18.040Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 120,
+        "event": "capture-error",
+        "id": 628,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710205117-55180",
+        "ts": "2026-07-11T03:51:28.459Z"
+      },
+      {
+        "agent": "",
+        "category": "session",
+        "duration_ms": 9747000,
+        "event": "session:end",
+        "id": 629,
+        "metadata": "{\"branch\":\"feat/yaml-skill-unification\",\"files_changed\":2,\"agent\":\"main-53184\",\"duration_s\":9747}",
+        "session_id": "",
+        "ts": "2026-07-11T03:52:40.299Z"
+      },
+      {
+        "agent": "",
+        "category": "hook",
+        "duration_ms": 936,
+        "event": "session-end",
+        "id": 630,
+        "metadata": "{\"exit_code\":0}",
+        "session_id": "sess-20260710205117-55180",
+        "ts": "2026-07-11T03:52:40.866Z"
       }
     ],
     "execution_traces": [],
     "experiments": [],
+    "graph_receipts": [
+      {
+        "manifest_path": "tests/fixtures/manifests/handoff-example.yaml",
+        "projected_at": "2026-07-11T03:53:39.113Z",
+        "receipt_path": "/Users/slowember/Documents/Vaults/CodingVault/kernel-claude/tests/fixtures/manifests/receipt-example.yaml",
+        "session_id": "RCP-acb531bc4f8ed573"
+      }
+    ],
     "hypotheses": [],
     "learnings": [
       {
@@ -6263,7 +7131,7 @@
         "id": "LRN-20260606095613-95225-21898",
         "insight": "Retrieval fix split: ship recall dedup+visibility+recalibrate+load_count now (cascades safe); offer scope/recall --global/promote as opt-in tools; defer decontaminate --apply until --global proves the global brain earns the W8 risk",
         "last_hit": "2026-06-06T17:26:53.719Z",
-        "load_count": 36,
+        "load_count": 39,
         "sensitivity": "low",
         "ts": "2026-06-06T16:56:13.866Z",
         "type": "pattern",
@@ -6276,7 +7144,7 @@
         "id": "LRN-20260606101828-39006-24196",
         "insight": "bm25() cannot be used inside an aggregate or GROUP BY in SQLite FTS5 — the optimizer flattens the subquery and throws 'unable to use function bm25 in the requested context'. Dedup ranked FTS results in awk (post-query), not in SQL.",
         "last_hit": "2026-06-06T17:26:53.719Z",
-        "load_count": 36,
+        "load_count": 39,
         "sensitivity": "low",
         "ts": "2026-06-06T17:18:28.385Z",
         "type": "gotcha",
@@ -6289,7 +7157,7 @@
         "id": "LRN-20260606101828-39039-22805",
         "insight": "AgentDB retrieval rot: per-project learning DBs were 73% identical clones (328/452 distinct insights in all 5 DBs), hit_count was poisoned by read-start blanket-bumping every row each session, and FTS existed in only 1 of 5 DBs. Fix shipped: dedup + visibility filter + recalibrated ranking + load_count split (v7.15). Deferred: scope column + cross-project recall --global (global brain empty, would ship dead).",
         "last_hit": "2026-06-06T17:26:53.719Z",
-        "load_count": 36,
+        "load_count": 39,
         "sensitivity": "low",
         "ts": "2026-06-06T17:18:28.416Z",
         "type": "pattern",
@@ -6302,7 +7170,7 @@
         "id": "LRN-20260619112517-41191-951",
         "insight": "deliberate behavior change shipped via chore(session-end) auto-commit without updating its test → suite red on main for days; no CI-failure auto-fix trigger existed and the local test-gate cache (_meta/.test-status) was frozen PASS so red kept pushing",
         "last_hit": null,
-        "load_count": 27,
+        "load_count": 30,
         "sensitivity": "low",
         "ts": "2026-06-19T18:25:17.417Z",
         "type": "failure",
@@ -6315,7 +7183,7 @@
         "id": "LRN-20260706173657-3978-22856",
         "insight": "kernel plugin guard-config blocks Write/Edit outside .claude allowlist (CLAUDE.md, rules/, commands/, agents/, skills/, hooks/, settings)",
         "last_hit": null,
-        "load_count": 6,
+        "load_count": 9,
         "sensitivity": "low",
         "ts": "2026-07-07T00:36:57.429Z",
         "type": "gotcha",
@@ -6328,7 +7196,7 @@
         "id": "LRN-20260710080950-25036-29600",
         "insight": "Promotion pathway shifted to artifact ladder: hook > agent > skill > CLAUDE.md prose. Retrospective scaffolds project-local artifacts in host .claude/ and audits project fit (missing + dormant).",
         "last_hit": null,
-        "load_count": 1,
+        "load_count": 4,
         "sensitivity": "low",
         "ts": "2026-07-10T15:09:50.666Z",
         "type": "pattern",
@@ -6341,7 +7209,7 @@
         "id": "LRN-20260710082547-45774-22154",
         "insight": "Cross-repo retrospective promotion round: 4 repos mined, 10 artifacts shipped via artifact ladder. Strongest cross-repo failure class: green sub-computation / broken armed path (4 independent sightings) -> kernel testing+adversary+CLAUDE.md anti-pattern",
         "last_hit": null,
-        "load_count": 1,
+        "load_count": 4,
         "sensitivity": "low",
         "ts": "2026-07-10T15:25:47.044Z",
         "type": "pattern",
@@ -6354,7 +7222,7 @@
         "id": "LRN-20260710082547-45809-5741",
         "insight": "Subagent committed despite explicit no-commit contract (urban-atlas 0ba9e19) into another live session's branch; likely that repo's auto-commit hooks. Writer-lane contracts need commit-suppression verified, not just stated",
         "last_hit": null,
-        "load_count": 1,
+        "load_count": 4,
         "sensitivity": "low",
         "ts": "2026-07-10T15:25:47.096Z",
         "type": "gotcha",
@@ -6367,7 +7235,7 @@
         "id": "LRN-20260710185543-915-25107",
         "insight": "Migration cost lives in enforcement surfaces, not the moved files: 14 command files moved in one scripted minute; ~90% of the work was retargeting tests/hooks/docs/metadata that ENUMERATED the old layer",
         "last_hit": null,
-        "load_count": 0,
+        "load_count": 3,
         "sensitivity": "low",
         "ts": "2026-07-11T01:55:43.146Z",
         "type": "pattern",
@@ -6380,7 +7248,7 @@
         "id": "LRN-20260710185543-981-22323",
         "insight": "YAML scalar typing: an all-digit git sha (or sha256) parses as an integer and fails string schema validation; manifests must quote every hash/commit field",
         "last_hit": null,
-        "load_count": 0,
+        "load_count": 3,
         "sensitivity": "low",
         "ts": "2026-07-11T01:55:43.247Z",
         "type": "gotcha",
@@ -6393,13 +7261,83 @@
         "id": "LRN-20260710185543-1035-14087",
         "insight": "Plugin skills preserve slash invocation exactly: skills/<dir>/SKILL.md in plugin 'kernel' surfaces as /kernel:<dir>, so a commands->skills migration needs NO aliases",
         "last_hit": null,
-        "load_count": 0,
+        "load_count": 3,
         "sensitivity": "low",
         "ts": "2026-07-11T01:55:43.338Z",
         "type": "pattern",
         "visibility": "agent"
+      },
+      {
+        "domain": "kernel-claude",
+        "evidence": "kernel v8 PR 145: 3 CI-only failures after a fully green local suite; all three were environment/enumeration gaps, zero logic bugs",
+        "hit_count": 0,
+        "id": "LRN-20260710203236-86517-22082",
+        "insight": "CI workflow yml files duplicate repo checks inline (version-sync in test.yml mirrored run-tests.sh) and are an enumeration surface migrations miss: grep sweeps covering *.md/*.sh/*.json skip *.yml. Also: CI runners have no git identity (tests that commit in temp repos need inline -c user.email/-c user.name) and shellcheck runs in CI but not locally by default",
+        "last_hit": null,
+        "load_count": 3,
+        "sensitivity": "low",
+        "ts": "2026-07-11T03:32:36.861Z",
+        "type": "gotcha",
+        "visibility": "agent"
       }
     ],
-    "nodes": []
+    "nodes": [
+      {
+        "access_count": 1,
+        "avg_success_rate": 0.0,
+        "last_accessed": "2026-07-11T03:53:112191Z",
+        "path": "CLAUDE.md",
+        "tokens": 0,
+        "type": "config"
+      },
+      {
+        "access_count": 1,
+        "avg_success_rate": 0.0,
+        "last_accessed": "2026-07-11T03:53:112191Z",
+        "path": "skills/quality/SKILL.md",
+        "tokens": 0,
+        "type": "skill"
+      },
+      {
+        "access_count": 1,
+        "avg_success_rate": 0.0,
+        "last_accessed": "2026-07-11T03:53:112191Z",
+        "path": "skills/testing/SKILL.md",
+        "tokens": 0,
+        "type": "skill"
+      },
+      {
+        "access_count": 1,
+        "avg_success_rate": 0.0,
+        "last_accessed": "2026-07-11T03:53:112191Z",
+        "path": "skills/git/SKILL.md",
+        "tokens": 0,
+        "type": "skill"
+      },
+      {
+        "access_count": 1,
+        "avg_success_rate": 0.0,
+        "last_accessed": "2026-07-11T03:53:112191Z",
+        "path": "tests/fixtures/manifests/handoff-example.yaml",
+        "tokens": 0,
+        "type": "config"
+      },
+      {
+        "access_count": 1,
+        "avg_success_rate": 0.0,
+        "last_accessed": "2026-07-11T03:53:112191Z",
+        "path": "CHANGELOG.md",
+        "tokens": 0,
+        "type": "code"
+      },
+      {
+        "access_count": 1,
+        "avg_success_rate": 0.0,
+        "last_accessed": "2026-07-11T03:53:112191Z",
+        "path": "_meta/research/context-graph-architecture.md",
+        "tokens": 0,
+        "type": "research"
+      }
+    ]
   }
 }

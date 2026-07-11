@@ -455,6 +455,11 @@ cmd_write_end() {
   if command -v jq >/dev/null 2>&1; then
     cmd_export_json >/dev/null 2>&1 || true
   fi
+
+  # Best-effort: close the latest receipt-derived graph session (shadow telemetry).
+  if [ -x "$SCHEMA_DIR/graph-project.py" ] || [ -f "$SCHEMA_DIR/graph-project.py" ]; then
+    python3 "$SCHEMA_DIR/graph-project.py" outcome-from-checkpoint "$content" >/dev/null 2>&1 || true
+  fi
 }
 
 cmd_learn() {
@@ -1181,28 +1186,32 @@ cmd_track_node() {
   "
 }
 
+cmd_graph_project() {
+  cmd_init >/dev/null 2>&1 || true
+  local target="${1:-}"
+  if [ ! -f "$SCHEMA_DIR/graph-project.py" ]; then
+    echo "graph-project.py not found" >&2
+    exit 1
+  fi
+  if [ -z "$target" ] || [ "$target" = "--all" ]; then
+    python3 "$SCHEMA_DIR/graph-project.py" project-all
+  else
+    python3 "$SCHEMA_DIR/graph-project.py" project "$target"
+  fi
+}
+
+cmd_graph_suggest() {
+  local task_type="${1:-}"
+  [ -z "$task_type" ] && { echo "Usage: agentdb graph-suggest <task_type> [--min-sessions N]"; exit 1; }
+  cmd_init >/dev/null 2>&1 || true
+  shift
+  python3 "$SCHEMA_DIR/graph-project.py" suggest "$task_type" "$@"
+}
+
 cmd_suggest_context() {
   local task_type="${1:-}"
-  local max_tokens="${2:-4000}"
-
-  [ -z "$task_type" ] && { echo "Usage: agentdb suggest-context <task_type> [max_tokens]"; exit 1; }
-  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
-  validate_int "$max_tokens" "max_tokens"
-
-  # Find nodes that correlate with success for this task type
-  db_exec_opts "-header -column" "
-    SELECT DISTINCT
-      n.path,
-      n.type,
-      n.tokens,
-      n.avg_success_rate,
-      n.access_count
-    FROM nodes n
-    WHERE n.avg_success_rate > 0.5
-      AND n.access_count >= 2
-    ORDER BY n.avg_success_rate DESC, n.access_count DESC
-    LIMIT 10;
-  " 2>/dev/null || echo "No suggestions yet. Need more session data."
+  echo "NOTE: suggest-context is deprecated; use 'agentdb graph-suggest' (shadow advisory only)." >&2
+  cmd_graph_suggest "$task_type" "${@:2}"
 }
 
 cmd_emit() {
@@ -2040,6 +2049,8 @@ case "${1:-help}" in
   session-start)  shift; cmd_session_start "$@" ;;
   session-end)    shift; cmd_session_end "$@" ;;
   track-node)     shift; cmd_track_node "$@" ;;
+  graph-project)  shift; cmd_graph_project "$@" ;;
+  graph-suggest)  shift; cmd_graph_suggest "$@" ;;
   suggest-context) shift; cmd_suggest_context "$@" ;;
   inject-context) shift; cmd_inject_context "$@" ;;
   emit)        shift; cmd_emit "$@" ;;
@@ -2076,11 +2087,15 @@ case "${1:-help}" in
     echo "  contract list           List recent contracts"
     echo "  verdict <p|f> <evidence>  QA result"
     echo ""
-    echo "GRAPH TRACKING (after migration 002):"
-    echo "  session-start <type> [tier]  Start tracking a work session"
-    echo "  session-end <id> <1|0> <json>  Close session with outcome"
-    echo "  track-node <path> <type> [tokens]  Record node access"
-    echo "  suggest-context <type>  Suggest context based on success patterns"
+    echo "CONTEXT GRAPH (derived from manifest receipts — shadow/advisory):"
+    echo "  graph-project [receipt.yaml|--all]  Project receipt YAML into nodes/edges"
+    echo "  graph-suggest <task_type> [--min-sessions N]  Advisory co-load suggestions (never auto-loads)"
+    echo ""
+    echo "LEGACY GRAPH (manual test hooks — prefer graph-project from receipts):"
+    echo "  session-start <type> [tier]  Manual session row (tests only)"
+    echo "  session-end <id> <1|0> <json>  Manual session close (tests only)"
+    echo "  track-node <path> <type> [tokens]  Manual node access"
+    echo "  suggest-context <type>  Deprecated alias for graph-suggest"
     echo ""
     echo "TELEMETRY (after migration 003):"
     echo "  emit <cat> <event> [ms] [json]  Record telemetry event"

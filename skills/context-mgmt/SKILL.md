@@ -27,7 +27,7 @@ Use native /context command to check usage. This skill is for methodology.
 <reference>
 Skill-specific: skills/context-mgmt/reference/context-mgmt-research.md
 Architecture: _meta/research/context-graph-architecture.md
-Graph tracking: orchestration/agentdb/migrations/002_graph_tracking.sql
+Graph telemetry (shadow): receipts → `agentdb graph-project` / `graph-suggest` (see orchestration/agentdb/graph-project.py). YAML manifests remain authoritative.
 </reference>
 
 <core_principles>

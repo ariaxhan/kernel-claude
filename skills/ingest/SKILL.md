@@ -138,7 +138,14 @@ Workflow steps guide the phase sequence. Human confirms at each step (ingest mod
      ```bash
      "$KM" deactivate --receipt _meta/reports/receipt-{date}.yaml
      ```
-     then outputs.completion (usually agentdb write-end).
+     Deactivate projects the receipt into AgentDB's observational context graph (shadow
+     telemetry). Then outputs.completion (usually agentdb write-end), which records session
+     outcome on that graph row when `did`/`blocked` are present.
+
+  Optional advisory (never auto-loads):
+     ```bash
+     agentdb graph-suggest {task_type}
+     ```
 
   Output: "Resuming {manifest}: {goal}. Entry: {entry_phase}. Receipt: {total_estimated_tokens} tokens ({status})."
 </step>

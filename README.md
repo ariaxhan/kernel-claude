@@ -164,9 +164,9 @@ Edits take effect immediately — no version bumps or reinstalls needed. Claude 
 
 SQLite database at `_meta/agentdb/agent.db`. Stores learnings, events, errors, hypotheses, experiments, contracts, checkpoints, verdicts. Graduated retrieval loads the top 75 by weighted score (86% token savings vs loading everything).
 
-### Graph Layer (Built on aDNA)
+### Context Graph (Observational, Receipt-Derived)
 
-Context graph inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtocol/adna) from Lattice Protocol. Models context as nodes + edges — which skills load well together, which agent combinations succeed, which nodes conflict. The graph learns over time.
+Inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtocol/adna) — but **YAML manifests stay authoritative** for resume, policy, and safety. After `/kernel:ingest` compiles a manifest, the `kernel.context-receipt/v1` YAML records what context was actually loaded. `agentdb graph-project` derives nodes and co-load edges from those receipts (automatic on `kernel-manifest deactivate`). `agentdb graph-suggest` surfaces **shadow-mode** advisory patterns only; it never auto-loads context or overrides manifest selectors until experiment-backed promotion (50+ comparable sessions). The graph observes; manifests decide.
 
 ### Experiment Engine
 

@@ -40,6 +40,10 @@ conversations.
   confirmation, produces/consumes). Side-effecting skills (forge, init, experiment,
   landing-page) carry disable-model-invocation: true (test-enforced).
 - 27 new tests (manifest suite: schemas, CLI, guard hook, migration guards).
+- **Context graph (shadow telemetry).** Receipt-derived projection only:
+  `orchestration/agentdb/graph-project.py` + `agentdb graph-project|graph-suggest`.
+  `kernel-manifest deactivate --receipt` auto-projects; `write-end` records outcome.
+  YAML manifests remain authoritative; suggestions are advisory until 50+ sessions.
 
 ### Changed
 - **handoff** emits canonical YAML manifests (md renders marked non-authoritative) and

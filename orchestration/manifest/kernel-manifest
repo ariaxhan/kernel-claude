@@ -469,6 +469,15 @@ def cmd_deactivate(args):
     for p in (ACTIVE_POINTER, CONTEXT_LEDGER):
         if os.path.isfile(p):
             os.remove(p)
+    if receipt_path and os.path.isfile(receipt_path):
+        graph_script = os.path.join(PLUGIN_ROOT, "orchestration", "agentdb", "graph-project.py")
+        if os.path.isfile(graph_script):
+            subprocess.run(
+                [sys.executable, graph_script, "project", receipt_path],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
     print("deactivated")
 
 # ---------- main ----------

@@ -831,7 +831,8 @@ _ensure_graph_migration() {
   local has_table
   has_table=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='context_sessions' LIMIT 1;" 2>/dev/null || echo "")
   if [ -z "$has_table" ]; then
-    sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" < "$PLUGIN_ROOT/orchestration/agentdb/migrations/002_graph_tracking.sql"
+    echo "FAIL: agentdb init did not apply graph tracking migration"
+    return 1
   fi
 }
 
@@ -877,6 +878,48 @@ test_session_end_validates_tokens() {
     echo "FAIL: non-integer tokens should fail"
     return 1
   }
+}
+
+test_graph_project_from_receipt() {
+  _ensure_graph_migration
+  local receipt="$PLUGIN_ROOT/tests/fixtures/manifests/receipt-example.yaml"
+  [ -f "$receipt" ] || { echo "FAIL: missing receipt fixture"; return 1; }
+  agentdb graph-project "$receipt" >/dev/null
+  local sessions nodes edges
+  sessions=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM context_sessions WHERE id LIKE 'RCP-%';")
+  nodes=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM nodes;")
+  edges=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM edges;")
+  assert_equals "1" "$sessions" "receipt should create one graph session"
+  [ "$nodes" -gt 0 ] || { echo "FAIL: expected nodes from receipt projection"; return 1; }
+  [ "$edges" -gt 0 ] || { echo "FAIL: expected co-load edges from receipt projection"; return 1; }
+}
+
+test_graph_project_idempotent() {
+  _ensure_graph_migration
+  local receipt="$PLUGIN_ROOT/tests/fixtures/manifests/receipt-example.yaml"
+  agentdb graph-project "$receipt" >/dev/null
+  agentdb graph-project "$receipt" >/dev/null
+  local sessions
+  sessions=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM graph_receipts WHERE receipt_path LIKE '%receipt-example.yaml';")
+  assert_equals "1" "$sessions" "receipt projection should be idempotent"
+}
+
+test_graph_suggest_shadow_mode() {
+  _ensure_graph_migration
+  local output
+  output=$(agentdb graph-suggest feature 2>&1)
+  assert_contains "$output" "shadow mode"
+  assert_contains "$output" "YAML manifests remain authoritative"
+}
+
+test_graph_outcome_from_write_end() {
+  _ensure_graph_migration
+  local receipt="$PLUGIN_ROOT/tests/fixtures/manifests/receipt-example.yaml"
+  agentdb graph-project "$receipt" >/dev/null
+  agentdb write-end '{"did":"finished task","next":"","blocked":""}' >/dev/null
+  local success
+  success=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT success FROM context_sessions WHERE id LIKE 'RCP-%' ORDER BY started_at DESC LIMIT 1;")
+  assert_equals "1" "$success" "write-end should mark latest graph session successful"
 }
 
 # === Schema Validation Tests ===
@@ -2938,6 +2981,10 @@ run_test_suite() {
       run_test "session-start validates tier" test_session_start_validates_tier
       run_test "session-end updates session" test_session_end_updates_session
       run_test "session-end validates tokens" test_session_end_validates_tokens
+      run_test "graph-project from receipt" test_graph_project_from_receipt
+      run_test "graph-project idempotent" test_graph_project_idempotent
+      run_test "graph-suggest shadow mode" test_graph_suggest_shadow_mode
+      run_test "graph outcome from write-end" test_graph_outcome_from_write_end
       ;;
     schema_validation)
       run_test "inline schema matches schema.sql" test_inline_schema_matches_schema_sql
