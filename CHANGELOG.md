@@ -31,12 +31,17 @@ versioned plugin cache cannot keep serving the incomplete build.
   who do not receive repository `AGENTS.md` automatically.
 - Made no-marker compaction restoration silent without hiding legitimate runtime
   selection messages in other paths.
+- Added an exact-root ownership boundary for the shared Vaults continuity service.
+  KERNEL compaction hooks cleanly no-op only when the active project is the Vaults root
+  and the shared engine plus an executable host adapter exist; nested repositories keep
+  KERNEL's no-auto-commit fallback, and SessionStart retains governance without a
+  competing restore injection.
 - Made retrospective staleness use `COALESCE(last_hit, ts)` so recently recalled older
   learnings are not archived, and corrected release instructions to name the exact
   canonical files changed by `scripts/bump-version.sh`.
 
 ### Verification
-- The corrected candidate passes the bounded full suite: **363 passed, 0 failed**, plus
+- The corrected candidate passes the bounded full suite: **368 passed, 0 failed**, plus
   focused runtime-upgrade, release-documentation, cross-loader hook, retrospective,
   compaction, and version-synchronization gates.
 

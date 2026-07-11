@@ -247,6 +247,19 @@ get_project_root() {
   echo "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 }
 
+# The shared Vaults continuity service owns compaction only for a session whose
+# active project is the Vaults root itself. Nested repositories keep KERNEL's
+# deterministic fallback because root-level host hooks may not be loaded there.
+kernel_vaults_continuity_active() {
+  local vaults="${1:-}" project_root="${2:-}"
+  [ -n "$vaults" ] && [ -n "$project_root" ] || return 1
+  kernel_safe_path "$vaults" && kernel_safe_path "$project_root" || return 1
+  [ "$project_root" = "$vaults" ] || return 1
+  [ -f "$vaults/_meta/services/context_checkpoint.py" ] || return 1
+  [ -x "$vaults/.claude/hooks/context-checkpoint.sh" ] \
+    || [ -x "$vaults/.codex/shims/context-checkpoint.sh" ]
+}
+
 # === Hook Telemetry ===
 # Lightweight timing for hook execution. Fire-and-forget.
 # Usage: _kernel_hook_start at top, _kernel_hook_end at bottom.

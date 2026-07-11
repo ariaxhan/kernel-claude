@@ -164,6 +164,13 @@ the project profile enables it. KERNEL does not promise that all processing stay
 local when you invoke a workflow that uses external tools. Review host permissions
 and the repository's own instructions before granting access.
 
+When the active project root exactly matches the Vaults root and the shared continuity
+engine plus an executable Claude or Codex adapter are present, that Vaults service owns
+compaction checkpoints and restore injection. KERNEL's PreCompact and PostCompact paths
+cleanly no-op there; SessionStart still supplies AgentDB and governance without adding a
+second restore. Nested repositories retain KERNEL's deterministic generic fallback.
+Merely finding continuity files above the active project does not disable KERNEL.
+
 ## Safety model
 
 - Risk is based on how hard a change is to undo, how quietly it can fail, and how much it can affect.

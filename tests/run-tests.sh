@@ -1788,7 +1788,7 @@ test_release_changelog_v8_is_current_and_history_preserved() {
   local v801 v800
   v801=$(awk '/^## \[8\.0\.1\]/{on=1} /^## \[8\.0\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
   v800=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
-  [[ "$v801" == *"incomplete"* ]] && [[ "$v801" == *"Codex"* ]] && [[ "$v801" == *"363"* ]] || return 1
+  [[ "$v801" == *"incomplete"* ]] && [[ "$v801" == *"Codex"* ]] && [[ "$v801" == *"368"* ]] || return 1
   [[ "$v800" == *"strict JSON"* ]] && [[ "$v800" == *"preflight"* ]] && [[ "$v800" == *"select-runtime.sh"* ]] || return 1
   grep -q '^## \[7.23.0\] - 2026-07-06' "$PLUGIN_ROOT/CHANGELOG.md"
 }
@@ -1798,6 +1798,12 @@ test_release_docs_use_current_801_runtime() {
   ! grep -q 'kernel/8\.0\.0/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
   # Historical 8.0.0 release and upgrade references remain valid outside active runtime commands.
   grep -q '^## \[8\.0\.0\] - 2026-07-11' "$PLUGIN_ROOT/CHANGELOG.md"
+}
+
+test_release_docs_explain_vaults_continuity_boundary() {
+  grep -q 'active project root exactly matches the Vaults root' "$PLUGIN_ROOT/README.md" || return 1
+  grep -q 'Nested repositories retain KERNEL' "$PLUGIN_ROOT/README.md" || return 1
+  grep -q 'shared Vaults continuity service' "$PLUGIN_ROOT/CHANGELOG.md"
 }
 
 test_release_metadata_and_inventory_are_truthful() {
@@ -1838,6 +1844,72 @@ test_dream_command_has_github_integration() {
 }
 
 # === Compaction Restore Tests ===
+
+make_vaults_continuity_fixture() {
+  local vaults="$1"
+  mkdir -p "$vaults/_meta/services" "$vaults/.claude/hooks"
+  : > "$vaults/_meta/services/context_checkpoint.py"
+  printf '#!/bin/bash\nexit 0\n' > "$vaults/.claude/hooks/context-checkpoint.sh"
+  chmod +x "$vaults/.claude/hooks/context-checkpoint.sh"
+}
+
+test_vaults_continuity_requires_exact_root_and_executable_adapter() {
+  local vaults="$TEST_DIR/vaults" nested="$TEST_DIR/vaults/nested"
+  mkdir -p "$nested"
+  make_vaults_continuity_fixture "$vaults"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  kernel_vaults_continuity_active "$vaults" "$vaults" || return 1
+  ! kernel_vaults_continuity_active "$vaults" "$nested" || { echo "FAIL: nested project must retain KERNEL fallback"; return 1; }
+  chmod -x "$vaults/.claude/hooks/context-checkpoint.sh"
+  ! kernel_vaults_continuity_active "$vaults" "$vaults" || { echo "FAIL: non-executable adapter must not activate"; return 1; }
+  rm "$vaults/_meta/services/context_checkpoint.py"
+  chmod +x "$vaults/.claude/hooks/context-checkpoint.sh"
+  ! kernel_vaults_continuity_active "$vaults" "$vaults" || { echo "FAIL: missing shared engine must not activate"; return 1; }
+}
+
+test_vaults_root_compaction_hooks_clean_noop() {
+  local vaults="$TEST_DIR/vaults-root" output
+  mkdir -p "$vaults/_meta/agents"
+  make_vaults_continuity_fixture "$vaults"
+  printf 'vaults-owned\n' > "$vaults/_meta/.compact-marker"
+  output=$(cd "$vaults" && KERNEL_VAULTS="$vaults" CLAUDE_PROJECT_DIR="$vaults" \
+    bash "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh" <<<'{"trigger":"manual"}' 2>&1)
+  assert_equals "" "$output" "PreCompact must clean no-op at activated Vaults root" || return 1
+  output=$(cd "$vaults" && KERNEL_VAULTS="$vaults" CLAUDE_PROJECT_DIR="$vaults" \
+    bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" <<<'{}' 2>&1)
+  assert_equals "" "$output" "PostCompact must not inject restore state at activated Vaults root" || return 1
+  assert_equals "vaults-owned" "$(cat "$vaults/_meta/.compact-marker")" "KERNEL must preserve Vaults-owned marker" || return 1
+  [ ! -e "$vaults/_meta/.compact-keyterms" ]
+}
+
+test_nested_project_retains_kernel_compaction_fallback() {
+  local vaults="$TEST_DIR/vaults-root" nested output
+  nested="$vaults/nested"
+  mkdir -p "$nested/_meta" "$vaults/_meta/agents"
+  make_vaults_continuity_fixture "$vaults"
+  echo test-agent > "$vaults/_meta/agents/.current"
+  echo nested-owned > "$nested/_meta/.compact-marker"
+  output=$(cd "$nested" && KERNEL_VAULTS="$vaults" CLAUDE_PROJECT_DIR="$nested" \
+    bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" <<<'{}' 2>&1)
+  assert_contains "$output" "Context Restored After Compaction" || return 1
+  [ ! -e "$nested/_meta/.compact-marker" ]
+}
+
+test_vaults_root_session_start_keeps_governance_without_restore() {
+  local vaults="$TEST_DIR/vaults-root" output
+  mkdir -p "$vaults/_meta/agentdb"
+  make_vaults_continuity_fixture "$vaults"
+  KERNEL_VAULTS="$vaults" AGENTDB_ROOT="$vaults" agentdb init >/dev/null
+  KERNEL_VAULTS="$vaults" AGENTDB_ROOT="$vaults" agentdb write-end \
+    '{"event":"pre-compact","goal":"must-not-inject"}' >/dev/null
+  output=$(cd "$vaults" && KERNEL_VAULTS="$vaults" AGENTDB_ROOT="$vaults" CLAUDE_PROJECT_DIR="$vaults" \
+    bash "$PLUGIN_ROOT/hooks/scripts/session-start.sh" <<<'{"session_id":"root-test"}' 2>&1)
+  assert_contains "$output" "# KERNEL" "SessionStart governance must remain" || return 1
+  if [[ "$output" == *"Resume From Checkpoint"* || "$output" == *"must-not-inject"* ]]; then
+    echo "FAIL: SessionStart injected competing restore state at activated Vaults root"
+    return 1
+  fi
+}
 
 test_compact_restore_fast_exit() {
   cd "$TEST_PROJECT"
@@ -4228,6 +4300,10 @@ run_test_suite() {
       run_test "dream command has github integration" test_dream_command_has_github_integration
       ;;
     compaction_restore)
+      run_test "Vaults continuity requires exact root and executable adapter" test_vaults_continuity_requires_exact_root_and_executable_adapter
+      run_test "Vaults root compaction hooks clean no-op" test_vaults_root_compaction_hooks_clean_noop
+      run_test "nested project retains KERNEL compaction fallback" test_nested_project_retains_kernel_compaction_fallback
+      run_test "Vaults root SessionStart keeps governance without restore" test_vaults_root_session_start_keeps_governance_without_restore
       run_test "post-compact-restore fast exit without marker" test_compact_restore_fast_exit
       run_test "post-compact-restore outputs marker content" test_compact_restore_outputs_marker
       run_test "post-compact-restore deletes marker" test_compact_restore_deletes_marker
@@ -4324,6 +4400,7 @@ run_test_suite() {
       run_test "active docs reject stale claims" test_release_docs_reject_stale_live_claims
       run_test "8.0 changelog current and 7.x history preserved" test_release_changelog_v8_is_current_and_history_preserved
       run_test "active release docs use 8.0.1 runtime" test_release_docs_use_current_801_runtime
+      run_test "Vaults continuity boundary is documented" test_release_docs_explain_vaults_continuity_boundary
       run_test "metadata and inventory truthful" test_release_metadata_and_inventory_are_truthful
       run_test "rollback works outside a checkout" test_release_docs_rollback_works_outside_a_checkout
       run_test "Claude and Codex lifecycle commands are separate" test_release_docs_separate_claude_and_codex_lifecycle

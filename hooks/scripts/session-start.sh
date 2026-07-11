@@ -10,6 +10,8 @@ _kernel_hook_start
 VAULTS=$(detect_vaults)
 AGENTDB=$(get_agentdb "$VAULTS")
 PROJECT_ROOT=$(get_project_root)
+VAULTS_CONTINUITY_ACTIVE=0
+kernel_vaults_continuity_active "$VAULTS" "$PROJECT_ROOT" && VAULTS_CONTINUITY_ACTIVE=1
 
 # Ensure auto-memory MEMORY.md exists (prevents first-session crash)
 MEMORY_DIR="$HOME/.claude/projects/-$(echo "$PROJECT_ROOT" | tr '/' '-' | sed 's/^-//')/memory"
@@ -153,7 +155,15 @@ fi
 
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   echo ""
-  "$AGENTDB" read-start 2>/dev/null
+  if [ "$VAULTS_CONTINUITY_ACTIVE" -eq 1 ]; then
+    "$AGENTDB" read-start 2>/dev/null | awk '
+      /^## Last Checkpoint/ { skip=1; next }
+      skip && /^## / { skip=0 }
+      !skip { print }
+    '
+  else
+    "$AGENTDB" read-start 2>/dev/null
+  fi
   echo ""
 
   # Prune stale learnings (0 hits, >30 days old)
@@ -168,7 +178,10 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   fi
 
   # Check for recent compaction checkpoint (auto-handoff)
-  LAST_CHECKPOINT=$("$AGENTDB" query "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1" 2>/dev/null)
+  LAST_CHECKPOINT=""
+  if [ "$VAULTS_CONTINUITY_ACTIVE" -eq 0 ]; then
+    LAST_CHECKPOINT=$("$AGENTDB" query "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1" 2>/dev/null)
+  fi
   if [ -n "$LAST_CHECKPOINT" ]; then
     # Check if it was a pre-compact checkpoint
     if echo "$LAST_CHECKPOINT" | grep -q "pre-compact\|compaction"; then
