@@ -1981,6 +1981,25 @@ test_release_docs_explain_codex_invocation_and_boundaries() {
   done
 }
 
+test_release_docs_explicit_only_inventory_is_derived() {
+  python3 - "$PLUGIN_ROOT" <<'PY'
+import pathlib, re, sys
+root = pathlib.Path(sys.argv[1])
+actual = {
+    skill.parent.name
+    for skill in (root / "skills").glob("*/SKILL.md")
+    if re.search(r"^disable-model-invocation:\s*true\s*$", skill.read_text(), re.M)
+}
+for relative in ("docs/QUICKSTART.md", "docs/MIGRATION-8.md"):
+    text = (root / relative).read_text()
+    match = re.search(r"Explicit-only skills \((\d+)\):\s*(.*?)\.", text, re.S)
+    assert match, f"{relative}: explicit-only inventory missing"
+    documented = set(re.findall(r"`([a-z0-9-]+)`", match.group(2)))
+    assert int(match.group(1)) == len(actual), (relative, match.group(1), actual)
+    assert documented == actual, (relative, documented, actual)
+PY
+}
+
 test_release_changelog_v8_is_current_and_history_preserved() {
   local v810 v802 v801 v800
   v810=$(awk '/^## \[8\.1\.0\]/{on=1} /^## \[8\.0\.2\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
@@ -4624,6 +4643,7 @@ run_test_suite() {
       run_test "rollback works outside a checkout" test_release_docs_rollback_works_outside_a_checkout
       run_test "Claude and Codex lifecycle commands are separate" test_release_docs_separate_claude_and_codex_lifecycle
       run_test "Codex invocation and lifecycle boundaries are documented" test_release_docs_explain_codex_invocation_and_boundaries
+      run_test "explicit-only skill inventory is derived" test_release_docs_explicit_only_inventory_is_derived
       ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol

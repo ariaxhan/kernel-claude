@@ -122,8 +122,8 @@ was removed.
 Codex loads all 34 KERNEL skills, with explicit calls written as `$kernel:<name>`.
 Use `$kernel:governance-sync` (or Claude's `/kernel:governance-sync`) to audit native
 instruction coverage. Writes require explicit confirmation and a backup directory.
-The four side-effecting skills (`init`, `forge`, `experiment`, and `landing-page`)
-also carry Codex-native policy that forbids automatic invocation.
+Explicit-only skills (5): `experiment`, `forge`, `governance-sync`, `init`,
+`landing-page`. Their Codex-native policy forbids automatic invocation.
 
 The 15 files under `agents/` are Claude Code agent definitions. Codex does not
 register them as native agents; KERNEL applies their role contracts when coordinating
