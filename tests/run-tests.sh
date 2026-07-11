@@ -322,10 +322,10 @@ test_session_start_creates_agent_file() {
 }
 
 test_detect_secrets_clean() {
-  # Create a clean file
-  echo "const x = 123;" > "$TEST_PROJECT/test.ts"
+  # Exercise the real Claude Write hook payload with clean content.
   local exit_code=0
-  "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" "$TEST_PROJECT/test.ts" >/dev/null 2>&1 || exit_code=$?
+  printf '%s\n' '{"tool_input":{"content":"const x = 123;"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1 || exit_code=$?
   # Should pass (0) for clean file
   assert_exit_code 0 "$exit_code" "clean file should pass"
 }
@@ -967,6 +967,26 @@ test_guard_config_allows_codex_apply_patch_rule() {
   json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
   printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1
   assert_exit_code 0 "$?" "Codex apply_patch into .claude/rules must be allowed"
+}
+
+test_guard_config_blocks_codex_dot_segment_bypass() {
+  local patch json ec=0
+  patch=$'*** Begin Patch\n*** Add File: .claude/rules/../generated/x.md\n+bypass\n*** End Patch'
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "dot segments must not escape the .claude allowlist"
+}
+
+test_guard_config_fails_closed_on_malformed_json() {
+  local ec=0
+  printf '{malformed\n' | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "guard-config must block malformed hook JSON"
+}
+
+test_detect_secrets_fails_closed_on_malformed_json() {
+  local ec=0
+  printf '{malformed\n' | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "detect-secrets must block malformed hook JSON"
 }
 
 test_codex_explicit_only_skill_policies() {
@@ -4040,6 +4060,9 @@ run_test_suite() {
       run_test "guard-config allows rules" test_guard_config_allows_rules
       run_test "guard-config blocks Codex apply_patch" test_guard_config_blocks_codex_apply_patch
       run_test "guard-config allows Codex apply_patch rule" test_guard_config_allows_codex_apply_patch_rule
+      run_test "guard-config blocks Codex dot segment bypass" test_guard_config_blocks_codex_dot_segment_bypass
+      run_test "guard-config fails closed on malformed JSON" test_guard_config_fails_closed_on_malformed_json
+      run_test "detect-secrets fails closed on malformed JSON" test_detect_secrets_fails_closed_on_malformed_json
       run_test "Codex risky skills are explicit-only" test_codex_explicit_only_skill_policies
       run_test "Codex apply_patch guards are wired" test_codex_apply_patch_guards_are_wired
       run_test "SessionStart includes dual-loader tier rules" test_session_start_includes_dual_loader_tier_rules

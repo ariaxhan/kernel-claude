@@ -14,6 +14,11 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
+if ! echo "$INPUT" | jq -e 'type == "object" and (.tool_input | type == "object")' >/dev/null 2>&1; then
+  echo "BLOCKED: config guard received unreadable or malformed hook JSON." >&2
+  exit 2
+fi
+
 FILE_PATHS=$(echo "$INPUT" | jq -r '
   if (.tool_input.file_path | type) == "string" then .tool_input.file_path
   elif (.tool_input.patch | type) == "string" then
@@ -30,6 +35,14 @@ while IFS= read -r FILE_PATH; do
   [ -z "$FILE_PATH" ] && continue
   # Only care about .claude/ paths.
   echo "$FILE_PATH" | grep -q '\.claude/' || continue
+
+  # Reject lexical traversal before applying the allowlist. A path such as
+  # .claude/rules/../generated/x.md resolves outside the apparently allowed tree.
+  if echo "$FILE_PATH" | grep -qE '(^|/)\.\.?(/|$)'; then
+    echo "BLOCKED: dot segments are not allowed in .claude/ write paths." >&2
+    echo "  Attempted: $FILE_PATH" >&2
+    exit 2
+  fi
 
   # Allow: CLAUDE.md, rules/*.md, commands/*.md, agents/*.md, skills/*.md, hooks/*.sh, settings*.json
   if echo "$FILE_PATH" | grep -qE '\.claude/(CLAUDE\.md|rules/.*\.md|commands/.*\.md|agents/.*\.md|skills/.*\.md|hooks/.*\.sh|settings.*\.json|projects/.*/memory/.*)$'; then
