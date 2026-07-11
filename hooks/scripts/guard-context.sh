@@ -18,8 +18,19 @@
 #     experiment must never silently degrade to unsealed.
 #   - jq missing             -> same: pointer present = block with message.
 
-POINTER="_meta/.active-manifest.json"
-LEDGER="_meta/.context-ledger"
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+if [ ! -f "$ROOT/_meta/.active-manifest.json" ]; then
+  SEARCH_DIR="$PWD"
+  while [ "$SEARCH_DIR" != "/" ]; do
+    if [ -f "$SEARCH_DIR/_meta/.active-manifest.json" ]; then
+      ROOT="$SEARCH_DIR"
+      break
+    fi
+    SEARCH_DIR="$(dirname "$SEARCH_DIR")"
+  done
+fi
+POINTER="$ROOT/_meta/.active-manifest.json"
+LEDGER="$ROOT/_meta/.context-ledger"
 
 [ -f "$POINTER" ] || exit 0
 
@@ -38,28 +49,142 @@ fi
 
 [ "$MODE" = "advisory" ] && exit 0
 
-# Extract the target path(s) from the tool input
-TARGET=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // .tool_input.pattern // empty' 2>/dev/null)
-[ -z "$TARGET" ] && exit 0
+TOOL=$(echo "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null)
+
+DECISION=$(
+  GUARD_ROOT="$ROOT" HOOK_INPUT="$INPUT" python3 - "$POINTER" <<'PY'
+import fnmatch
+import json
+import os
+import subprocess
+import sys
+
+pointer_path = sys.argv[1]
+event = json.loads(os.environ.get("HOOK_INPUT", "{}") or "{}")
+pointer = json.load(open(pointer_path, encoding="utf-8"))
+tool = event.get("tool_name") or ""
+tool_input = event.get("tool_input") or {}
+forbidden = [g for g in pointer.get("forbidden") or [] if g]
+
+try:
+    root = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        timeout=2,
+        check=True,
+    ).stdout.strip()
+except Exception:
+    root = os.environ.get("GUARD_ROOT") or os.getcwd()
+root = os.path.realpath(root)
+
+def relpath(path):
+    if not path:
+        return ""
+    raw = os.path.expanduser(str(path))
+    abs_path = raw if os.path.isabs(raw) else os.path.join(os.getcwd(), raw)
+    norm = os.path.normpath(abs_path)
+    real = os.path.realpath(norm)
+    out = []
+    for candidate in (norm, real):
+        if candidate == root:
+            rel = "."
+        elif candidate.startswith(root + os.sep):
+            rel = os.path.relpath(candidate, root)
+        else:
+            rel = candidate
+        out.append(rel.replace(os.sep, "/"))
+    return "|".join(dict.fromkeys(out))
+
+def fixed_prefix(glob):
+    parts = []
+    for part in glob.replace("\\", "/").split("/"):
+        if any(ch in part for ch in "*?["):
+            break
+        if part:
+            parts.append(part)
+    return "/".join(parts)
+
+def matches_path(rel):
+    candidates = [p for p in rel.split("|") if p]
+    for candidate in candidates:
+        for glob in forbidden:
+            clean = glob.replace("\\", "/").lstrip("./")
+            if fnmatch.fnmatchcase(candidate, clean):
+                return glob, candidate
+    return None, None
+
+def scope_contains_forbidden(scope):
+    if not forbidden:
+        return None
+    rel = relpath(scope or ".")
+    candidates = [p.rstrip("/") for p in rel.split("|") if p]
+    for candidate in candidates:
+        if candidate in ("", "."):
+            return forbidden[0]
+        for glob in forbidden:
+            prefix = fixed_prefix(glob)
+            if not prefix:
+                return glob
+            prefix = prefix.rstrip("/")
+            if candidate == prefix or prefix.startswith(candidate + "/") or candidate.startswith(prefix + "/"):
+                return glob
+    return None
+
+target = ""
+reason = ""
+if tool == "Grep":
+    scope = tool_input.get("path")
+    if not scope:
+        if forbidden:
+            print("block\tpathless Grep may scan forbidden context\tGrep:workspace")
+            sys.exit(0)
+        target = "Grep:workspace"
+    else:
+        blocked = scope_contains_forbidden(scope)
+        target = relpath(scope)
+        if blocked:
+            print(f"block\tGrep scope '{scope}' may scan forbidden glob '{blocked}'\t{target}")
+            sys.exit(0)
+elif tool == "Glob":
+    target = str(tool_input.get("pattern") or "")
+    blocked = scope_contains_forbidden(target)
+    if blocked:
+        print(f"block\tGlob pattern '{target}' may enumerate forbidden glob '{blocked}'\t{target}")
+        sys.exit(0)
+else:
+    raw = tool_input.get("file_path") or tool_input.get("path") or tool_input.get("pattern") or ""
+    target = relpath(raw)
+    blocked, candidate = matches_path(target)
+    if blocked:
+        print(f"block\t'{candidate}' matches forbidden glob '{blocked}'\t{target}")
+        sys.exit(0)
+
+print(f"allow\t\t{target}")
+PY
+)
+
+ACTION=$(printf '%s' "$DECISION" | cut -f1)
+REASON=$(printf '%s' "$DECISION" | cut -f2)
+TARGET=$(printf '%s' "$DECISION" | cut -f3)
+
+if [ -z "$ACTION" ]; then
+  echo "guard-context: manifest active but path policy evaluation failed. Blocking (check python3 and pointer JSON)." >&2
+  exit 2
+fi
 
 if [ "$MODE" = "sealed" ]; then
-  # Block access to any forbidden glob
-  while IFS= read -r glob; do
-    [ -z "$glob" ] && continue
-    # shellcheck disable=SC2254  # unquoted on purpose: forbidden entries ARE globs (e.g. frontend/*)
-    case "$TARGET" in
-      $glob)
-        echo "BLOCKED by sealed manifest: '$TARGET' matches forbidden glob '$glob'" >&2
-        echo "  Manifest: $(jq -r '.manifest' "$POINTER")" >&2
-        echo "  Sealed runs prohibit contaminating context. If this access is genuinely needed, amend the manifest and re-activate." >&2
-        exit 2
-        ;;
-    esac
-  done < <(jq -r '.forbidden[]?' "$POINTER" 2>/dev/null)
+  if [ "$ACTION" = "block" ]; then
+    echo "BLOCKED by sealed manifest: $REASON" >&2
+    echo "  Manifest: $(jq -r '.manifest' "$POINTER")" >&2
+    echo "  Sealed runs prohibit contaminating context. Provide a narrower safe path/glob, or amend the manifest and re-activate." >&2
+    exit 2
+  fi
   exit 0
 fi
 
 if [ "$MODE" = "bounded" ]; then
+  [ -z "$TARGET" ] && TARGET="${TOOL:-unknown}:workspace"
   # Allow, but ledger the access for receipt accounting.
   printf '{"path":"%s","reason":"unstated (agent must justify in receipt)","ts":"%s"}\n' \
     "$(echo "$TARGET" | sed 's/"/\\"/g')" \

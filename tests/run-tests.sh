@@ -2517,6 +2517,53 @@ PYEOF
   assert_exit_code 1 "$ec" "selector without path or git_diff must be rejected"
 }
 
+test_manifest_validate_rejects_unknown_keys() {
+  cat > bad.yaml <<'MEOF'
+schema: kernel.checkpoint/v1
+identity: {name: t, created: "2026-01-01T00:00:00Z"}
+provenance: {branch: main, commit: "abc", dirty: false}
+task: {goal: t}
+steps_completed: []
+pending_steps: []
+resume: {position: p, next_operation: n, entrypointt: typo}
+MEOF
+  local ec=0
+  "$KM" validate bad.yaml >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "unknown manifest keys must be rejected"
+}
+
+test_manifest_compile_validates_before_consuming() {
+  cat > bad.yaml <<'MEOF'
+schema: kernel.checkpoint/v1
+identity: {name: t, created: "2026-01-01T00:00:00Z"}
+provenance: {branch: main, commit: "abc", dirty: false}
+task: {goal: t}
+steps_completed: []
+pending_steps: []
+resume: {position: p, next_operation: n, entrypointt: typo}
+MEOF
+  local ec=0
+  "$KM" compile bad.yaml >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "compile must validate before consuming manifest"
+}
+
+test_manifest_activate_validates_before_pointer() {
+  mkdir -p _meta
+  cat > bad.yaml <<'MEOF'
+schema: kernel.checkpoint/v1
+identity: {name: t, created: "2026-01-01T00:00:00Z"}
+provenance: {branch: main, commit: "abc", dirty: false}
+task: {goal: t}
+steps_completed: []
+pending_steps: []
+resume: {position: p, next_operation: n, entrypointt: typo}
+MEOF
+  local ec=0
+  "$KM" activate bad.yaml >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "activate must validate before writing pointer" || return 1
+  [ ! -f _meta/.active-manifest.json ] || { echo "FAIL: invalid activation wrote pointer"; return 1; }
+}
+
 test_manifest_latest_finds_newest() {
   mkdir -p _meta/handoffs _meta/checkpoints
   printf 'schema: kernel.handoff/v1\n' > _meta/handoffs/old.yaml
@@ -2679,9 +2726,12 @@ context:
     - {path: nope-does-not-exist.md}
 MEOF
   local output
-  output=$("$KM" compile m.yaml 2>&1)
+  local ec=0
+  output=$("$KM" compile m.yaml 2>&1) || ec=$?
+  assert_exit_code 4 "$ec" "unresolved required selector must fail closed" || return 1
   assert_contains "$output" "resolved: false" || return 1
-  assert_contains "$output" "file missing"
+  assert_contains "$output" "file missing" || return 1
+  assert_contains "$output" "ERROR: unresolved required selector"
 }
 
 test_guard_context_no_manifest_allows() {
@@ -2713,6 +2763,75 @@ JEOF
   assert_exit_code 0 "$ec" "sealed manifest must allow unforbidden path"
 }
 
+test_guard_context_sealed_blocks_pathless_grep() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.yaml","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["secrets/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_name":"Grep","tool_input":{"pattern":"needle"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block pathless Grep when forbidden globs exist"
+}
+
+test_guard_context_sealed_blocks_root_grep() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.yaml","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["_meta/research/**"]}
+JEOF
+  local ec=0
+  echo '{"tool_name":"Grep","tool_input":{"pattern":"needle","path":"."}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block Grep from repo root when forbidden paths exist"
+}
+
+test_guard_context_sealed_blocks_absolute_read() {
+  mkdir -p _meta frontend
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.yaml","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["frontend/*"]}
+JEOF
+  local ec=0
+  echo "{\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$PWD/frontend/secret.md\"}}" \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block absolute paths into forbidden globs"
+}
+
+test_guard_context_sealed_blocks_dot_prefix_read() {
+  mkdir -p _meta frontend
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.yaml","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["frontend/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_name":"Read","tool_input":{"file_path":"./frontend/secret.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block ./-prefixed forbidden paths"
+}
+
+test_guard_context_sealed_blocks_parent_directory_grep() {
+  mkdir -p _meta frontend src
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.yaml","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["frontend/*"]}
+JEOF
+  (cd src && \
+    echo '{"tool_name":"Grep","tool_input":{"pattern":"needle","path":".."}}' \
+      | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1)
+  local ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block parent-directory Grep that includes forbidden paths"
+}
+
+test_guard_context_sealed_blocks_symlink_read() {
+  mkdir -p _meta frontend links
+  touch frontend/secret.md
+  ln -s ../frontend/secret.md links/secret-link.md
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.yaml","schema":"kernel.handoff/v1","mode":"sealed","forbidden":["frontend/*"]}
+JEOF
+  local ec=0
+  echo '{"tool_name":"Read","tool_input":{"file_path":"links/secret-link.md"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "sealed manifest must block symlinks into forbidden paths"
+}
+
 test_guard_context_bounded_ledgers_access() {
   mkdir -p _meta
   cat > _meta/.active-manifest.json <<'JEOF'
@@ -2737,6 +2856,7 @@ test_guard_context_fails_closed_on_broken_pointer() {
 
 test_manifest_activate_deactivate_roundtrip() {
   mkdir -p _meta
+  agentdb init >/dev/null
   cp "$FIXTURES/handoff-example.yaml" m.yaml
   "$KM" activate m.yaml >/dev/null
   assert_file_exists "_meta/.active-manifest.json" || return 1
@@ -2744,11 +2864,26 @@ test_manifest_activate_deactivate_roundtrip() {
   mode=$(jq -r '.mode' _meta/.active-manifest.json)
   assert_equals "bounded" "$mode" "pointer must carry policy mode" || return 1
   echo '{"path":"x.md","reason":"test"}' > _meta/.context-ledger
-  printf 'schema: kernel.context-receipt/v1\n' > receipt.yaml
+  cp "$FIXTURES/receipt-example.yaml" receipt.yaml
   "$KM" deactivate --receipt receipt.yaml >/dev/null
   [ ! -f _meta/.active-manifest.json ] || { echo "FAIL: pointer not removed"; return 1; }
   [ ! -f _meta/.context-ledger ] || { echo "FAIL: ledger not removed"; return 1; }
   assert_contains "$(cat receipt.yaml)" "loads_beyond_manifest"
+}
+
+test_manifest_deactivate_rewrites_receipt_without_duplicate_keys() {
+  mkdir -p _meta
+  agentdb init >/dev/null
+  cp "$FIXTURES/handoff-example.yaml" m.yaml
+  "$KM" activate m.yaml >/dev/null
+  cp "$FIXTURES/receipt-example.yaml" receipt.yaml
+  printf '{"path":"extra/file.md","reason":"test"}\n' > _meta/.context-ledger
+  "$KM" deactivate --receipt receipt.yaml >/dev/null
+  local count
+  count=$(grep -c '^loads_beyond_manifest:' receipt.yaml)
+  assert_equals "1" "$count" "deactivate must keep one top-level loads_beyond_manifest key" || return 1
+  assert_contains "$(cat receipt.yaml)" "extra/file.md" || return 1
+  "$KM" validate receipt.yaml >/dev/null
 }
 
 test_manifest_checkpoint_resume_position_surfaced() {
@@ -2839,6 +2974,9 @@ run_test_suite() {
       run_test "missing schema field rejected" test_manifest_validate_rejects_missing_schema_field
       run_test "bad policy mode rejected" test_manifest_validate_rejects_bad_policy_mode
       run_test "selector without path rejected" test_manifest_validate_rejects_selector_without_path
+      run_test "unknown manifest keys rejected" test_manifest_validate_rejects_unknown_keys
+      run_test "compile validates before consuming" test_manifest_compile_validates_before_consuming
+      run_test "activate validates before pointer" test_manifest_activate_validates_before_pointer
       run_test "latest finds newest manifest" test_manifest_latest_finds_newest
       run_test "latest fails when empty" test_manifest_latest_fails_when_empty
       run_test "divergence: branch mismatch" test_manifest_divergence_detects_branch_mismatch
@@ -2850,9 +2988,16 @@ run_test_suite() {
       run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
       run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
       run_test "guard-context: sealed allows unforbidden" test_guard_context_sealed_allows_unforbidden
+      run_test "guard-context: sealed blocks pathless Grep" test_guard_context_sealed_blocks_pathless_grep
+      run_test "guard-context: sealed blocks root Grep" test_guard_context_sealed_blocks_root_grep
+      run_test "guard-context: sealed blocks absolute read" test_guard_context_sealed_blocks_absolute_read
+      run_test "guard-context: sealed blocks dot-prefix read" test_guard_context_sealed_blocks_dot_prefix_read
+      run_test "guard-context: sealed blocks parent-directory Grep" test_guard_context_sealed_blocks_parent_directory_grep
+      run_test "guard-context: sealed blocks symlink read" test_guard_context_sealed_blocks_symlink_read
       run_test "guard-context: bounded ledgers access" test_guard_context_bounded_ledgers_access
       run_test "guard-context: fails closed on broken pointer" test_guard_context_fails_closed_on_broken_pointer
       run_test "activate/deactivate roundtrip" test_manifest_activate_deactivate_roundtrip
+      run_test "deactivate rewrites receipt once" test_manifest_deactivate_rewrites_receipt_without_duplicate_keys
       run_test "checkpoint resume position surfaced" test_manifest_checkpoint_resume_position_surfaced
       run_test "migration: every command has destination" test_migration_every_command_has_destination
       run_test "migration: no live command references" test_migration_no_live_command_references
