@@ -5,8 +5,8 @@
 source "$(dirname "$0")/common.sh"
 
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.file_path // .path // ""' 2>/dev/null)
-CONTENT=$(echo "$INPUT" | jq -r '.content // .new_string // ""' 2>/dev/null)
+FILE_PATH=$(kernel_hook_file_path "$INPUT")
+CONTENT=$(kernel_hook_content "$INPUT")
 
 # Only check component/style files
 case "$FILE_PATH" in

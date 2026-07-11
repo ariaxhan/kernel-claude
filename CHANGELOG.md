@@ -2,6 +2,25 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.0.2] - 2026-07-11
+
+KERNEL 8.0.2 fixes cross-client advisory hooks that Codex skipped whenever the shared
+manifest marked them `async`. Upgrade and restart Codex so its installed cache loads
+the corrected manifest.
+
+### Fixed
+- Removed exactly six unsupported `async` keys while preserving every hook command,
+  matcher, order, and timeout. The advisory checks now run synchronously in both Claude
+  Code and Codex and still exit successfully when their own downstream work fails.
+- Normalized valid Claude Write/Edit and Codex `apply_patch` payloads for structure,
+  hardcoded-value, JSON-schema, write-log, and error-capture advisory hooks, so inspected
+  paths, added content, and errors are no longer silently empty.
+- Made `log-write.sh` wait for its AgentDB timing emit and tolerate emit failure instead
+  of leaving a detached child after the hook process exits.
+- Added armed cross-loader payload, failure, false-positive, command-retention,
+  no-child, and critical-guard-integrity regressions. The blocking guards remain
+  unchanged.
+
 ## [8.0.1] - 2026-07-11
 
 KERNEL 8.0.1 is the corrected KERNEL 8 release. An incomplete 8.0.0 candidate reached

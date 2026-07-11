@@ -2,12 +2,10 @@
 # KERNEL: Validate file structure on writes
 # Pre-tool hook for Write/Edit — checks structural conventions
 
-set -e
-
 source "$(dirname "$0")/common.sh"
 
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.file_path // .path // ""' 2>/dev/null)
+FILE_PATH=$(kernel_hook_file_path "$INPUT")
 
 # Only validate files we care about
 case "$FILE_PATH" in

@@ -247,6 +247,36 @@ get_project_root() {
   echo "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 }
 
+# Normalize the two loader payload shapes used by advisory hooks. Claude sends
+# Write/Edit fields under tool_input; Codex sends an apply_patch document.
+kernel_hook_file_path() {
+  printf '%s' "$1" | jq -r '
+    .tool_input.file_path // .tool_input.path // .file_path // .path //
+    (if (.tool_input.patch | type) == "string" then
+       [.tool_input.patch | split("\n")[]
+        | select(test("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "))
+        | sub("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "; "")][0] // empty
+     else empty end)
+  ' 2>/dev/null || true
+}
+
+kernel_hook_content() {
+  printf '%s' "$1" | jq -r '
+    .tool_input.content // .tool_input.new_string // .content // .new_string //
+    (if (.tool_input.patch | type) == "string" then
+       [.tool_input.patch | split("\n")[] | select(startswith("+"))] | join("\n")
+     else empty end)
+  ' 2>/dev/null || true
+}
+
+kernel_hook_error() {
+  printf '%s' "$1" | jq -r '
+    (if (.error | type) == "string" then .error
+     elif (.error.message | type) == "string" then .error.message
+     else .message // .tool_error // "unknown error" end)
+  ' 2>/dev/null || printf '%s\n' 'unknown error'
+}
+
 # The shared Vaults continuity service owns compaction only for a session whose
 # active project is the Vaults root itself. Nested repositories keep KERNEL's
 # deterministic fallback because root-level host hooks may not be loaded there.

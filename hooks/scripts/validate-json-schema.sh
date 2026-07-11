@@ -5,7 +5,7 @@
 source "$(dirname "$0")/common.sh"
 
 INPUT=$(cat)
-FILE_PATH=$(echo "$INPUT" | jq -r '.file_path // .path // ""' 2>/dev/null)
+FILE_PATH=$(kernel_hook_file_path "$INPUT")
 
 # Only validate JSON files
 case "$FILE_PATH" in

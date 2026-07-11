@@ -1,12 +1,19 @@
 #!/bin/bash
 _LW_START_MS=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo "")
-# PostToolUse hook: Log file writes (async, non-blocking)
+# PostToolUse hook: Log file writes (synchronous, advisory)
 # Replaces the old post-write.sh. No git operations - that's SessionEnd's job.
-# Events: PostToolUse (matcher: Write|Edit), async: true
+# Events: PostToolUse (matcher: Write|Edit)
 
 INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty')
+FILE_PATH=$(echo "$INPUT" | jq -r '
+  .tool_input.file_path // .tool_input.path //
+  (if (.tool_input.patch | type) == "string" then
+     [.tool_input.patch | split("\n")[]
+      | select(test("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "))
+      | sub("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "; "")][0] // empty
+   else empty end)
+')
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # CLAUDE_PROJECT_DIR is set by Claude Code hook executor
@@ -22,7 +29,7 @@ if [ -n "$_LW_START_MS" ]; then
   if [ -n "$_LW_END" ]; then
     _LW_DUR=$(( _LW_END - _LW_START_MS ))
     _LW_AGENTDB="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}/orchestration/agentdb/agentdb"
-    "$_LW_AGENTDB" emit hook "log-write" "$_LW_DUR" "{\"exit_code\":0,\"file\":\"$FILE_PATH\"}" "" "" 2>/dev/null &
+    "$_LW_AGENTDB" emit hook "log-write" "$_LW_DUR" "{\"exit_code\":0,\"file\":\"$FILE_PATH\"}" "" "" 2>/dev/null || true
   fi
 fi
 
