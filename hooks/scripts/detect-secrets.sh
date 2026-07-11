@@ -15,7 +15,21 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 2
 fi
 
-CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // .tool_input.new_string // empty')
+if ! echo "$INPUT" | jq -e 'type == "object" and (.tool_input | type == "object")' >/dev/null 2>&1; then
+  echo "BLOCKED: secret scanner received unreadable or malformed hook JSON." >&2
+  exit 2
+fi
+
+# Claude sends Write/Edit text as content/new_string. Codex maps those hook
+# matchers to apply_patch and sends the complete patch in tool_input.patch.
+CONTENT=$(echo "$INPUT" | jq -r '
+  [.tool_input.content, .tool_input.new_string,
+   (if (.tool_input.patch | type) == "string" then
+      [.tool_input.patch | split("\n")[] | select(startswith("+"))] | join("\n")
+    else empty end)]
+  | map(select(type == "string"))
+  | join("\n")
+')
 
 [ -z "$CONTENT" ] && exit 0
 

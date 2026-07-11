@@ -13,10 +13,16 @@ kernel:
 <skill id="help">
 
 <purpose>
-Quick reference for KERNEL v8.0.0.
+Quick reference for KERNEL v8.0.1.
 One primitive: skills (methodology, workflows, state transitions, validators,
 operators). Agents, manifests, philosophy, and current plugin status.
 </purpose>
+
+<host_invocation>
+Claude Code invokes skills as `/kernel:<name>`. Codex invokes them as
+`$kernel:<name>`. Tables below use Claude Code syntax; Codex users replace the
+leading slash with a dollar sign.
+</host_invocation>
 
 <on_start>
 Before showing help, check the actual state of the plugin as loaded in your context:
@@ -83,7 +89,7 @@ forbidden globs) | bounded (extra loads ledgered) | advisory. Details: docs/MIGR
 
 | Skill | Purpose | When to use |
 |-------|---------|-------------|
-| `/kernel:init` | Initialize KERNEL for a machine | Once. Creates `_meta/` structure. |
+| `/kernel:init` | Confirm Vaults, create missing data dirs and three safe helper links | Once per machine, or helper-link recovery. |
 | `/kernel:help` | This help | When you need a reminder. |
 </skills_reference>
 
@@ -117,6 +123,9 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 </tiers>
 
 <agents>
+These are Claude Code agent definitions. Codex does not register the files as native
+agents; KERNEL applies the role contracts to available Codex subagents.
+
 | Agent | Role |
 |-------|------|
 | **Surgeon** | Minimal diff implementation. Only touches contract-listed files. |
@@ -127,6 +136,13 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 | **Validator** | Pre-commit quality gate, build, types, lint, tests, security. |
 | **Dreamer** | Multi-perspective debate, minimalist/maximalist/pragmatist. |
 </agents>
+
+<lifecycle>
+Claude Code runs the full declared plugin lifecycle. Codex runs supported synchronous
+events, including SessionStart and write guards, but skips asynchronous command hooks
+and has no plugin SessionEnd event. In Codex, use `$kernel:handoff` explicitly when
+durable end-of-session state is required.
+</lifecycle>
 
 <philosophy>
 <principle id="research_first">Research anti-patterns before solutions. Most problems are already solved.</principle>
@@ -140,7 +156,7 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 - **Be specific**: "Add rate limiting to /api/upload" > "make it more secure"
 - **Use the right skill**: diagnose for bugs, dream for design, ingest for everything else
 - **Check metrics**: `/kernel:metrics` shows if learnings are being used or ignored
-- **Save often**: `/kernel:handoff` before long breaks, the next session starts faster
+- **Save deliberately**: `/kernel:checkpoint` mid-task or `/kernel:handoff` before a session boundary
 - **Run retrospective**: After several sessions, synthesize what you've learned
 </tips>
 

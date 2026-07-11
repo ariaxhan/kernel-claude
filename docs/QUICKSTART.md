@@ -1,349 +1,184 @@
-# KERNEL Setup Guide
+# KERNEL 8 setup guide
 
-You don't need technical knowledge. Just follow these steps and KERNEL will handle everything.
+KERNEL adds durable memory, resumable JSON state, engineering workflows, and separate
+verification roles to Claude Code. It supports Claude Code Terminal, Desktop local/SSH
+sessions, and VS Code. Plugin skills always use the `kernel:` namespace.
 
----
+Codex CLI and the Codex app can load KERNEL through their Claude-marketplace
+compatibility loader. KERNEL 8 does not claim native Codex-manifest support because
+the native validator does not preserve Claude's explicit-only marker for the four
+side-effecting skills. The compatibility path keeps that safety rule intact.
 
-## What You're Setting Up
+## Install
 
-**Claude Code** is like having a developer who can read your entire project, write working features, and take real action. But it forgets everything when you close it.
+Requirements: Git, SQLite 3, `jq`, Python 3, and Bash.
 
-**KERNEL** gives Claude Code permanent memory. It remembers what worked, what broke, and where you left off. Every conversation makes it smarter about YOUR project.
+Claude Code:
 
-Think of it like this: Claude Code is the worker. KERNEL is the training program that makes the worker better every day.
-
----
-
-## Installation
-
-Choose your platform:
-
-### Option A: Claude Code (Terminal)
-
-**Step 1:** Add the KERNEL marketplace
-```
+```text
 /plugin marketplace add ariaxhan/kernel-claude
-```
-
-**Step 2:** Install the plugin
-```
-/plugin install kernel
-```
-
-**Step 3:** Set up your project (in your project folder)
-```
-/kernel:init
-```
-
----
-
-### Option B: Claude Desktop
-
-**Step 1:** Open the sidebar and click **Customize**
-
-**Step 2:** Under **Personal plugins**, click the **+** button
-
-**Step 3:** Select **Add marketplace from GitHub**
-
-**Step 4:** Enter `ariaxhan/kernel-claude` and press Enter
-
-**Step 5:** Find **KERNEL** in the list and click **Install**
-
-**Step 6:** Open your project and run `/init` to set up memory
-
----
-
-### Option C: Cursor
-
-Cursor shares plugin configuration with Claude Code and Claude Desktop. Install via either of those first, then Cursor will have access automatically.
-
----
-
-**That's it.** You're ready to work.
-
----
-
-## Verify It Worked
-
-Type `/kernel:` in Claude Code. You should see these skills appear:
-
-- `/kernel:ingest` - Start working on a task
-- `/kernel:validate` - Check your work before committing
-- `/kernel:handoff` - Save your progress
-- `/kernel:help` - Get help
-
-If the skills don't appear, try:
-```
-/plugin marketplace update kernel-marketplace
-/plugin update kernel@kernel-marketplace
-/reload-plugins
-```
-Then restart Claude Code.
-
----
-
-## What Just Happened
-
-KERNEL created a `_meta/` folder in your project where Claude Code saves everything:
-
-| Folder | What It's For (Technical) | What It's For (Plain English) |
-|--------|---------------------------|-------------------------------|
-| `agentdb/` | AgentDB storage | Memory—what went wrong, what works, where you left off |
-| `context/` | active.md | Project notes—what your project does and what you're working on now |
-| `plans/` | Build pipeline output | Step-by-step plans for bigger changes |
-| `research/` | Researcher agent output | Notes when Claude looks up how to do something |
-| `handoffs/` | Session handoff briefs | Saved progress when you stop for the day |
-| `reviews/` | Tear-down reviews | A detailed look before making big changes |
-| `agents/` | Agent registry | List of helpers working on your project |
-
-These folders stay with your project forever. Close Claude Code, come back tomorrow, and it remembers everything.
-
----
-
-## Your Daily Workflow
-
-### Starting Work
-
-**Always start with `/kernel:ingest`**
-
-This is the universal entry point. Type `/kernel:ingest` followed by what you want:
-
-```
-/kernel:ingest add a contact form to the homepage
-```
-
-Or type `/kernel:ingest` first, then describe your task on the next line.
-
-**Why this matters:** `/kernel:ingest` reads memory, classifies your request, and routes to the right approach. Without it, Claude Code skips the memory system entirely.
-
-Behind the scenes, it classifies your request (bug, feature, refactor, question), decides scope by risk (how hard it is to undo, how quietly it can fail, and how far it reaches), reads what's been tried before, checks what broke last time, and picks up where you left off.
-
-### Doing Work
-
-Claude Code builds what you asked for. For low-risk changes (Tier 1), it executes directly. For durable or high-risk projects (Tier 2+: contract → surgeon → adversary), it breaks the work into steps, gets it done, and verifies everything works. In plain terms: you just describe what you want.
-
-### Checking Work
-
-Before sharing your changes, type:
-
-```
-/kernel:validate
-```
-
-Or say: "validate my work"
-
-It runs the **Validator** agent: checks for secrets, types, lint, and tests. In plain terms: no accidental secrets, everything looks correct, nothing's broken.
-
-### Saving Progress
-
-Before closing Claude Code, type:
-
-```
-/kernel:handoff
-```
-
-Or say: "Remember that I finished the contact form and need to style it next"
-
-Claude Code saves a handoff brief to `_meta/handoffs/`. In plain terms: a short summary of where you left off so tomorrow you can pick up exactly there.
-
----
-
-## Common Situations
-
-### "Claude Code is doing too much"
-
-Say "stop" and be more specific. Instead of "improve the website," try "make the homepage header bigger."
-
-### "Something broke"
-
-Your work is saved automatically. You can undo recent changes or go back to any earlier version. Just ask Claude Code: "undo my recent changes."
-
-### "Claude Code is confused"
-
-Restate what you want more clearly. Focus on one thing at a time. "Fix the login" is clearer than "improve user experience."
-
-### "Same mistake keeps happening"
-
-Tell Claude Code: "Remember this keeps breaking and why."
-
-It saves this permanently so the mistake never happens again.
-
----
-
-## What's Inside KERNEL
-
-| Component | Technical Name | Plain English |
-|-----------|----------------|---------------|
-| **Memory** | AgentDB + `_meta/` | Remembers what worked, what broke, where you left off |
-| **Helpers** | Surgeon, Adversary, Researcher, Scout, Validator, Reviewer | Builds features, checks work, finds solutions, explores project, pre-commit checks, reviews code |
-| **Skills** | `/kernel:ingest`, `/kernel:validate`, `/kernel:handoff`, `/kernel:checkpoint`, `/kernel:review`, `/kernel:tearitapart`, `/kernel:init`, `/kernel:help` | Start work, check work, save progress, checkpoint mid-task, review code, critical review, setup, help |
-
-### The Agents (Helpers)
-
-KERNEL includes specialized helpers that Claude Code can use:
-
-- **Surgeon** - Builds features with minimal changes. Focuses on doing one thing well.
-- **Adversary** - QA agent. Assumes code is broken until proven otherwise. Finds edge cases.
-- **Reviewer** - Reviews code for quality, security, and best practices.
-- **Researcher** - Looks up solutions before building. Finds packages, reads docs.
-- **Scout** - Explores your codebase. Maps structure, finds patterns.
-- **Validator** - Pre-commit checks. Runs tests, lint, security scans.
-
----
-
-## Command Names by Platform
-
-Commands have different prefixes depending on where you're using Claude:
-
-| Platform | Command Format | Example |
-|----------|----------------|---------|
-| **Claude Code (terminal)** | `/kernel:skill` | `/kernel:ingest` |
-| **Claude Desktop** | `/skill` | `/ingest` |
-| **Cursor** | `/skill` | `/ingest` |
-
-The functionality is identical—only the prefix differs.
-
----
-
-## Using KERNEL with Cursor
-
-If you have KERNEL installed in Claude Code and also use Cursor with Claude, KERNEL works automatically—no extra setup needed.
-
-### How It Works
-
-Cursor uses the same Claude configuration as Claude Code. When you installed KERNEL in Claude Code, it registered globally. Cursor picks this up automatically.
-
-### Verify It's Working
-
-In Cursor's Claude chat, type `/` and you should see skills like `/ingest`, `/validate`, `/handoff` appear. If not:
-
-1. Make sure you ran `/plugin install kernel` in Claude Code first
-2. Restart Cursor
-3. The `_meta/` folder from `/init` must exist in your project
-
-### Best Practice
-
-- **Use Claude Code** for `/kernel:ingest` tasks (building features, multi-file changes)
-- **Use Cursor** for quick edits and file navigation
-- Both share the same AgentDB memory in `_meta/`
-
----
-
-## Using KERNEL with Claude Desktop
-
-Same as Cursor—KERNEL skills appear without the `kernel:` prefix. Type `/ingest` to start.
-
-If skills don't appear, make sure:
-1. You installed the plugin in Claude Code first
-2. Restart Claude Desktop
-3. Your project has the `_meta/` folder from running init
-
----
-
-## All Commands
-
-| Command | What It Does |
-|---------|--------------|
-| `/kernel:ingest` | Universal entry point. Classifies your task, determines scope, routes to the right agent. |
-| `/kernel:validate` | Pre-commit verification. Runs build, types, lint, tests, security scan. Blocks if anything fails. |
-| `/kernel:handoff` | Saves your progress as a canonical JSON manifest so you can pick up exactly where you left off. |
-| `/kernel:checkpoint` | Bounded mid-task save. Records exact resume position for a safe context reset without a full handoff. |
-| `/kernel:review` | Code review for PRs or staged changes. Reports issues with >80% confidence. |
-| `/kernel:tearitapart` | Critical pre-implementation review. Finds problems before you write code. |
-| `/kernel:init` | Sets up KERNEL for your project. Run once when starting a new project. |
-| `/kernel:help` | Shows help and available skills. |
-
----
-
-## Your Project Instructions
-
-KERNEL loads instructions from your project's `.claude/CLAUDE.md` file. You can add your own rules:
-
-- What technologies you're using
-- Your preferences
-- Things Claude Code should never do
-- Things Claude Code should always do
-
-Claude Code reads this at the start of every conversation. Think of it as standing instructions that persist forever.
-
----
-
-## If Something Goes Wrong
-
-### "Commands don't show up"
-
-Run these commands:
-```
-/plugin marketplace update kernel-marketplace
-/plugin update kernel@kernel-marketplace
-/reload-plugins
-```
-
-Then restart Claude Code. If still not working, try:
-```
-/plugin install kernel
-```
-
-### "Claude Code says it can't find something"
-
-Run `/kernel:init` to create the `_meta/` folders and initialize memory.
-
-### "Claude Code forgot everything"
-
-You didn't save your progress last time. Always end by typing `/kernel:handoff` or saying: "Remember where I stopped and what I was doing."
-
-### "Claude Code keeps making the same mistake"
-
-Say: "Remember this mistake permanently so you never repeat it." Be specific about what went wrong and what you observed. KERNEL saves it to memory so it never happens again.
-
----
-
-## Updating KERNEL
-
-### Quick Update (CLI)
-
-```
-/plugin marketplace update kernel-marketplace
-/plugin update kernel@kernel-marketplace
-/reload-plugins
-```
-
-### Interactive Update
-
-1. Type `/plugin` and go to the **Installed** tab
-2. Select **KERNEL**
-3. Choose **Update to latest**
-4. Run `/reload-plugins` to apply without restarting
-
-### Enable Auto-Update
-
-So you never get stuck on an old version:
-
-1. Type `/plugin` → **Marketplaces** tab
-2. Select **kernel-marketplace**
-3. Toggle **Enable auto-update**
-
-### Stuck on an Old Version?
-
-If commands are missing or behaving unexpectedly:
-
-```
-/plugin uninstall kernel@kernel-marketplace
 /plugin install kernel@kernel-marketplace
 /reload-plugins
 /kernel:init
 ```
 
----
+Codex CLI or app:
 
-## Next Steps
+```bash
+codex plugin marketplace add ariaxhan/kernel-claude
+codex plugin add kernel@kernel-marketplace
+```
 
-That's it. You're ready to work.
+Restart Codex after installation and verify with `codex plugin list`. Run KERNEL init
+explicitly from the installed skill before expecting host helper links.
 
-Just open Claude Code in your project and describe what you want. KERNEL handles everything else.
+Init asks you to confirm the Vaults path before it writes. Detection checks a valid
+`KERNEL_VAULTS` first, then `~/Documents/Vaults`, `~/Vaults`, and
+`~/Downloads/Vaults`. It creates missing KERNEL data directories and three helper
+links; it does not move `~/.claude` or overwrite user-owned paths.
 
-The more you use it, the smarter Claude Code gets about YOUR project specifically.
+Verify in a new session:
 
----
+```bash
+agentdb status
+readlink "$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current"
+```
 
-*Built with KERNEL v8.0.0 | [GitHub](https://github.com/ariaxhan/kernel-claude)*
+Then use `/kernel:help` in Claude Code or `$kernel:help` in Codex.
+
+## Daily workflow
+
+1. `/kernel:ingest` starts or resumes work from repository truth and AgentDB.
+2. KERNEL chooses direct work or a contract based on reversibility, quiet failure
+   risk, and blast radius—not file count.
+3. `/kernel:validate` checks the result. `/kernel:handoff` creates a bounded JSON
+   resume point when another session must continue.
+
+Common skills below use Claude Code syntax. In Codex, replace the leading `/` with
+`$`, for example `$kernel:validate`.
+
+Common skills:
+
+- Work: `/kernel:ingest`, `/kernel:diagnose`, `/kernel:dream`
+- Checks: `/kernel:validate`, `/kernel:review`, `/kernel:tearitapart`
+- State: `/kernel:checkpoint`, `/kernel:handoff`, `/kernel:retrospective`
+- Setup/reference: `/kernel:init`, `/kernel:help`
+
+## Safe resumes and context limits
+
+Handoffs and checkpoints are canonical JSON: the JSON file is the source of truth,
+not a Markdown summary or an old YAML file. On resume, KERNEL discovers the newest
+state, validates it, checks whether the repository changed, runs only typed preflight
+checks, compiles the allowed context with a receipt, activates its context policy,
+and resumes at the recorded operation. Changed inputs invalidate inherited phases
+instead of silently treating stale work as complete.
+
+Context policies can be `advisory`, `bounded`, or `sealed`. Bounded mode records extra
+file loads in the context receipt. Sealed mode makes hooks block forbidden paths.
+Receipts record selected inputs, integrity hashes, and budget status so the next
+session can show what it actually loaded.
+
+The underlying runtime commands are:
+
+```text
+kernel-manifest validate | latest | divergence | preflight | compile | resume | activate | deactivate
+```
+
+Most users should call `/kernel:ingest` (or `$kernel:ingest` in Codex) and let it run
+that sequence. A manifest that fails validation or exceeds its maximum context budget
+is a stop condition, not permission to fall back to the whole conversation.
+
+## Update from 7.23.0
+
+Claude Code:
+
+```text
+/plugin marketplace update kernel-marketplace
+/plugin update kernel@kernel-marketplace
+/reload-plugins
+```
+
+Codex:
+
+```bash
+codex plugin marketplace upgrade kernel-marketplace
+```
+
+Restart Codex after upgrading. The marketplace upgrade refreshes an installed plugin
+cache too; Codex has no separate `plugin update` command.
+
+Start a new session if Claude Code cannot reload a component; VS Code may request a
+restart. Startup validates the loaded KERNEL runtime, advances `current` only forward,
+and repairs old numbered KERNEL helper links. Missing links stay missing. Files,
+directories, malformed links, and unrelated links are preserved with a warning.
+
+The update does not replace project files, AgentDB, manifests, or receipts. KERNEL 8
+uses canonical JSON state and cannot promise that KERNEL 7 will resume KERNEL 8 state.
+`/kernel:design` is now `/kernel:frontend`; the old command-file implementation layer
+was removed.
+
+## Codex behavior boundaries
+
+Codex loads all 33 KERNEL skills, with explicit calls written as `$kernel:<name>`.
+The four side-effecting skills (`init`, `forge`, `experiment`, and `landing-page`)
+also carry Codex-native policy that forbids automatic invocation.
+
+The 15 files under `agents/` are Claude Code agent definitions. Codex does not
+register them as native agents; KERNEL applies their role contracts when coordinating
+available Codex subagents. Codex runs supported synchronous hooks, including
+SessionStart and the write guards. It skips asynchronous command hooks and has no
+plugin SessionEnd event, so finish Codex work with `$kernel:handoff` when durable
+end-state is required.
+
+For a session-only rollback:
+
+```bash
+git clone https://github.com/ariaxhan/kernel-claude.git "$HOME/kernel-claude-7.23"
+git -C "$HOME/kernel-claude-7.23" checkout 54a0053
+V8_SELECTOR="$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current/scripts/select-runtime.sh"
+"$V8_SELECTOR" "$HOME/kernel-claude-7.23"
+claude --plugin-dir "$HOME/kernel-claude-7.23"
+```
+
+For an explicit helper-runtime selection:
+
+```bash
+scripts/select-runtime.sh /path/to/kernel-runtime
+```
+
+Do not clear the plugin cache or remove the marketplace as a normal update step.
+
+## Troubleshooting
+
+- Skills missing: `/reload-plugins`, then start a new session.
+- `agentdb` missing: rerun `/kernel:init`; add the printed PATH line yourself.
+- Wrong Vaults: export `KERNEL_VAULTS` to the existing root, then rerun init.
+- Host-link warning: inspect the exact path. Init refuses regular files, directories,
+  malformed links, and unrelated links instead of replacing them.
+- Codex `unknown field version` warning for `hooks/hooks.json`: restart Codex after
+  upgrading to KERNEL 8; the warning means Codex is still reading a 7.23 cache.
+- Reinstall only after update/reload fails:
+
+Claude Code:
+
+```text
+/plugin uninstall kernel@kernel-marketplace --keep-data
+/plugin install kernel@kernel-marketplace
+/reload-plugins
+```
+
+Codex:
+
+```bash
+codex plugin marketplace upgrade kernel-marketplace
+codex plugin remove kernel@kernel-marketplace
+codex plugin add kernel@kernel-marketplace
+```
+
+Restart Codex after reinstalling. Do not remove the marketplace or project data.
+
+Contributor setup uses `claude --plugin-dir ./`; never replace a numbered installed
+cache directory with a development symlink.
+
+See [README](../README.md), [8.0 migration](MIGRATION-8.md), and
+[KERNEL instructions](../CLAUDE.md).

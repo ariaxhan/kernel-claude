@@ -11,12 +11,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Load shared functions
 source "$SCRIPT_DIR/common.sh"
-_kernel_hook_start
 
 # Detect paths
 VAULTS=$(detect_vaults)
-AGENTDB=$(get_agentdb "$VAULTS")
 PROJECT_ROOT=$(get_project_root)
+if kernel_vaults_continuity_active "$VAULTS" "$PROJECT_ROOT"; then
+  exit 0
+fi
+# UserPromptSubmit is a high-frequency fallback hook. Keep its setup silent; the
+# real SessionStart path still reports a runtime change when one is selected.
+KERNEL_RUNTIME_QUIET=1 _kernel_hook_start
+AGENTDB=$(get_agentdb "$VAULTS")
 AGENTS_DIR="$VAULTS/_meta/agents"
 
 # === FALLBACK SESSION-START ===

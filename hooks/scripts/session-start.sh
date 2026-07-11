@@ -10,6 +10,8 @@ _kernel_hook_start
 VAULTS=$(detect_vaults)
 AGENTDB=$(get_agentdb "$VAULTS")
 PROJECT_ROOT=$(get_project_root)
+VAULTS_CONTINUITY_ACTIVE=0
+kernel_vaults_continuity_active "$VAULTS" "$PROJECT_ROOT" && VAULTS_CONTINUITY_ACTIVE=1
 
 # Ensure auto-memory MEMORY.md exists (prevents first-session crash)
 MEMORY_DIR="$HOME/.claude/projects/-$(echo "$PROJECT_ROOT" | tr '/' '-' | sed 's/^-//')/memory"
@@ -129,7 +131,9 @@ agentdb wtf                                        # confused? full ref: agentdb
 ```
 
 Tier by reversibility x silence x blast radius (T1 execute, T2 plan+verify, T3 confirm); file count is only a weak hint.
-Skills fire by trigger; /kernel:help lists them.
+Tier 2+: create an AgentDB contract, run tearitapart, delegate implementation to a surgeon, then use an adversary/reviewer to verify. The coordinating agent does not implement.
+Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
+AGENTS.md is contributor source-of-truth. This SessionStart output carries the essential rules because Codex plugin users do not receive that file automatically.
 KERNEL_CONTEXT
 
 # =============================================================================
@@ -151,7 +155,15 @@ fi
 
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   echo ""
-  "$AGENTDB" read-start 2>/dev/null
+  if [ "$VAULTS_CONTINUITY_ACTIVE" -eq 1 ]; then
+    "$AGENTDB" read-start 2>/dev/null | awk '
+      /^## Last Checkpoint/ { skip=1; next }
+      skip && /^## / { skip=0 }
+      !skip { print }
+    '
+  else
+    "$AGENTDB" read-start 2>/dev/null
+  fi
   echo ""
 
   # Prune stale learnings (0 hits, >30 days old)
@@ -166,7 +178,10 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   fi
 
   # Check for recent compaction checkpoint (auto-handoff)
-  LAST_CHECKPOINT=$("$AGENTDB" query "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1" 2>/dev/null)
+  LAST_CHECKPOINT=""
+  if [ "$VAULTS_CONTINUITY_ACTIVE" -eq 0 ]; then
+    LAST_CHECKPOINT=$("$AGENTDB" query "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1" 2>/dev/null)
+  fi
   if [ -n "$LAST_CHECKPOINT" ]; then
     # Check if it was a pre-compact checkpoint
     if echo "$LAST_CHECKPOINT" | grep -q "pre-compact\|compaction"; then

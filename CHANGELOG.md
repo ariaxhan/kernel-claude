@@ -2,30 +2,67 @@
 
 All notable changes to KERNEL are documented in this file.
 
-## [8.0.0] - 2026-07-10
+## [8.0.1] - 2026-07-11
 
-The unified skill architecture. The commands layer is gone; every kernel operation is a
-first-class skill, and YAML manifests are the canonical machine-readable representation
-of resumable state. Grounded in EXP-L21 (attention ledger): load-bearing context is flat
-(~50-70k tokens/decision) while accumulating transcripts force attention over 7-11x that
-— so resumes now reconstruct bounded task state from manifests instead of inheriting
-conversations.
+KERNEL 8.0.1 is the corrected KERNEL 8 release. An incomplete 8.0.0 candidate reached
+the public `main` branch before the full release gate had finished. Users who installed
+or refreshed 8.0.0 should upgrade to 8.0.1 and restart Claude Code or Codex so the
+versioned plugin cache cannot keep serving the incomplete build.
+
+### Fixed
+- Completed the strict-JSON manifest runtime with typed divergence and preflight
+  checks, canonical receipts and hashes, safe path handling, and transactional ledger
+  and deactivation behavior.
+- Added validated runtime selection, forward-only normal upgrades, explicit rollback,
+  and ownership-safe repair for the three KERNEL helper links without overwriting user
+  files, directories, malformed links, or unrelated links.
+- Rewrote the README, setup guide, and migration guide around the actual KERNEL 8 user
+  flow, including executable Claude Code and Codex install, upgrade, reinstall, and
+  rollback commands plus honest data-preservation and compatibility boundaries.
+- Made the shared hook configuration parse in both Claude Code and Codex. Codex
+  `apply_patch` payloads now reach the secret and configuration guards; dot-segment
+  traversal and malformed hook JSON fail closed, while removing an existing secret
+  remains possible.
+- Added Codex-native explicit-only policies for `init`, `forge`, `experiment`, and
+  `landing-page`, corrected Codex invocation syntax to `$kernel:<skill>`, and documented
+  that Claude agent definitions, asynchronous hooks, and SessionEnd do not become
+  native Codex lifecycle features through the compatibility loader.
+- Restored essential tier-2 orchestration rules through SessionStart for plugin users
+  who do not receive repository `AGENTS.md` automatically.
+- Made no-marker compaction restoration silent without hiding legitimate runtime
+  selection messages in other paths.
+- Added an exact-root ownership boundary for the shared Vaults continuity service.
+  KERNEL compaction hooks cleanly no-op only when the active project is the Vaults root
+  and the shared engine plus an executable host adapter exist; nested repositories keep
+  KERNEL's no-auto-commit fallback, and SessionStart retains governance without a
+  competing restore injection.
+- Made retrospective staleness use `COALESCE(last_hit, ts)` so recently recalled older
+  learnings are not archived, and corrected release instructions to name the exact
+  canonical files changed by `scripts/bump-version.sh`.
+
+### Verification
+- The corrected candidate passes the bounded full suite: **368 passed, 0 failed**, plus
+  focused runtime-upgrade, release-documentation, cross-loader hook, retrospective,
+  compaction, and version-synchronization gates.
+
+## [8.0.0] - 2026-07-11
+
+KERNEL 8 unifies its public operations as skills, makes strict JSON the canonical
+resumable state format, and adds a safe runtime selector so plugin updates cannot quietly
+leave AgentDB, hooks, and orchestration pinned to 7.23.
 
 ### BREAKING
-- **commands/ removed.** All 14 commands migrated to `skills/<name>/SKILL.md`. Invocation
-  strings are IDENTICAL (`/kernel:ingest` etc, plugin skills auto-namespace), so no user
-  workflow changes; no aliases shipped. `plugin.json` no longer registers commands.
+- **`commands/` removed.** Workflow, state, validator, operator, and methodology
+  definitions all live in `skills/`. Namespaced invocations remain `/kernel:<skill>`.
 - **experiment collision resolved**: the autonomous engine (former command) and the
   methodology (former skill) merged into one `skills/experiment/SKILL.md`.
-- **design skill renamed to `frontend`.** `skills/design/` -> `skills/frontend/`,
-  invoked as `/kernel:frontend` (was `/kernel:design`). Renamed to avoid colliding with
-  Claude's native `/design` command in the Desktop/Cursor unprefixed form. Behavior,
-  mood variants (abyss, spatial, verdant, ...), and reference docs are unchanged.
+- **Design renamed to frontend.** Use `/kernel:frontend`; `/kernel:design` is removed.
+- **Canonical state is strict JSON.** Historical YAML records are preserved but are not
+  active KERNEL 8 resume inputs. KERNEL 7 may not resume KERNEL 8-created state.
 
 ### Added
-- **Manifest runtime** `orchestration/manifest/kernel-manifest`: validate | latest |
-  divergence | compile | resume | activate | deactivate. YAML parse chain: pyyaml ->
-  system ruby -> loud failure (sealed resumes treat unvalidatable as blocking).
+- **Manifest runtime** actions: `validate | latest | divergence | preflight | compile |
+  resume | activate | deactivate`. Duplicate JSON keys and invalid schema are rejected.
 - **Schemas** (`schemas/`): kernel.handoff/v1, kernel.checkpoint/v1,
   kernel.retrospective-result/v1, kernel.context-receipt/v1.
 - **/kernel:checkpoint** (new skill): bounded mid-task manifest — steps completed with
@@ -39,24 +76,50 @@ conversations.
   (kind: methodology|workflow|state_transition|validator|operator, side_effects,
   confirmation, produces/consumes). Side-effecting skills (forge, init, experiment,
   landing-page) carry disable-model-invocation: true (test-enforced).
-- 27 new tests (manifest suite: schemas, CLI, guard hook, migration guards).
+- **Validated runtime selection and host repair.** The plugin root Claude Code actually
+  loaded is authority. Normal sessions move `current` forward only; explicit rollback
+  can select a lower trusted root. Startup atomically repairs exactly three recognizable
+  old numbered KERNEL links and refuses every user-owned or malformed destination.
+- **Rollback tool:** `scripts/select-runtime.sh /trusted/kernel/root` validates identity,
+  version, and helpers without deleting cache or project data.
+- **Release and migration tests** cover upgrades, rollback, malformed caches, broken and
+  relative links, user-owned objects, atomic failure, data preservation, and live docs.
+- **Claude/Codex hook compatibility gate.** `hooks/hooks.json` now has a regression test
+  that permits only the shared loaders' top-level `description` and `hooks` fields. This
+  prevents the old top-level `version` field from breaking Codex startup. Native Codex
+  manifest packaging remains deferred because its validator conflicts with Claude's
+  explicit-only marker for side-effecting skills; Codex uses its compatibility loader.
+- **Executable Codex lifecycle docs.** Install uses `codex plugin marketplace add` plus
+  `codex plugin add`; normal updates use `codex plugin marketplace upgrade`; targeted
+  recovery uses `codex plugin remove` then `codex plugin add`. These flows were exercised
+  against the current CLI in a disposable Codex home instead of inferred from Claude's
+  slash commands.
+- **Cross-loader security tests.** Claude and Codex hook payloads exercise the installed
+  entry points separately. Config guards reject dot-segment traversal before allowlist
+  checks, and the ship methodology now requires an explicit resource ceiling for
+  heavyweight verification.
 - **Context graph (shadow telemetry).** Receipt-derived projection only:
   `orchestration/agentdb/graph-project.py` + `agentdb graph-project|graph-suggest`.
   `kernel-manifest deactivate --receipt` auto-projects; `write-end` records outcome.
-  YAML manifests remain authoritative; suggestions are advisory until 50+ sessions.
+  JSON manifests remain authoritative; graph suggestions remain advisory.
 
 ### Changed
-- **handoff** emits canonical YAML manifests (md renders marked non-authoritative) and
+- **handoff** emits canonical JSON manifests (markdown renders are non-authoritative) and
   validates its own output. **ingest** is the unified entry: discovers/validates
   manifests, checks divergence (live state wins; inherited phases invalidate by rule),
   compiles bounded context, arms the policy, resumes at the declared phase.
   **retrospective** additionally emits a validated machine-readable mutation record.
-- CLAUDE.md/AGENTS.md `<commands>` block replaced by `<workflow_skills>` + manifest
-  runtime reference; README/QUICKSTART/help speak unified-skill language.
+- `/kernel:init` now uses validated shared runtime helpers, creates missing links only
+  after confirmation, and never moves or replaces the whole `~/.claude` directory.
+- `/kernel:retrospective` now queries the current AgentDB learning columns and records
+  evidence for resolved contradictions. This release's loader, path-validation, install,
+  and bounded-test lessons were promoted into the testing, security, and ship skills.
+- README, setup, migration, help, governance, workflows, metadata, and CI now describe
+  the same supported surfaces, update/reload behavior, JSON state, and data boundaries.
 
 ### Deprecated
-- Legacy markdown handoffs (`_meta/handoffs/*.md`) remain readable in 8.x (no
-  validation/divergence/budget), removed in 9.0. See docs/MIGRATION-8.md.
+- Legacy markdown and YAML records remain historical artifacts. Convert or create a new
+  JSON manifest before using the KERNEL 8 resume runtime.
 
 ## [7.23.0] - 2026-07-06
 

@@ -23,6 +23,14 @@ kernel:
    - Invoke `/kernel:validate` (spawns validator agent, full 9-gate safety chain).
    - If unavailable: run project's nearest configured command (see reference/ship-research.md for equivalents).
    - (gate: any FAIL → stop; report which gate; do NOT push)
+   - For plugins that support multiple loaders, validate each loader's schema
+     independently and exercise one installed payload per loader. A shared file
+     parsing successfully is not proof that its armed behavior is equivalent.
+   - Run install, supported upgrade, and documented recovery commands in a
+     disposable plugin/cache copy from outside the source checkout. Assert user
+     data and user-owned files are unchanged.
+   - Put an explicit resource ceiling around heavyweight suites when available;
+     a release gate must fail loudly instead of exhausting the host machine.
 
 3. **Review**
    - Tier 1 (1–2 file changes, low risk): self-review via Big 5 from skills/quality/SKILL.md.
@@ -39,9 +47,17 @@ kernel:
 
 5. **Version + Tag** *(on a release)*
    - Semver: patch=fix, minor=feature or behavior-preserving refactor, major=breaking. Confirm the number with the user.
-   - Bump ALL canonical declarations in one shot: `scripts/bump-version.sh X.Y.Z` (updates plugin.json, marketplace.json, CLAUDE.md `<kernel version>`, help.md, README install path). NEVER hand-edit one location — drift fails `test_version_sync_all`.
+   - Bump ALL canonical declarations in one shot: `scripts/bump-version.sh X.Y.Z`
+     updates `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`,
+     `AGENTS.md` and `CLAUDE.md` `<kernel version>` declarations, and
+     `skills/help/SKILL.md`. NEVER hand-edit one location — drift fails
+     `test_version_sync_all`.
    - Human-author the release prose the script does NOT touch: the plugin/marketplace `description` highlight + a `CHANGELOG.md` entry (`## [X.Y.Z] - DATE` + Added/Changed/Fixed).
    - (gate: `bash tests/run-tests.sh` green — `test_version_sync_all` confirms no stale version anywhere.)
+   - If a native manifest validator rejects required safety metadata, do not
+     weaken the safety metadata or hand-author an unvalidated manifest. Keep the
+     proven compatibility loader, record the limitation, and defer the native
+     manifest until both schemas can be satisfied.
    - Tag (only if user requested a tagged release): `git tag -l` to avoid clobber → `git tag -a v{X.Y.Z} -m "{summary}"` → `git push origin v{X.Y.Z}`.
 
 6. **Checkpoint**

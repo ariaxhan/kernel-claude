@@ -31,7 +31,7 @@ tier: auto  # determined at classify step
    - isolation: worktree (tier 2+)
    - output: commits on refactor branch
    - retry: max 3 with feedback
-   - constraint: no new tests needed, but all existing tests must stay green
+   - constraint: add characterization tests first when behavior is not already covered
 
 5. **Verify Baseline** -- Confirm no behavior change
    - agent: validator
@@ -39,9 +39,10 @@ tier: auto  # determined at classify step
    - check: test results identical to step 2 (same pass/fail, same count)
    - on_reject: return to step 4 with diff of what changed
 
-6. **Ship** -- Commit, push, PR (profile-gated)
+6. **Prepare to ship** -- validate committed branch; external writes need user authority
    - agent: orchestrator
-   - local/github: push to main or refactor branch
+   - local: leave verified commits ready for the user
+   - github: push the refactor branch only when the task authorizes a push
    - github-oss: push refactor branch, create PR (required)
    - github-production: push refactor branch, create PR, request review (required)
 

@@ -21,7 +21,7 @@ principle: real deps, minimal mocks, edge cases first
 
 ## Test Suites
 
-# 282 tests total across the suites below.
+# The runner prints the authoritative current count.
 ```yaml
 suites:
   agentdb:
@@ -86,6 +86,20 @@ suites:
       - guard-context: sealed blocks/allows, bounded ledgers, fails closed
       - migration: every command has a destination, no live command refs,
         side-effecting skills not ambient, taxonomy blocks parse
+
+  runtime_upgrade:
+    count: 9
+    tests:
+      - loaded-root validation and monotonic selector authority
+      - safe 7.23 link repair, rollback, malformed cache refusal
+      - missing/user-owned/broken-relative/read-only failure behavior
+      - project data checksums and armed startup path
+
+  release_docs:
+    tests:
+      - active docs reject unsupported surfaces and stale v7 runtime claims
+      - 8.0 changelog is current while historical 7.x prose remains untouched
+      - plugin metadata, skill/agent counts, and manifest actions agree
 
   test_gate:
     count: 11

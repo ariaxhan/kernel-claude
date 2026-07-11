@@ -27,13 +27,13 @@ jobs:
             1. VALIDATE structure:
                - All agents/*.md have required sections (purpose, tools, spawn conditions)
                - All skills/*/SKILL.md have frontmatter (name, description, triggers)
-               - All commands/*.md have required sections
+               - No legacy commands/ implementation directory exists
                - CLAUDE.md parses as valid XML within <kernel> tags
 
             2. CHECK consistency:
                - Every agent referenced in CLAUDE.md exists in agents/
                - Every skill referenced in CLAUDE.md exists in skills/
-               - Every command referenced in CLAUDE.md exists in commands/
+               - Every workflow skill referenced in CLAUDE.md exists in skills/
                - No orphan files (defined but not referenced)
 
             3. TEST AgentDB:

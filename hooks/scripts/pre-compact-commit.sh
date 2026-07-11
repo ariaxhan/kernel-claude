@@ -5,12 +5,15 @@ set -eo pipefail
 
 # Load shared functions
 source "$(dirname "$0")/common.sh"
-_kernel_hook_start
 
 # Detect paths
 VAULTS=$(detect_vaults)
-AGENTDB=$(get_agentdb "$VAULTS")
 PROJECT_ROOT=$(get_project_root)
+if kernel_vaults_continuity_active "$VAULTS" "$PROJECT_ROOT"; then
+  exit 0
+fi
+_kernel_hook_start
+AGENTDB=$(get_agentdb "$VAULTS")
 AGENTS_DIR="$VAULTS/_meta/agents"
 AGENTDB_PATH="$VAULTS/_meta/agentdb/agent.db"
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")

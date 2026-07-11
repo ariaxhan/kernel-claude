@@ -322,10 +322,10 @@ test_session_start_creates_agent_file() {
 }
 
 test_detect_secrets_clean() {
-  # Create a clean file
-  echo "const x = 123;" > "$TEST_PROJECT/test.ts"
+  # Exercise the real Claude Write hook payload with clean content.
   local exit_code=0
-  "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" "$TEST_PROJECT/test.ts" >/dev/null 2>&1 || exit_code=$?
+  printf '%s\n' '{"tool_input":{"content":"const x = 123;"}}' \
+    | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1 || exit_code=$?
   # Should pass (0) for clean file
   assert_exit_code 0 "$exit_code" "clean file should pass"
 }
@@ -644,6 +644,252 @@ test_session_start_calls_update_symlink() {
   }
 }
 
+# === KERNEL 8 runtime upgrade tests ===
+
+make_runtime_fixture() {
+  local root="$1" version="$2"
+  mkdir -p "$root/.claude-plugin" "$root/hooks/scripts" "$root/orchestration/agentdb"
+  printf '{"name":"kernel","version":"%s"}\n' "$version" > "$root/.claude-plugin/plugin.json"
+  cp "$PLUGIN_ROOT/hooks/scripts/common.sh" "$root/hooks/scripts/common.sh"
+  : > "$root/orchestration/agentdb/agentdb"
+  chmod +x "$root/orchestration/agentdb/agentdb"
+}
+
+runtime_fixture() {
+  export HOME="$TEST_DIR/home with spaces"
+  export KERNEL_VAULTS="$TEST_DIR/Vaults with spaces"
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  mkdir -p "$cache" "$KERNEL_VAULTS/.local/bin" "$KERNEL_VAULTS/.claude/kernel"
+  make_runtime_fixture "$cache/7.23.0" "7.23.0"
+  make_runtime_fixture "$cache/8.0.0" "8.0.0"
+}
+
+test_runtime_validates_loaded_v8_root() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  kernel_validate_runtime_root "$cache/8.0.0"
+}
+
+test_runtime_selection_message_is_locally_suppressible() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel" output
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  output=$(KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_update_current)
+  assert_contains "$output" "KERNEL runtime selected: 8.0.0" "normal runtime selection must stay visible" || return 1
+  rm "$cache/current"
+  output=$(KERNEL_RUNTIME_QUIET=1 KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_update_current)
+  assert_equals "" "$output" "quiet selection must be local to high-frequency hooks"
+}
+
+test_runtime_upgrade_repairs_only_numbered_links() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/7.23.0/orchestration/agentdb/agentdb" "$KERNEL_VAULTS/.local/bin/agentdb"
+  ln -s "$cache/7.23.0/orchestration" "$KERNEL_VAULTS/.claude/kernel/orchestration"
+  ln -s "$cache/7.23.0/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  mkdir -p "$KERNEL_VAULTS/_meta/agentdb" "$KERNEL_VAULTS/_meta/handoffs"
+  echo precious > "$KERNEL_VAULTS/_meta/agentdb/agent.db"
+  echo state > "$KERNEL_VAULTS/_meta/handoffs/live.json"
+  local before; before=$(find "$KERNEL_VAULTS/_meta" -type f -exec shasum -a 256 {} \; | sort)
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
+  assert_equals "$cache/current/orchestration/agentdb/agentdb" "$(readlink "$KERNEL_VAULTS/.local/bin/agentdb")"
+  assert_equals "$cache/current/orchestration" "$(readlink "$KERNEL_VAULTS/.claude/kernel/orchestration")"
+  assert_equals "$cache/current/hooks" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
+  assert_equals "$before" "$(find "$KERNEL_VAULTS/_meta" -type f -exec shasum -a 256 {} \; | sort)" "project data must not change"
+}
+
+test_runtime_current_noop_and_missing_untouched() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/8.0.0" "$cache/current"
+  ln -s "$cache/current/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  local inode; inode=$(stat -f %i "$KERNEL_VAULTS/.claude/kernel/hooks" 2>/dev/null || stat -c %i "$KERNEL_VAULTS/.claude/kernel/hooks")
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
+  assert_equals "$inode" "$(stat -f %i "$KERNEL_VAULTS/.claude/kernel/hooks" 2>/dev/null || stat -c %i "$KERNEL_VAULTS/.claude/kernel/hooks")" "correct links must not churn"
+  [ ! -e "$KERNEL_VAULTS/.local/bin/agentdb" ] && [ ! -L "$KERNEL_VAULTS/.local/bin/agentdb" ]
+}
+
+test_runtime_refuses_user_owned_destinations() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  echo mine > "$KERNEL_VAULTS/.local/bin/agentdb"
+  mkdir "$KERNEL_VAULTS/.claude/kernel/orchestration"
+  ln -s "$TEST_DIR/unrelated" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local output rc=0
+  output=$(KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ]
+  assert_contains "$output" "run /kernel:init"
+  assert_equals mine "$(cat "$KERNEL_VAULTS/.local/bin/agentdb")"
+  [ -d "$KERNEL_VAULTS/.claude/kernel/orchestration" ]
+  assert_equals "$TEST_DIR/unrelated" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
+}
+
+test_runtime_repairs_broken_relative_numbered_link() {
+  runtime_fixture
+  local dest="$KERNEL_VAULTS/.claude/kernel/hooks"
+  local cache="$(dirname "$dest")/cache"
+  make_runtime_fixture "$cache/8.0.0" 8.0.0
+  local rel="cache/7.23.0/hooks"
+  ln -s "$rel" "$dest"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_CACHE_DIR="$cache" KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
+  assert_equals "$cache/current/hooks" "$(readlink "$dest")"
+}
+
+test_runtime_rejects_malformed_cache_and_preserves_current() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  mkdir -p "$cache/9.0.0/.claude-plugin"
+  printf '{"name":"not-kernel","version":"9.0.0"}\n' > "$cache/9.0.0/.claude-plugin/plugin.json"
+  ln -s "$cache/8.0.0" "$cache/current"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  ! KERNEL_RUNTIME_ROOT="$cache/9.0.0" kernel_update_current
+  assert_equals "$cache/8.0.0" "$(readlink "$cache/current")"
+}
+
+test_runtime_authority_is_monotonic_but_override_can_rollback() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/8.0.0" "$cache/current"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_LOADED_ROOT="$cache/7.23.0" kernel_update_current
+  assert_equals "$cache/8.0.0" "$(readlink "$cache/current")" "old loaded session must not downgrade"
+  KERNEL_RUNTIME_ROOT="$cache/7.23.0" kernel_update_current
+  assert_equals "$cache/7.23.0" "$(readlink "$cache/current")" "explicit rollback must win"
+}
+
+test_runtime_failed_replacement_leaves_original() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/7.23.0/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_ATOMIC_LINK_FAIL=1 ! kernel_repair_host_link "$KERNEL_VAULTS/.claude/kernel/hooks" "$cache/current/hooks" "$cache" "hooks"
+  assert_equals "$cache/7.23.0/hooks" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
+}
+
+test_runtime_startup_arms_reconciliation() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/7.23.0/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_RUNTIME_ROOT="$cache/8.0.0" _kernel_hook_start
+  assert_equals "$cache/current/hooks" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
+}
+
+test_select_runtime_supports_explicit_local_rollback() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/8.0.0" "$cache/current"
+  ln -s "$cache/8.0.0/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  local local_root="$TEST_DIR/local kernel 7"
+  make_runtime_fixture "$local_root" 7.23.0
+  local output
+  output=$(KERNEL_CACHE_DIR="$cache" KERNEL_VAULTS="$KERNEL_VAULTS" "$PLUGIN_ROOT/scripts/select-runtime.sh" "$local_root")
+  assert_equals "$local_root" "$(readlink "$cache/current")"
+  assert_contains "$output" "KERNEL runtime: 7.23.0"
+}
+
+test_select_runtime_accepts_real_legacy_common() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  local legacy="$TEST_DIR/real legacy 7.23"
+  mkdir -p "$legacy/.claude-plugin" "$legacy/hooks/scripts" "$legacy/orchestration/agentdb"
+  git -C "$PLUGIN_ROOT" show 54a0053:hooks/scripts/common.sh > "$legacy/hooks/scripts/common.sh" 2>/dev/null || {
+    # CI uses a shallow checkout. This is the relevant legacy behavior: the target
+    # common exists but has none of KERNEL 8's selector functions.
+    printf '#!/bin/bash\nupdate_current_symlink() { :; }\n' > "$legacy/hooks/scripts/common.sh"
+  }
+  git -C "$PLUGIN_ROOT" show 54a0053:orchestration/agentdb/agentdb > "$legacy/orchestration/agentdb/agentdb" 2>/dev/null || cp "$PLUGIN_ROOT/orchestration/agentdb/agentdb" "$legacy/orchestration/agentdb/agentdb"
+  chmod +x "$legacy/orchestration/agentdb/agentdb"
+  printf '{"name":"kernel","version":"7.23.0"}\n' > "$legacy/.claude-plugin/plugin.json"
+  ! grep -q 'kernel_validate_runtime_root' "$legacy/hooks/scripts/common.sh"
+  KERNEL_CACHE_DIR="$cache" KERNEL_VAULTS="$KERNEL_VAULTS" "$PLUGIN_ROOT/scripts/select-runtime.sh" "$legacy" >/dev/null
+  assert_equals "$legacy" "$(readlink "$cache/current")"
+}
+
+test_runtime_rejects_helper_escape_and_special_files() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  local bad="$cache/9.0.0" outside="$TEST_DIR/outside"
+  make_runtime_fixture "$bad" 9.0.0
+  mkdir -p "$outside/hooks/scripts"
+  : > "$outside/hooks/scripts/common.sh"
+  rm "$bad/hooks/scripts/common.sh"
+  ln -s "$outside/hooks/scripts/common.sh" "$bad/hooks/scripts/common.sh"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  ! kernel_validate_runtime_root "$bad"
+  rm "$bad/hooks/scripts/common.sh"
+  mkdir "$bad/hooks/scripts/common.sh"
+  ! kernel_validate_runtime_root "$bad"
+  rm -rf "$bad/hooks/scripts/common.sh"
+  mkfifo "$bad/hooks/scripts/common.sh"
+  ! kernel_validate_runtime_root "$bad"
+}
+
+test_runtime_rejects_symlinked_version_root() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  local external="$TEST_DIR/external-valid-runtime"
+  make_runtime_fixture "$external" 9.0.0
+  ln -s "$external" "$cache/9.0.0"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local current_before; current_before=$(readlink "$cache/current" 2>/dev/null || true)
+  if kernel_validate_runtime_root "$cache/9.0.0" >/dev/null; then
+    echo "symlinked cache version root was accepted"
+    return 1
+  fi
+  kernel_validate_runtime_root "$cache/8.0.0" >/dev/null
+  assert_equals "$current_before" "$(readlink "$cache/current" 2>/dev/null || true)" "validation must not mutate current"
+}
+
+test_runtime_rejects_control_paths_and_traversal_links() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  ! KERNEL_RUNTIME_ROOT="$cache/8.0.0" KERNEL_CACHE_DIR="$cache/line"$'\n'"break" kernel_update_current
+  ! KERNEL_VAULTS="$TEST_DIR/vault"$'\n'"break" detect_vaults >/dev/null
+  local dest="$KERNEL_VAULTS/.claude/kernel/hooks"
+  ln -s "$cache/junk/../7.23.0/hooks" "$dest"
+  ! kernel_repair_host_link "$dest" "$cache/current/hooks" "$cache" hooks
+  assert_equals "$cache/junk/../7.23.0/hooks" "$(readlink "$dest")"
+}
+
+test_atomic_link_scavenges_only_matching_symlink_residue() {
+  local dest="$TEST_DIR/current" target="$TEST_DIR/target"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  ln -s "$target" "$dest.kernel-tmp.111.222"
+  echo mine > "$dest.kernel-tmp.user"
+  kernel_atomic_link "$target" "$dest"
+  [ ! -L "$dest.kernel-tmp.111.222" ]
+  assert_equals mine "$(cat "$dest.kernel-tmp.user")"
+}
+
+test_init_agentdb_targets_selected_vaults() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel" elsewhere="$TEST_DIR/elsewhere"
+  cp "$PLUGIN_ROOT/orchestration/agentdb/agentdb" "$cache/8.0.0/orchestration/agentdb/agentdb"
+  cp "$PLUGIN_ROOT/orchestration/agentdb/schema.sql" "$cache/8.0.0/orchestration/agentdb/schema.sql"
+  cp -R "$PLUGIN_ROOT/orchestration/agentdb/migrations" "$cache/8.0.0/orchestration/agentdb/migrations"
+  chmod +x "$cache/8.0.0/orchestration/agentdb/agentdb"
+  mkdir -p "$elsewhere/_meta/agentdb" "$KERNEL_VAULTS/_meta/agentdb"
+  echo keep > "$KERNEL_VAULTS/_meta/agentdb/sentinel"
+  AGENTDB_ROOT="$KERNEL_VAULTS" "$cache/8.0.0/orchestration/agentdb/agentdb" init >/dev/null
+  local before sentinel_before
+  before=$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/agent.db")
+  sentinel_before=$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/sentinel")
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_update_current >/dev/null || return 1
+  (cd "$elsewhere" && kernel_init_agentdb "$KERNEL_VAULTS" "$cache") || return 1
+  [ -f "$KERNEL_VAULTS/_meta/agentdb/agent.db" ] || return 1
+  [ ! -f "$elsewhere/_meta/agentdb/agent.db" ] || return 1
+  assert_equals "$before" "$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/agent.db")" "existing AgentDB unchanged"
+  assert_equals "$sentinel_before" "$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/sentinel")"
+}
+
 # === Security Hook Tests ===
 # Note: Secret values are built dynamically to avoid triggering detect-secrets on THIS file
 
@@ -698,6 +944,91 @@ test_detect_secrets_allows_clean_code() {
     | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
   local exit_code=$?
   assert_exit_code 0 "$exit_code" "clean code should pass"
+}
+
+test_detect_secrets_blocks_codex_apply_patch() {
+  local key="AKIA"; key+="IOSFODNN7EXAMPLE"
+  local patch json ec=0
+  patch=$(printf '*** Begin Patch\n*** Add File: config.ts\n+const key = "%s";\n*** End Patch' "$key")
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "Codex apply_patch secret must be blocked by the armed hook"
+}
+
+test_detect_secrets_allows_codex_secret_removal() {
+  local key="AKIA"; key+="IOSFODNN7EXAMPLE"
+  local patch json
+  patch=$(printf '*** Begin Patch\n*** Update File: config.ts\n@@\n-const key = "%s";\n+const key = process.env.API_KEY;\n*** End Patch' "$key")
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  assert_exit_code 0 "$?" "Codex must be able to remove an existing secret"
+}
+
+test_guard_config_blocks_codex_apply_patch() {
+  local patch json ec=0
+  patch=$'*** Begin Patch\n*** Add File: .claude/generated/foo.md\n+generated\n*** End Patch'
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "Codex apply_patch into .claude/generated must be blocked by the armed hook"
+}
+
+test_guard_config_allows_codex_apply_patch_rule() {
+  local patch json
+  patch=$'*** Begin Patch\n*** Add File: .claude/rules/safe.md\n+safe\n*** End Patch'
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1
+  assert_exit_code 0 "$?" "Codex apply_patch into .claude/rules must be allowed"
+}
+
+test_guard_config_blocks_codex_dot_segment_bypass() {
+  local patch json ec=0
+  patch=$'*** Begin Patch\n*** Add File: .claude/rules/../generated/x.md\n+bypass\n*** End Patch'
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "dot segments must not escape the .claude allowlist"
+}
+
+test_guard_config_fails_closed_on_malformed_json() {
+  local ec=0
+  printf '{malformed\n' | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "guard-config must block malformed hook JSON"
+}
+
+test_detect_secrets_fails_closed_on_malformed_json() {
+  local ec=0
+  printf '{malformed\n' | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "detect-secrets must block malformed hook JSON"
+}
+
+test_codex_explicit_only_skill_policies() {
+  local skill policy
+  for skill in init forge experiment landing-page; do
+    policy="$PLUGIN_ROOT/skills/$skill/agents/openai.yaml"
+    [ -f "$policy" ] || { echo "FAIL: missing Codex policy for $skill"; return 1; }
+    grep -q '^policy:' "$policy" || return 1
+    grep -q '^  allow_implicit_invocation: false$' "$policy" || return 1
+    grep -q '^disable-model-invocation: true$' "$PLUGIN_ROOT/skills/$skill/SKILL.md" || return 1
+  done
+}
+
+test_codex_apply_patch_guards_are_wired() {
+  jq -e '
+    .hooks.PreToolUse[]
+    | select(.matcher == "Write|Edit")
+    | [.hooks[].command]
+    | index("${CLAUDE_PLUGIN_ROOT}/hooks/scripts/detect-secrets.sh") != null
+      and index("${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-config.sh") != null
+  ' "$PLUGIN_ROOT/hooks/hooks.json" >/dev/null
+}
+
+test_session_start_includes_dual_loader_tier_rules() {
+  local output
+  output=$(HOME="$TEST_DIR/home" KERNEL_VAULTS="$TEST_PROJECT" \
+    "$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>/dev/null)
+  assert_contains "$output" "Tier 2+: create an AgentDB contract"
+  assert_contains "$output" "surgeon"
+  assert_contains "$output" "adversary"
+  assert_contains "$output" "Codex"
 }
 
 test_guard_bash_blocks_force_push() {
@@ -985,6 +1316,20 @@ for event in data.get('hooks', {}).keys():
     fi
   done <<< "$events"
   assert_exit_code 0 "$invalid" "all hook events should be valid Claude Code events"
+}
+
+test_hooks_json_cross_loader_schema() {
+  local hooks_file="$PLUGIN_ROOT/hooks/hooks.json"
+  python3 - "$hooks_file" <<'PY'
+import json, pathlib, sys
+path = pathlib.Path(sys.argv[1])
+data = json.loads(path.read_text())
+assert set(data) <= {"description", "hooks"}, (
+    f"Codex accepts only description/hooks at the hooks root, got {sorted(data)}"
+)
+assert isinstance(data.get("hooks"), dict) and data["hooks"], "hooks must be a non-empty object"
+assert "version" not in data, "top-level version breaks the Codex hooks loader"
+PY
 }
 
 # === Input Validation Tests ===
@@ -1393,10 +1738,90 @@ test_version_sync_all() {
   local mv
   mv=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/.claude-plugin/marketplace.json'))['plugins'][0]['version'])")
   [ "$mv" = "$v" ]                                                 || { echo "FAIL: marketplace.json ($mv) != plugin.json ($v)"; fail=1; }
+  grep -qF "<kernel version=\"$v\">" "$PLUGIN_ROOT/AGENTS.md"       || { echo "FAIL: AGENTS.md <kernel version> != $v"; fail=1; }
   grep -qF "<kernel version=\"$v\">" "$PLUGIN_ROOT/CLAUDE.md"      || { echo "FAIL: CLAUDE.md <kernel version> != $v"; fail=1; }
   grep -qF "KERNEL v$v" "$PLUGIN_ROOT/skills/help/SKILL.md"            || { echo "FAIL: skills/help/SKILL.md KERNEL version != $v"; fail=1; }
-  grep -qF "kernel-marketplace/kernel/$v" "$PLUGIN_ROOT/README.md" || { echo "FAIL: README.md install-path version != $v"; fail=1; }
   return $fail
+}
+
+test_release_docs_reject_stale_live_claims() {
+  local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md AGENTS.md CLAUDE.md skills/help/SKILL.md skills/init/SKILL.md workflows/feature.md workflows/bugfix.md workflows/refactor.md)
+  local pattern='Cursor shares|without the kernel: prefix|yaml-first|YAML is the canonical|All v7 invocations work unchanged|ln -sfn|push to main|no new tests needed|commands/\*\.md'
+  ! grep -En "$pattern" "${files[@]/#/$PLUGIN_ROOT/}"
+}
+
+test_release_docs_rollback_works_outside_a_checkout() {
+  local files=("$PLUGIN_ROOT/README.md" "$PLUGIN_ROOT/docs/QUICKSTART.md" "$PLUGIN_ROOT/docs/MIGRATION-8.md") file
+  for file in "${files[@]}"; do
+    grep -q 'git clone https://github.com/ariaxhan/kernel-claude.git' "$file" || return 1
+    grep -q 'checkout 54a0053' "$file" || return 1
+    grep -q 'plugins/cache/kernel-marketplace/kernel/current/scripts/select-runtime.sh' "$file" || return 1
+    ! grep -q 'git worktree add' "$file" || return 1
+  done
+}
+
+test_release_docs_separate_claude_and_codex_lifecycle() {
+  local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md) file content
+  for file in "${files[@]}"; do
+    content=$(cat "$PLUGIN_ROOT/$file")
+    [[ "$content" == *"/plugin marketplace update kernel-marketplace"* ]] || return 1
+    [[ "$content" == *"codex plugin marketplace upgrade kernel-marketplace"* ]] || return 1
+    [[ "$content" == *"codex plugin remove kernel@kernel-marketplace"* ]] || return 1
+    [[ "$content" == *"codex plugin add kernel@kernel-marketplace"* ]] || return 1
+    ! grep -Eq '^codex plugin update( |$)' "$PLUGIN_ROOT/$file" || return 1
+  done
+  grep -q 'codex plugin marketplace add ariaxhan/kernel-claude' "$PLUGIN_ROOT/README.md"
+  grep -q 'codex plugin marketplace add ariaxhan/kernel-claude' "$PLUGIN_ROOT/docs/QUICKSTART.md"
+}
+
+test_release_docs_explain_codex_invocation_and_boundaries() {
+  local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md skills/help/SKILL.md) file
+  for file in "${files[@]}"; do
+    grep -Fq '/kernel:' "$PLUGIN_ROOT/$file" || return 1
+    grep -Fq '$kernel:' "$PLUGIN_ROOT/$file" || return 1
+    grep -Fqi 'Claude Code agent' "$PLUGIN_ROOT/$file" || return 1
+    grep -Fq 'SessionEnd' "$PLUGIN_ROOT/$file" || return 1
+  done
+}
+
+test_release_changelog_v8_is_current_and_history_preserved() {
+  local v801 v800
+  v801=$(awk '/^## \[8\.0\.1\]/{on=1} /^## \[8\.0\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
+  v800=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
+  [[ "$v801" == *"incomplete"* ]] && [[ "$v801" == *"Codex"* ]] && [[ "$v801" == *"368"* ]] || return 1
+  [[ "$v800" == *"strict JSON"* ]] && [[ "$v800" == *"preflight"* ]] && [[ "$v800" == *"select-runtime.sh"* ]] || return 1
+  grep -q '^## \[7.23.0\] - 2026-07-06' "$PLUGIN_ROOT/CHANGELOG.md"
+}
+
+test_release_docs_use_current_801_runtime() {
+  grep -q 'kernel/8\.0\.1/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
+  ! grep -q 'kernel/8\.0\.0/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
+  # Historical 8.0.0 release and upgrade references remain valid outside active runtime commands.
+  grep -q '^## \[8\.0\.0\] - 2026-07-11' "$PLUGIN_ROOT/CHANGELOG.md"
+}
+
+test_release_docs_explain_vaults_continuity_boundary() {
+  grep -q 'active project root exactly matches the Vaults root' "$PLUGIN_ROOT/README.md" || return 1
+  grep -q 'Nested repositories retain KERNEL' "$PLUGIN_ROOT/README.md" || return 1
+  grep -q 'shared Vaults continuity service' "$PLUGIN_ROOT/CHANGELOG.md"
+}
+
+test_release_metadata_and_inventory_are_truthful() {
+  local skills agents
+  skills=$(find "$PLUGIN_ROOT/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
+  agents=$(find "$PLUGIN_ROOT/agents" -maxdepth 1 -name '*.md' ! -name README.md | wc -l | tr -d ' ')
+  assert_equals 33 "$skills" "skill inventory"
+  assert_equals 15 "$agents" "agent inventory"
+  python3 - "$PLUGIN_ROOT" <<'PY'
+import json, pathlib, sys
+r=pathlib.Path(sys.argv[1])
+p=json.loads((r/'.claude-plugin/plugin.json').read_text())
+m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
+assert p['version']==m['version']=='8.0.1'
+for x in (p,m):
+    assert 'JSON' in x['description'] and '33 skills' in x['description'] and '15 specialized agent' in x['description']
+PY
+  grep -q 'validate | latest | divergence | preflight | compile | resume | activate | deactivate' "$PLUGIN_ROOT/README.md"
 }
 
 test_dreamer_agent_exists_with_frontmatter() {
@@ -1419,6 +1844,72 @@ test_dream_command_has_github_integration() {
 }
 
 # === Compaction Restore Tests ===
+
+make_vaults_continuity_fixture() {
+  local vaults="$1"
+  mkdir -p "$vaults/_meta/services" "$vaults/.claude/hooks"
+  : > "$vaults/_meta/services/context_checkpoint.py"
+  printf '#!/bin/bash\nexit 0\n' > "$vaults/.claude/hooks/context-checkpoint.sh"
+  chmod +x "$vaults/.claude/hooks/context-checkpoint.sh"
+}
+
+test_vaults_continuity_requires_exact_root_and_executable_adapter() {
+  local vaults="$TEST_DIR/vaults" nested="$TEST_DIR/vaults/nested"
+  mkdir -p "$nested"
+  make_vaults_continuity_fixture "$vaults"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  kernel_vaults_continuity_active "$vaults" "$vaults" || return 1
+  ! kernel_vaults_continuity_active "$vaults" "$nested" || { echo "FAIL: nested project must retain KERNEL fallback"; return 1; }
+  chmod -x "$vaults/.claude/hooks/context-checkpoint.sh"
+  ! kernel_vaults_continuity_active "$vaults" "$vaults" || { echo "FAIL: non-executable adapter must not activate"; return 1; }
+  rm "$vaults/_meta/services/context_checkpoint.py"
+  chmod +x "$vaults/.claude/hooks/context-checkpoint.sh"
+  ! kernel_vaults_continuity_active "$vaults" "$vaults" || { echo "FAIL: missing shared engine must not activate"; return 1; }
+}
+
+test_vaults_root_compaction_hooks_clean_noop() {
+  local vaults="$TEST_DIR/vaults-root" output
+  mkdir -p "$vaults/_meta/agents"
+  make_vaults_continuity_fixture "$vaults"
+  printf 'vaults-owned\n' > "$vaults/_meta/.compact-marker"
+  output=$(cd "$vaults" && KERNEL_VAULTS="$vaults" CLAUDE_PROJECT_DIR="$vaults" \
+    bash "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh" <<<'{"trigger":"manual"}' 2>&1)
+  assert_equals "" "$output" "PreCompact must clean no-op at activated Vaults root" || return 1
+  output=$(cd "$vaults" && KERNEL_VAULTS="$vaults" CLAUDE_PROJECT_DIR="$vaults" \
+    bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" <<<'{}' 2>&1)
+  assert_equals "" "$output" "PostCompact must not inject restore state at activated Vaults root" || return 1
+  assert_equals "vaults-owned" "$(cat "$vaults/_meta/.compact-marker")" "KERNEL must preserve Vaults-owned marker" || return 1
+  [ ! -e "$vaults/_meta/.compact-keyterms" ]
+}
+
+test_nested_project_retains_kernel_compaction_fallback() {
+  local vaults="$TEST_DIR/vaults-root" nested output
+  nested="$vaults/nested"
+  mkdir -p "$nested/_meta" "$vaults/_meta/agents"
+  make_vaults_continuity_fixture "$vaults"
+  echo test-agent > "$vaults/_meta/agents/.current"
+  echo nested-owned > "$nested/_meta/.compact-marker"
+  output=$(cd "$nested" && KERNEL_VAULTS="$vaults" CLAUDE_PROJECT_DIR="$nested" \
+    bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" <<<'{}' 2>&1)
+  assert_contains "$output" "Context Restored After Compaction" || return 1
+  [ ! -e "$nested/_meta/.compact-marker" ]
+}
+
+test_vaults_root_session_start_keeps_governance_without_restore() {
+  local vaults="$TEST_DIR/vaults-root" output
+  mkdir -p "$vaults/_meta/agentdb"
+  make_vaults_continuity_fixture "$vaults"
+  KERNEL_VAULTS="$vaults" AGENTDB_ROOT="$vaults" agentdb init >/dev/null
+  KERNEL_VAULTS="$vaults" AGENTDB_ROOT="$vaults" agentdb write-end \
+    '{"event":"pre-compact","goal":"must-not-inject"}' >/dev/null
+  output=$(cd "$vaults" && KERNEL_VAULTS="$vaults" AGENTDB_ROOT="$vaults" CLAUDE_PROJECT_DIR="$vaults" \
+    bash "$PLUGIN_ROOT/hooks/scripts/session-start.sh" <<<'{"session_id":"root-test"}' 2>&1)
+  assert_contains "$output" "# KERNEL" "SessionStart governance must remain" || return 1
+  if [[ "$output" == *"Resume From Checkpoint"* || "$output" == *"must-not-inject"* ]]; then
+    echo "FAIL: SessionStart injected competing restore state at activated Vaults root"
+    return 1
+  fi
+}
 
 test_compact_restore_fast_exit() {
   cd "$TEST_PROJECT"
@@ -1567,6 +2058,80 @@ test_retrospective_has_output_format() {
 
 test_retrospective_has_clusters() {
   grep -q "Clusters\|cluster" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
+}
+
+test_retrospective_queries_current_learning_schema() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/retrospective/SKILL.md")
+  assert_contains "$content" "SELECT id, type, insight, evidence, hit_count, load_count, ts, last_hit FROM learnings ORDER BY ts DESC" "retrospective must query current AgentDB columns" || return 1
+  assert_contains "$content" "COALESCE(last_hit, ts) < datetime('now', '-30 days')" "staleness must use last recall when available" || return 1
+  if grep -qE 'content, evidence, reinforced, created_at|ORDER BY created_at' "$PLUGIN_ROOT/skills/retrospective/SKILL.md"; then
+    echo "FAIL: retrospective still names removed learning columns"
+    return 1
+  fi
+}
+
+test_ship_bump_targets_are_truthful() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/ship/SKILL.md")
+  for target in '.claude-plugin/plugin.json' '.claude-plugin/marketplace.json' 'AGENTS.md' 'CLAUDE.md' 'skills/help/SKILL.md'; do
+    assert_contains "$content" "$target" "ship bump prose must name $target" || return 1
+  done
+  if grep -q 'README install path' "$PLUGIN_ROOT/skills/ship/SKILL.md"; then
+    echo "FAIL: bump-version.sh does not update a README install path"
+    return 1
+  fi
+}
+
+test_methodology_carries_cross_loader_release_lessons() {
+  grep -q "one real payload fixture per loader" "$PLUGIN_ROOT/skills/testing/SKILL.md" &&
+    grep -q "NORMALIZE BEFORE ALLOWLISTS" "$PLUGIN_ROOT/skills/security/SKILL.md" &&
+    grep -q "disposable plugin/cache copy" "$PLUGIN_ROOT/skills/ship/SKILL.md" &&
+    grep -q "native manifest validator rejects required safety metadata" "$PLUGIN_ROOT/skills/ship/SKILL.md" &&
+    grep -q "resource ceiling" "$PLUGIN_ROOT/skills/ship/SKILL.md"
+}
+
+test_retrospective_contradictions_have_mutation_evidence() {
+  python3 - "$PLUGIN_ROOT/_meta/reports/retrospective-2026-07-11.json" <<'PY'
+import json
+import re
+import sys
+
+report = json.load(open(sys.argv[1]))
+expected = report["analyzed"].get("contradictions_resolved", 0)
+backed = [
+    mutation for mutation in report["mutations"]
+    if mutation.get("artifact_type") == "learning"
+    and "contradiction" in mutation.get("reason", "").lower()
+    and mutation.get("evidence")
+]
+if len(backed) != expected:
+    raise SystemExit(
+        f"contradictions_resolved={expected}, but {len(backed)} learning mutations carry contradiction evidence"
+    )
+
+paths = []
+for mutation in backed:
+    if mutation.get("status") != "applied":
+        raise SystemExit("counted contradiction mutation must have status=applied")
+    if mutation.get("op") != "modify":
+        raise SystemExit("counted contradiction mutation must have op=modify")
+    path = mutation.get("path", "")
+    if not re.fullmatch(r"agentdb://learnings/LRN-[0-9]{14}-[0-9]+-[0-9]+", path):
+        raise SystemExit(f"invalid contradiction learning path: {path!r}")
+    paths.append(path)
+if len(paths) != len(set(paths)):
+    raise SystemExit("contradiction learning paths must be unique")
+
+target = "agentdb://learnings/LRN-20260710185543-1035-14087"
+if paths != [target]:
+    raise SystemExit(f"expected exact resolved learning {target}, got {paths}")
+evidence = backed[0]["evidence"]
+if "Claude Code invokes /kernel:<skill>" not in evidence:
+    raise SystemExit("contradiction evidence is missing Claude /kernel:<skill> truth")
+if "Codex 0.144.1 invokes $kernel:<skill>" not in evidence:
+    raise SystemExit("contradiction evidence is missing Codex $kernel:<skill> truth")
+PY
 }
 
 # === GitHub Integration Tests ===
@@ -3579,6 +4144,7 @@ run_test_suite() {
       run_test "detect-secrets clean file" test_detect_secrets_clean
       run_test "hooks.json has SessionStart" test_hooks_json_has_session_start
       run_test "hooks.json has SessionEnd" test_hooks_json_has_session_end
+      run_test "hooks.json supports Claude and Codex loaders" test_hooks_json_cross_loader_schema
       run_test "session-start has compact quick reference" test_session_start_workflow_present
       run_test "session-start points at skill routing" test_session_start_skill_routing
       run_test "session-start has no scripted interrupts" test_session_start_no_scripted_interrupts
@@ -3586,6 +4152,25 @@ run_test_suite() {
       run_test "pre-compact payload survives quotes" test_pre_compact_payload_survives_quotes
       run_test "lifecycle hooks guard main push" test_lifecycle_hooks_guard_main_push
       run_test "session-start shows checkpoint after compact" test_session_start_shows_checkpoint_after_compact
+      ;;
+    runtime_upgrade)
+      run_test "validated loaded v8 root" test_runtime_validates_loaded_v8_root
+      run_test "runtime selection message is locally suppressible" test_runtime_selection_message_is_locally_suppressible
+      run_test "7.23 links repair and data is unchanged" test_runtime_upgrade_repairs_only_numbered_links
+      run_test "current no-op and missing untouched" test_runtime_current_noop_and_missing_untouched
+      run_test "user-owned destinations refused" test_runtime_refuses_user_owned_destinations
+      run_test "broken relative numbered link repaired" test_runtime_repairs_broken_relative_numbered_link
+      run_test "malformed cache rejected" test_runtime_rejects_malformed_cache_and_preserves_current
+      run_test "authority monotonic with explicit rollback" test_runtime_authority_is_monotonic_but_override_can_rollback
+      run_test "failed replacement preserves original" test_runtime_failed_replacement_leaves_original
+      run_test "startup arms reconciliation" test_runtime_startup_arms_reconciliation
+      run_test "rollback tool selects a lower local runtime" test_select_runtime_supports_explicit_local_rollback
+      run_test "rollback tool accepts real legacy common" test_select_runtime_accepts_real_legacy_common
+      run_test "helper escapes and special files rejected" test_runtime_rejects_helper_escape_and_special_files
+      run_test "symlinked cache version root rejected" test_runtime_rejects_symlinked_version_root
+      run_test "control paths and traversal links rejected" test_runtime_rejects_control_paths_and_traversal_links
+      run_test "atomic link cleans only matching symlink residue" test_atomic_link_scavenges_only_matching_symlink_residue
+      run_test "init AgentDB targets selected Vaults" test_init_agentdb_targets_selected_vaults
       ;;
     security)
       run_test "no hardcoded secrets" test_no_hardcoded_secrets_in_plugin
@@ -3635,12 +4220,22 @@ run_test_suite() {
       run_test "detect-secrets blocks OpenAI key" test_detect_secrets_blocks_openai_key
       run_test "detect-secrets blocks private key" test_detect_secrets_blocks_private_key
       run_test "detect-secrets allows clean code" test_detect_secrets_allows_clean_code
+      run_test "detect-secrets blocks Codex apply_patch" test_detect_secrets_blocks_codex_apply_patch
+      run_test "detect-secrets allows Codex secret removal" test_detect_secrets_allows_codex_secret_removal
       run_test "guard-bash blocks force push" test_guard_bash_blocks_force_push
       run_test "guard-bash allows safe commands" test_guard_bash_allows_safe_commands
       run_test "guard-bash allows git log" test_guard_bash_allows_git_log
       run_test "guard-config blocks .claude/ write" test_guard_config_blocks_claude_dir_write
       run_test "guard-config allows CLAUDE.md" test_guard_config_allows_claude_md
       run_test "guard-config allows rules" test_guard_config_allows_rules
+      run_test "guard-config blocks Codex apply_patch" test_guard_config_blocks_codex_apply_patch
+      run_test "guard-config allows Codex apply_patch rule" test_guard_config_allows_codex_apply_patch_rule
+      run_test "guard-config blocks Codex dot segment bypass" test_guard_config_blocks_codex_dot_segment_bypass
+      run_test "guard-config fails closed on malformed JSON" test_guard_config_fails_closed_on_malformed_json
+      run_test "detect-secrets fails closed on malformed JSON" test_detect_secrets_fails_closed_on_malformed_json
+      run_test "Codex risky skills are explicit-only" test_codex_explicit_only_skill_policies
+      run_test "Codex apply_patch guards are wired" test_codex_apply_patch_guards_are_wired
+      run_test "SessionStart includes dual-loader tier rules" test_session_start_includes_dual_loader_tier_rules
       run_test "auto-approve allows git status" test_auto_approve_allows_git_status
       run_test "auto-approve allows npm test" test_auto_approve_allows_npm_test
       run_test "auto-approve rejects rm -rf" test_auto_approve_rejects_rm_rf
@@ -3705,6 +4300,10 @@ run_test_suite() {
       run_test "dream command has github integration" test_dream_command_has_github_integration
       ;;
     compaction_restore)
+      run_test "Vaults continuity requires exact root and executable adapter" test_vaults_continuity_requires_exact_root_and_executable_adapter
+      run_test "Vaults root compaction hooks clean no-op" test_vaults_root_compaction_hooks_clean_noop
+      run_test "nested project retains KERNEL compaction fallback" test_nested_project_retains_kernel_compaction_fallback
+      run_test "Vaults root SessionStart keeps governance without restore" test_vaults_root_session_start_keeps_governance_without_restore
       run_test "post-compact-restore fast exit without marker" test_compact_restore_fast_exit
       run_test "post-compact-restore outputs marker content" test_compact_restore_outputs_marker
       run_test "post-compact-restore deletes marker" test_compact_restore_deletes_marker
@@ -3730,6 +4329,10 @@ run_test_suite() {
       run_test "retrospective has agentdb integration" test_retrospective_has_agentdb
       run_test "retrospective has output format" test_retrospective_has_output_format
       run_test "retrospective has cluster analysis" test_retrospective_has_clusters
+      run_test "retrospective queries current learning schema" test_retrospective_queries_current_learning_schema
+      run_test "methodology carries cross-loader release lessons" test_methodology_carries_cross_loader_release_lessons
+      run_test "ship bump targets are truthful" test_ship_bump_targets_are_truthful
+      run_test "resolved contradictions have learning mutation evidence" test_retrospective_contradictions_have_mutation_evidence
       ;;
     github_integration)
       run_test "github-integration.sh exists" test_github_integration_exists
@@ -3792,6 +4395,16 @@ run_test_suite() {
       ;;
     version_sync)
       run_test "all canonical version declarations in sync" test_version_sync_all
+      ;;
+    release_docs)
+      run_test "active docs reject stale claims" test_release_docs_reject_stale_live_claims
+      run_test "8.0 changelog current and 7.x history preserved" test_release_changelog_v8_is_current_and_history_preserved
+      run_test "active release docs use 8.0.1 runtime" test_release_docs_use_current_801_runtime
+      run_test "Vaults continuity boundary is documented" test_release_docs_explain_vaults_continuity_boundary
+      run_test "metadata and inventory truthful" test_release_metadata_and_inventory_are_truthful
+      run_test "rollback works outside a checkout" test_release_docs_rollback_works_outside_a_checkout
+      run_test "Claude and Codex lifecycle commands are separate" test_release_docs_separate_claude_and_codex_lifecycle
+      run_test "Codex invocation and lifecycle boundaries are documented" test_release_docs_explain_codex_invocation_and_boundaries
       ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
@@ -3935,6 +4548,8 @@ main() {
     run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"
+    run_test_suite "runtime_upgrade"
+    run_test_suite "release_docs"
     run_test_suite "test_gate"
     run_test_suite "manifest"
   else

@@ -34,7 +34,7 @@ jobs:
             2. Check if any new patterns emerged that should be captured:
                - New anti-patterns discovered → update skills/*/SKILL.md
                - New conventions established → update rules/
-               - Workflow improvements → update commands/
+               - Workflow improvements → update the matching skills/*/SKILL.md
             3. If improvements found:
                - Create a branch: learn/pr-${{ github.event.pull_request.number }}
                - Make the updates (minimal, surgical)

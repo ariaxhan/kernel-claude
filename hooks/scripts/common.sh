@@ -5,52 +5,211 @@
 # Dependency check: jq is required by most hooks for JSON parsing
 command -v jq >/dev/null 2>&1 || { echo "Warning: jq not found, some hooks may not work" >&2; }
 
-# Auto-update current symlink to latest version (fixes stale hook issue)
-# Claude Code downloads new versions AFTER session-start hooks run,
-# so we check on every hook invocation (throttled to once per 60s).
-# Uses BASH_SOURCE[0] (common.sh itself) to find cache dir reliably,
-# regardless of call depth or caller location.
-update_current_symlink() {
-  # common.sh lives at {cache}/{version}/hooks/scripts/common.sh
-  # So 3 levels up from common.sh = the plugin parent dir (e.g. kernel/)
-  local COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local CACHE_DIR="$(cd "$COMMON_DIR/../../.." && pwd)"
-
-  # Only run if we're in the plugin cache (not dev mode)
-  [[ "$CACHE_DIR" == *"plugins/cache"* ]] || return 0
-
-  # Throttle: skip if checked within last 60 seconds
-  local STAMP="$CACHE_DIR/.update_checked"
-  if [ -f "$STAMP" ]; then
-    local stamp_age
-    stamp_age=$(( $(date +%s) - $(stat -f %m "$STAMP" 2>/dev/null || stat -c %Y "$STAMP" 2>/dev/null || echo 0) ))
-    [ "$stamp_age" -lt 60 ] && return 0
-  fi
-  touch "$STAMP" 2>/dev/null || true
-
-  local LATEST
-  LATEST=$(ls -d "$CACHE_DIR"/[0-9]*/ 2>/dev/null \
-    | xargs -n1 basename 2>/dev/null \
-    | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-    | sort -t. -k1,1n -k2,2n -k3,3n \
-    | tail -1 || true)
-
-  [ -z "$LATEST" ] && return 0
-
-  # Check if current symlink needs updating
-  local CURRENT_TARGET
-  CURRENT_TARGET=$(readlink "$CACHE_DIR/current" 2>/dev/null | xargs basename 2>/dev/null || true)
-
-  if [ "$CURRENT_TARGET" != "$LATEST" ]; then
-    ln -sfn "$CACHE_DIR/$LATEST" "$CACHE_DIR/current" 2>/dev/null && \
-      echo "**KERNEL auto-updated:** ${CURRENT_TARGET:-none} → $LATEST"
+# Runtime selection is based on the plugin Claude Code actually loaded. A cache
+# directory that merely has the largest number is not proof that it is active.
+kernel_loaded_root() {
+  if [ -n "${KERNEL_RUNTIME_ROOT:-}" ]; then
+    printf '%s\n' "$KERNEL_RUNTIME_ROOT"
+  elif [ -n "${KERNEL_LOADED_ROOT:-}" ]; then
+    printf '%s\n' "$KERNEL_LOADED_ROOT"
+  else
+    local common_dir
+    common_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || return 1
+    (cd "$common_dir/../.." && pwd)
   fi
 }
+
+kernel_safe_path() {
+  python3 - "$1" <<'PY'
+import sys
+raise SystemExit(any(ord(c) < 32 or ord(c) == 127 for c in sys.argv[1]))
+PY
+}
+
+kernel_cache_dir() {
+  local cache="${KERNEL_CACHE_DIR:-$HOME/.claude/plugins/cache/kernel-marketplace/kernel}"
+  kernel_safe_path "$cache" || return 1
+  printf '%s\n' "$cache"
+}
+
+kernel_semver() { [[ "$1" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; }
+
+kernel_validate_runtime_root() {
+  local root="$1" cache
+  kernel_safe_path "$root" || return 1
+  cache=$(kernel_cache_dir) || return 1
+  python3 - "$root" "$cache" <<'PY'
+import json, os, pathlib, re, stat, sys
+root, cache = sys.argv[1:]
+if os.path.islink(root) or not os.path.isdir(root): raise SystemExit(1)
+real_root = os.path.realpath(root)
+required = ['.claude-plugin/plugin.json', 'hooks/scripts/common.sh', 'orchestration/agentdb/agentdb']
+for rel in required:
+    path = os.path.join(root, rel)
+    try: mode = os.stat(path).st_mode
+    except OSError: raise SystemExit(1)
+    if not stat.S_ISREG(mode): raise SystemExit(1)
+    real = os.path.realpath(path)
+    if os.path.commonpath([real_root, real]) != real_root: raise SystemExit(1)
+manifest = pathlib.Path(root, '.claude-plugin/plugin.json')
+try: data = json.loads(manifest.read_text())
+except Exception: raise SystemExit(1)
+version = data.get('version')
+if data.get('name') != 'kernel' or not isinstance(version, str) or not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+    raise SystemExit(1)
+root_norm, cache_norm = os.path.normpath(root), os.path.normpath(cache)
+if os.path.dirname(root_norm) == cache_norm and os.path.basename(root_norm) != version:
+    raise SystemExit(1)
+print(version)
+PY
+}
+
+kernel_version_lt() {
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -t. -k1,1n -k2,2n -k3,3n | head -1)" = "$1" ] && [ "$1" != "$2" ]
+}
+
+kernel_atomic_link() {
+  (
+  local target="$1" dest="$2" tmp residue
+  kernel_safe_path "$target" && kernel_safe_path "$dest" || return 1
+  for residue in "${dest}.kernel-tmp."*; do
+    [ -L "$residue" ] || continue
+    [ "$(readlink "$residue" 2>/dev/null)" = "$target" ] && rm -f "$residue"
+  done
+  tmp="${dest}.kernel-tmp.$$.$RANDOM"
+  cleanup() { if [ -n "${tmp:-}" ] && [ -L "$tmp" ]; then rm -f "$tmp"; fi; return 0; }
+  trap cleanup EXIT
+  trap 'cleanup; exit 129' HUP
+  trap 'cleanup; exit 130' INT
+  trap 'cleanup; exit 143' TERM
+  [ -e "$tmp" ] || [ -L "$tmp" ] && return 1
+  ln -s "$target" "$tmp" || return 1
+  if [ "${KERNEL_ATOMIC_LINK_FAIL:-0}" = 1 ]; then return 1; fi
+  python3 - "$tmp" "$dest" <<'PY' || return 1
+import os, sys
+os.replace(sys.argv[1], sys.argv[2])
+PY
+  tmp=""
+  )
+}
+
+kernel_update_current() {
+  local root cache current current_root new_version current_version explicit=0
+  root=$(kernel_loaded_root) || return 1
+  new_version=$(kernel_validate_runtime_root "$root") || { echo "kernel: refusing invalid runtime root: $root" >&2; return 1; }
+  cache=$(kernel_cache_dir); current="$cache/current"
+  [ -n "${KERNEL_RUNTIME_ROOT:-}" ] && explicit=1
+  mkdir -p "$cache" 2>/dev/null || return 1
+  if [ -L "$current" ]; then
+    current_root=$(readlink "$current")
+    case "$current_root" in /*) ;; *) current_root="$cache/$current_root" ;; esac
+    current_version=$(kernel_validate_runtime_root "$current_root" 2>/dev/null || true)
+    [ "$current_root" = "$root" ] && return 0
+    if [ "$explicit" -eq 0 ] && [ -n "$current_version" ] && kernel_version_lt "$new_version" "$current_version"; then
+      return 0
+    fi
+  elif [ -e "$current" ]; then
+    echo "kernel: refusing non-symlink runtime selector: $current" >&2; return 1
+  fi
+  kernel_atomic_link "$root" "$current" || { echo "kernel: could not update runtime selector: $current" >&2; return 1; }
+  [ "${KERNEL_RUNTIME_QUIET:-0}" = "1" ] || echo "KERNEL runtime selected: $new_version"
+}
+
+kernel_lexical_target() {
+  python3 - "$1" "$2" <<'PY'
+import os, sys
+target, dest = sys.argv[1:]
+if any(ord(c) < 32 or ord(c) == 127 for c in target + dest):
+    raise SystemExit(1)
+parts = target.split(os.sep)
+if '..' in parts or any(p == '' for p in parts[1:-1]):
+    raise SystemExit(1)
+print(os.path.normpath(target if os.path.isabs(target) else os.path.join(os.path.dirname(dest), target)))
+PY
+}
+
+kernel_owned_numbered_target() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import os, re, sys
+target, cache, suffix = map(os.path.normpath, sys.argv[1:])
+prefix = cache + os.sep
+if not target.startswith(prefix):
+    raise SystemExit(1)
+rest = target[len(prefix):].split(os.sep)
+expected = suffix.split(os.sep)
+if len(rest) != len(expected) + 1 or rest[1:] != expected:
+    raise SystemExit(1)
+if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', rest[0]):
+    raise SystemExit(1)
+PY
+}
+
+kernel_repair_host_link() {
+  local dest="$1" wanted="$2" cache="$3" suffix="$4" raw lexical
+  if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then return 0; fi
+  if [ ! -L "$dest" ]; then
+    echo "kernel: kept user-owned path $dest; run /kernel:init to resolve it" >&2; return 1
+  fi
+  raw=$(readlink "$dest") || return 1
+  lexical=$(kernel_lexical_target "$raw" "$dest") || {
+    echo "kernel: kept malformed link $dest; run /kernel:init to resolve it" >&2; return 1;
+  }
+  [ "$lexical" = "$wanted" ] && return 0
+  if kernel_owned_numbered_target "$lexical" "$cache" "$suffix"; then
+    kernel_atomic_link "$wanted" "$dest" || {
+      echo "kernel: could not repair $dest; run /kernel:init" >&2; return 1;
+    }
+    echo "KERNEL repaired helper link: $dest"
+    return 0
+  fi
+  echo "kernel: kept unrelated link $dest; run /kernel:init to resolve it" >&2
+  return 1
+}
+
+kernel_init_host_link() {
+  local dest="$1" wanted="$2" cache="$3" suffix="$4"
+  if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then
+    mkdir -p "$(dirname "$dest")" || return 1
+    kernel_atomic_link "$wanted" "$dest" || return 1
+    echo "KERNEL created helper link: $dest"
+    return 0
+  fi
+  kernel_repair_host_link "$dest" "$wanted" "$cache" "$suffix"
+}
+
+kernel_reconcile_runtime() {
+  local vaults="$1" cache rc=0
+  kernel_safe_path "$vaults" || { echo "kernel: refusing unsafe Vaults path" >&2; return 1; }
+  cache=$(kernel_cache_dir) || return 1
+  kernel_update_current || rc=1
+  kernel_repair_host_link "$vaults/.local/bin/agentdb" "$cache/current/orchestration/agentdb/agentdb" "$cache" "orchestration/agentdb/agentdb" || rc=1
+  kernel_repair_host_link "$vaults/.claude/kernel/orchestration" "$cache/current/orchestration" "$cache" "orchestration" || rc=1
+  kernel_repair_host_link "$vaults/.claude/kernel/hooks" "$cache/current/hooks" "$cache" "hooks" || rc=1
+  return "$rc"
+}
+
+kernel_init_agentdb() {
+  local vaults="$1" cache="$2" selected agentdb
+  kernel_safe_path "$vaults" && kernel_safe_path "$cache" || return 1
+  [ -L "$cache/current" ] || return 1
+  selected=$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$cache/current") || return 1
+  kernel_validate_runtime_root "$selected" >/dev/null || return 1
+  agentdb="$cache/current/orchestration/agentdb/agentdb"
+  [ -f "$agentdb" ] || return 1
+  AGENTDB_ROOT="$vaults" "$agentdb" init
+}
+
+# Backward-compatible internal name used by existing checks.
+update_current_symlink() { kernel_update_current; }
 
 # Detect Vaults location - env var takes priority, then checks filesystem
 detect_vaults() {
   # Explicit override always wins (for testing + custom setups)
-  if [ -n "${KERNEL_VAULTS:-}" ] && [ -d "${KERNEL_VAULTS:-}" ]; then
+  kernel_safe_path "$HOME" || { echo "kernel: refusing unsafe HOME path" >&2; return 1; }
+  if [ -n "${KERNEL_VAULTS:-}" ] && ! kernel_safe_path "$KERNEL_VAULTS"; then
+    echo "kernel: refusing unsafe KERNEL_VAULTS path" >&2
+    return 1
+  elif [ -n "${KERNEL_VAULTS:-}" ] && [ -d "${KERNEL_VAULTS:-}" ]; then
     echo "$KERNEL_VAULTS"
   elif [ -f "$HOME/Documents/Vaults/_meta/agentdb/agent.db" ]; then
     echo "$HOME/Documents/Vaults"
@@ -88,6 +247,19 @@ get_project_root() {
   echo "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 }
 
+# The shared Vaults continuity service owns compaction only for a session whose
+# active project is the Vaults root itself. Nested repositories keep KERNEL's
+# deterministic fallback because root-level host hooks may not be loaded there.
+kernel_vaults_continuity_active() {
+  local vaults="${1:-}" project_root="${2:-}"
+  [ -n "$vaults" ] && [ -n "$project_root" ] || return 1
+  kernel_safe_path "$vaults" && kernel_safe_path "$project_root" || return 1
+  [ "$project_root" = "$vaults" ] || return 1
+  [ -f "$vaults/_meta/services/context_checkpoint.py" ] || return 1
+  [ -x "$vaults/.claude/hooks/context-checkpoint.sh" ] \
+    || [ -x "$vaults/.codex/shims/context-checkpoint.sh" ]
+}
+
 # === Hook Telemetry ===
 # Lightweight timing for hook execution. Fire-and-forget.
 # Usage: _kernel_hook_start at top, _kernel_hook_end at bottom.
@@ -97,8 +269,9 @@ _KERNEL_HOOK_START_MS=""
 _kernel_hook_start() {
   # macOS date doesn't support %N, use python for ms precision
   _KERNEL_HOOK_START_MS=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo "")
-  # Check for plugin updates on every hook (throttled to 60s in the function)
-  update_current_symlink 2>/dev/null || true
+  # Keep the selector and the three known KERNEL helper links aligned. Refusals
+  # are warnings: hooks continue, but mixed-version risk is never hidden.
+  kernel_reconcile_runtime "$(detect_vaults)" || true
 }
 
 _kernel_hook_end() {

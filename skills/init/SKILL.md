@@ -1,6 +1,6 @@
 ---
 name: init
-description: "Initialize KERNEL globally. Sets up Vaults, symlinks, CLI, database."
+description: "Initialize KERNEL links and AgentDB in a confirmed Vaults directory."
 user-invocable: true
 allowed-tools: Bash
 disable-model-invocation: true
@@ -11,118 +11,104 @@ kernel:
   confirmation: always
 ---
 
-<skill id="init">
+# KERNEL init
 
-<purpose>
-Global KERNEL setup. Run once per machine. Detects existing Vaults or creates ~/Vaults.
-</purpose>
+Explicit, once-per-machine setup. This skill never moves or replaces the whole
+`~/.claude` directory.
 
-<detection>
-Hooks auto-detect: `~/Vaults` → `~/Downloads/Vaults` → `$KERNEL_VAULTS`
-</detection>
+## Requirements
 
-<requirements>Git, SQLite3, jq</requirements>
+Git, SQLite 3, `jq`, Python 3, and Bash. Install the plugin first with the exact ID:
 
-<steps>
-
-## Step 1: Detect/create Vaults + find plugin
-
-```bash
-# Detect existing
-if [ -d "$HOME/Vaults/_meta" ]; then VAULTS="$HOME/Vaults"
-elif [ -d "$HOME/Downloads/Vaults/_meta" ]; then VAULTS="$HOME/Downloads/Vaults"
-else VAULTS="$HOME/Vaults"; fi
-echo "Vaults: $VAULTS"
-
-# Create structure
-mkdir -p "$VAULTS/_meta"/{agentdb,research,plans,handoffs,agents,logs}
-mkdir -p "$VAULTS/.claude"/{rules,commands,skills,kernel}
-mkdir -p "$VAULTS/.local/bin"
-
-# Find plugin
-PLUGIN_CACHE="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
-LATEST=$(ls -1 "$PLUGIN_CACHE" 2>/dev/null | grep -E '^[0-9]' | sort -V | tail -1)
-[ -z "$LATEST" ] && echo "ERROR: Install plugin first" && exit 1
-PLUGIN_ROOT="$PLUGIN_CACHE/$LATEST"
+```text
+/plugin marketplace add ariaxhan/kernel-claude
+/plugin install kernel@kernel-marketplace
+/reload-plugins
 ```
 
-## Step 2: Install CLI + symlinks
+## Detection and confirmation
 
-```bash
-# CLI
-ln -sf "$PLUGIN_ROOT/orchestration/agentdb/agentdb" "$VAULTS/.local/bin/agentdb"
-chmod +x "$VAULTS/.local/bin/agentdb"
+Locate the runtime selector at
+`$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current`, source its
+`hooks/scripts/common.sh`, and call `kernel_validate_runtime_root` on the selected
+root. Stop if validation fails.
 
-# Kernel symlinks (for hooks)
-ln -sfn "$PLUGIN_ROOT/orchestration" "$VAULTS/.claude/kernel/orchestration"
-ln -sfn "$PLUGIN_ROOT/hooks" "$VAULTS/.claude/kernel/hooks"
+Call `detect_vaults`. Its order is: an existing valid `KERNEL_VAULTS`,
+`$HOME/Documents/Vaults`, `$HOME/Vaults`, `$HOME/Downloads/Vaults`, then the
+reported `$HOME/Documents/Vaults` fallback.
+
+Before writing, show the exact Vaults path and ask:
+
+> Set up KERNEL in this Vaults directory?
+
+Continue only after confirmation. A different path must be exported as
+`KERNEL_VAULTS` and detected again.
+
+## Writes
+
+After confirmation, create only these directories when absent:
+
+```text
+$VAULTS/_meta/agentdb
+$VAULTS/_meta/research
+$VAULTS/_meta/plans
+$VAULTS/_meta/handoffs
+$VAULTS/_meta/checkpoints
+$VAULTS/_meta/retrospectives
+$VAULTS/_meta/agents
+$VAULTS/_meta/logs
+$VAULTS/.claude/kernel
+$VAULTS/.local/bin
 ```
 
-## Step 3: Symlink ~/.claude (optional)
+Call `kernel_update_current`, then use `kernel_init_host_link` for exactly:
 
-```bash
-if [ ! -L "$HOME/.claude" ]; then
-  [ -d "$HOME/.claude/plugins" ] && cp -r "$HOME/.claude/plugins" "$VAULTS/.claude/"
-  [ -d "$HOME/.claude" ] && mv "$HOME/.claude" "$HOME/.claude.backup.$(date +%Y%m%d)"
-  ln -sfn "$VAULTS/.claude" "$HOME/.claude"
-fi
+```text
+$VAULTS/.local/bin/agentdb          -> $CACHE/current/orchestration/agentdb/agentdb
+$VAULTS/.claude/kernel/orchestration -> $CACHE/current/orchestration
+$VAULTS/.claude/kernel/hooks         -> $CACHE/current/hooks
 ```
 
-## Step 4: PATH + init DB
+Missing links may be created. Correct links are unchanged. Recognizable numbered
+KERNEL links may be repaired. A regular file, directory, malformed link, or unrelated
+link is preserved and stops setup with an actionable message. Never force-replace links.
+
+Initialize the database through the shared helper, which pins AgentDB to the selected
+Vaults even when init was invoked from another directory:
 
 ```bash
-SHELL_RC="$HOME/.zshrc"
-grep -q 'Vaults/.local/bin' "$SHELL_RC" 2>/dev/null || \
-  echo 'export PATH="$HOME/Vaults/.local/bin:$HOME/Downloads/Vaults/.local/bin:$PATH"' >> "$SHELL_RC"
-export PATH="$VAULTS/.local/bin:$PATH"
-
-agentdb init
+kernel_init_agentdb "$VAULTS" "$CACHE"
 ```
 
-<ask_user>
-  Use AskUserQuestion when: detection complete, before creating/modifying directories
-  Ask: "Detected Vaults at {path}. Proceed with setup, or use a different location?"
-  Options: proceed, use different path, abort
-</ask_user>
-
-## Step 5: Verify
+Do not edit a shell startup file automatically. If `$VAULTS/.local/bin` is not on
+`PATH`, print this line for the user to add to their chosen shell configuration:
 
 ```bash
-echo "=== KERNEL INIT COMPLETE ==="
-echo "Vaults: $VAULTS"
-ls "$VAULTS/_meta/"
-agentdb status
-echo "Next: restart terminal, then: agentdb read-start"
+export PATH="${KERNEL_VAULTS:-$HOME/Documents/Vaults}/.local/bin:$PATH"
 ```
 
-</steps>
+## Verify
 
-<one_liner>
 ```bash
-VAULTS="${KERNEL_VAULTS:-$HOME/Vaults}"; [ -d "$HOME/Downloads/Vaults/_meta" ] && VAULTS="$HOME/Downloads/Vaults"; \
-mkdir -p "$VAULTS/_meta"/{agentdb,research,plans,handoffs,agents,logs} "$VAULTS/.claude"/{rules,commands,skills,kernel} "$VAULTS/.local/bin" && \
-PLUGIN_CACHE="$HOME/.claude/plugins/cache/kernel-marketplace/kernel" && \
-LATEST=$(ls -1 "$PLUGIN_CACHE" 2>/dev/null | grep -E '^[0-9]' | sort -V | tail -1) && \
-ln -sf "$PLUGIN_CACHE/$LATEST/orchestration/agentdb/agentdb" "$VAULTS/.local/bin/agentdb" && \
-ln -sfn "$PLUGIN_CACHE/$LATEST/orchestration" "$VAULTS/.claude/kernel/orchestration" && \
-ln -sfn "$PLUGIN_CACHE/$LATEST/hooks" "$VAULTS/.claude/kernel/hooks" && \
-grep -q 'Vaults/.local/bin' ~/.zshrc 2>/dev/null || echo 'export PATH="$HOME/Vaults/.local/bin:$HOME/Downloads/Vaults/.local/bin:$PATH"' >> ~/.zshrc && \
-export PATH="$VAULTS/.local/bin:$PATH" && agentdb init && echo "Done. Restart terminal."
+"$VAULTS/.local/bin/agentdb" status
+readlink "$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current"
+readlink "$VAULTS/.local/bin/agentdb"
 ```
-</one_liner>
 
-<teammate_onboarding>
-1. `git clone <vaults-repo> ~/Vaults` (if shared)
-2. `claude plugin marketplace add ariaxhan/kernel-claude && claude plugin install kernel`
-3. `/kernel:init`
-4. Restart terminal + Claude Code
-</teammate_onboarding>
+Report every directory and link created. Existing AgentDB data, manifests, receipts,
+project configuration, and unrelated files are not rewritten.
 
-<troubleshooting>
-- **agentdb not found**: `source ~/.zshrc` or restart terminal
-- **plugin not found**: install plugin first (see step 2 above)
-- **permission denied**: `chmod +x ~/Vaults/.local/bin/agentdb`
-- **wrong Vaults**: `export KERNEL_VAULTS="$HOME/path/to/Vaults"` in ~/.zshrc
-</troubleshooting>
+## Legacy `~/.claude` consolidation
 
-</skill>
+This is not part of init. Moving an existing `~/.claude` can affect plugins,
+credentials, settings, and other tools. If a user explicitly requests consolidation,
+make a dated backup, show a complete move plan and rollback command, and ask for a
+separate confirmation before any move. There is no one-line migration.
+
+## Recovery
+
+- Missing plugin: install `kernel@kernel-marketplace`, then reload.
+- Wrong Vaults: export `KERNEL_VAULTS` to the existing root and rerun init.
+- Unsafe host path: inspect the named object; KERNEL will not overwrite it.
+- Intentional runtime rollback: run `scripts/select-runtime.sh /path/to/runtime` from
+  a trusted KERNEL checkout. It selects code only; it does not convert state formats.
