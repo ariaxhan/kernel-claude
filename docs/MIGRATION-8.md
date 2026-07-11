@@ -76,6 +76,11 @@ kernel-manifest activate   <file>    # arm the context policy (writes hook point
 kernel-manifest deactivate           # merge ledger into receipt, disarm
 ```
 
+CLI-relative manifest, directory, bundle, and receipt paths resolve from the repository
+root, so behavior does not depend on the caller's directory. Explicit absolute bundle and
+receipt output paths remain supported for `/tmp` resume bundles. Paths stored inside a
+manifest are repository-contained; absolute paths, `..`, and symlink escapes are invalid.
+
 **Authority order on resume:** live verified repository state > explicit user
 instruction > manifest > chronicle > inferred conversation history. Divergence
 (branch/commit/pinned-artifact-hash) flips inherited workflow phases back to `required`

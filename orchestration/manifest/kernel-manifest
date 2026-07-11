@@ -42,6 +42,28 @@ CONTEXT_LEDGER = os.path.join(REPO_ROOT, "_meta", ".context-ledger")
 def repo_path(path):
     return path if os.path.isabs(path) else os.path.join(REPO_ROOT, path)
 
+
+def cli_path(path):
+    """CLI-relative paths are always interpreted from the repository root."""
+    return os.path.realpath(repo_path(path))
+
+
+def validate_repo_path(path, field, errors):
+    """Manifest-sourced paths may not escape the repository, including via symlink."""
+    if not isinstance(path, str) or not path:
+        errors.append(f"{field}: expected non-empty repository-relative path")
+        return
+    if os.path.isabs(path) or os.path.normpath(path).startswith(".."):
+        errors.append(f"{field}: path must be repository-relative and may not contain '..'")
+        return
+    resolved = os.path.realpath(os.path.join(REPO_ROOT, path))
+    try:
+        contained = os.path.commonpath([REPO_ROOT, resolved]) == REPO_ROOT
+    except ValueError:
+        contained = False
+    if not contained:
+        errors.append(f"{field}: path resolves outside repository")
+
 # ---------- manifest loading (canonical JSON) ----------
 
 def _reject_duplicate_keys(pairs):
@@ -60,6 +82,7 @@ def load_manifest_file(path):
                "  ruby -ryaml -rjson -e 'puts JSON.pretty_generate(YAML.safe_load(ARGF.read))' "
                "old.yaml > new.json")
     try:
+        path = cli_path(path)
         with open(path, encoding="utf-8") as f:
             return json.load(f, object_pairs_hook=_reject_duplicate_keys)
     except OSError as e:
@@ -154,6 +177,24 @@ def validate_invariants(manifest, errors):
         prov = manifest.get("provenance") or {}
         if prov.get("dirty") and not prov.get("dirty_tree_sha256"):
             errors.append("provenance.dirty_tree_sha256: required when dirty is true")
+    created = ((manifest.get("identity") or {}).get("created"))
+    if created is not None:
+        try:
+            parsed = datetime.fromisoformat(created.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                raise ValueError("timezone required")
+        except (AttributeError, ValueError):
+            errors.append("identity.created: must be an RFC3339 timestamp with timezone")
+    for group in ("required", "optional"):
+        for i, selector in enumerate(ctx.get(group) or []):
+            if isinstance(selector, dict) and selector.get("path"):
+                validate_repo_path(selector["path"], f"context.{group}[{i}].path", errors)
+    for i, artifact in enumerate((manifest.get("provenance") or {}).get("artifacts") or []):
+        if isinstance(artifact, dict) and artifact.get("path"):
+            validate_repo_path(artifact["path"], f"provenance.artifacts[{i}].path", errors)
+    for i, check in enumerate((manifest.get("runtime") or {}).get("preflight") or []):
+        if isinstance(check, dict) and check.get("check") == "path_exists":
+            validate_repo_path(check.get("path"), f"runtime.preflight[{i}].path", errors)
 
 
 def schema_for(manifest):
@@ -195,19 +236,26 @@ def cmd_validate(args):
 def cmd_latest(args):
     dirs = []
     any_branch = "--any-branch" in args
-    it = iter(args)
-    for a in it:
+    i = 0
+    while i < len(args):
+        a = args[i]
         if a == "--dir":
-            dirs.append(next(it))
+            if i + 1 >= len(args):
+                die(1, "--dir requires a directory value")
+            dirs.append(args[i + 1])
+            i += 1
+        i += 1
     if not dirs:
         dirs = ["_meta/checkpoints", "_meta/handoffs"]
     candidates = []
     _, live_branch = git("branch", "--show-current")
     for d in dirs:
-        if os.path.isdir(d):
-            for f in os.listdir(d):
+        absolute_dir = cli_path(d)
+        if os.path.isdir(absolute_dir):
+            for f in os.listdir(absolute_dir):
                 if f.endswith(".json") and not f.startswith("."):
-                    p = os.path.join(d, f)
+                    display_dir = d if not os.path.isabs(d) else absolute_dir
+                    p = os.path.join(display_dir, f)
                     try:
                         manifest = load_and_validate(p)
                         created = (manifest.get("identity") or {}).get("created")
@@ -468,7 +516,7 @@ def cmd_compile(args):
         if os.path.isfile(absolute):
             project_instr += estimate(open(absolute, encoding="utf-8", errors="replace").read())
 
-    manifest_tokens = estimate(open(path, encoding="utf-8").read())
+    manifest_tokens = estimate(open(cli_path(path), encoding="utf-8").read())
     always = skill_tokens(["quality", "testing", "git"])  # ingest's always-set
     workflow_sk = skill_tokens(runtime.get("required_skills"))
     domain_sk = skill_tokens(runtime.get("optional_skills"))
@@ -486,7 +534,7 @@ def cmd_compile(args):
     receipt = {
         "schema": "kernel.context-receipt/v1",
         "manifest": path,
-        "manifest_sha256": hashlib.sha256(open(path, "rb").read()).hexdigest(),
+        "manifest_sha256": hashlib.sha256(open(cli_path(path), "rb").read()).hexdigest(),
         "bundle_sha256": hashlib.sha256(bundle.encode()).hexdigest(),
         "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "manifest_tokens": manifest_tokens,
@@ -506,10 +554,10 @@ def cmd_compile(args):
     }
     out = dump_json(receipt)
     if bundle_out:
-        with open(bundle_out, "w", encoding="utf-8") as f:
+        with open(cli_path(bundle_out), "w", encoding="utf-8") as f:
             f.write(bundle)
     if receipt_out:
-        with open(receipt_out, "w", encoding="utf-8") as f:
+        with open(cli_path(receipt_out), "w", encoding="utf-8") as f:
             f.write(out)
     print(out, end="")
     if unresolved_required:
@@ -565,6 +613,8 @@ def cmd_deactivate(args):
     for a in it:
         if a == "--receipt":
             receipt_path = next(it)
+    if receipt_path:
+        receipt_path = cli_path(receipt_path)
     if os.path.isfile(CONTEXT_LEDGER) and receipt_path and os.path.isfile(receipt_path):
         entries = []
         for line in open(CONTEXT_LEDGER, encoding="utf-8"):

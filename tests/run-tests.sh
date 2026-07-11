@@ -2799,9 +2799,9 @@ test_manifest_paths_anchor_to_repo_root() {
   cat > m.json <<MEOF
 {"schema":"kernel.checkpoint/v1","identity":{"name":"t","created":"2026-01-01T00:00:00Z"},"provenance":{"branch":"main","commit":"$head","dirty":true,"dirty_tree_sha256":"0000000000000000000000000000000000000000000000000000000000000000"},"task":{"goal":"t"},"steps_completed":[],"pending_steps":[],"resume":{"position":"p","next_operation":"n"},"context":{"policy":{"mode":"advisory"},"required":[{"path":"docs/a.md"}]}}
 MEOF
-  (cd sub && "$KM" compile ../m.json --bundle-out ../bundle.txt >/dev/null)
+  (cd sub && "$KM" compile m.json --bundle-out bundle.txt >/dev/null)
   assert_contains "$(cat bundle.txt)" "anchored" || return 1
-  (cd sub && "$KM" activate ../m.json >/dev/null)
+  (cd sub && "$KM" activate m.json >/dev/null)
   assert_file_exists "_meta/.active-manifest.json"
 }
 
@@ -2946,11 +2946,82 @@ test_manifest_committed_state_files_are_checked() {
   local bad=0 path ec
   while IFS= read -r path; do
     case "$path" in
-      *.json) "$KM" validate "$PLUGIN_ROOT/$path" >/dev/null 2>&1 || bad=1 ;;
+      *.json)
+        "$KM" validate "$PLUGIN_ROOT/$path" >/dev/null 2>&1 || bad=1
+        ec=0; "$KM" divergence "$PLUGIN_ROOT/$path" --json >/dev/null 2>&1 || ec=$?
+        [ "$ec" -le 1 ] || bad=1
+        ;;
       *.yaml|*.yml) ec=0; "$KM" validate "$PLUGIN_ROOT/$path" >/dev/null 2>&1 || ec=$?; [ "$ec" -eq 2 ] || bad=1 ;;
     esac
   done < <(git -C "$PLUGIN_ROOT" ls-files '_meta/handoffs/*' '_meta/checkpoints/*')
   assert_exit_code 0 "$bad" "committed canonical manifests validate and YAML is non-authoritative"
+}
+
+test_manifest_committed_gate_invokes_divergence() {
+  assert_contains "$(declare -f test_manifest_committed_state_files_are_checked)" 'divergence "$PLUGIN_ROOT/$path"'
+}
+
+test_manifest_cli_paths_are_rooted_from_subdirs() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  mkdir -p skills manifests
+  cp "$FIXTURES/checkpoint-example.json" manifests/checkpoint.json
+  local root_output sub_output
+  root_output=$("$KM" latest --dir manifests --any-branch)
+  sub_output=$(cd skills && "$KM" latest --dir manifests --any-branch)
+  assert_equals "$root_output" "$sub_output" "latest must be cwd-independent" || return 1
+  (cd skills && "$KM" validate manifests/checkpoint.json >/dev/null)
+}
+
+test_manifest_rejects_paths_outside_repo() {
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  local candidate ec
+  for candidate in /etc/hosts ../escape.md; do
+    python3 - "$candidate" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'path':sys.argv[1]}]; json.dump(m,open(p,'w'))
+PYEOF
+    ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "selector path must stay in repo" || return 1
+  done
+  mkdir -p links
+  ln -s /etc/hosts links/hosts
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'path':'links/hosts'}]; json.dump(m,open(p,'w'))
+PYEOF
+  ec=0; "$KM" compile m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "selector symlink escape must fail" || return 1
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['runtime']['preflight']=[{'check':'path_exists','path':'/etc/passwd'}]; json.dump(m,open(p,'w'))
+PYEOF
+  ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "preflight paths must stay in repo" || return 1
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['provenance']['artifacts']=[{'path':'../escape','sha256':'x'}]; json.dump(m,open(p,'w'))
+PYEOF
+  ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "artifact paths must stay in repo"
+}
+
+test_manifest_rejects_bad_created_timestamp() {
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['identity']['created']='zzzz'; json.dump(m,open(p,'w'))
+PYEOF
+  local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "identity.created must be RFC3339"
+}
+
+test_manifest_latest_missing_dir_value_is_controlled() {
+  local output ec=0; output=$("$KM" latest --dir 2>&1) || ec=$?
+  assert_exit_code 1 "$ec" "missing --dir value must be usage error" || return 1
+  if [[ "$output" == *Traceback* ]]; then echo "FAIL: traceback leaked"; return 1; fi
+  assert_contains "$output" "--dir requires"
 }
 
 test_guard_context_no_manifest_allows() {
@@ -3220,6 +3291,11 @@ run_test_suite() {
       run_test "dirty tree hash divergence" test_manifest_divergence_checks_dirty_tree_hash
       run_test "schema fields name enforcement owner" test_manifest_schema_fields_name_enforcement_owner
       run_test "committed manifests are checked" test_manifest_committed_state_files_are_checked
+      run_test "committed gate invokes divergence" test_manifest_committed_gate_invokes_divergence
+      run_test "CLI paths root from subdirectories" test_manifest_cli_paths_are_rooted_from_subdirs
+      run_test "manifest paths stay in repo" test_manifest_rejects_paths_outside_repo
+      run_test "created timestamp validates" test_manifest_rejects_bad_created_timestamp
+      run_test "latest missing dir is controlled" test_manifest_latest_missing_dir_value_is_controlled
       run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
       run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
       run_test "guard-context: sealed allows unforbidden" test_guard_context_sealed_allows_unforbidden
