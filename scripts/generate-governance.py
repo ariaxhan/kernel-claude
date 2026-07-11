@@ -6,9 +6,9 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import os
 import sys
-import tempfile
+
+from governance_transaction import TransactionError, locked_root, transactional_write as durable_write
 
 TOKEN_RE = re.compile(r"\{\{([A-Z][A-Z0-9_]*)\}\}")
 AMBIENT_RE = re.compile(
@@ -48,48 +48,6 @@ def require_contained(root, path, label):
             fail(f"{label} resolves outside the plugin root: {path}")
     except (OSError, ValueError) as exc:
         fail(f"cannot resolve {label}: {exc}")
-
-
-def transactional_write(changes):
-    """Stage every file, then replace all-or-restore exact original bytes."""
-    originals = {}
-    staged = {}
-    for path, content in changes.items():
-        require_regular(path, "transaction target", missing_ok=True)
-        originals[path] = path.read_bytes() if path.is_file() else None
-        handle = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=f".{path.name}.stage.", delete=False)
-        try:
-            handle.write(content.encode("utf-8") if isinstance(content, str) else content)
-            handle.flush()
-            os.fsync(handle.fileno())
-        finally:
-            handle.close()
-        staged[path] = Path(handle.name)
-    replaced = []
-    fail_after = int(os.environ.get("KERNEL_TEST_FAIL_AFTER_REPLACE", "0") or 0)
-    try:
-        for path, stage in staged.items():
-            os.replace(stage, path)
-            replaced.append(path)
-            if fail_after and len(replaced) == fail_after:
-                raise OSError(f"injected failure after replace {fail_after}")
-    except Exception as exc:
-        for path in reversed(replaced):
-            original = originals[path]
-            if original is None:
-                path.unlink(missing_ok=True)
-            else:
-                rollback = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=f".{path.name}.rollback.", delete=False)
-                try:
-                    rollback.write(original)
-                    rollback.flush()
-                    os.fsync(rollback.fileno())
-                finally:
-                    rollback.close()
-                os.replace(rollback.name, path)
-        for stage in staged.values():
-            stage.unlink(missing_ok=True)
-        fail(f"transaction rolled back: {exc}")
 
 
 def load(root):
@@ -178,27 +136,27 @@ def main():
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    supplied_root = args.root.absolute()
-    if supplied_root.is_symlink() or not supplied_root.is_dir():
-        fail(f"plugin root must be a real directory, not a symlink: {supplied_root}")
-    root = supplied_root.resolve()
-    _, outputs = render_outputs(root)
-    stale = []
-    for path in outputs:
-        require_contained(root, path, "generated output")
-        require_regular(path, "generated output", missing_ok=path.name in {"CLAUDE.md", "AGENTS.md"})
-    for path, expected in outputs.items():
-        actual = path.read_text(encoding="utf-8") if path.is_file() else None
-        if actual != expected:
-            stale.append(path.relative_to(root).as_posix())
-    if args.check and stale:
-        fail("stale generated file(s): " + ", ".join(stale))
-    if not args.check:
-        changes = {path: expected for path, expected in outputs.items()
-                   if path.relative_to(root).as_posix() in stale}
-        if changes:
-            transactional_write(changes)
-    print("governance current" if args.check else "generated: " + ", ".join(stale or ["no changes"]))
+    try:
+        with locked_root(args.root) as root:
+            _, outputs = render_outputs(root)
+            stale = []
+            for path in outputs:
+                require_contained(root, path, "generated output")
+                require_regular(path, "generated output", missing_ok=path.name in {"CLAUDE.md", "AGENTS.md"})
+            for path, expected in outputs.items():
+                actual = path.read_text(encoding="utf-8") if path.is_file() else None
+                if actual != expected:
+                    stale.append(path.relative_to(root).as_posix())
+            if args.check and stale:
+                fail("stale generated file(s): " + ", ".join(stale))
+            if not args.check:
+                changes = {path: expected.encode() for path, expected in outputs.items()
+                           if path.relative_to(root).as_posix() in stale}
+                if changes:
+                    durable_write(root, changes)
+            print("governance current" if args.check else "generated: " + ", ".join(stale or ["no changes"]))
+    except TransactionError as exc:
+        fail(str(exc))
 
 
 if __name__ == "__main__":

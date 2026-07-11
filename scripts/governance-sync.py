@@ -8,10 +8,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import shutil
 import subprocess
 import sys
-import tempfile
+
+from governance_transaction import TransactionError, locked_root, transactional_write as durable_write
 
 SCHEMA = "kernel.governance/v1"
 MANIFEST = ".kernel-governance.json"
@@ -148,7 +148,10 @@ def nested_scopes(repo):
 def audit(args):
     root = args.path.resolve()
     repos = discover(root)
-    records = [{"path": str(repo), "state": classify(repo), "nested_scopes": nested_scopes(repo)} for repo in repos]
+    records = []
+    for repo in repos:
+        with locked_root(repo):
+            records.append({"path": str(repo), "state": classify(repo), "nested_scopes": nested_scopes(repo)})
     payload = {
         "root": str(root),
         "canonical_repo_count": len(records),
@@ -169,6 +172,10 @@ def backup_target(path, backup_dir, repo):
 
 
 def preflight_backups(paths, backup_dir, repo):
+    try:
+        backup_dir.relative_to(repo)
+    except ValueError:
+        die(f"backup directory must stay inside repository: {backup_dir}")
     if exists_any(backup_dir) and (backup_dir.is_symlink() or not backup_dir.is_dir()):
         die(f"backup directory must be a regular directory: {backup_dir}")
     plans = []
@@ -184,78 +191,6 @@ def preflight_backups(paths, backup_dir, repo):
             continue
         plans.append((path, target))
     return plans
-
-
-def validate_write_target(path):
-    cursor = Path(path.anchor)
-    for part in path.parts[1:-1]:
-        cursor = cursor / part
-        if exists_any(cursor) and (cursor.is_symlink() or not cursor.is_dir()):
-            die(f"write ancestor must be a real directory, not a symlink: {cursor}")
-    if exists_any(path):
-        if path.is_symlink() or not path.is_file():
-            die(f"write target must be a regular non-symlink file: {path}")
-        if path.stat(follow_symlinks=False).st_nlink != 1:
-            die(f"write target must not be hardlinked: {path}")
-
-
-def transactional_write(writes):
-    """Stage all target bytes and roll every target back if any replace fails."""
-    if len(writes) != len(set(writes)):
-        die("transaction contains duplicate targets")
-    for path in writes:
-        validate_write_target(path)
-    originals = {path: read_bytes(path) if path.is_file() else None for path in writes}
-    created_dirs = []
-    staged = {}
-    try:
-        for path in writes:
-            missing = []
-            cursor = path.parent
-            while not cursor.exists():
-                missing.append(cursor)
-                cursor = cursor.parent
-            for directory in reversed(missing):
-                directory.mkdir()
-                created_dirs.append(directory)
-        for path, content in writes.items():
-            handle = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=f".{path.name}.stage.", delete=False)
-            try:
-                handle.write(content)
-                handle.flush()
-                os.fsync(handle.fileno())
-            finally:
-                handle.close()
-            staged[path] = Path(handle.name)
-        replaced = []
-        fail_after = int(os.environ.get("KERNEL_TEST_FAIL_AFTER_REPLACE", "0") or 0)
-        for path, stage in staged.items():
-            os.replace(stage, path)
-            replaced.append(path)
-            if fail_after and len(replaced) == fail_after:
-                raise OSError(f"injected failure after replace {fail_after}")
-    except Exception as exc:
-        for path in reversed(locals().get("replaced", [])):
-            original = originals[path]
-            if original is None:
-                path.unlink(missing_ok=True)
-            else:
-                rollback = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=f".{path.name}.rollback.", delete=False)
-                try:
-                    rollback.write(original)
-                    rollback.flush()
-                    os.fsync(rollback.fileno())
-                finally:
-                    rollback.close()
-                os.replace(rollback.name, path)
-        for stage in staged.values():
-            stage.unlink(missing_ok=True)
-        for directory in reversed(created_dirs):
-            try:
-                directory.rmdir()
-            except OSError:
-                pass
-        die(f"transaction rolled back: {exc}")
 
 
 def manifest_bytes(data):
@@ -321,7 +256,7 @@ def adopt(args):
     }
     writes = {target: read_bytes(source_path) for source_path, target in backups}
     writes[manifest_path(repo)] = manifest_bytes(manifest)
-    transactional_write(writes)
+    durable_write(repo, writes)
     print(f"adopted {source_name}; adapter target {output_name}")
 
 
@@ -349,7 +284,7 @@ def generate(args):
     data["output_sha256"] = digest(content)
     writes[output] = content
     writes[manifest_path(repo)] = manifest_bytes(data)
-    transactional_write(writes)
+    durable_write(repo, writes)
     print(f"generated {data['output']}")
 
 
@@ -390,7 +325,7 @@ def init_repo(args):
         "source": "CLAUDE.md", "source_sha256": source_hash,
         "output": "AGENTS.md", "output_sha256": source_hash,
     }
-    transactional_write({source: content, output: content, manifest_path(repo): manifest_bytes(manifest)})
+    durable_write(repo, {source: content, output: content, manifest_path(repo): manifest_bytes(manifest)})
     print("initialized CLAUDE.md and AGENTS.md")
 
 
@@ -416,4 +351,13 @@ def parser():
 
 if __name__ == "__main__":
     arguments = parser().parse_args()
-    arguments.func(arguments)
+    try:
+        if arguments.command == "audit":
+            arguments.func(arguments)
+        else:
+            arguments.repo = require_repo(arguments.repo)
+            with locked_root(arguments.repo) as locked_repo:
+                arguments.repo = locked_repo
+                arguments.func(arguments)
+    except TransactionError as exc:
+        die(str(exc))

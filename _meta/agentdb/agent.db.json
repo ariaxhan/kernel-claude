@@ -506,6 +506,46 @@
         "id": "CP-20260711110824-39638-25256",
         "ts": "2026-07-11T18:08:24.642Z",
         "type": "checkpoint"
+      },
+      {
+        "agent": "adversary",
+        "content": "{\n  \"result\": \"fail\",\n  \"evidence\": \"{\\\"tested\\\":[\\\"22 governance tests\\\",\\\"governance suite\\\",\\\"all prior armed fixtures\\\",\\\"direct root symlink\\\",\\\"successful output permissions\\\",\\\"rollback permissions\\\",\\\"pre-replace exception temp cleanup\\\",\\\"hard process interruption between replacements\\\",\\\"lock and recovery mechanism search\\\"],\\\"evidence\\\":\\\"Prior exploits fixed, but successful generation changes session-start from 0755 to 0600; rollback changes 0644 files to 0600; invalid fail env leaks all stages; os._exit after first replacement leaves mixed old/new files and leaked stage; no concurrency lock or recovery journal exists\\\",\\\"issues\\\":[\\\"executable hook mode destroyed\\\",\\\"rollback does not restore modes\\\",\\\"staging exceptions leak temp files\\\",\\\"interruption leaves torn transaction\\\",\\\"concurrent invocations are unlocked\\\"]}\"\n}",
+        "contract_id": "",
+        "id": "VD-20260711111115-43083-29628",
+        "ts": "2026-07-11T18:11:15.859Z",
+        "type": "verdict"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711104258-18886-29532\",\"agent\":\"reviewer\",\"commit\":\"d4283b0\",\"verdict\":\"REQUEST_CHANGES\",\"confidence\":99,\"did\":\"verified prior fixes and broke transaction permissions, cleanup, interruption, and concurrency guarantees\",\"next\":\"preserve modes, wrap all staging cleanup, add exclusive lock and durable recovery journal, test concurrent and killed writers\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711111115-43065-21451",
+        "ts": "2026-07-11T18:11:15.894Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"goal\":\"Add mode-preserving, crash-recoverable, serialized governance transactions\",\"constraints\":{\"files\":[\"scripts/generate-governance.py\",\"scripts/governance-sync.py\",\"tests/test_governance_generation.py\",\"tests/run-tests.sh\"]},\"failure\":\"Executable bit lost; metadata changes on rollback; temp leak; hard-kill mixed state not recovered next run; concurrent interleave; stale lock permanent block; tests fail\",\"tier\":3,\"branch\":\"refactor/generated-governance\",\"max_budget_usd\":4,\"parent\":\"CR-20260711110340-6731-3270\"}",
+        "contract_id": "CR-20260711111139-43499-147",
+        "id": "CR-20260711111139-43499-147",
+        "ts": "2026-07-11T18:11:39.341Z",
+        "type": "contract"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"goal\":\"Allow shared governance transaction helper used by both generator and sync operator\",\"constraints\":{\"files\":[\"scripts/governance_transaction.py\"]},\"failure\":\"Helper public surface exceeds transaction needs; untested standalone behavior; non-stdlib dependency\",\"tier\":3,\"branch\":\"refactor/generated-governance\",\"max_budget_usd\":1,\"parent\":\"CR-20260711111139-43499-147\"}",
+        "contract_id": "CR-20260711111433-48064-6801",
+        "id": "CR-20260711111433-48064-6801",
+        "ts": "2026-07-11T18:14:33.982Z",
+        "type": "contract"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711111139-43499-147\",\"agent\":\"surgeon\",\"did\":\"implemented shared durable governance transaction helper with lock, journal, mode preservation, crash recovery, and serialization\",\"tested\":[\"armed governance variants 28/28\",\"hard kill after replace 1 and 2 recovers exact bytes and modes\",\"two-process serialization\",\"stale lock recovery\",\"manifest 65/65\",\"full 378/378\",\"generator byte check\",\"python compile\",\"diff check\"],\"next\":\"reviewer re-review\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711111846-82562-16609",
+        "ts": "2026-07-11T18:18:46.775Z",
+        "type": "checkpoint"
       }
     ],
     "context_sessions": [
