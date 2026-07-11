@@ -83,7 +83,7 @@ forbidden globs) | bounded (extra loads ledgered) | advisory. Details: docs/MIGR
 
 | Skill | Purpose | When to use |
 |-------|---------|-------------|
-| `/kernel:init` | Initialize KERNEL for a machine | Once. Creates `_meta/` structure. |
+| `/kernel:init` | Confirm Vaults, create missing data dirs and three safe helper links | Once per machine, or helper-link recovery. |
 | `/kernel:help` | This help | When you need a reminder. |
 </skills_reference>
 
@@ -140,7 +140,7 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 - **Be specific**: "Add rate limiting to /api/upload" > "make it more secure"
 - **Use the right skill**: diagnose for bugs, dream for design, ingest for everything else
 - **Check metrics**: `/kernel:metrics` shows if learnings are being used or ignored
-- **Save often**: `/kernel:handoff` before long breaks, the next session starts faster
+- **Save deliberately**: `/kernel:checkpoint` mid-task or `/kernel:handoff` before a session boundary
 - **Run retrospective**: After several sessions, synthesize what you've learned
 </tips>
 

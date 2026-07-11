@@ -9,7 +9,6 @@
 #   .claude-plugin/marketplace.json   plugins[0].version
 #   CLAUDE.md                         <kernel version="X.Y.Z">
 #   skills/help/SKILL.md                  KERNEL vX.Y.Z
-#   README.md                         kernel-marketplace/kernel/X.Y.Z  (install example path)
 #
 # NOT touched here (human-authored per release, intentionally version-specific prose):
 #   - plugin.json / marketplace.json `description` highlight (v7.x: ...)
@@ -41,7 +40,6 @@ sub('.claude-plugin/plugin.json',      r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(
 sub('.claude-plugin/marketplace.json', r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(")',     rf'\g<1>{new}\g<2>')
 sub('CLAUDE.md',                       r'(<kernel version=")[0-9]+\.[0-9]+\.[0-9]+(">)',  rf'\g<1>{new}\g<2>')
 sub('skills/help/SKILL.md',                r'(KERNEL v)[0-9]+\.[0-9]+\.[0-9]+',               rf'\g<1>{new}')
-sub('README.md',                       r'(kernel-marketplace/kernel/)[0-9]+\.[0-9]+\.[0-9]+', rf'\g<1>{new}')
 
 # validate JSON still parses and carries the new version
 assert json.load(open('.claude-plugin/plugin.json'))['version'] == new, "plugin.json"

@@ -32,19 +32,20 @@ tier: auto  # determined at classify step
    - retry: max 3 with feedback
 
 5. **Verify** -- QA and validation
-   - agent: adversary (tier 3) OR validator (tier 1-2)
+   - agent: adversary (tier 2-3) OR validator (tier 1)
    - output: verdict to AgentDB
    - on_reject: return to step 4 with feedback
 
-6. **Ship** -- Commit, push, PR (profile-gated)
+6. **Prepare to ship** -- validate committed branch; external writes need user authority
    - agent: orchestrator
-   - local/github: push to main or feature branch
+   - local: leave verified commits ready for the user
+   - github: push the feature branch only when the task authorizes a push
    - github-oss: push feature branch, create PR (required)
    - github-production: push feature branch, create PR, request review (required)
 
 ## On Failure
 
-- Step 2 fails: proceed with caution, note gap in research
+- Step 2 fails: checkpoint and resolve the research gap before implementation
 - Step 4 fails: retry with narrower scope (max 3)
 - Step 4 blocked: checkpoint, escalate to human
 - Step 5 rejects: return to step 4 with adversary feedback

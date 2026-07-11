@@ -164,7 +164,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <skill id="tearitapart" kind="validator" file="skills/tearitapart/SKILL.md">Critical pre-implementation review. Verdict: PROCEED/REVISE/RETHINK.</skill>
   <skill id="review" kind="validator" file="skills/review/SKILL.md">Code review, >80% confidence threshold. APPROVE/REQUEST CHANGES/COMMENT.</skill>
 
-  <skill id="handoff" kind="state_transition" file="skills/handoff/SKILL.md">Compiles the authoritative kernel.handoff/v1 YAML manifest (canonical; md renders are not sources of truth). Pins provenance, phases, context policy + budget.</skill>
+  <skill id="handoff" kind="state_transition" file="skills/handoff/SKILL.md">Compiles the authoritative kernel.handoff/v1 JSON manifest (canonical; yaml/md renders are not sources of truth). Pins provenance, phases, context policy + budget.</skill>
   <skill id="checkpoint" kind="state_transition" file="skills/checkpoint/SKILL.md">Bounded mid-task kernel.checkpoint/v1 manifest: safe context resets without full handoff ceremony. Steps completed with evidence, exact resume position.</skill>
   <skill id="retrospective" kind="state_transition" file="skills/retrospective/SKILL.md">Cross-session learning synthesis; promotes via artifact ladder (hook > agent > skill > prose) AND emits a validated kernel.retrospective-result/v1 mutation record.</skill>
 
@@ -176,13 +176,13 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <rule>no-ambient skills carry disable-model-invocation: true — side-effecting or expensive operations never fire without an explicit invocation (test-enforced).</rule>
 
   <manifest_runtime>
-    YAML is the canonical machine-readable state representation. Schemas in schemas/:
+    Strict JSON is the canonical machine-readable state representation. Schemas in schemas/:
     kernel.handoff/v1 · kernel.checkpoint/v1 · kernel.retrospective-result/v1 ·
     kernel.context-receipt/v1. CLI: orchestration/manifest/kernel-manifest
     (validate | latest | divergence | compile | resume | activate | deactivate).
     Context policies: sealed (forbidden globs hook-blocked) | bounded (extra loads
     ledgered) | advisory. Enforcement: hooks/scripts/guard-context.sh reads the
-    activated manifest — the yaml feeds the hooks, the hooks feed the receipts (I0.15).
+    activated manifest — JSON feeds the hooks, and hooks feed the receipts (I0.15).
     Grounding: EXP-L21 — load-bearing context is flat (~50-70k/decision); resumes
     reconstruct bounded state from manifests, never inherit whole conversations.
   </manifest_runtime>

@@ -55,12 +55,13 @@ jobs:
           [ "$MV" = "$V" ] || { echo "FAIL: marketplace.json ($MV) != $V"; fail=1; }
           grep -qF "<kernel version=\"$V\">" CLAUDE.md           || { echo "FAIL: CLAUDE.md <kernel version> != $V"; fail=1; }
           grep -qF "KERNEL v$V" skills/help/SKILL.md             || { echo "FAIL: skills/help/SKILL.md KERNEL version != $V"; fail=1; }
-          grep -qF "kernel-marketplace/kernel/$V" README.md      || { echo "FAIL: README.md install-path version != $V"; fail=1; }
           if [ "$fail" -ne 0 ]; then
             echo "Version drift detected. Run: scripts/bump-version.sh $V"
             exit 1
           fi
           echo "All canonical version declarations in sync: $V"
+      - name: Verify active release documentation
+        run: ./tests/run-tests.sh release_docs
 
   schema-check:
     runs-on: ubuntu-latest

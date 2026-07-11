@@ -1,187 +1,156 @@
-# KERNEL
+# KERNEL 8
 
-**Claude Code learns from itself.**
+KERNEL is a Claude Code plugin that gives coding sessions durable project memory, bounded handoffs, repeatable engineering workflows, and independent checks before risky changes ship.
 
-Your agent forgets everything when you close it. KERNEL gives it persistent memory, multi-agent orchestration, and a scientific experiment engine that proves which rules actually work. Every session makes it smarter about YOUR project.
+It is for people who use Claude Code on real repositories and want work to survive session boundaries without turning the agent loose. It does not replace source control, tests, human review, or project-specific instructions. KERNEL records evidence and enforces process; it cannot prove a product is correct by itself.
 
----
+## Supported surfaces
+
+- Claude Code in a terminal.
+- Claude Code Desktop local and SSH sessions. Remote sessions do not support plugins.
+- Claude Code in VS Code, which uses the same plugin configuration and may ask for a restart after changes.
+
+KERNEL skills are namespaced: `/kernel:ingest`, `/kernel:validate`, and so on. Cursor and Claude chat Personal plugins are not supported installation targets here.
 
 ## Install
 
-### Claude Code (Terminal)
+In Claude Code:
 
-```
+```text
 /plugin marketplace add ariaxhan/kernel-claude
-/plugin install kernel
-/kernel:init
-```
-
-### Claude Desktop
-
-1. Open **Customize** (sidebar) → **Personal plugins**
-2. Click **+** → **Add marketplace from GitHub**
-3. Enter: `ariaxhan/kernel-claude`
-4. Click the **KERNEL** plugin → **Install**
-5. In a project, run `/init` to set up memory
-
-### Cursor
-
-Install via Claude Code or Claude Desktop first. Cursor shares the same plugin configuration automatically.
-
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for the full setup guide.
-
----
-
-## What It Does
-
-### Memory That Compounds
-
-AgentDB remembers what worked, what broke, and where you left off — across every session. Not just logs. Weighted retrieval surfaces the learnings that matter (top 7% deliver 80% of value) while pruning what doesn't. Your agent stops repeating the same mistakes.
-
-### Agents That Coordinate
-
-15 specialized agents route by complexity (tier = reversibility x silence x blast radius; file count is only a weak hint). Tier 1 executes directly. Tier 2+ spawns surgeons to implement and an adversary to verify. The adversary checks **coordination first** (file overlap, scope drift, duplicate work) because our telemetry proved coordination failures are 4.3x more impactful than code bugs.
-
-| Agent | Role |
-|-------|------|
-| **Surgeon** | Minimal-diff implementation. Checkpoints to AgentDB. |
-| **Adversary** | Coordination verification + code quality. Assumes broken until proven. |
-| **Reviewer** | 11-phase code review, >80% confidence threshold. |
-| **Researcher** | Finds solutions before building. Anti-patterns first. |
-| **Scout** | Maps codebase structure, detects tooling, identifies risk. |
-| **Validator** | Pre-commit: tests, lint, types, security scan. |
-| **Triage** | Fast complexity classifier before expensive work. |
-
-### Rules That Prove Themselves
-
-The experiment engine treats every rule as a hypothesis. It seeds them from your CLAUDE.md, designs experiments, runs them against AgentDB telemetry, and graduates rules that survive or kills rules that don't. 22 rules graduated from 107 hypotheses across 205 experiments. The forge skill uses this: after building, it **tempers** — experiments on its own output, discovers emergent patterns, and self-corrects before shipping.
-
-### One Primitive: Skills That Load On-Demand
-
-Everything is a skill (v8): methodology skills (testing, security, debug, api, backend, architecture, ...) load when relevant, not at startup; workflow skills (`/kernel:ingest`, `/kernel:forge`) orchestrate them; state-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit validated JSON manifests so resumed sessions reconstruct bounded task state instead of inheriting whole conversations. Side-effecting skills can never fire ambiently. Details: docs/MIGRATION-8.md.
-
----
-
-## Daily Use
-
-**Start with `/ingest`** — the universal entry point. Reads memory, classifies your task, routes to the right agent.
-
-```
-/ingest add user authentication to the app
-```
-
-**Run overnight with `/forge`** — autonomous engine. Generates competing approaches, iterates against tests, adversarial review, experiments on output. Come back to shipped code.
-
-**Save with `/handoff`** before closing. Next session, `/ingest` auto-resumes from where you left off.
-
-**Check with `/validate`** before committing. Tests, lint, types, security.
-
-> **Note:** Everything is a skill (v8 unified architecture; the old commands layer merged into skills). In the Claude Code terminal, skills use the `kernel:` prefix (`/kernel:ingest`). In Claude Desktop and Cursor, they appear without the prefix (`/ingest`). All v7 invocations work unchanged.
-
----
-
-## Commands
-
-| Terminal | Desktop/Cursor | What It Does |
-|----------|----------------|--------------|
-| `/kernel:ingest` | `/ingest` | Guided flow — classify, scope, execute. Auto-resumes from handoffs. |
-| `/kernel:forge` | `/forge` | Autonomous — heat/hammer/quench/temper/anneal until antifragile |
-| `/kernel:experiment` | `/experiment` | Run the hypothesis engine — seed, test, graduate, kill rules |
-| `/kernel:dream` | `/dream` | Creative exploration — 3 perspectives, 4-persona stress test |
-| `/kernel:diagnose` | `/diagnose` | Systematic debugging + refactor analysis before fixing |
-| `/kernel:retrospective` | `/retrospective` | Cross-session learning synthesis + pattern promotion |
-| `/kernel:metrics` | `/metrics` | Observability — sessions, agents, hooks, learnings |
-| `/kernel:validate` | `/validate` | Pre-commit quality gates |
-| `/kernel:tearitapart` | `/tearitapart` | Critical pre-implementation review |
-| `/kernel:review` | `/review` | Code review for PRs |
-| `/kernel:handoff` | `/handoff` | Save progress for next session — emits a canonical `kernel.handoff/v1` JSON manifest |
-| `/kernel:checkpoint` | `/checkpoint` | Bounded mid-task save — `kernel.checkpoint/v1` manifest for safe context resets |
-| `/kernel:landing-page` | `/landing-page` | Guided landing page generator — interview, scaffold, enforce, deploy |
-| `/kernel:init` | `/init` | Setup (run once per project) |
-| `/kernel:help` | `/help` | Show help |
-
----
-
-## Updating KERNEL
-
-### Quick Update (CLI)
-
-```
-/plugin marketplace update kernel-marketplace
-/plugin update kernel@kernel-marketplace
-/reload-plugins
-```
-
-### Enable Auto-Update (Recommended)
-
-1. Type `/plugin` and go to the **Marketplaces** tab
-2. Select **kernel-marketplace**
-3. Toggle **Enable auto-update**
-
-### Stuck on an Old Version?
-
-```
-/plugin uninstall kernel@kernel-marketplace
 /plugin install kernel@kernel-marketplace
 /reload-plugins
 /kernel:init
 ```
 
----
+`/kernel:init` is an explicit setup operation. It shows the detected Vaults path and asks before creating directories or links. Requirements: Git, SQLite 3, `jq`, Python 3, and Bash.
 
-## Local Development (For Contributors)
-
-Symlink the cache to avoid stale copies:
+Verify:
 
 ```bash
-rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/8.0.0
-ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/8.0.0
+agentdb status
+readlink "$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current"
 ```
 
-Edits take effect immediately — no version bumps or reinstalls needed. Claude Code [caches plugins](https://dev.to/wkusnierczyk/claude-code-plugin-cache-1dn) by version; the symlink bypasses this.
+Then run `/kernel:help` in a new Claude Code session.
 
----
+## Upgrading from 7.23.0
 
-## Troubleshooting
+KERNEL 8 is a major release. Update explicitly:
 
-**Skills not showing up?** Run the quick update commands above.
+```text
+/plugin marketplace update kernel-marketplace
+/plugin update kernel@kernel-marketplace
+/reload-plugins
+```
 
-**Claude isn't reading memory?** Start with `/ingest`. Plain requests skip the memory system.
+Start a new session if Claude Code says a component or monitor could not reload. VS Code may show a restart banner.
 
-**Claude forgot everything?** Run `/kernel:handoff` before closing. Or just run `/ingest` next session — it auto-resumes from the latest handoff.
+On startup, KERNEL validates the plugin Claude Code actually loaded and advances its `current` runtime selector only forward. It repairs exactly three old KERNEL links when their link text proves they point to a numbered `kernel-marketplace/kernel/<version>` runtime:
 
-**Same mistake keeps happening?** Say: "Remember this as a failure pattern." KERNEL logs it to AgentDB and avoids it next time.
+- `$KERNEL_VAULTS/.local/bin/agentdb`
+- `$KERNEL_VAULTS/.claude/kernel/orchestration`
+- `$KERNEL_VAULTS/.claude/kernel/hooks`
 
-**"AgentDB not found" error?** Run `/kernel:init` first.
+Missing paths stay missing. Regular files, directories, malformed links, and unrelated links are never replaced; KERNEL prints a recovery warning instead. Updating does not replace project files, existing manifests, receipts, or AgentDB. Hooks and explicit init still write session records and setup files in the selected Vaults.
 
-**Agents not spawning?** Use `/ingest`. Direct requests bypass the tiering system.
+Breaking changes:
 
----
+- Live handoffs, checkpoints, retrospectives, and context receipts use canonical JSON. Historical YAML remains history, but KERNEL 8 does not resume it as live state.
+- The old command-file implementation layer is gone. Workflows are skills and keep their namespaced invocations.
+- `/kernel:design` became `/kernel:frontend` to avoid a native-name collision.
+- A KERNEL 7 session may keep using its loaded 7.23 code until reloaded or restarted. Old cache directories may remain temporarily; their presence does not make them active.
+- KERNEL 7 may not resume state created by KERNEL 8 even though that state is preserved.
 
-## Architecture
+### Roll back without deleting data
 
-### AgentDB
+For one session, check out `v7.23.0` separately and run:
 
-SQLite database at `_meta/agentdb/agent.db`. Stores learnings, events, errors, hypotheses, experiments, contracts, checkpoints, verdicts. Graduated retrieval loads the top 75 by weighted score (86% token savings vs loading everything).
+```bash
+claude --plugin-dir /path/to/kernel-claude-7.23.0
+```
 
-### Context Graph (Observational, Receipt-Derived)
+To deliberately select a validated local or cached runtime for the helper links:
 
-Inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtocol/adna) — but **JSON manifests stay authoritative** for resume, policy, and safety. After `/kernel:ingest` compiles a manifest, the `kernel.context-receipt/v1` JSON records what context was actually loaded. `agentdb graph-project` derives nodes and co-load edges from those receipts (automatic on `kernel-manifest deactivate`). `agentdb graph-suggest` surfaces **shadow-mode** advisory patterns only; it never auto-loads context or overrides manifest selectors until experiment-backed promotion (50+ comparable sessions). The graph observes; manifests decide.
+```bash
+scripts/select-runtime.sh /path/to/kernel-claude-7.23.0
+```
 
-### Experiment Engine
+That explicit selection may move `current` backward; normal old sessions cannot. It does not convert KERNEL 8 JSON state to KERNEL 7 YAML. Do not delete the plugin cache or remove the marketplace as a normal rollback step.
 
-107 hypotheses, 205 experiments, 22 graduated rules. Every rule in CLAUDE.md is a hypothesis until proven by evidence. The engine seeds rules, designs experiments against AgentDB telemetry, issues verdicts (supports/refutes/inconclusive), and graduates or kills rules based on Bayesian confidence scoring. Runs autonomously via `/kernel:experiment`.
+## Daily use
 
-### Manifest Runtime (v8)
+1. Start or resume with `/kernel:ingest`. KERNEL reads AgentDB and the live repository, then defines observable success.
+2. Let risk choose the workflow. Easy-to-undo work runs directly; durable or quiet changes use a contract and separate implementation/checking roles.
+3. Run `/kernel:validate`, then `/kernel:handoff` when another session needs an exact resume point.
 
-JSON manifests are the canonical machine-readable representation of resumable state. State-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit schema-validated manifests (`schemas/`: `kernel.handoff/v1`, `kernel.checkpoint/v1`, `kernel.retrospective-result/v1`, `kernel.context-receipt/v1`) instead of prose. The CLI at `orchestration/manifest/kernel-manifest` (`validate | latest | divergence | compile | resume | activate | deactivate`) drives resume: a fresh session compiles bounded task state from the manifest rather than inheriting a whole transcript. Context policies — **sealed** (forbidden globs are hook-blocked, fails closed), **bounded** (extra loads are ledgered into a receipt), **advisory** — are enforced by `hooks/scripts/guard-context.sh` reading the activated manifest (I0.15: hooks, not honor-system). Grounding: EXP-L21 showed load-bearing context stays flat (~50–70k tokens/decision) while attended context grows 7–11x per session, so resumes reconstruct minimal state instead of replaying history.
+Useful skill groups:
 
----
+- Workflows: `ingest`, `diagnose`, `dream`, `metrics`, `forge`, `experiment`
+- State: `handoff`, `checkpoint`, `retrospective`
+- Validation: `validate`, `review`, `tearitapart`
+- Methods: `build`, `testing`, `debug`, `security`, `architecture`, `git`, `frontend`, and more
+- Setup/reference: `init`, `help`, `landing-page`
 
-## Full Documentation
+There are 33 skills and 15 specialized agent definitions in this release. `/kernel:help` is the live index.
 
-See [docs/QUICKSTART.md](docs/QUICKSTART.md) for detailed installation, daily workflow, and what's inside KERNEL.
+## What KERNEL writes
 
----
+KERNEL keeps durable data in the selected Vaults, found in this order: valid `KERNEL_VAULTS`, `~/Documents/Vaults`, `~/Vaults`, then `~/Downloads/Vaults`.
 
-MIT | [Aria Han](https://github.com/ariaxhan)
+- `_meta/agentdb/agent.db`: project memory, contracts, checkpoints, verdicts, and telemetry.
+- `_meta/handoffs/`, `_meta/checkpoints/`, `_meta/retrospectives/`, and receipts: JSON state artifacts.
+- `_meta/agents/`, `_meta/logs/`, and small session-status files: runtime records.
+- `.claude/kernel/` and `.local/bin/agentdb`: links created only by explicit init; startup only repairs recognized old numbered KERNEL links.
+
+KERNEL hooks can inspect repository state, run configured checks, and write these records. Some workflows can use GitHub when the project profile enables it. KERNEL does not promise that all processing stays local when you invoke a workflow that uses external tools. Review Claude Code permissions and the repository's own instructions before granting access.
+
+## Safety model
+
+- Risk is based on how hard a change is to undo, how quietly it can fail, and how much it can affect.
+- Tier 2 and 3 work uses bounded contracts, separate agents, and a required budget cap.
+- Context manifests can be `sealed`, `bounded`, or `advisory`; hooks enforce active restrictions.
+- Runtime roots, JSON state, selectors, and helper-link ownership are validated before mutation.
+- KERNEL refuses unsafe filesystem objects instead of overwriting them.
+- “Done” requires a real verification command. A commit, push, deploy, and working product are different states.
+
+## Troubleshooting and recovery
+
+Skills missing after update: run `/reload-plugins`; start a new session if prompted.
+
+Helper-link warning: inspect the exact path printed by KERNEL, then run `/kernel:init`. Init will not overwrite a regular file, directory, or unrelated link without a separate manual decision.
+
+Wrong Vaults: set `KERNEL_VAULTS` to the existing Vaults root before init or startup.
+
+Normal reinstall, only after update/reload fails:
+
+```text
+/plugin uninstall kernel@kernel-marketplace --keep-data
+/plugin install kernel@kernel-marketplace
+/reload-plugins
+```
+
+Do not remove the marketplace or clear `~/.claude/plugins/cache` as routine maintenance. Those are destructive recovery steps with wider effects.
+
+Manifest runtime:
+
+```text
+kernel-manifest validate | latest | divergence | preflight | compile | resume | activate | deactivate
+```
+
+## Contributing
+
+Use the checkout directly instead of modifying a numbered cache directory:
+
+```bash
+git clone https://github.com/ariaxhan/kernel-claude.git
+cd kernel-claude
+claude --plugin-dir ./
+./tests/run-tests.sh
+```
+
+Reload or start a new development session after plugin-structure changes. Do not replace installed cache directories with development symlinks.
+
+Architecture references: [KERNEL instructions](CLAUDE.md), [setup guide](docs/QUICKSTART.md), [8.0 migration](docs/MIGRATION-8.md), [manifest schema](schemas/), [workflows](workflows/), and [changelog](CHANGELOG.md).
+
+MIT licensed.
