@@ -3,64 +3,158 @@
   "title": "KERNEL retrospective mutation record",
   "description": "Machine-readable record of what a retrospective changed. The human-readable synthesis remains the primary narrative; this file is the authoritative mutation ledger other manifests can reference (provenance.retrospective_refs).",
   "type": "object",
-  "required": ["schema", "identity", "analyzed", "mutations"],
+  "required": [
+    "schema",
+    "identity",
+    "analyzed",
+    "mutations"
+  ],
   "properties": {
-    "schema": { "type": "string", "enum": ["kernel.retrospective-result/v1"] },
-
+    "schema": {
+      "type": "string",
+      "enum": [
+        "kernel.retrospective-result/v1"
+      ],
+      "x-kernel-enforced-by": "agent"
+    },
     "identity": {
       "type": "object",
-      "required": ["created"],
+      "required": [
+        "created"
+      ],
       "properties": {
-        "created": { "type": "string", "description": "ISO 8601 timestamp" },
-        "session": { "type": "string" },
-        "scope": { "type": "string", "description": "project path or 'cross-project'" }
-      }
+        "created": {
+          "type": "string",
+          "description": "ISO 8601 timestamp",
+          "x-kernel-enforced-by": "agent"
+        },
+        "session": {
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
+        },
+        "scope": {
+          "type": "string",
+          "description": "project path or 'cross-project'",
+          "x-kernel-enforced-by": "agent"
+        }
+      },
+      "x-kernel-enforced-by": "agent"
     },
-
     "analyzed": {
       "type": "object",
-      "required": ["learnings"],
+      "required": [
+        "learnings"
+      ],
       "properties": {
-        "learnings": { "type": "integer", "description": "total learnings reviewed" },
-        "clusters": { "type": "integer" },
-        "merged": { "type": "integer" },
-        "archived": { "type": "integer" },
-        "contradictions_resolved": { "type": "integer" }
-      }
+        "learnings": {
+          "type": "integer",
+          "description": "total learnings reviewed",
+          "x-kernel-enforced-by": "agent"
+        },
+        "clusters": {
+          "type": "integer",
+          "x-kernel-enforced-by": "agent"
+        },
+        "merged": {
+          "type": "integer",
+          "x-kernel-enforced-by": "agent"
+        },
+        "archived": {
+          "type": "integer",
+          "x-kernel-enforced-by": "agent"
+        },
+        "contradictions_resolved": {
+          "type": "integer",
+          "x-kernel-enforced-by": "agent"
+        }
+      },
+      "x-kernel-enforced-by": "agent"
     },
-
     "mutations": {
       "type": "array",
       "description": "every infrastructure change this retrospective made or proposed",
       "items": {
         "type": "object",
-        "required": ["op", "artifact_type", "path", "reason"],
+        "required": [
+          "op",
+          "artifact_type",
+          "path",
+          "reason"
+        ],
         "properties": {
-          "op": { "type": "string", "enum": ["create", "modify", "remove", "promote"] },
-          "artifact_type": { "type": "string", "enum": ["hook", "agent", "skill", "prose", "learning"] },
-          "path": { "type": "string" },
-          "reason": { "type": "string" },
-          "evidence": { "type": "string" },
-          "reinforced": { "type": "integer", "description": "reinforcement count that justified promotion" },
-          "status": { "type": "string", "enum": ["applied", "scaffolded", "proposed", "rejected"] }
+          "op": {
+            "type": "string",
+            "enum": [
+              "create",
+              "modify",
+              "remove",
+              "promote"
+            ],
+            "x-kernel-enforced-by": "agent"
+          },
+          "artifact_type": {
+            "type": "string",
+            "enum": [
+              "hook",
+              "agent",
+              "skill",
+              "prose",
+              "learning"
+            ],
+            "x-kernel-enforced-by": "agent"
+          },
+          "path": {
+            "type": "string",
+            "x-kernel-enforced-by": "agent"
+          },
+          "reason": {
+            "type": "string",
+            "x-kernel-enforced-by": "agent"
+          },
+          "evidence": {
+            "type": "string",
+            "x-kernel-enforced-by": "agent"
+          },
+          "reinforced": {
+            "type": "integer",
+            "description": "reinforcement count that justified promotion",
+            "x-kernel-enforced-by": "agent"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "scaffolded",
+              "proposed",
+              "rejected"
+            ],
+            "x-kernel-enforced-by": "agent"
+          }
         }
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     },
-
     "project_fit": {
       "type": "object",
       "properties": {
         "missing": {
           "type": "array",
           "description": "recurring patterns with no artifact",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "dormant": {
           "type": "array",
           "description": "artifacts that never fire; prune candidates (require explicit human approval)",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "agent"
         }
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     }
   }
 }

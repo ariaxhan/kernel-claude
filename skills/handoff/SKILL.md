@@ -42,7 +42,8 @@ Capture (these become manifest sections, not prose):
   as valuable as accepted ones; they stop re-exploration
 - workflow.phases: name each phase of the work; status inherited (done, with evidence)
   | required (still to do). Add invalidation_rules: what live-state change would flip an
-  inherited phase back to required (e.g. "artifact hash mismatch: schemas/*").
+  inherited phase back to required. Rules use typed `when.event` plus optional
+  `when.path_glob`; never prose trigger strings.
 - open_threads, warnings (failed approaches — never re-explore silently)
 - tier (1/2/3) in identity
 </phase>

@@ -68,6 +68,8 @@ blocking):
 kernel-manifest validate   <file>    # schema check
 kernel-manifest latest               # newest manifest (checkpoints + handoffs)
 kernel-manifest divergence <file>    # live git state vs manifest provenance
+kernel-manifest divergence <file> --json # typed events + recalculated phases
+kernel-manifest preflight  <file>    # typed, non-shell resume checks
 kernel-manifest compile    <file>    # resolve context selectors -> bundle + receipt
 kernel-manifest resume     <file>    # print the re-entry point
 kernel-manifest activate   <file>    # arm the context policy (writes hook pointer)

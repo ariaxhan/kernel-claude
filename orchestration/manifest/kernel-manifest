@@ -274,6 +274,14 @@ def cmd_divergence(args):
         event("dirty_match", "match", dirty=live_dirty)
     else:
         event("dirty_changed", "warn", expected=want_dirty, actual=live_dirty)
+    want_tree_sha = prov.get("dirty_tree_sha256")
+    if want_tree_sha:
+        proc = subprocess.run(["git", "diff", "--binary", "HEAD"], cwd=REPO_ROOT, capture_output=True)
+        got_tree_sha = hashlib.sha256(proc.stdout).hexdigest() if proc.returncode == 0 else ""
+        if got_tree_sha == want_tree_sha:
+            event("dirty_tree_hash_match", "match", sha256=got_tree_sha)
+        else:
+            event("dirty_tree_hash_mismatch", "diverged", expected=want_tree_sha, actual=got_tree_sha)
 
     for art in prov.get("artifacts") or []:
         p, want_sha = art.get("path", ""), art.get("sha256", "")

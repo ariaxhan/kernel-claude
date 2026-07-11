@@ -76,7 +76,7 @@ agentdb read-start
 | `/kernel:ingest` (resume) | `kernel.context-receipt/v1` | Resuming: validates the manifest, checks divergence, compiles bounded context. |
 
 Manifest CLI: `orchestration/manifest/kernel-manifest` (validate | latest | divergence |
-compile | resume | activate | deactivate). Context policies: sealed (hook-blocked
+preflight | compile | resume | activate | deactivate). Context policies: sealed (hook-blocked
 forbidden globs) | bounded (extra loads ledgered) | advisory. Details: docs/MIGRATION-8.md.
 
 ## Setup

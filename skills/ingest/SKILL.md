@@ -102,13 +102,13 @@ Workflow steps guide the phase sequence. Human confirms at each step (ingest mod
 
   3. **Divergence** — live state wins over manifest claims:
      ```bash
-     "$KM" divergence <manifest>
+     "$KM" divergence <manifest> --json
      ```
-     On DIVERGED (branch/commit/artifact-hash): apply workflow.invalidation_rules —
-     flip matching inherited phases to required. Never trust an inherited phase whose
-     inputs changed. ADVANCED commits + dirty WARN = note and proceed.
+     Typed divergence events apply `workflow.invalidation_rules[].when` and return
+     recalculated phase statuses. Never trust an inherited phase whose inputs changed.
 
-  4. **Preflight**: run each runtime.preflight cmd; a failed check = STOP and report.
+  4. **Preflight**: run `"$KM" preflight <manifest>`. Canonical state permits only typed
+     current-branch, path-exists, and allowlisted argv checks; raw shell is invalid.
 
   5. **Compile bounded context** — read the bundle, not the raw tree:
      ```bash

@@ -41,6 +41,7 @@ Ending the session / transferring to a future session with decisions and policy 
    - steps_completed: each with EVIDENCE (commit sha, test output, command result),
      never intent. Receipts describe intent; files describe reality.
    - current_outputs: files produced so far
+   - provenance.dirty_tree_sha256: when dirty, sha256 of `git diff --binary HEAD`
    - pending_steps: what remains, in order
    - resume: position (exact place in the work), entrypoint (skill to re-enter),
      next_operation (the LITERAL first action — "retarget tests/run-tests.sh lines

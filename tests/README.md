@@ -82,7 +82,7 @@ suites:
       # v8 JSON manifest runtime + guard-context hook + migration guards
       - schemas parse; handoff/checkpoint/retrospective examples validate
       - validate rejects bad schema/policy/selector
-      - latest, divergence, compile (receipt fields, budget, selectors)
+      - latest, structured divergence, typed preflight, compile (integrity hashes, budget, selectors)
       - guard-context: sealed blocks/allows, bounded ledgers, fails closed
       - migration: every command has a destination, no live command refs,
         side-effecting skills not ambient, taxonomy blocks parse

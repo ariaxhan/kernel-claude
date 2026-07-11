@@ -18,7 +18,8 @@
       "type": "string",
       "enum": [
         "kernel.handoff/v1"
-      ]
+      ],
+      "x-kernel-enforced-by": "agent"
     },
     "identity": {
       "type": "object",
@@ -28,22 +29,27 @@
       ],
       "properties": {
         "name": {
-          "type": "string"
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
         },
         "created": {
           "type": "string",
-          "description": "ISO 8601 timestamp"
+          "description": "ISO 8601 timestamp",
+          "x-kernel-enforced-by": "agent"
         },
         "session": {
           "type": "string",
-          "description": "originating session id"
+          "description": "originating session id",
+          "x-kernel-enforced-by": "agent"
         },
         "tier": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 3
+          "maximum": 3,
+          "x-kernel-enforced-by": "agent"
         }
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     },
     "provenance": {
       "type": "object",
@@ -54,14 +60,17 @@
       ],
       "properties": {
         "branch": {
-          "type": "string"
+          "type": "string",
+          "x-kernel-enforced-by": "divergence"
         },
         "commit": {
           "type": "string",
-          "description": "full sha of HEAD at handoff time"
+          "description": "full sha of HEAD at handoff time",
+          "x-kernel-enforced-by": "divergence"
         },
         "dirty": {
-          "type": "boolean"
+          "type": "boolean",
+          "x-kernel-enforced-by": "divergence"
         },
         "artifacts": {
           "type": "array",
@@ -74,25 +83,31 @@
             ],
             "properties": {
               "path": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "divergence"
               },
               "sha256": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "divergence"
               },
               "purpose": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "divergence"
               }
             }
-          }
+          },
+          "x-kernel-enforced-by": "divergence"
         },
         "retrospective_refs": {
           "type": "array",
           "description": "kernel.retrospective-result/v1 files whose mutations this work depends on",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "divergence"
         }
-      }
+      },
+      "x-kernel-enforced-by": "divergence"
     },
     "objective": {
       "type": "object",
@@ -102,40 +117,47 @@
       ],
       "properties": {
         "goal": {
-          "type": "string"
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
         },
         "success_conditions": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "non_goals": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         }
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     },
     "contract": {
       "type": "object",
       "properties": {
         "ref": {
           "type": "string",
-          "description": "path to the governing _meta/contracts/ file"
+          "description": "path to the governing _meta/contracts/ file",
+          "x-kernel-enforced-by": "agent"
         },
         "invariants": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "assumptions": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "decisions_accepted": {
           "type": "array",
@@ -146,13 +168,16 @@
             ],
             "properties": {
               "decision": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "agent"
               },
               "rationale": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "agent"
               }
             }
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "alternatives_rejected": {
           "type": "array",
@@ -163,15 +188,19 @@
             ],
             "properties": {
               "alternative": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "agent"
               },
               "reason": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "agent"
               }
             }
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         }
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     },
     "workflow": {
       "type": "object",
@@ -189,7 +218,8 @@
             ],
             "properties": {
               "name": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "divergence"
               },
               "status": {
                 "type": "string",
@@ -197,40 +227,58 @@
                   "inherited",
                   "required",
                   "invalidated"
-                ]
+                ],
+                "x-kernel-enforced-by": "divergence"
               },
               "evidence": {
                 "type": "string",
-                "description": "why an inherited phase may be trusted"
+                "description": "why an inherited phase may be trusted",
+                "x-kernel-enforced-by": "divergence"
               }
             }
-          }
+          },
+          "x-kernel-enforced-by": "divergence"
         },
         "invalidation_rules": {
           "type": "array",
           "description": "live-state triggers that flip inherited phases to required",
           "items": {
             "type": "object",
-            "required": ["when", "invalidates"],
+            "required": [
+              "when",
+              "invalidates"
+            ],
             "properties": {
               "when": {
                 "type": "object",
-                "required": ["event"],
+                "required": [
+                  "event"
+                ],
                 "properties": {
-                  "event": {"type": "string"},
-                  "path_glob": {"type": "string"}
-                }
+                  "event": {
+                    "type": "string",
+                    "x-kernel-enforced-by": "divergence"
+                  },
+                  "path_glob": {
+                    "type": "string",
+                    "x-kernel-enforced-by": "divergence"
+                  }
+                },
+                "x-kernel-enforced-by": "divergence"
               },
               "invalidates": {
                 "type": "array",
                 "items": {
                   "type": "string"
-                }
+                },
+                "x-kernel-enforced-by": "divergence"
               }
             }
-          }
+          },
+          "x-kernel-enforced-by": "divergence"
         }
-      }
+      },
+      "x-kernel-enforced-by": "divergence"
     },
     "runtime": {
       "type": "object",
@@ -244,40 +292,69 @@
             ],
             "properties": {
               "name": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
               },
               "version": {
                 "type": "integer",
-                "description": "kernel.version of the skill when pinned"
+                "description": "kernel.version of the skill when pinned",
+                "x-kernel-enforced-by": "compiler"
               },
               "sha256": {
                 "type": "string",
-                "description": "hash of SKILL.md when practical"
+                "description": "hash of SKILL.md when practical",
+                "x-kernel-enforced-by": "compiler"
               }
             }
-          }
+          },
+          "x-kernel-enforced-by": "compiler"
         },
         "optional_skills": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "compiler"
         },
         "preflight": {
           "type": "array",
           "description": "checks ingest runs before resuming; failure = stop and report",
           "items": {
             "type": "object",
-            "required": ["check"],
+            "required": [
+              "check"
+            ],
             "properties": {
-              "check": {"type": "string", "enum": ["current_branch", "path_exists", "argv"]},
-              "expected": {"type": "string"},
-              "path": {"type": "string"},
-              "argv": {"type": "array", "items": {"type": "string"}}
+              "check": {
+                "type": "string",
+                "enum": [
+                  "current_branch",
+                  "path_exists",
+                  "argv"
+                ],
+                "x-kernel-enforced-by": "compiler"
+              },
+              "expected": {
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
+              },
+              "path": {
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
+              },
+              "argv": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "x-kernel-enforced-by": "compiler"
+              }
             }
-          }
+          },
+          "x-kernel-enforced-by": "compiler"
         }
-      }
+      },
+      "x-kernel-enforced-by": "compiler"
     },
     "context": {
       "type": "object",
@@ -297,9 +374,11 @@
                 "sealed",
                 "bounded",
                 "advisory"
-              ]
+              ],
+              "x-kernel-enforced-by": "hook"
             }
-          }
+          },
+          "x-kernel-enforced-by": "hook"
         },
         "required": {
           "type": "array",
@@ -308,33 +387,41 @@
             "description": "context selector v1. Must contain 'path' or 'git_diff'; refinement keys (lines|heading|grep) apply to 'path'. Enforced in validator code, not schema (subset validator has no oneOf). Deferred: yaml_path, json_path, symbol.",
             "properties": {
               "path": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
               },
               "lines": {
                 "type": "string",
-                "description": "'A-B' inclusive line range"
+                "description": "'A-B' inclusive line range",
+                "x-kernel-enforced-by": "compiler"
               },
               "heading": {
                 "type": "string",
-                "description": "markdown heading text; loads that section"
+                "description": "markdown heading text; loads that section",
+                "x-kernel-enforced-by": "compiler"
               },
               "grep": {
                 "type": "string",
-                "description": "pattern; loads matches with context"
+                "description": "pattern; loads matches with context",
+                "x-kernel-enforced-by": "compiler"
               },
               "context": {
                 "type": "integer",
-                "description": "surrounding lines for grep (default 3)"
+                "description": "surrounding lines for grep (default 3)",
+                "x-kernel-enforced-by": "compiler"
               },
               "git_diff": {
                 "type": "string",
-                "description": "'revA..revB'; loads the diff instead of a file"
+                "description": "'revA..revB'; loads the diff instead of a file",
+                "x-kernel-enforced-by": "compiler"
               },
               "reason": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
               }
             }
-          }
+          },
+          "x-kernel-enforced-by": "compiler"
         },
         "optional": {
           "type": "array",
@@ -343,55 +430,68 @@
             "description": "context selector v1. Must contain 'path' or 'git_diff'; refinement keys (lines|heading|grep) apply to 'path'. Enforced in validator code, not schema (subset validator has no oneOf). Deferred: yaml_path, json_path, symbol.",
             "properties": {
               "path": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
               },
               "lines": {
                 "type": "string",
-                "description": "'A-B' inclusive line range"
+                "description": "'A-B' inclusive line range",
+                "x-kernel-enforced-by": "compiler"
               },
               "heading": {
                 "type": "string",
-                "description": "markdown heading text; loads that section"
+                "description": "markdown heading text; loads that section",
+                "x-kernel-enforced-by": "compiler"
               },
               "grep": {
                 "type": "string",
-                "description": "pattern; loads matches with context"
+                "description": "pattern; loads matches with context",
+                "x-kernel-enforced-by": "compiler"
               },
               "context": {
                 "type": "integer",
-                "description": "surrounding lines for grep (default 3)"
+                "description": "surrounding lines for grep (default 3)",
+                "x-kernel-enforced-by": "compiler"
               },
               "git_diff": {
                 "type": "string",
-                "description": "'revA..revB'; loads the diff instead of a file"
+                "description": "'revA..revB'; loads the diff instead of a file",
+                "x-kernel-enforced-by": "compiler"
               },
               "reason": {
-                "type": "string"
+                "type": "string",
+                "x-kernel-enforced-by": "compiler"
               }
             }
-          }
+          },
+          "x-kernel-enforced-by": "compiler"
         },
         "forbidden": {
           "type": "array",
           "description": "glob patterns; sealed mode blocks access via guard-context hook",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "hook"
         },
         "budget": {
           "type": "object",
           "properties": {
             "target_tokens": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "x-kernel-enforced-by": "compiler"
             },
             "max_tokens": {
               "type": "integer",
-              "minimum": 1
+              "minimum": 1,
+              "x-kernel-enforced-by": "compiler"
             }
-          }
+          },
+          "x-kernel-enforced-by": "compiler"
         }
-      }
+      },
+      "x-kernel-enforced-by": "compiler"
     },
     "execution": {
       "type": "object",
@@ -400,39 +500,46 @@
       ],
       "properties": {
         "entry_phase": {
-          "type": "string"
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
         },
         "entrypoint": {
           "type": "string",
-          "description": "the exact first operation to perform"
+          "description": "the exact first operation to perform",
+          "x-kernel-enforced-by": "agent"
         },
         "stop_conditions": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "checkpoints": {
           "type": "array",
           "description": "points at which a kernel.checkpoint/v1 should be emitted",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         }
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     },
     "open_threads": {
       "type": "array",
       "items": {
         "type": "string"
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     },
     "warnings": {
       "type": "array",
       "description": "failed approaches; do not re-explore",
       "items": {
         "type": "string"
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     },
     "outputs": {
       "type": "object",
@@ -441,13 +548,16 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "completion": {
           "type": "string",
-          "description": "the operation that closes this manifest (e.g. 'kernel-manifest deactivate + agentdb write-end')"
+          "description": "the operation that closes this manifest (e.g. 'kernel-manifest deactivate + agentdb write-end')",
+          "x-kernel-enforced-by": "agent"
         }
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     },
     "resume": {
       "type": "object",
@@ -457,9 +567,11 @@
       "properties": {
         "prompt": {
           "type": "string",
-          "description": "one-line continuation prompt for the next session"
+          "description": "one-line continuation prompt for the next session",
+          "x-kernel-enforced-by": "agent"
         }
-      }
+      },
+      "x-kernel-enforced-by": "agent"
     }
   }
 }

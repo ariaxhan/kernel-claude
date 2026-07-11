@@ -180,7 +180,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     keys rejected — the manifest's meaning never depends on machine config). Schemas in schemas/:
     kernel.handoff/v1 · kernel.checkpoint/v1 · kernel.retrospective-result/v1 ·
     kernel.context-receipt/v1. CLI: orchestration/manifest/kernel-manifest
-    (validate | latest | divergence | compile | resume | activate | deactivate).
+    (validate | latest | divergence | preflight | compile | resume | activate | deactivate).
     Context policies: sealed (forbidden globs hook-blocked) | bounded (extra loads
     ledgered) | advisory. Enforcement: hooks/scripts/guard-context.sh reads the
     activated manifest — the manifest feeds the hooks, the hooks feed the receipts (I0.15).

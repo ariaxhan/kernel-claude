@@ -2904,6 +2904,46 @@ JEOF
   [ ! -f _meta/.context-ledger ] || { echo "FAIL: allowlisted read was ledgered"; return 1; }
 }
 
+test_manifest_divergence_checks_dirty_tree_hash() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  echo one > dirty.txt
+  local head; head=$(git rev-parse HEAD)
+  cat > m.json <<MEOF
+{"schema":"kernel.checkpoint/v1","identity":{"name":"t","created":"2026-01-01T00:00:00Z"},"provenance":{"branch":"main","commit":"$head","dirty":true,"dirty_tree_sha256":"deadbeef"},"task":{"goal":"t"},"steps_completed":[],"pending_steps":[],"resume":{"position":"p","next_operation":"n"}}
+MEOF
+  local output ec=0; output=$("$KM" divergence m.json --json) || ec=$?
+  assert_exit_code 1 "$ec" "dirty tree hash mismatch must diverge" || return 1
+  assert_contains "$output" '"event": "dirty_tree_hash_mismatch"'
+}
+
+test_manifest_schema_fields_name_enforcement_owner() {
+  python3 - "$PLUGIN_ROOT/schemas" <<'PYEOF'
+import json,glob,sys
+bad=[]
+def walk(node,path):
+ if not isinstance(node,dict): return
+ for name,field in (node.get('properties') or {}).items():
+  if 'x-kernel-enforced-by' not in field: bad.append(f'{path}.{name}')
+  walk(field,f'{path}.{name}')
+ item=node.get('items')
+ if isinstance(item,dict): walk(item,path+'[]')
+for p in glob.glob(sys.argv[1]+'/*.schema.json'):
+ walk(json.load(open(p)),'$')
+if bad: print('\n'.join(bad[:20])); raise SystemExit(1)
+PYEOF
+}
+
+test_manifest_committed_state_files_are_checked() {
+  local bad=0 path ec
+  while IFS= read -r path; do
+    case "$path" in
+      *.json) "$KM" validate "$PLUGIN_ROOT/$path" >/dev/null 2>&1 || bad=1 ;;
+      *.yaml|*.yml) ec=0; "$KM" validate "$PLUGIN_ROOT/$path" >/dev/null 2>&1 || ec=$?; [ "$ec" -eq 2 ] || bad=1 ;;
+    esac
+  done < <(git -C "$PLUGIN_ROOT" ls-files '_meta/handoffs/*' '_meta/checkpoints/*')
+  assert_exit_code 0 "$bad" "committed canonical manifests validate and YAML is non-authoritative"
+}
+
 test_guard_context_no_manifest_allows() {
   local ec=0
   echo '{"tool_input":{"file_path":"anything.md"}}' \
@@ -3167,6 +3207,9 @@ run_test_suite() {
       run_test "divergence JSON invalidates phases" test_manifest_divergence_json_invalidates_phases
       run_test "preflight checks are typed" test_manifest_preflight_is_typed
       run_test "latest uses identity timestamp" test_manifest_latest_uses_identity_not_mtime
+      run_test "dirty tree hash divergence" test_manifest_divergence_checks_dirty_tree_hash
+      run_test "schema fields name enforcement owner" test_manifest_schema_fields_name_enforcement_owner
+      run_test "committed manifests are checked" test_manifest_committed_state_files_are_checked
       run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
       run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
       run_test "guard-context: sealed allows unforbidden" test_guard_context_sealed_allows_unforbidden
