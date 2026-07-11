@@ -642,6 +642,38 @@
         "id": "CP-20260711114134-78058-928",
         "ts": "2026-07-11T18:41:34.626Z",
         "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"goal\":\"Keep governance audit in scope, fail loudly on incomplete traversal, and recognize KERNEL generated reference state\",\"constraints\":{\"files\":[\"scripts/governance-sync.py\",\"tests/test_governance.py\",\"tests/run-tests.sh\"]},\"failure\":\"Canonical path outside audit root; traversal error hidden; incomplete count reported complete; KERNEL reference classifies conflict; audit writes\",\"tier\":3,\"branch\":\"refactor/generated-governance\",\"max_budget_usd\":2,\"parent\":\"CR-20260711113907-73010-16487\"}",
+        "contract_id": "CR-20260711114307-81675-15237",
+        "id": "CR-20260711114307-81675-15237",
+        "ts": "2026-07-11T18:43:07.171Z",
+        "type": "contract"
+      },
+      {
+        "agent": "adversary",
+        "content": "{\n  \"result\": \"fail\",\n  \"evidence\": \"{\\\"tested\\\":[\\\"31 governance tests\\\",\\\"live Vaults audit count\\\",\\\"nested repositories\\\",\\\"gitfile repositories\\\",\\\"linked worktree dedupe\\\",\\\"out-of-scope linked worktree\\\",\\\"cache pruning\\\",\\\"symlink traversal behavior\\\",\\\"unreadable subtree\\\",\\\"read-only audit snapshot\\\",\\\"live state reconciliation\\\"],\\\"evidence\\\":\\\"Live count is 49 and nominal discovery passes, but audit of an in-scope linked worktree returned its main checkout outside requested root; unreadable nested repo was silently skipped with exit 0; KERNEL canonical generated pair reports conflict\\\",\\\"issues\\\":[\\\"linked worktree canonicalization escapes audit scope\\\",\\\"permission errors silently undercount\\\",\\\"KERNEL template-generated pair unreconciled in generic state audit\\\"]}\"\n}",
+        "contract_id": "",
+        "id": "VD-20260711114307-81746-31108",
+        "ts": "2026-07-11T18:43:07.402Z",
+        "type": "verdict"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"agent\":\"reviewer\",\"commit\":\"b052b4d\",\"verdict\":\"REQUEST_CHANGES\",\"confidence\":98,\"did\":\"verified live 49 count and found scope escape plus silent permission undercount\",\"next\":\"bound preferred worktree paths to audit root, surface os.walk errors, reconcile KERNEL generated state\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711114307-81734-25657",
+        "ts": "2026-07-11T18:43:07.426Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711114307-81675-15237\",\"agent\":\"surgeon\",\"did\":\"bounded worktree preference to audit root, surfaced walk errors structurally, and classified KERNEL reference adapters from static template semantics\",\"tested\":[\"exact QA fixtures 34/34\",\"governance suite 1/1\",\"live Vaults 49 repos incomplete=false errors=0\",\"python compile\",\"diff check\"],\"next\":\"reviewer final\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711114531-85591-24712",
+        "ts": "2026-07-11T18:45:31.449Z",
+        "type": "checkpoint"
       }
     ],
     "context_sessions": [

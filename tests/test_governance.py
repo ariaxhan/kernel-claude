@@ -1,17 +1,30 @@
 #!/usr/bin/env python3
 import hashlib
+import importlib.util
+import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from contextlib import redirect_stdout
+from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 GEN = ROOT / "scripts" / "generate-governance.py"
 SYNC = ROOT / "scripts" / "governance-sync.py"
+
+
+def load_sync_module():
+    spec = importlib.util.spec_from_file_location("kernel_governance_sync", SYNC)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def run(*args, cwd=ROOT, env=None):
@@ -377,6 +390,65 @@ class SyncTests(unittest.TestCase):
             paths = {Path(item["path"]).name for item in data["repositories"]}
             self.assertEqual({"vaults", "nested", "submodule-like"}, paths)
             self.assertEqual(before, snapshot_tree(root))
+
+    def test_linked_worktree_never_reports_checkout_outside_audit_root(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            main = git_repo(base / "outside-main")
+            run("git", "-C", str(main), "-c", "user.email=test@example.com", "-c", "user.name=Test",
+                "commit", "--allow-empty", "-qm", "init")
+            audit_root = base / "audit-root"
+            audit_root.mkdir()
+            worktree = audit_root / "linked"
+            result = run("git", "-C", str(main), "worktree", "add", "-q", "--detach", str(worktree))
+            self.assertEqual(0, result.returncode, result.stderr)
+            audit = run(sys.executable, str(SYNC), "audit", str(audit_root), "--json")
+            self.assertEqual(0, audit.returncode, audit.stderr)
+            data = json.loads(audit.stdout)
+            self.assertEqual(1, data["canonical_repo_count"])
+            reported = Path(data["repositories"][0]["path"])
+            self.assertEqual(worktree.resolve(), reported)
+            self.assertTrue(reported.is_relative_to(audit_root.resolve()))
+
+    def test_walk_errors_are_structured_and_make_audit_incomplete(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo = git_repo(Path(td) / "repo")
+            denied = repo / "denied"
+            module = load_sync_module()
+
+            def fake_walk(_root, onerror=None):
+                yield str(repo.resolve()), [".git"], []
+                if onerror is not None:
+                    onerror(PermissionError(13, "Permission denied", str(denied)))
+
+            stdout = io.StringIO()
+            with patch.object(module.os, "walk", fake_walk), redirect_stdout(stdout):
+                with self.assertRaises(SystemExit) as raised:
+                    module.audit(SimpleNamespace(path=repo, json=True))
+            self.assertNotEqual(0, raised.exception.code)
+            payload = json.loads(stdout.getvalue())
+            self.assertEqual(1, payload["canonical_repo_count"])
+            self.assertTrue(payload["incomplete"])
+            self.assertEqual([{"errno": 13, "error": "Permission denied", "path": str(denied)}],
+                             payload["errors"])
+
+    def test_kernel_reference_classification_uses_template_without_execution(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo = git_repo(Path(td) / "kernel-copy")
+            (repo / "governance").mkdir()
+            for relative in ("governance/adapters.json", "governance/kernel.md.tmpl", "CLAUDE.md", "AGENTS.md"):
+                source = ROOT / relative
+                target = repo / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, target)
+            module = load_sync_module()
+            before = snapshot_tree(repo)
+            self.assertEqual("generated_current", module.classify(repo))
+            self.assertEqual(before, snapshot_tree(repo))
+            (repo / ".kernel-governance.json").write_text("{not generic manifest json")
+            self.assertEqual("generated_current", module.classify(repo))
+            (repo / "AGENTS.md").write_text("stale\n")
+            self.assertEqual("generated_stale", module.classify(repo))
 
     def test_missing_both_is_noop_until_init(self):
         with tempfile.TemporaryDirectory() as td:
