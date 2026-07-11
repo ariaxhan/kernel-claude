@@ -161,6 +161,11 @@
           "estimated_tokens": {
             "type": "integer",
             "x-kernel-enforced-by": "compiler"
+          },
+          "ts": {
+            "type": "string",
+            "description": "RFC3339 timestamp recorded by guard-context for live bounded loads",
+            "x-kernel-enforced-by": "hook"
           }
         }
       },

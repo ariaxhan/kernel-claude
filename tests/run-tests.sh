@@ -2918,10 +2918,13 @@ test_guard_context_bounded_ledgers_valid_json_escaping() {
   cat > _meta/.active-manifest.json <<'JEOF'
 {"manifest":"m.json","schema":"kernel.handoff/v1","mode":"bounded","forbidden":[],"allowlist":[]}
 JEOF
-  python3 - <<'PYEOF' | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh"
+  local hook_input
+  hook_input=$(python3 - <<'PYEOF'
 import json
 print(json.dumps({'tool_name':'Read','tool_input':{'file_path':'odd/quote"\\slash\nline\tcontrol.md'}}))
 PYEOF
+  ) || return 1
+  printf '%s\n' "$hook_input" | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh" || return 1
   python3 - <<'PYEOF'
 import json
 lines=open('_meta/.context-ledger').read().splitlines()
@@ -2929,10 +2932,21 @@ assert len(lines)==1, lines
 entry=json.loads(lines[0])
 assert entry['path']=='odd/quote"\\slash\nline\tcontrol.md', repr(entry['path'])
 PYEOF
-  agentdb init >/dev/null
+  [ "$?" -eq 0 ] || return 1
+  agentdb init >/dev/null || return 1
+  cp "$FIXTURES/receipt-example.json" receipt.json || return 1
+  "$KM" deactivate --receipt receipt.json >/dev/null || return 1
+  "$KM" validate receipt.json >/dev/null || return 1
+}
+
+test_manifest_deactivate_rejects_ledger_schema_mismatch() {
+  mkdir -p _meta
   cp "$FIXTURES/receipt-example.json" receipt.json
-  "$KM" deactivate --receipt receipt.json >/dev/null
-  "$KM" validate receipt.json >/dev/null
+  echo '{"path":"x.md","unknown_field":true}' > _meta/.context-ledger
+  echo '{"manifest":"m.json","mode":"bounded","forbidden":[],"allowlist":[]}' > _meta/.active-manifest.json
+  local ec=0; "$KM" deactivate --receipt receipt.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "ledger/schema mismatch must fail deactivate" || return 1
+  assert_file_exists "_meta/.active-manifest.json" "failed deactivate must stay armed"
 }
 
 test_manifest_divergence_checks_dirty_tree_hash() {
@@ -3139,6 +3153,34 @@ test_manifest_skill_pin_enforcement_owner_is_truthful() {
   local schema="$PLUGIN_ROOT/schemas/kernel.handoff.v1.schema.json"
   assert_equals "agent" "$(jq -r '.properties.runtime.properties.required_skills.items.properties.version["x-kernel-enforced-by"]' "$schema")" "version pin is agent-enforced" || return 1
   assert_equals "agent" "$(jq -r '.properties.runtime.properties.required_skills.items.properties.sha256["x-kernel-enforced-by"]' "$schema")" "sha pin is agent-enforced"
+}
+
+
+test_manifest_cli_rejects_bad_options_without_traceback() {
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  local -a cases=(
+    'compile m.json --bundle-out'
+    'compile m.json --receipt-out'
+    'compile m.json --agentdb-tokens'
+    'compile m.json --agentdb-tokens nope'
+    'compile m.json --unknown'
+    'deactivate --receipt'
+    'deactivate --unknown'
+    'latest --unknown'
+    'validate m.json --unknown'
+    'resume m.json --unknown'
+    'activate m.json --unknown'
+    'preflight m.json --unknown'
+    'divergence m.json --unknown'
+  )
+  local case_args output ec
+  for case_args in "${cases[@]}"; do
+    local -a argv
+    read -r -a argv <<< "$case_args"
+    ec=0; output=$("$KM" "${argv[@]}" 2>&1) || ec=$?
+    assert_exit_code 1 "$ec" "bad CLI args must exit 1: $case_args" || return 1
+    if [[ "$output" == *Traceback* ]]; then echo "FAIL: traceback for $case_args"; return 1; fi
+  done
 }
 
 test_guard_context_no_manifest_allows() {
@@ -3417,6 +3459,7 @@ run_test_suite() {
       run_test "git_diff rejects option injection" test_manifest_git_diff_rejects_option_injection
       run_test "invalidation rules validate targets" test_manifest_rejects_invalid_invalidation_rules
       run_test "skill pin owner is truthful" test_manifest_skill_pin_enforcement_owner_is_truthful
+      run_test "CLI rejects bad options cleanly" test_manifest_cli_rejects_bad_options_without_traceback
       run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
       run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
       run_test "guard-context: sealed allows unforbidden" test_guard_context_sealed_allows_unforbidden
@@ -3429,6 +3472,7 @@ run_test_suite() {
       run_test "guard-context: bounded ledgers access" test_guard_context_bounded_ledgers_access
       run_test "guard-context: bounded skips allowlist" test_guard_context_bounded_skips_allowlisted_access
       run_test "guard-context: bounded JSON escaping" test_guard_context_bounded_ledgers_valid_json_escaping
+      run_test "deactivate rejects ledger schema mismatch" test_manifest_deactivate_rejects_ledger_schema_mismatch
       run_test "guard-context: fails closed on broken pointer" test_guard_context_fails_closed_on_broken_pointer
       run_test "activate/deactivate roundtrip" test_manifest_activate_deactivate_roundtrip
       run_test "deactivate rewrites receipt once" test_manifest_deactivate_rewrites_receipt_without_duplicate_keys

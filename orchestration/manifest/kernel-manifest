@@ -99,6 +99,11 @@ def die(code, msg):
     print(f"kernel-manifest: {msg}", file=sys.stderr)
     sys.exit(code)
 
+
+def require_exact_args(command, args, count):
+    if len(args) != count:
+        die(1, f"'{command}' expects exactly {count} argument(s)")
+
 # ---------- subset schema validator ----------
 # Supports: type, required, properties, enum, items, minimum, maximum, unknown-key rejection.
 # Custom rule (not expressible in the subset): context selectors need path or git_diff.
@@ -265,6 +270,7 @@ def load_and_validate(path):
 
 
 def cmd_validate(args):
+    require_exact_args("validate", args, 1)
     path = args[0]
     manifest = load_and_validate(path)
     print(f"VALID {path} ({manifest.get('schema')})")
@@ -282,6 +288,10 @@ def cmd_latest(args):
                 die(1, "--dir requires a directory value")
             dirs.append(args[i + 1])
             i += 1
+        elif a == "--any-branch":
+            pass
+        else:
+            die(1, f"latest: unknown option or argument '{a}'")
         i += 1
     if not dirs:
         dirs = ["_meta/checkpoints", "_meta/handoffs"]
@@ -326,6 +336,8 @@ def git(*argv):
 
 
 def cmd_divergence(args):
+    if not args or len(args) > 2 or (len(args) == 2 and args[1] != "--json"):
+        die(1, "divergence usage: divergence <manifest> [--json]")
     path = args[0]
     json_mode = "--json" in args
     manifest = load_and_validate(path)
@@ -417,6 +429,7 @@ def cmd_divergence(args):
 
 
 def cmd_preflight(args):
+    require_exact_args("preflight", args, 1)
     manifest = load_and_validate(args[0])
     allowed_argv = {("git", "status", "--short"), ("git", "diff", "--check")}
     for check in (manifest.get("runtime") or {}).get("preflight") or []:
@@ -519,14 +532,30 @@ def cmd_compile(args):
     path = args[0]
     bundle_out = receipt_out = None
     agentdb_tokens = 0
-    it = iter(args[1:])
-    for a in it:
+    i = 1
+    seen = set()
+    while i < len(args):
+        a = args[i]
+        if a not in ("--bundle-out", "--receipt-out", "--agentdb-tokens"):
+            die(1, f"compile: unknown option or argument '{a}'")
+        if a in seen:
+            die(1, f"compile: duplicate option '{a}'")
+        seen.add(a)
+        if i + 1 >= len(args):
+            die(1, f"compile: {a} requires a value")
+        value = args[i + 1]
         if a == "--bundle-out":
-            bundle_out = next(it)
+            bundle_out = value
         elif a == "--receipt-out":
-            receipt_out = next(it)
+            receipt_out = value
         elif a == "--agentdb-tokens":
-            agentdb_tokens = int(next(it))
+            try:
+                agentdb_tokens = int(value)
+            except ValueError:
+                die(1, f"compile: --agentdb-tokens requires an integer, got '{value}'")
+            if agentdb_tokens < 0:
+                die(1, "compile: --agentdb-tokens must be >= 0")
+        i += 2
 
     manifest = load_and_validate(path)
     ctx = manifest.get("context", {}) or {}
@@ -612,6 +641,7 @@ def cmd_compile(args):
 
 def cmd_resume(args):
     """Print the machine-readable resume point of a manifest."""
+    require_exact_args("resume", args, 1)
     manifest = load_and_validate(args[0])
     sid = manifest.get("schema", "")
     if sid == "kernel.checkpoint/v1":
@@ -630,6 +660,7 @@ def cmd_resume(args):
 # ---------- activate / deactivate (hook bridge) ----------
 
 def cmd_activate(args):
+    require_exact_args("activate", args, 1)
     path = args[0]
     manifest = load_and_validate(path)
     ctx = manifest.get("context", {}) or {}
@@ -650,10 +681,10 @@ def cmd_activate(args):
 
 def cmd_deactivate(args):
     receipt_path = None
-    it = iter(args)
-    for a in it:
-        if a == "--receipt":
-            receipt_path = next(it)
+    if args:
+        if len(args) != 2 or args[0] != "--receipt":
+            die(1, "deactivate usage: deactivate [--receipt <path>]")
+        receipt_path = args[1]
     if receipt_path:
         receipt_path = cli_path(receipt_path)
     if os.path.isfile(CONTEXT_LEDGER) and receipt_path and os.path.isfile(receipt_path):

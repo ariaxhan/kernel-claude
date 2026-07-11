@@ -97,6 +97,10 @@ def relpath(path):
         out.append(rel.replace(os.sep, "/"))
     return "|".join(dict.fromkeys(out))
 
+def emit(action, reason="", target=""):
+    print(json.dumps({"action": action, "reason": reason, "target": target}, ensure_ascii=False))
+    raise SystemExit(0)
+
 def fixed_prefix(glob):
     parts = []
     for part in glob.replace("\\", "/").split("/"):
@@ -138,40 +142,35 @@ if tool == "Grep":
     scope = tool_input.get("path")
     if not scope:
         if forbidden:
-            print("block\tpathless Grep may scan forbidden context\tGrep:workspace")
-            sys.exit(0)
+            emit("block", "pathless Grep may scan forbidden context", "Grep:workspace")
         target = "Grep:workspace"
     else:
         blocked = scope_contains_forbidden(scope)
         target = relpath(scope)
         if blocked:
-            print(f"block\tGrep scope '{scope}' may scan forbidden glob '{blocked}'\t{target}")
-            sys.exit(0)
+            emit("block", f"Grep scope '{scope}' may scan forbidden glob '{blocked}'", target)
 elif tool == "Glob":
     target = str(tool_input.get("pattern") or "")
     blocked = scope_contains_forbidden(target)
     if blocked:
-        print(f"block\tGlob pattern '{target}' may enumerate forbidden glob '{blocked}'\t{target}")
-        sys.exit(0)
+        emit("block", f"Glob pattern '{target}' may enumerate forbidden glob '{blocked}'", target)
 else:
     raw = tool_input.get("file_path") or tool_input.get("path") or tool_input.get("pattern") or ""
     target = relpath(raw)
     blocked, candidate = matches_path(target)
     if blocked:
-        print(f"block\t'{candidate}' matches forbidden glob '{blocked}'\t{target}")
-        sys.exit(0)
+        emit("block", f"'{candidate}' matches forbidden glob '{blocked}'", target)
 
 target_parts = [p for p in target.split("|") if p]
 if any(p in allowlist for p in target_parts):
-    print(f"allowlisted\t\t{target}")
+    emit("allowlisted", target=target)
 else:
-    print(f"allow\t\t{target}")
+    emit("allow", target=target)
 PY
 )
 
-ACTION=$(printf '%s' "$DECISION" | cut -f1)
-REASON=$(printf '%s' "$DECISION" | cut -f2)
-TARGET=$(printf '%s' "$DECISION" | cut -f3)
+ACTION=$(printf '%s' "$DECISION" | jq -r '.action // empty' 2>/dev/null)
+REASON=$(printf '%s' "$DECISION" | jq -r '.reason // empty' 2>/dev/null)
 
 if [ -z "$ACTION" ]; then
   echo "guard-context: manifest active but path policy evaluation failed. Blocking (check python3 and pointer JSON)." >&2
@@ -190,16 +189,21 @@ fi
 
 if [ "$MODE" = "bounded" ]; then
   [ "$ACTION" = "allowlisted" ] && exit 0
-  [ -z "$TARGET" ] && TARGET="${TOOL:-unknown}:workspace"
   # Encode with the JSON library and append one complete record. Corrupt/missing
   # receipt accounting is a policy failure, so bounded mode fails loud.
-  if ! LEDGER_PATH="$LEDGER" LEDGER_TARGET="$TARGET" python3 - <<'PY'
+  if ! LEDGER_PATH="$LEDGER" POLICY_DECISION="$DECISION" POLICY_TOOL="${TOOL:-unknown}" python3 - <<'PY'
 import datetime
 import json
 import os
 
+decision = json.loads(os.environ["POLICY_DECISION"])
+target = decision.get("target")
+if not isinstance(target, str):
+    raise ValueError("policy decision target must be a string")
+if not target:
+    target = f"{os.environ['POLICY_TOOL']}:workspace"
 record = {
-    "path": os.environ["LEDGER_TARGET"],
+    "path": target,
     "reason": "unstated (agent must justify in receipt)",
     "ts": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
 }
