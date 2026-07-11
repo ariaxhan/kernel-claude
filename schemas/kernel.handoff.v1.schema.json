@@ -297,13 +297,13 @@
               },
               "version": {
                 "type": "integer",
-                "description": "kernel.version of the skill when pinned",
-                "x-kernel-enforced-by": "compiler"
+                "description": "Advisory kernel.version pin; the agent verifies it when exact replay matters",
+                "x-kernel-enforced-by": "agent"
               },
               "sha256": {
                 "type": "string",
-                "description": "hash of SKILL.md when practical",
-                "x-kernel-enforced-by": "compiler"
+                "description": "Advisory SKILL.md hash pin; the agent verifies it when exact replay matters",
+                "x-kernel-enforced-by": "agent"
               }
             }
           },

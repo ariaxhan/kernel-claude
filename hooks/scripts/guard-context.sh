@@ -191,10 +191,32 @@ fi
 if [ "$MODE" = "bounded" ]; then
   [ "$ACTION" = "allowlisted" ] && exit 0
   [ -z "$TARGET" ] && TARGET="${TOOL:-unknown}:workspace"
-  # Allow, but ledger the access for receipt accounting.
-  printf '{"path":"%s","reason":"unstated (agent must justify in receipt)","ts":"%s"}\n' \
-    "$(echo "$TARGET" | sed 's/"/\\"/g')" \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$LEDGER" 2>/dev/null || true
+  # Encode with the JSON library and append one complete record. Corrupt/missing
+  # receipt accounting is a policy failure, so bounded mode fails loud.
+  if ! LEDGER_PATH="$LEDGER" LEDGER_TARGET="$TARGET" python3 - <<'PY'
+import datetime
+import json
+import os
+
+record = {
+    "path": os.environ["LEDGER_TARGET"],
+    "reason": "unstated (agent must justify in receipt)",
+    "ts": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+}
+payload = (json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+fd = os.open(os.environ["LEDGER_PATH"], os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+try:
+    written = os.write(fd, payload)
+    if written != len(payload):
+        raise OSError(f"short ledger append: {written}/{len(payload)} bytes")
+    os.fsync(fd)
+finally:
+    os.close(fd)
+PY
+  then
+    echo "guard-context: bounded access allowed but ledger append failed; blocking to preserve receipt integrity." >&2
+    exit 2
+  fi
   exit 0
 fi
 

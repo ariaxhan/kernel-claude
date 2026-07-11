@@ -162,6 +162,28 @@ def validate_selectors(manifest, errors):
                 errors.append(f"context.{group}[{i}]: selector allows at most one refinement")
             if refinements and not sel.get("path"):
                 errors.append(f"context.{group}[{i}]: refinement requires 'path'")
+            if sel.get("git_diff") and not valid_git_diff_spec(sel["git_diff"]):
+                errors.append(f"context.{group}[{i}].git_diff: unsafe or invalid revision expression")
+
+
+REVISION_TOKEN_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._/@{}^~+\-]*")
+SUPPORTED_DIVERGENCE_EVENTS = {
+    "branch_unknown", "branch_match", "branch_diverged",
+    "commit_match", "commit_advanced", "commit_diverged", "commit_unknown",
+    "dirty_match", "dirty_changed", "dirty_tree_hash_match", "dirty_tree_hash_mismatch",
+    "artifact_missing", "artifact_match", "artifact_hash_mismatch",
+}
+
+
+def valid_git_diff_spec(value):
+    if not isinstance(value, str) or not value or value.startswith("-"):
+        return False
+    parts = re.split(r"(\.\.\.?)", value)
+    if len(parts) == 1:
+        return bool(REVISION_TOKEN_RE.fullmatch(parts[0]))
+    return (len(parts) == 3 and parts[1] in ("..", "...")
+            and bool(REVISION_TOKEN_RE.fullmatch(parts[0]))
+            and bool(REVISION_TOKEN_RE.fullmatch(parts[2])))
 
 
 def validate_invariants(manifest, errors):
@@ -200,6 +222,17 @@ def validate_invariants(manifest, errors):
     for i, check in enumerate((manifest.get("runtime") or {}).get("preflight") or []):
         if isinstance(check, dict) and check.get("check") == "path_exists":
             validate_repo_path(check.get("path"), f"runtime.preflight[{i}].path", errors)
+    workflow = manifest.get("workflow") or {}
+    phase_names = {phase.get("name") for phase in workflow.get("phases") or [] if isinstance(phase, dict)}
+    for i, rule in enumerate(workflow.get("invalidation_rules") or []):
+        if not isinstance(rule, dict):
+            continue
+        event_name = (rule.get("when") or {}).get("event")
+        if event_name not in SUPPORTED_DIVERGENCE_EVENTS:
+            errors.append(f"workflow.invalidation_rules[{i}].when.event: unsupported divergence event '{event_name}'")
+        for target in rule.get("invalidates") or []:
+            if target not in phase_names:
+                errors.append(f"workflow.invalidation_rules[{i}].invalidates: unknown phase '{target}'")
 
 
 def schema_for(manifest):
@@ -413,7 +446,10 @@ def estimate(text):
 def resolve_selector(sel):
     """Return (summary, outcome, content_or_None, note)."""
     if sel.get("git_diff"):
-        rc, out = git("diff", sel["git_diff"])
+        spec = sel["git_diff"]
+        if not valid_git_diff_spec(spec):
+            return (f"git_diff:{spec}", "invalid", None, "unsafe git revision expression")
+        rc, out = git("diff", spec, "--")
         if rc != 0:
             return (f"git_diff:{sel['git_diff']}", "invalid", None, "git diff failed")
         return (f"git_diff:{sel['git_diff']}", "resolved" if out else "empty", out, "")

@@ -2913,6 +2913,28 @@ JEOF
   [ ! -f _meta/.context-ledger ] || { echo "FAIL: allowlisted read was ledgered"; return 1; }
 }
 
+test_guard_context_bounded_ledgers_valid_json_escaping() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"bounded","forbidden":[],"allowlist":[]}
+JEOF
+  python3 - <<'PYEOF' | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh"
+import json
+print(json.dumps({'tool_name':'Read','tool_input':{'file_path':'odd/quote"\\slash\nline\tcontrol.md'}}))
+PYEOF
+  python3 - <<'PYEOF'
+import json
+lines=open('_meta/.context-ledger').read().splitlines()
+assert len(lines)==1, lines
+entry=json.loads(lines[0])
+assert entry['path']=='odd/quote"\\slash\nline\tcontrol.md', repr(entry['path'])
+PYEOF
+  agentdb init >/dev/null
+  cp "$FIXTURES/receipt-example.json" receipt.json
+  "$KM" deactivate --receipt receipt.json >/dev/null
+  "$KM" validate receipt.json >/dev/null
+}
+
 test_manifest_divergence_checks_dirty_tree_hash() {
   git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
   echo one > dirty.txt
@@ -3069,6 +3091,54 @@ test_manifest_latest_missing_dir_value_is_controlled() {
   assert_exit_code 1 "$ec" "missing --dir value must be usage error" || return 1
   if [[ "$output" == *Traceback* ]]; then echo "FAIL: traceback leaked"; return 1; fi
   assert_contains "$output" "--dir requires"
+}
+
+
+test_manifest_git_diff_rejects_option_injection() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  local escaped="$PWD/escaped.diff" value ec
+  for value in "--output=$escaped" 'HEAD --output=x' $'HEAD\n--output=x' 'HEAD..'; do
+    cp "$FIXTURES/checkpoint-example.json" m.json
+    python3 - "$value" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'git_diff':sys.argv[1]}]; json.dump(m,open(p,'w'))
+PYEOF
+    ec=0; "$KM" compile m.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "unsafe git_diff must fail validation" || return 1
+    [ ! -e "$escaped" ] || { echo "FAIL: git_diff created $escaped"; return 1; }
+  done
+  for value in HEAD HEAD~1..HEAD HEAD^...HEAD; do
+    cp "$FIXTURES/checkpoint-example.json" m.json
+    python3 - "$value" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'git_diff':sys.argv[1]}]; json.dump(m,open(p,'w'))
+PYEOF
+    "$KM" validate m.json >/dev/null || return 1
+  done
+}
+
+
+test_manifest_rejects_invalid_invalidation_rules() {
+  local mutation ec
+  for mutation in event phase; do
+    cp "$FIXTURES/handoff-example.json" m.json
+    python3 - "$mutation" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); rule=m['workflow']['invalidation_rules'][0]
+if sys.argv[1]=='event': rule['when']['event']='brnch_diverged'
+else: rule['invalidates']=['does-not-exist']
+json.dump(m,open(p,'w'))
+PYEOF
+    ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "invalid invalidation $mutation must fail" || return 1
+  done
+}
+
+
+test_manifest_skill_pin_enforcement_owner_is_truthful() {
+  local schema="$PLUGIN_ROOT/schemas/kernel.handoff.v1.schema.json"
+  assert_equals "agent" "$(jq -r '.properties.runtime.properties.required_skills.items.properties.version["x-kernel-enforced-by"]' "$schema")" "version pin is agent-enforced" || return 1
+  assert_equals "agent" "$(jq -r '.properties.runtime.properties.required_skills.items.properties.sha256["x-kernel-enforced-by"]' "$schema")" "sha pin is agent-enforced"
 }
 
 test_guard_context_no_manifest_allows() {
@@ -3344,6 +3414,9 @@ run_test_suite() {
       run_test "created timestamp validates" test_manifest_rejects_bad_created_timestamp
       run_test "created timestamp is strict RFC3339" test_manifest_created_timestamp_is_strict_rfc3339
       run_test "latest missing dir is controlled" test_manifest_latest_missing_dir_value_is_controlled
+      run_test "git_diff rejects option injection" test_manifest_git_diff_rejects_option_injection
+      run_test "invalidation rules validate targets" test_manifest_rejects_invalid_invalidation_rules
+      run_test "skill pin owner is truthful" test_manifest_skill_pin_enforcement_owner_is_truthful
       run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
       run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
       run_test "guard-context: sealed allows unforbidden" test_guard_context_sealed_allows_unforbidden
@@ -3355,6 +3428,7 @@ run_test_suite() {
       run_test "guard-context: sealed blocks symlink read" test_guard_context_sealed_blocks_symlink_read
       run_test "guard-context: bounded ledgers access" test_guard_context_bounded_ledgers_access
       run_test "guard-context: bounded skips allowlist" test_guard_context_bounded_skips_allowlisted_access
+      run_test "guard-context: bounded JSON escaping" test_guard_context_bounded_ledgers_valid_json_escaping
       run_test "guard-context: fails closed on broken pointer" test_guard_context_fails_closed_on_broken_pointer
       run_test "activate/deactivate roundtrip" test_manifest_activate_deactivate_roundtrip
       run_test "deactivate rewrites receipt once" test_manifest_deactivate_rewrites_receipt_without_duplicate_keys
