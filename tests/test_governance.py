@@ -38,6 +38,21 @@ def generator_fixture(root, source="shared\n", outputs=None):
     )
 
 
+def snapshot_tree(root):
+    snapshot = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        stat = path.lstat()
+        if path.is_symlink():
+            payload = ("symlink", os.readlink(path))
+        elif path.is_file():
+            payload = ("file", path.read_bytes())
+        else:
+            payload = ("dir", None)
+        snapshot[relative] = (stat.st_mode, stat.st_ino, stat.st_nlink, payload)
+    return snapshot
+
+
 class GeneratorTests(unittest.TestCase):
     def test_checked_in_outputs_are_current(self):
         result = run(sys.executable, str(GEN), "--check")
@@ -141,23 +156,23 @@ class GeneratorTests(unittest.TestCase):
             self.assertNotEqual(0, result.returncode)
             self.assertEqual("keep me\n", (root / "CLAUDE.md").read_text())
 
-    def test_generation_rolls_back_after_each_replace_boundary(self):
-        for fail_after in ("1", "2"):
-            with self.subTest(fail_after=fail_after), tempfile.TemporaryDirectory() as td:
-                root = Path(td) / "root"
-                generator_fixture(root)
-                originals = {}
-                for relative in ("CLAUDE.md", "AGENTS.md", "hooks/scripts/session-start.sh"):
-                    path = root / relative
-                    if relative != "hooks/scripts/session-start.sh":
-                        path.write_text(f"old {relative}\n")
-                    originals[relative] = path.read_bytes()
-                env = os.environ.copy()
-                env["KERNEL_TEST_FAIL_AFTER_REPLACE"] = fail_after
-                result = run(sys.executable, str(GEN), "--root", str(root), env=env)
-                self.assertNotEqual(0, result.returncode)
-                for relative, original in originals.items():
-                    self.assertEqual(original, (root / relative).read_bytes(), relative)
+    def test_interruption_leaves_full_files_check_reports_drift_and_rerun_repairs(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "root"
+            generator_fixture(root)
+            (root / "CLAUDE.md").write_text("old claude\n")
+            (root / "AGENTS.md").write_text("old agents\n")
+            env = os.environ.copy()
+            env["KERNEL_TEST_HARD_KILL_AFTER_REPLACE"] = "1"
+            self.assertNotEqual(0, run(sys.executable, str(GEN), "--root", str(root), env=env).returncode)
+            first = (root / "CLAUDE.md").read_bytes()
+            self.assertTrue(first.startswith(b"<!-- GENERATED FILE."))
+            before = snapshot_tree(root)
+            check = run(sys.executable, str(GEN), "--root", str(root), "--check")
+            self.assertNotEqual(0, check.returncode)
+            self.assertEqual(before, snapshot_tree(root))
+            self.assertEqual(0, run(sys.executable, str(GEN), "--root", str(root)).returncode)
+            self.assertEqual(0, run(sys.executable, str(GEN), "--root", str(root), "--check").returncode)
 
     def test_generation_preserves_modes_and_sets_safe_new_modes(self):
         with tempfile.TemporaryDirectory() as td:
@@ -172,32 +187,7 @@ class GeneratorTests(unittest.TestCase):
             self.assertEqual(0o644, (root / "AGENTS.md").stat().st_mode & 0o777)
             self.assertEqual(0o700, shell.stat().st_mode & 0o777)
 
-    def test_hard_kill_recovers_exact_bytes_modes_and_artifacts(self):
-        for fail_after in ("1", "2"):
-            with self.subTest(fail_after=fail_after), tempfile.TemporaryDirectory() as td:
-                root = Path(td) / "root"
-                generator_fixture(root)
-                originals = {}
-                for index, relative in enumerate(("CLAUDE.md", "AGENTS.md", "hooks/scripts/session-start.sh")):
-                    path = root / relative
-                    if index < 2:
-                        path.write_text(f"old {relative}\n")
-                    path.chmod(0o600 + index)
-                    originals[relative] = (path.read_bytes(), path.stat().st_mode & 0o777)
-                env = os.environ.copy()
-                env["KERNEL_TEST_HARD_KILL_AFTER_REPLACE"] = fail_after
-                killed = run(sys.executable, str(GEN), "--root", str(root), env=env)
-                self.assertNotEqual(0, killed.returncode)
-                recovered = run(sys.executable, str(GEN), "--root", str(root), "--check")
-                self.assertNotEqual(0, recovered.returncode)  # recovered originals are intentionally stale
-                for relative, (content, mode) in originals.items():
-                    path = root / relative
-                    self.assertEqual(content, path.read_bytes(), relative)
-                    self.assertEqual(mode, path.stat().st_mode & 0o777, relative)
-                self.assertFalse((root / ".kernel-governance.transaction.json").exists())
-                self.assertFalse(list(root.rglob("*.stage.*")))
-
-    def test_invalid_failure_env_cleans_all_transaction_artifacts(self):
+    def test_invalid_failure_env_cleans_own_atomic_temp(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "root"
             generator_fixture(root)
@@ -205,42 +195,46 @@ class GeneratorTests(unittest.TestCase):
             env["KERNEL_TEST_FAIL_AFTER_REPLACE"] = "not-an-int"
             result = run(sys.executable, str(GEN), "--root", str(root), env=env)
             self.assertNotEqual(0, result.returncode)
-            self.assertFalse((root / ".kernel-governance.transaction.json").exists())
-            self.assertFalse(list(root.rglob("*.stage.*")))
+            self.assertFalse(list(root.rglob("*.kernel-owned.*")))
 
-    def test_concurrent_generators_serialize_and_stale_lock_recovers(self):
+    def test_concurrent_same_source_converges_and_source_change_aborts(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "root"
             generator_fixture(root)
             env = os.environ.copy()
-            env["KERNEL_TEST_HOLD_LOCK_MS"] = "400"
+            env["KERNEL_TEST_PAUSE_BEFORE_REPLACE_MS"] = "300"
             first = subprocess.Popen([sys.executable, str(GEN), "--root", str(root)],
                                      text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
             time.sleep(0.05)
             second = run(sys.executable, str(GEN), "--root", str(root))
-            first_out, first_err = first.communicate(timeout=5)
+            _first_out, first_err = first.communicate(timeout=5)
             self.assertEqual(0, first.returncode, first_err)
             self.assertEqual(0, second.returncode, second.stderr)
-            lock = root / ".kernel-governance.lock"
-            lock.write_text(json.dumps({"pid": 99999999, "identity": "stale"}))
             self.assertEqual(0, run(sys.executable, str(GEN), "--root", str(root), "--check").returncode)
-            self.assertFalse(lock.exists())
+            (root / "AGENTS.md").write_text("stale\n")
+            env["KERNEL_TEST_PAUSE_BEFORE_REPLACE_MS"] = "300"
+            changed = subprocess.Popen([sys.executable, str(GEN), "--root", str(root)],
+                                       text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+            time.sleep(0.05)
+            source = root / "governance/kernel.md.tmpl"
+            source.write_text(source.read_text() + "changed concurrently\n")
+            _out, err = changed.communicate(timeout=5)
+            self.assertNotEqual(0, changed.returncode)
+            self.assertIn("changed during generation", err)
 
-    def test_lock_symlink_and_hardlink_are_never_followed(self):
-        for kind in ("symlink", "hardlink"):
-            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as td:
-                root = Path(td) / "root"
-                generator_fixture(root)
-                outside = Path(td) / "outside"
-                outside.write_text(json.dumps({"pid": 99999999, "identity": "x"}))
-                lock = root / ".kernel-governance.lock"
-                if kind == "symlink":
-                    lock.symlink_to(outside)
-                else:
-                    os.link(outside, lock)
-                result = run(sys.executable, str(GEN), "--root", str(root))
-                self.assertNotEqual(0, result.returncode)
-                self.assertEqual(json.dumps({"pid": 99999999, "identity": "x"}), outside.read_text())
+    def test_check_is_read_only_with_unknown_hostile_files(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td) / "root"
+            generator_fixture(root)
+            self.assertEqual(0, run(sys.executable, str(GEN), "--root", str(root)).returncode)
+            unknown = root / ".CLAUDE.md.kernel-owned.someone-else"
+            unknown.write_text("do not delete\n")
+            outside = Path(td) / "outside"
+            outside.write_text("outside\n")
+            (root / "hostile-link").symlink_to(outside)
+            before = snapshot_tree(root)
+            self.assertEqual(0, run(sys.executable, str(GEN), "--root", str(root), "--check").returncode)
+            self.assertEqual(before, snapshot_tree(root))
 
     def test_ambient_rejects_heredoc_terminator_and_preserves_backslashes(self):
         with tempfile.TemporaryDirectory() as td:
@@ -297,6 +291,7 @@ class SyncTests(unittest.TestCase):
             repo = git_repo(Path(td) / "repo")
             backups = repo / ".kernel-backups/phase"
             (repo / "CLAUDE.md").write_text("shared rules\n")
+            (repo / "CLAUDE.md").chmod(0o600)
             adopted = run(sys.executable, str(SYNC), "adopt", str(repo),
                           "--source", "CLAUDE.md", "--backup-dir", str(backups))
             self.assertEqual(0, adopted.returncode, adopted.stderr)
@@ -305,8 +300,11 @@ class SyncTests(unittest.TestCase):
             self.assertEqual(0, generated.returncode, generated.stderr)
             self.assertEqual(0o644, (repo / "AGENTS.md").stat().st_mode & 0o777)
             self.assertEqual(0o644, (repo / ".kernel-governance.json").stat().st_mode & 0o777)
-            self.assertEqual("shared rules\n", (repo / "AGENTS.md").read_text())
+            self.assertEqual(0o600, (backups / "repo__CLAUDE.md").stat().st_mode & 0o777)
+            self.assertTrue((repo / "AGENTS.md").read_text().endswith("shared rules\n"))
+            before_check = snapshot_tree(repo)
             self.assertEqual(0, run(sys.executable, str(SYNC), "check", str(repo)).returncode)
+            self.assertEqual(before_check, snapshot_tree(repo))
             manifest = json.loads((repo / ".kernel-governance.json").read_text())
             self.assertEqual(hashlib.sha256(b"shared rules\n").hexdigest(), manifest["source_sha256"])
             (repo / "AGENTS.md").write_text("human edit\n")
@@ -327,7 +325,7 @@ class SyncTests(unittest.TestCase):
                                     "--backup-dir", str(backups)).returncode)
             self.assertEqual(0, run(sys.executable, str(SYNC), "generate", str(repo),
                                     "--backup-dir", str(backups)).returncode)
-            self.assertEqual("scoped root rules\n", (repo / "AGENTS.md").read_text())
+            self.assertTrue((repo / "AGENTS.md").read_text().endswith("scoped root rules\n"))
             self.assertFalse((repo / "CLAUDE.md").exists())
             self.assertEqual("scoped root rules\n", source.read_text())
 
@@ -355,6 +353,7 @@ class SyncTests(unittest.TestCase):
             (repo / "CLAUDE.md").write_text("rules\n")
             self.assertEqual(0, run(sys.executable, str(SYNC), "adopt", str(repo),
                                     "--source", "CLAUDE.md", "--backup-dir", str(repo / ".kernel-backups/b2")).returncode)
+            (repo / "AGENTS.md").unlink()
             (repo / "AGENTS.md").symlink_to(outside)
             self.assertNotEqual(0, run(sys.executable, str(SYNC), "generate", str(repo),
                                        "--backup-dir", str(repo / ".kernel-backups/b3")).returncode)
@@ -443,58 +442,23 @@ class SyncTests(unittest.TestCase):
             scopes = json.loads(result.stdout)["repositories"][0]["nested_scopes"]
             self.assertEqual([{"path": "nested", "state": "unsafe_symlink"}], scopes)
 
-    def test_sync_generate_rolls_back_after_each_replace_boundary(self):
-        for fail_after in ("1", "2"):
-            with self.subTest(fail_after=fail_after), tempfile.TemporaryDirectory() as td:
-                base = Path(td)
-                repo = git_repo(base / "repo")
-                (repo / "CLAUDE.md").write_text("v1\n")
-                self.assertEqual(0, run(sys.executable, str(SYNC), "adopt", str(repo),
-                                        "--source", "CLAUDE.md", "--backup-dir", str(repo / ".kernel-backups/a1")).returncode)
-                self.assertEqual(0, run(sys.executable, str(SYNC), "generate", str(repo),
-                                        "--backup-dir", str(repo / ".kernel-backups/g1")).returncode)
-                (repo / "CLAUDE.md").write_text("v2\n")
-                self.assertEqual(0, run(sys.executable, str(SYNC), "adopt", str(repo),
-                                        "--source", "CLAUDE.md", "--backup-dir", str(repo / ".kernel-backups/a2")).returncode)
-                originals = {name: (repo / name).read_bytes() for name in ("AGENTS.md", ".kernel-governance.json")}
-                env = os.environ.copy()
-                env["KERNEL_TEST_FAIL_AFTER_REPLACE"] = fail_after
-                result = run(sys.executable, str(SYNC), "generate", str(repo),
-                             "--backup-dir", str(repo / ".kernel-backups/g2"), env=env)
-                self.assertNotEqual(0, result.returncode)
-                for name, original in originals.items():
-                    self.assertEqual(original, (repo / name).read_bytes(), name)
-
-    def test_sync_hard_kill_recovers_bytes_modes_and_journal(self):
-        for fail_after in ("1", "2"):
-            with self.subTest(fail_after=fail_after), tempfile.TemporaryDirectory() as td:
-                repo = git_repo(Path(td) / "repo")
-                (repo / "CLAUDE.md").write_text("v1\n")
-                (repo / "CLAUDE.md").chmod(0o600)
-                adopt_dir = repo / ".kernel-backups/adopt-1"
-                generate_dir = repo / ".kernel-backups/generate-1"
-                self.assertEqual(0, run(sys.executable, str(SYNC), "adopt", str(repo),
-                                        "--source", "CLAUDE.md", "--backup-dir", str(adopt_dir)).returncode)
-                self.assertEqual(0, run(sys.executable, str(SYNC), "generate", str(repo),
-                                        "--backup-dir", str(generate_dir)).returncode)
-                (repo / "CLAUDE.md").write_text("v2\n")
-                self.assertEqual(0, run(sys.executable, str(SYNC), "adopt", str(repo),
-                                        "--source", "CLAUDE.md",
-                                        "--backup-dir", str(repo / ".kernel-backups/adopt-2")).returncode)
-                originals = {name: ((repo / name).read_bytes(), (repo / name).stat().st_mode & 0o777)
-                             for name in ("AGENTS.md", ".kernel-governance.json")}
-                env = os.environ.copy()
-                env["KERNEL_TEST_HARD_KILL_AFTER_REPLACE"] = fail_after
-                result = run(sys.executable, str(SYNC), "generate", str(repo),
-                             "--backup-dir", str(repo / ".kernel-backups/generate-2"), env=env)
-                self.assertNotEqual(0, result.returncode)
-                self.assertNotEqual(0, run(sys.executable, str(SYNC), "check", str(repo)).returncode)
-                for name, (content, mode) in originals.items():
-                    path = repo / name
-                    self.assertEqual(content, path.read_bytes())
-                    self.assertEqual(mode, path.stat().st_mode & 0o777)
-                self.assertFalse((repo / ".kernel-governance.transaction.json").exists())
-                self.assertFalse(list(repo.rglob("*.stage.*")))
+    def test_interrupted_adoption_is_auditable_and_rerun_repairs(self):
+        with tempfile.TemporaryDirectory() as td:
+            repo = git_repo(Path(td) / "repo")
+            (repo / "CLAUDE.md").write_text("rules\n")
+            env = os.environ.copy()
+            env["KERNEL_TEST_HARD_KILL_AFTER_REPLACE"] = "2"  # backup, adapter, then stop before manifest
+            result = run(sys.executable, str(SYNC), "adopt", str(repo), "--source", "CLAUDE.md",
+                         "--backup-dir", str(repo / ".kernel-backups/adopt"), env=env)
+            self.assertNotEqual(0, result.returncode)
+            self.assertTrue((repo / "AGENTS.md").read_text().startswith("<!-- GENERATED by KERNEL"))
+            self.assertFalse((repo / ".kernel-governance.json").exists())
+            audit = run(sys.executable, str(SYNC), "audit", str(repo.parent), "--json")
+            self.assertEqual("incomplete_generation", json.loads(audit.stdout)["repositories"][0]["state"])
+            self.assertEqual(0, run(sys.executable, str(SYNC), "adopt", str(repo),
+                                    "--source", "CLAUDE.md",
+                                    "--backup-dir", str(repo / ".kernel-backups/adopt")).returncode)
+            self.assertEqual(0, run(sys.executable, str(SYNC), "check", str(repo)).returncode)
 
     def test_skill_documents_separate_backup_phases(self):
         skill = (ROOT / "skills/governance-sync/SKILL.md").read_text()

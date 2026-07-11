@@ -546,6 +546,38 @@
         "id": "CP-20260711111846-82562-16609",
         "ts": "2026-07-11T18:18:46.775Z",
         "type": "checkpoint"
+      },
+      {
+        "agent": "adversary",
+        "content": "{\n  \"result\": \"fail\",\n  \"evidence\": \"{\\\"tested\\\":[\\\"28 governance tests\\\",\\\"all prior armed regressions\\\",\\\"malicious journal arbitrary delete\\\",\\\"malicious journal arbitrary overwrite\\\",\\\"malformed stale lock\\\",\\\"private backup mode\\\",\\\"hard-kill journal confidentiality\\\",\\\"orphan stage recovery\\\",\\\"journal and lock validation inspection\\\"],\\\"evidence\\\":\\\"Crafted journal deleted two unrelated files and separately overwrote an unrelated file during --check; private 0600 content exposed in 0644 backup and crash journal; malformed stale lock is permanent because pid -1 tests alive; orphan stages persist; journal has no size or structural bounds\\\",\\\"issues\\\":[\\\"recovery journal permits arbitrary repo mutation\\\",\\\"journal leaks private originals\\\",\\\"backups do not preserve source mode\\\",\\\"malformed stale locks never recover\\\",\\\"orphan stages persist\\\",\\\"journal parsing is unbounded\\\",\\\"PID lock has reuse and unlink races\\\"]}\"\n}",
+        "contract_id": "",
+        "id": "VD-20260711112132-86211-29468",
+        "ts": "2026-07-11T18:21:32.667Z",
+        "type": "verdict"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711104258-18886-29532\",\"agent\":\"reviewer\",\"commit\":\"87ebe2a\",\"verdict\":\"REQUEST_CHANGES\",\"confidence\":99.9,\"did\":\"proved poisoned recovery journal can delete and overwrite unrelated repo files\",\"next\":\"move transaction state to private git metadata, use fd lock, strictly bind and bound journal entries, preserve backup modes\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711112132-86199-24016",
+        "ts": "2026-07-11T18:21:32.693Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"goal\":\"Simplify governance writes to read-only check plus independent atomic replacements; remove destructive journal/lock recovery\",\"constraints\":{\"files\":[\"scripts/governance_transaction.py\",\"scripts/generate-governance.py\",\"scripts/governance-sync.py\",\"tests/test_governance_generation.py\",\"tests/run-tests.sh\",\"README.md\",\"skills/governance-sync/SKILL.md\"]},\"failure\":\"Check mutates anything; journal/PID lock remains; external path/link overwrite; mode loss; invalid partial file; source changes unnoticed; docs claim all-or-rollback\",\"tier\":3,\"branch\":\"refactor/generated-governance\",\"max_budget_usd\":3,\"parent\":\"CR-20260711111139-43499-147\"}",
+        "contract_id": "CR-20260711112207-88255-7314",
+        "id": "CR-20260711112207-88255-7314",
+        "ts": "2026-07-11T18:22:07.346Z",
+        "type": "contract"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711112207-88255-7314\",\"agent\":\"surgeon\",\"did\":\"removed governance journal and lock system; implemented read-only checks and optimistic per-file atomic convergence\",\"tested\":[\"armed simplification variants 26/26\",\"hostile check snapshot unchanged\",\"kill after first leaves full file and rerun repairs\",\"concurrent same-source convergence\",\"source-changing concurrent abort\",\"incomplete adoption audit\",\"manifest 65/65\",\"full 378/378\"],\"next\":\"reviewer final review\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711112936-28806-7464",
+        "ts": "2026-07-11T18:29:36.084Z",
+        "type": "checkpoint"
       }
     ],
     "context_sessions": [

@@ -6,9 +6,11 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import os
 import sys
+import tempfile
+import time
 
-from governance_transaction import TransactionError, locked_root, transactional_write as durable_write
 
 TOKEN_RE = re.compile(r"\{\{([A-Z][A-Z0-9_]*)\}\}")
 AMBIENT_RE = re.compile(
@@ -48,6 +50,60 @@ def require_contained(root, path, label):
             fail(f"{label} resolves outside the plugin root: {path}")
     except (OSError, ValueError) as exc:
         fail(f"cannot resolve {label}: {exc}")
+
+
+def identity(path):
+    if not path.exists():
+        return None
+    stat = path.stat(follow_symlinks=False)
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_nlink, stat.st_mode)
+
+
+def fsync_dir(path):
+    try:
+        fd = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+    except OSError:
+        pass
+
+
+def atomic_replace(root, path, content, expected_identity, mode, validate_inputs, replace_number,
+                   fail_after, hard_after):
+    require_contained(root, path, "atomic output")
+    require_regular(path, "atomic output", missing_ok=True)
+    current_identity = identity(path)
+    if current_identity != expected_identity:
+        if path.is_file() and path.read_bytes() == content:
+            return False
+        fail(f"concurrent target change detected: {path}")
+    validate_inputs()
+    fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.kernel-owned.", dir=path.parent)
+    temp = Path(temp_name)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fchmod(handle.fileno(), mode)
+            os.fsync(handle.fileno())
+        validate_inputs()
+        require_contained(root, path, "atomic output")
+        require_regular(path, "atomic output", missing_ok=True)
+        if identity(path) != expected_identity:
+            if path.is_file() and path.read_bytes() == content:
+                return False
+            fail(f"concurrent target change detected before replace: {path}")
+        os.replace(temp, path)
+        fsync_dir(path.parent)
+        if hard_after and replace_number == hard_after:
+            os._exit(97)
+        if fail_after and replace_number == fail_after:
+            fail(f"injected failure after replace {replace_number}")
+        return True
+    finally:
+        temp.unlink(missing_ok=True)
 
 
 def load(root):
@@ -136,27 +192,54 @@ def main():
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
+    supplied_root = args.root.absolute()
+    if supplied_root.is_symlink() or not supplied_root.is_dir():
+        fail(f"plugin root must be a real directory, not a symlink: {supplied_root}")
+    root = supplied_root.resolve()
+    source = root / "governance/kernel.md.tmpl"
+    config = root / "governance/adapters.json"
+    _, outputs = render_outputs(root)
+    source_identity, config_identity = identity(source), identity(config)
+    target_identities = {path: identity(path) for path in outputs}
+    for path in outputs:
+        require_contained(root, path, "generated output")
+        require_regular(path, "generated output", missing_ok=path.name in {"CLAUDE.md", "AGENTS.md"})
+    stale = [path.relative_to(root).as_posix() for path, expected in outputs.items()
+             if not path.is_file() or path.read_text(encoding="utf-8") != expected]
+    if args.check:
+        if stale:
+            fail("stale generated file(s): " + ", ".join(stale))
+        print("governance current")
+        return
     try:
-        with locked_root(args.root) as root:
-            _, outputs = render_outputs(root)
-            stale = []
-            for path in outputs:
-                require_contained(root, path, "generated output")
-                require_regular(path, "generated output", missing_ok=path.name in {"CLAUDE.md", "AGENTS.md"})
-            for path, expected in outputs.items():
-                actual = path.read_text(encoding="utf-8") if path.is_file() else None
-                if actual != expected:
-                    stale.append(path.relative_to(root).as_posix())
-            if args.check and stale:
-                fail("stale generated file(s): " + ", ".join(stale))
-            if not args.check:
-                changes = {path: expected.encode() for path, expected in outputs.items()
-                           if path.relative_to(root).as_posix() in stale}
-                if changes:
-                    durable_write(root, changes)
-            print("governance current" if args.check else "generated: " + ", ".join(stale or ["no changes"]))
-    except TransactionError as exc:
-        fail(str(exc))
+        fail_after = int(os.environ.get("KERNEL_TEST_FAIL_AFTER_REPLACE", "0") or 0)
+        hard_after = int(os.environ.get("KERNEL_TEST_HARD_KILL_AFTER_REPLACE", "0") or 0)
+        pause_ms = int(os.environ.get("KERNEL_TEST_PAUSE_BEFORE_REPLACE_MS", "0") or 0)
+    except ValueError:
+        fail("invalid test timing/failure value")
+    if min(fail_after, hard_after, pause_ms) < 0 or pause_ms > 5000:
+        fail("test timing/failure value out of range")
+    if pause_ms:
+        time.sleep(pause_ms / 1000)
+
+    def validate_inputs():
+        require_regular(source, "canonical source")
+        require_regular(config, "adapter config")
+        if identity(source) != source_identity or identity(config) != config_identity:
+            fail("canonical source or adapter config changed during generation")
+
+    replaced = 0
+    for path, expected in outputs.items():
+        if path.relative_to(root).as_posix() not in stale:
+            continue
+        original_mode = (target_identities[path][-1] & 0o777) if target_identities[path] else None
+        mode = original_mode if original_mode is not None else (0o755 if path.suffix == ".sh" else 0o644)
+        changed = atomic_replace(root, path, expected.encode(), target_identities[path], mode,
+                                 validate_inputs, replaced + 1, fail_after, hard_after)
+        if changed:
+            replaced += 1
+        target_identities[path] = identity(path)
+    print("generated: " + ", ".join(stale or ["no changes"]))
 
 
 if __name__ == "__main__":
