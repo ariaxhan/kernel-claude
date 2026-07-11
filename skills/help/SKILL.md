@@ -1,6 +1,6 @@
 ---
 name: help
-description: "Show KERNEL help. What commands do, how to use them, current plugin status. Triggers: help, how, what, commands."
+description: "Show KERNEL help. The unified skill system, state operations, agents, current plugin status. Triggers: help, how, what, skills, commands."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob
 kernel:
@@ -13,8 +13,9 @@ kernel:
 <skill id="help">
 
 <purpose>
-Quick reference for KERNEL v7.23.0.
-Commands, agents, workflows, philosophy, and current plugin status.
+Quick reference for KERNEL v8.0.0.
+One primitive: skills (methodology, workflows, state transitions, validators,
+operators). Agents, manifests, philosophy, and current plugin status.
 </purpose>
 
 <on_start>
@@ -40,42 +41,54 @@ agentdb read-start
 | Save progress before stopping | `/kernel:handoff` |
 </getting_started>
 
-<commands>
-## Core Workflow
+<skills_reference>
+## Core Workflow (kind: workflow)
 
-| Command | Purpose | When to use |
-|---------|---------|-------------|
+| Skill | Purpose | When to use |
+|-------|---------|-------------|
 | `/kernel:ingest` | Guided entry, classify, scope, execute | Default for any task. Human confirms each phase. |
 | `/kernel:forge` | Autonomous engine, heat/hammer/quench/anneal | Run overnight. Iterates until antifragile or reports why not. |
 | `/kernel:dream` | Creative exploration, 3 perspectives + stress test | When you need competing approaches before committing. |
 | `/kernel:diagnose` | Systematic debugging + refactor analysis | Bugs, regressions, or before refactoring. Diagnosis before prescription. |
 
-## Quality & Review
+## Quality & Review (kind: validator)
 
-| Command | Purpose | When to use |
-|---------|---------|-------------|
+| Skill | Purpose | When to use |
+|-------|---------|-------------|
 | `/kernel:validate` | Pre-commit gates, build, lint, test, security | Before every commit. Blocks on failure. |
 | `/kernel:tearitapart` | Critical pre-implementation review | Before tier 2+ work. Verdict: PROCEED/REVISE/RETHINK. |
 | `/kernel:review` | Code review for PRs or staged changes | Before merging. >80% confidence threshold. |
 
 ## Learning & Observability
 
-| Command | Purpose | When to use |
-|---------|---------|-------------|
+| Skill | Purpose | When to use |
+|-------|---------|-------------|
 | `/kernel:retrospective` | Cross-session learning synthesis | When 5+ learnings accumulated. Clusters, deduplicates, promotes patterns into project hooks/agents/skills. |
 | `/kernel:metrics` | Observability dashboard | Check session stats, agent success rates, hook health, learning utilization. |
 
-## Session Management
+## State Operations (kind: state_transition) — yaml-first
 
-| Command | Purpose | When to use |
-|---------|---------|-------------|
-| `/kernel:handoff` | Save context for next session | Before closing. Saves state, decisions, next steps. |
-| `/kernel:init` | Initialize KERNEL for a project | Once per project. Creates `_meta/` structure. |
+| Skill | Emits | When to use |
+|-------|-------|-------------|
+| `/kernel:handoff` | `kernel.handoff/v1` yaml manifest | Ending a session. Pins provenance, decisions, phases, context policy + budget. |
+| `/kernel:checkpoint` | `kernel.checkpoint/v1` yaml manifest | MID-task save: safe context reset without full handoff ceremony. |
+| `/kernel:retrospective` | `kernel.retrospective-result/v1` mutation record | 5+ learnings accumulated; promotes via artifact ladder. |
+| `/kernel:ingest` (resume) | `kernel.context-receipt/v1` | Resuming: validates the manifest, checks divergence, compiles bounded context. |
+
+Manifest CLI: `orchestration/manifest/kernel-manifest` (validate | latest | divergence |
+compile | resume | activate | deactivate). Context policies: sealed (hook-blocked
+forbidden globs) | bounded (extra loads ledgered) | advisory. Details: docs/MIGRATION-8.md.
+
+## Setup
+
+| Skill | Purpose | When to use |
+|-------|---------|-------------|
+| `/kernel:init` | Initialize KERNEL for a machine | Once. Creates `_meta/` structure. |
 | `/kernel:help` | This help | When you need a reminder. |
-</commands>
+</skills_reference>
 
-<command_flow>
-Typical workflows, commands chain together:
+<flow_examples>
+Typical flows, skills chain together:
 
 **New feature:**
   ingest → (dream if complex) → tearitapart → execute → validate → review → handoff
@@ -88,12 +101,15 @@ Typical workflows, commands chain together:
 
 **End of session:**
   retrospective (if learnings accumulated) → handoff
-</command_flow>
+
+**Long task, context filling up:**
+  checkpoint → /clear → ingest (auto-discovers the checkpoint, resumes bounded)
+</flow_examples>
 
 <tiers>
 Tier by reversibility x silence x blast radius; file count is only a weak hint.
 
-| Tier | Risk profile | Your Role | Commands involved |
+| Tier | Risk profile | Your Role | Skills involved |
 |------|--------------|-----------|-------------------|
 | 1 | easy to undo, loud if wrong | Execute directly | ingest → validate |
 | 2 | persistent or moderately quiet | Orchestrate, spawn surgeon | ingest → tearitapart → validate → review |
@@ -122,7 +138,7 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 
 <tips>
 - **Be specific**: "Add rate limiting to /api/upload" > "make it more secure"
-- **Use the right command**: diagnose for bugs, dream for design, ingest for everything else
+- **Use the right skill**: diagnose for bugs, dream for design, ingest for everything else
 - **Check metrics**: `/kernel:metrics` shows if learnings are being used or ignored
 - **Save often**: `/kernel:handoff` before long breaks, the next session starts faster
 - **Run retrospective**: After several sessions, synthesize what you've learned

@@ -4,6 +4,23 @@ Copy this file to `skills/{name}/SKILL.md` and fill in sections.
 
 ## Frontmatter (required)
 
+Native Claude Code keys: `name`, `description` (with "Triggers:" phrasing),
+`allowed-tools`; optional `user-invocable`, `disable-model-invocation` (REQUIRED true
+for side-effecting/expensive skills), `context: fork`, `model`, `hooks`.
+
+Kernel taxonomy block (kernel-validated, host-ignored):
+
+```yaml
+kernel:
+  kind: methodology | workflow | state_transition | validator | operator
+  version: 1
+  side_effects: none | writes_meta | writes_repo | writes_remote | deploys
+  confirmation: none | on_side_effect | always
+  produces: [kernel.handoff/v1]      # state transitions only
+  consumes: [kernel.checkpoint/v1]   # if the skill reads manifests
+```
+
+
 Every skill needs these sections. Delete this template text after filling in.
 
 ### Source Loading

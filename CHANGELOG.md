@@ -2,6 +2,54 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.0.0] - 2026-07-10
+
+The unified skill architecture. The commands layer is gone; every kernel operation is a
+first-class skill, and YAML manifests are the canonical machine-readable representation
+of resumable state. Grounded in EXP-L21 (attention ledger): load-bearing context is flat
+(~50-70k tokens/decision) while accumulating transcripts force attention over 7-11x that
+— so resumes now reconstruct bounded task state from manifests instead of inheriting
+conversations.
+
+### BREAKING
+- **commands/ removed.** All 14 commands migrated to `skills/<name>/SKILL.md`. Invocation
+  strings are IDENTICAL (`/kernel:ingest` etc, plugin skills auto-namespace), so no user
+  workflow changes; no aliases shipped. `plugin.json` no longer registers commands.
+- **experiment collision resolved**: the autonomous engine (former command) and the
+  methodology (former skill) merged into one `skills/experiment/SKILL.md`.
+
+### Added
+- **Manifest runtime** `orchestration/manifest/kernel-manifest`: validate | latest |
+  divergence | compile | resume | activate | deactivate. YAML parse chain: pyyaml ->
+  system ruby -> loud failure (sealed resumes treat unvalidatable as blocking).
+- **Schemas** (`schemas/`): kernel.handoff/v1, kernel.checkpoint/v1,
+  kernel.retrospective-result/v1, kernel.context-receipt/v1.
+- **/kernel:checkpoint** (new skill): bounded mid-task manifest — steps completed with
+  evidence, exact resume position — for safe context resets without handoff ceremony.
+- **Context policies** sealed | bounded | advisory, enforced by the new
+  `guard-context.sh` PreToolUse hook reading the activated manifest: sealed blocks
+  forbidden globs (fails closed), bounded ledgers extra loads into the receipt.
+- **Context selectors v1**: whole-file, line ranges, markdown headings, grep+context,
+  git diffs. `compile` emits a token-estimated context receipt with budget status.
+- **Taxonomy**: every skill carries a kernel-validated frontmatter block
+  (kind: methodology|workflow|state_transition|validator|operator, side_effects,
+  confirmation, produces/consumes). Side-effecting skills (forge, init, experiment,
+  landing-page) carry disable-model-invocation: true (test-enforced).
+- 27 new tests (manifest suite: schemas, CLI, guard hook, migration guards).
+
+### Changed
+- **handoff** emits canonical YAML manifests (md renders marked non-authoritative) and
+  validates its own output. **ingest** is the unified entry: discovers/validates
+  manifests, checks divergence (live state wins; inherited phases invalidate by rule),
+  compiles bounded context, arms the policy, resumes at the declared phase.
+  **retrospective** additionally emits a validated machine-readable mutation record.
+- CLAUDE.md/AGENTS.md `<commands>` block replaced by `<workflow_skills>` + manifest
+  runtime reference; README/QUICKSTART/help speak unified-skill language.
+
+### Deprecated
+- Legacy markdown handoffs (`_meta/handoffs/*.md`) remain readable in 8.x (no
+  validation/divergence/budget), removed in 9.0. See docs/MIGRATION-8.md.
+
 ## [7.23.0] - 2026-07-06
 
 The Fable harness prune. One theme: the plugin stops re-teaching what the model already

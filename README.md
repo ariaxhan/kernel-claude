@@ -54,11 +54,11 @@ AgentDB remembers what worked, what broke, and where you left off — across eve
 
 ### Rules That Prove Themselves
 
-The experiment engine treats every rule as a hypothesis. It seeds them from your CLAUDE.md, designs experiments, runs them against AgentDB telemetry, and graduates rules that survive or kills rules that don't. 22 rules graduated from 107 hypotheses across 205 experiments. The forge command uses this: after building, it **tempers** — experiments on its own output, discovers emergent patterns, and self-corrects before shipping.
+The experiment engine treats every rule as a hypothesis. It seeds them from your CLAUDE.md, designs experiments, runs them against AgentDB telemetry, and graduates rules that survive or kills rules that don't. 22 rules graduated from 107 hypotheses across 205 experiments. The forge skill uses this: after building, it **tempers** — experiments on its own output, discovers emergent patterns, and self-corrects before shipping.
 
-### Skills That Load On-Demand
+### One Primitive: Skills That Load On-Demand
 
-19 skills (testing, security, debug, api, backend, architecture, etc.) load when relevant, not at startup. Each is a methodology: HOW to approach a problem, not just tools to use.
+Everything is a skill (v8): methodology skills (testing, security, debug, api, backend, architecture, ...) load when relevant, not at startup; workflow skills (`/kernel:ingest`, `/kernel:forge`) orchestrate them; state-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit validated YAML manifests so resumed sessions reconstruct bounded task state instead of inheriting whole conversations. Side-effecting skills can never fire ambiently. Details: docs/MIGRATION-8.md.
 
 ---
 
@@ -76,7 +76,7 @@ The experiment engine treats every rule as a hypothesis. It seeds them from your
 
 **Check with `/validate`** before committing. Tests, lint, types, security.
 
-> **Note:** In Claude Code terminal, commands use the `kernel:` prefix (`/kernel:ingest`). In Claude Desktop and Cursor, they appear without the prefix (`/ingest`).
+> **Note:** Everything is a skill (v8 unified architecture; the old commands layer merged into skills). In the Claude Code terminal, skills use the `kernel:` prefix (`/kernel:ingest`). In Claude Desktop and Cursor, they appear without the prefix (`/ingest`). All v7 invocations work unchanged.
 
 ---
 
@@ -132,8 +132,8 @@ The experiment engine treats every rule as a hypothesis. It seeds them from your
 Symlink the cache to avoid stale copies:
 
 ```bash
-rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/7.23.0
-ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/7.23.0
+rm -rf ~/.claude/plugins/cache/kernel-marketplace/kernel/8.0.0
+ln -s /path/to/your/kernel-claude ~/.claude/plugins/cache/kernel-marketplace/kernel/8.0.0
 ```
 
 Edits take effect immediately — no version bumps or reinstalls needed. Claude Code [caches plugins](https://dev.to/wkusnierczyk/claude-code-plugin-cache-1dn) by version; the symlink bypasses this.
@@ -142,7 +142,7 @@ Edits take effect immediately — no version bumps or reinstalls needed. Claude 
 
 ## Troubleshooting
 
-**Commands not showing up?** Run the quick update commands above.
+**Skills not showing up?** Run the quick update commands above.
 
 **Claude isn't reading memory?** Start with `/ingest`. Plain requests skip the memory system.
 

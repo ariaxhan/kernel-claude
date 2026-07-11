@@ -65,14 +65,14 @@ Cursor shares plugin configuration with Claude Code and Claude Desktop. Install 
 
 ## Verify It Worked
 
-Type `/kernel:` in Claude Code. You should see these commands appear:
+Type `/kernel:` in Claude Code. You should see these skills appear:
 
 - `/kernel:ingest` - Start working on a task
 - `/kernel:validate` - Check your work before committing
 - `/kernel:handoff` - Save your progress
 - `/kernel:help` - Get help
 
-If the commands don't appear, try:
+If the skills don't appear, try:
 ```
 /plugin marketplace update kernel-marketplace
 /plugin update kernel@kernel-marketplace
@@ -176,7 +176,7 @@ It saves this permanently so the mistake never happens again.
 |-----------|----------------|---------------|
 | **Memory** | AgentDB + `_meta/` | Remembers what worked, what broke, where you left off |
 | **Helpers** | Surgeon, Adversary, Researcher, Scout, Validator, Reviewer | Builds features, checks work, finds solutions, explores project, pre-commit checks, reviews code |
-| **Commands** | `/kernel:ingest`, `/kernel:validate`, `/kernel:handoff`, `/kernel:review`, `/kernel:tearitapart`, `/kernel:init`, `/kernel:help` | Start work, check work, save progress, review code, critical review, setup, help |
+| **Skills** | `/kernel:ingest`, `/kernel:validate`, `/kernel:handoff`, `/kernel:review`, `/kernel:tearitapart`, `/kernel:init`, `/kernel:help` | Start work, check work, save progress, review code, critical review, setup, help |
 
 ### The Agents (Helpers)
 
@@ -197,9 +197,9 @@ Commands have different prefixes depending on where you're using Claude:
 
 | Platform | Command Format | Example |
 |----------|----------------|---------|
-| **Claude Code (terminal)** | `/kernel:command` | `/kernel:ingest` |
-| **Claude Desktop** | `/command` | `/ingest` |
-| **Cursor** | `/command` | `/ingest` |
+| **Claude Code (terminal)** | `/kernel:skill` | `/kernel:ingest` |
+| **Claude Desktop** | `/skill` | `/ingest` |
+| **Cursor** | `/skill` | `/ingest` |
 
 The functionality is identical—only the prefix differs.
 
@@ -215,7 +215,7 @@ Cursor uses the same Claude configuration as Claude Code. When you installed KER
 
 ### Verify It's Working
 
-In Cursor's Claude chat, type `/` and you should see commands like `/ingest`, `/validate`, `/handoff` appear. If not:
+In Cursor's Claude chat, type `/` and you should see skills like `/ingest`, `/validate`, `/handoff` appear. If not:
 
 1. Make sure you ran `/plugin install kernel` in Claude Code first
 2. Restart Cursor
@@ -231,9 +231,9 @@ In Cursor's Claude chat, type `/` and you should see commands like `/ingest`, `/
 
 ## Using KERNEL with Claude Desktop
 
-Same as Cursor—KERNEL commands appear without the `kernel:` prefix. Type `/ingest` to start.
+Same as Cursor—KERNEL skills appear without the `kernel:` prefix. Type `/ingest` to start.
 
-If commands don't appear, make sure:
+If skills don't appear, make sure:
 1. You installed the plugin in Claude Code first
 2. Restart Claude Desktop
 3. Your project has the `_meta/` folder from running init
@@ -250,7 +250,7 @@ If commands don't appear, make sure:
 | `/kernel:review` | Code review for PRs or staged changes. Reports issues with >80% confidence. |
 | `/kernel:tearitapart` | Critical pre-implementation review. Finds problems before you write code. |
 | `/kernel:init` | Sets up KERNEL for your project. Run once when starting a new project. |
-| `/kernel:help` | Shows help and available commands. |
+| `/kernel:help` | Shows help and available skills. |
 
 ---
 

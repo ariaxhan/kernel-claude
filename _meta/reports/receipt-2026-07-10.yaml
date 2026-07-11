@@ -1,0 +1,26 @@
+schema: kernel.context-receipt/v1
+manifest: _meta/handoffs/yaml-skill-unification-2026-07-10.yaml
+created: "2026-07-11T01:45:40Z"
+manifest_tokens: 1011
+project_instructions_tokens: 5701
+always_skills_tokens: 2784
+workflow_skills_tokens: 1640
+domain_skills_tokens: 0
+selected_artifacts_tokens: 940
+agentdb_tokens: 0
+total_estimated_tokens: 12076
+target_budget_tokens: 30000
+maximum_budget_tokens: 60000
+status: within_budget
+estimation_method: chars/4 (directional; structural overhead undercounted; agentdb_tokens=0 unless --agentdb-tokens provided)
+selections:
+  - selector: "[required] _meta/contracts/yaml-skill-unification-2026-07-10.md :: ## 7. Files to modify"
+    resolved: true
+    estimated_tokens: 312
+  - selector: "[required] _meta/contracts/yaml-skill-unification-2026-07-10.md :: ## 12. Commit plan"
+    resolved: true
+    estimated_tokens: 149
+  - selector: "[required] CHANGELOG.md:1-30"
+    resolved: true
+    estimated_tokens: 479
+loads_beyond_manifest: []
