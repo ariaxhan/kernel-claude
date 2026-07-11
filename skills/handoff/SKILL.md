@@ -1,11 +1,11 @@
 ---
 name: handoff
-description: "Generate context handoff brief for session continuation. Saves state, decisions, next steps. Triggers: handoff, save, pause, context, continue later."
+description: "Compile session state into an authoritative kernel.handoff/v1 YAML manifest for bounded resume. Saves provenance, decisions, workflow phases, context policy, next steps. Triggers: handoff, save, pause, context, continue later."
 user-invocable: true
-allowed-tools: Read, Bash, Grep, Glob
+allowed-tools: Read, Bash, Grep, Glob, Write
 kernel:
   kind: state_transition
-  version: 1
+  version: 2
   side_effects: writes_meta
   confirmation: none
   produces:
@@ -15,9 +15,15 @@ kernel:
 <skill id="handoff">
 
 <purpose>
-Save session state for seamless continuation.
-Context = decisions + artifacts + warnings + next steps.
-A good handoff lets the next session start working immediately.
+Compile the current task into an authoritative, resumable YAML manifest.
+The YAML file is CANONICAL. A markdown rendering may be generated for humans but is
+never a second source of truth.
+
+Why yaml-first + bounded (EXP-L21): what a decision needs is flat (~50-70k tokens)
+regardless of session length; the accumulating transcript is almost pure decoration by
+late session. A handoff that says "read the conversation" recreates the waste. A handoff
+that pins exact selectors + phases lets the next session reconstruct ONLY the load-bearing
+state.
 
 Reference: skills/context-mgmt/SKILL.md
 </purpose>
@@ -29,109 +35,81 @@ agentdb read-start
 </on_start>
 
 <phase id="1_extract" name="EXTRACT STATE">
-<capture>
-goal: What is the user trying to achieve?
-position: Where are we in the workflow?
-decisions: Choices made and why (include rejected alternatives)
-open_threads: Unfinished items
-artifacts: Files created (with paths)
-warnings: Failed approaches to avoid
-</capture>
-
-<ai_context>
-calibration: What tier is this work? (affects handoff detail)
-  tier_1: brief handoff (1-2 files, simple)
-  tier_2: moderate handoff (3-5 files, orchestrated)
-  tier_3: detailed handoff (6+ files, complex)
-
-big5_status: Which of the Big 5 were addressed?
-  - input validation
-  - edge cases
-  - error handling
-  - duplication
-  - complexity
-</ai_context>
+Capture (these become manifest sections, not prose):
+- objective: goal, success_conditions (observable), non_goals
+- contract: governing _meta/contracts/ file if one exists, invariants, assumptions,
+  decisions_accepted (+rationale), alternatives_rejected (+reason) — rejected paths are
+  as valuable as accepted ones; they stop re-exploration
+- workflow.phases: name each phase of the work; status inherited (done, with evidence)
+  | required (still to do). Add invalidation_rules: what live-state change would flip an
+  inherited phase back to required (e.g. "artifact hash mismatch: schemas/*").
+- open_threads, warnings (failed approaches — never re-explore silently)
+- tier (1/2/3) in identity
 </phase>
 
 <phase id="2_gather" name="GATHER EVIDENCE">
 ```bash
-git status --short
-git diff --stat
+git branch --show-current && git rev-parse HEAD && git status --short
 git log --oneline -10
-git stash list
-find . -type f -mmin -120 | grep -v node_modules | grep -v .git | head -20
 agentdb query "SELECT * FROM context WHERE type IN ('contract','checkpoint') ORDER BY ts DESC LIMIT 5"
 ```
+Pin artifacts: for each file the next session must trust unchanged,
+`shasum -a 256 <path>` → provenance.artifacts[{path, sha256, purpose}].
 </phase>
 
 <ask_user>
-  Use AskUserQuestion when: state extraction complete, before writing handoff
+  Use AskUserQuestion when: state extraction complete, before writing the manifest
   Ask: "Anything to add to the handoff? Blockers, decisions, or context I might have missed?"
   Options: looks complete, add context, skip handoff
 </ask_user>
 
 <phase id="3_hygiene" name="GIT HYGIENE">
-<checks>
-uncommitted: Commit with "wip: checkpoint before handoff" or stash
-push: Push current branch to remote
-stashed: Document any stashed work
-</checks>
+uncommitted: commit with "wip: checkpoint before handoff" or stash (document it)
+push: push current branch to remote — a local-only handoff is stranded work
 </phase>
 
-<output_format>
-```markdown
-## CONTEXT HANDOFF
-Generated: {timestamp}
+<phase id="4_compile" name="COMPILE THE MANIFEST">
+Write `_meta/handoffs/{name}-{date}.yaml` conforming to schemas/kernel.handoff.v1.schema.json.
 
-**Summary**: [One sentence]
+Context section — the attention budget is the design center:
+- policy.mode: advisory (default) | bounded (extra loads must be justified + ledgered)
+  | sealed (forbidden globs hook-blocked; for controlled experiments)
+- required: SELECTORS, not whole files, wherever a section suffices:
+  `{path, heading: "## X"}` · `{path, lines: "A-B"}` · `{path, grep: "pat", context: N}`
+  · `{git_diff: "revA..revB"}` — each with a reason
+- forbidden: globs the resume must NOT touch (sealed mode enforces via guard-context hook)
+- budget: target_tokens (aim: boot + manifest + 2-12k selected history, per EXP-L21),
+  max_tokens (hard stop)
 
-**Goal**: [What user is trying to achieve]
+Execution section: entry_phase, entrypoint (the literal first operation), stop_conditions,
+checkpoints (when to emit kernel.checkpoint/v1 during the resumed work).
 
-**Current state**: [Where things stand]
+Resume section: one-line continuation prompt:
+  `/kernel:ingest resume from _meta/handoffs/{file}.yaml`
 
-**Branch**: [branch name, clean/dirty]
+Quote every sha/commit string in the YAML (an all-digit sha parses as an integer and
+fails validation).
+</phase>
 
-**Tier**: [1/2/3] - [brief/moderate/detailed]
-
-**Decisions made**:
-- [Decision: choice + rationale]
-
-**Artifacts created**:
-- [path: purpose]
-
-**Big 5 Status**:
-- [ ] Input validation - [done/pending/n/a]
-- [ ] Edge cases - [done/pending/n/a]
-- [ ] Error handling - [done/pending/n/a]
-- [ ] Duplication - [done/pending/n/a]
-- [ ] Complexity - [done/pending/n/a]
-
-**Open threads**:
-- [BLOCKER: item]
-- [TODO: item]
-
-**Next steps**:
-1. [Specific action]
-2. [Second action]
-
-**Warnings**:
-- [Failed approach: why]
-
-**Continuation prompt**:
-> /kernel:ingest [goal]. [position]. Read _meta/handoffs/{filename}.
+<phase id="5_validate" name="VALIDATE — MANDATORY">
+```bash
+"${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest" validate _meta/handoffs/{file}.yaml
 ```
-</output_format>
+A handoff that does not validate DOES NOT EXIST. Fix and re-validate before reporting done.
+Optional human rendering: a .md next to it, first line
+`# RENDERED FROM {file}.yaml — NOT AUTHORITATIVE`.
+</phase>
 
 <delivery>
-1. Save to `_meta/handoffs/{feature}-{date}.md`
-2. Commit: "docs: context handoff for {feature}"
+1. `kernel-manifest validate` passes (above)
+2. Commit: "docs: handoff manifest for {name}"
 3. Push to remote
 </delivery>
 
 <on_complete>
 ```bash
-agentdb write-end '{"command":"handoff","saved_to":"path","branch":"X","tier":N}'
-# If non-local profile: post handoff to GitHub Discussions (Agent Logs category)
+agentdb write-end '{"skill":"handoff","saved_to":"_meta/handoffs/{file}.yaml","branch":"X","tier":N}'
+# If non-local profile: post handoff summary to GitHub Discussions (Agent Logs category)
 # Suggest /kernel:retrospective if learnings accumulated across sessions
 ```
 </on_complete>

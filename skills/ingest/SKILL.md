@@ -1,6 +1,6 @@
 ---
 name: ingest
-description: "Guided entry point. Research → classify → scope → execute. Human confirms each phase. Triggers: start, begin, do, implement, build, fix, create."
+description: "Unified entry point for new AND resumed work. Research → classify → scope → execute for new tasks; manifest validate → divergence check → bounded context compile → resume for kernel.handoff/v1 / kernel.checkpoint/v1 manifests. Triggers: start, begin, do, implement, build, fix, create, resume, continue."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob, Task, WebSearch, WebFetch
 kernel:
@@ -16,8 +16,17 @@ kernel:
 <skill id="ingest">
 
 <purpose>
-Guided entry: READ → CLASSIFY → RESEARCH → SCOPE → TESTS → EXECUTE → LEARN
-Human confirms each phase. For autonomous loop: /kernel:forge
+Unified entry for new and resumed work.
+New task:  READ → CLASSIFY → RESEARCH → SCOPE → TESTS → EXECUTE → LEARN (human confirms each phase).
+Resume:    DISCOVER → VALIDATE → DIVERGENCE → COMPILE (bounded context + receipt) → RESUME AT PHASE.
+For autonomous loop: /kernel:forge
+
+Authority order (highest wins) — a manifest is a map, not the territory:
+1. live verified repository state
+2. explicit current user instruction
+3. handoff or checkpoint manifest
+4. chronicle
+5. inferred conversation history
 </purpose>
 
 <skill_load>
@@ -51,7 +60,7 @@ If any domain detected (API, auth, frontend, backend): load domain skills.
 
 <step id="1_classify">
 task: what user wants (one sentence)
-type: bug|feature|refactor|question|verify|handoff|review
+type: bug|feature|refactor|question|verify|resume|review
 familiar: yes|no
 
 Search before asking: Glob, Grep, common paths.
@@ -67,45 +76,71 @@ Workflow steps guide the phase sequence. Human confirms at each step (ingest mod
 </step>
 
 <branch after="classify">
-  IF type == handoff → go to HANDOFF RESUME (below)
+  IF type == resume (or a manifest path was supplied) → go to MANIFEST RESUME (below)
   IF familiar AND tier_likely_1 → skip to step 3 (scope), mark research="skipped (familiar)"
   IF unfamiliar OR complex → proceed to step 2 (research)
   ALWAYS: check _meta/research/ cache regardless (cache != full research)
 </branch>
 
-<step id="1b_handoff_resume" trigger="classify.type == handoff">
-  Auto-detect and resume from a handoff file.
+<step id="1b_manifest_resume" trigger="classify.type == resume">
+  Resume from a kernel.handoff/v1 or kernel.checkpoint/v1 manifest. The runtime CLI:
+  `KM="${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest"`
 
-  1. **Find the handoff**: If user specified a file path, read it. Otherwise:
+  1. **Discover**: explicit path if the user gave one, else:
      ```bash
-     ls -t _meta/handoffs/*.md | head -1
+     "$KM" latest        # newest across _meta/checkpoints/ + _meta/handoffs/
      ```
-     Read the most recent handoff file.
+     Legacy markdown handoffs (_meta/handoffs/*.md) remain readable this release:
+     parse goal/decisions/next-steps from prose, note "legacy handoff (deprecated,
+     no validation/divergence/budget)" and suggest regenerating as YAML. Removal
+     path: docs/MIGRATION-8.md.
 
-  2. **Extract resume context**: Parse the handoff for:
-     - **Goal**: What the prior session was doing
-     - **Current state**: Where it left off (branch, dirty/clean, artifacts)
-     - **Decisions made**: Choices to preserve (don't re-explore rejected alternatives)
-     - **Next steps**: The numbered action items — these become the task
-     - **Warnings**: Failed approaches to avoid
-     - **Tier**: Inherited from handoff
-
-  3. **Verify state matches**: Check that git state matches handoff expectations:
+  2. **Validate** — a manifest that does not validate is not resumed:
      ```bash
-     git branch --show-current    # matches handoff branch?
-     git status --short            # matches handoff dirty/clean?
+     "$KM" validate <manifest>     # exit 2 (no parser) on a sealed manifest = STOP
      ```
-     If state diverges from handoff (e.g., branch was merged, files already committed),
-     note the divergence and adjust next steps accordingly.
 
-  4. **Resume**: Skip classify/research/scope (already done in prior session).
-     Jump directly to the appropriate step:
-     - If next steps are "commit and push" → go to step 5 (execute)
-     - If next steps are "implement X" → go to step 4 (tests) then step 5
-     - If next steps are "research X" → go to step 2 (research)
-     - If next steps are "review/test" → go to step 4 (tests)
+  3. **Divergence** — live state wins over manifest claims:
+     ```bash
+     "$KM" divergence <manifest>
+     ```
+     On DIVERGED (branch/commit/artifact-hash): apply workflow.invalidation_rules —
+     flip matching inherited phases to required. Never trust an inherited phase whose
+     inputs changed. ADVANCED commits + dirty WARN = note and proceed.
 
-  Output: "Resuming from handoff: {filename}. Goal: {goal}. Next: {first action}."
+  4. **Preflight**: run each runtime.preflight cmd; a failed check = STOP and report.
+
+  5. **Compile bounded context** — read the bundle, not the raw tree:
+     ```bash
+     "$KM" compile <manifest> --bundle-out /tmp/resume-bundle.md --receipt-out _meta/reports/receipt-{date}.yaml
+     ```
+     The receipt (kernel.context-receipt/v1) reports estimated tokens per layer and
+     status: within_budget → proceed · target_exceeded → drop optional selectors,
+     proceed with a note · maximum_exceeded (exit 3) → STOP, report the receipt,
+     ask before loading anything.
+
+  6. **Activate** the policy (arms the guard-context hook for sealed/bounded):
+     ```bash
+     "$KM" activate <manifest>
+     ```
+     sealed: forbidden globs are hook-BLOCKED; do not fight the hook — amend the
+     manifest if access is genuinely needed. bounded: extra loads are allowed but
+     ledgered; justify each in the receipt's loads_beyond_manifest.
+
+  7. **Resume at the declared position**:
+     ```bash
+     "$KM" resume <manifest>    # entry_phase / entrypoint / next_operation
+     ```
+     Skip inherited phases (already verified by divergence), execute required ones.
+     Honor execution.stop_conditions and emit checkpoints at execution.checkpoints.
+
+  8. **Complete**: when outputs.required are verified,
+     ```bash
+     "$KM" deactivate --receipt _meta/reports/receipt-{date}.yaml
+     ```
+     then outputs.completion (usually agentdb write-end).
+
+  Output: "Resuming {manifest}: {goal}. Entry: {entry_phase}. Receipt: {total_estimated_tokens} tokens ({status})."
 </step>
 
 <step id="2_research" mandatory="true">
@@ -251,6 +286,7 @@ agentdb learn pattern "{what worked}" "{evidence}"
 agentdb learn failure "{what broke}" "{evidence}"
 Update _meta/research/ if new findings.
 Suggest /kernel:retrospective if 5+ learnings accumulated since last synthesis.
+Long task still running? Emit /kernel:checkpoint at natural boundaries instead of letting context accumulate (EXP-L21).
 
 <checkpoint>
 agentdb write-end '{"task":"X","tier":N,"learned":["Z"]}'

@@ -2718,6 +2718,70 @@ test_manifest_checkpoint_resume_position_surfaced() {
   assert_contains "$output" "entry_phase: migration"
 }
 
+
+test_migration_every_command_has_destination() {
+  # contract table section 3: every former command name resolves to a skill dir
+  local missing=0
+  for name in ingest forge validate tearitapart review handoff retrospective \
+              diagnose dream metrics init help experiment landing-page checkpoint; do
+    [ -f "$PLUGIN_ROOT/skills/$name/SKILL.md" ] || { echo "  no destination: $name"; missing=1; }
+  done
+  assert_exit_code 0 "$missing" "every former command needs a skill destination"
+}
+
+test_migration_no_live_command_references() {
+  # no live file may reference commands/ paths (CHANGELOG + _meta archives excluded)
+  local hits
+  hits=$(grep -rln 'commands/' "$PLUGIN_ROOT" \
+    --include='*.md' --include='*.sh' --include='*.json' 2>/dev/null \
+    | grep -v '_meta/' | grep -v 'CHANGELOG.md' | grep -v '.obsidian' \
+    | grep -v 'tests/run-tests.sh' | grep -v 'docs/MIGRATION-8.md' \
+    | grep -v 'guard-config.sh' || true)
+  # guard-config.sh keeps commands/ in its HOST-project allowlist deliberately
+  [ -z "$hits" ] || { echo "  live commands/ references:"; echo "$hits"; return 1; }
+}
+
+test_migration_side_effecting_skills_not_ambient() {
+  # forge/init/experiment/landing-page must carry disable-model-invocation: true
+  local bad=0
+  for s in forge init experiment landing-page; do
+    grep -q '^disable-model-invocation: true' "$PLUGIN_ROOT/skills/$s/SKILL.md" || {
+      echo "  $s can fire ambiently (missing disable-model-invocation: true)"; bad=1; }
+  done
+  assert_exit_code 0 "$bad" "side-effecting skills must not fire ambiently"
+}
+
+test_migration_kernel_taxonomy_blocks_parse() {
+  # every SKILL.md frontmatter parses and carries kernel.kind
+  python3 - "$PLUGIN_ROOT" <<'PYINNER'
+import glob, re, sys
+root = sys.argv[1]
+bad = 0
+valid_kinds = {"methodology", "workflow", "state_transition", "validator", "operator"}
+for p in sorted(glob.glob(f"{root}/skills/*/SKILL.md")):
+    text = open(p).read()
+    m = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    if not m:
+        print(f"  no frontmatter: {p}"); bad = 1; continue
+    fm = m.group(1)
+    km = re.search(r"^kernel:\n((?:  .*\n?)+)", fm, re.M)
+    if not km:
+        print(f"  no kernel: block: {p}"); bad = 1; continue
+    kind = re.search(r"^  kind: (\S+)", km.group(1), re.M)
+    if not kind or kind.group(1) not in valid_kinds:
+        print(f"  bad kernel.kind: {p}"); bad = 1
+sys.exit(bad)
+PYINNER
+}
+
+test_migration_workflows_reference_skills() {
+  local bad=0
+  for w in "$PLUGIN_ROOT/workflows/"*.md; do
+    if grep -q '^  - command:' "$w"; then echo "  stale command label: $w"; bad=1; fi
+  done
+  assert_exit_code 0 "$bad" "workflow steps must use skill: labels"
+}
+
 run_test_suite() {
   local suite="$1"
   echo ""
@@ -2747,6 +2811,11 @@ run_test_suite() {
       run_test "guard-context: fails closed on broken pointer" test_guard_context_fails_closed_on_broken_pointer
       run_test "activate/deactivate roundtrip" test_manifest_activate_deactivate_roundtrip
       run_test "checkpoint resume position surfaced" test_manifest_checkpoint_resume_position_surfaced
+      run_test "migration: every command has destination" test_migration_every_command_has_destination
+      run_test "migration: no live command references" test_migration_no_live_command_references
+      run_test "migration: side-effecting skills not ambient" test_migration_side_effecting_skills_not_ambient
+      run_test "migration: kernel taxonomy blocks parse" test_migration_kernel_taxonomy_blocks_parse
+      run_test "migration: workflows reference skills" test_migration_workflows_reference_skills
       ;;
     test_gate)
       run_test "test-gate detects + passes" test_test_gate_detects_and_passes
