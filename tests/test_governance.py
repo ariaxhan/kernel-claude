@@ -225,10 +225,10 @@ class GeneratorTests(unittest.TestCase):
             self.assertEqual(0, second.returncode, second.stderr)
             self.assertEqual(0, run(sys.executable, str(GEN), "--root", str(root), "--check").returncode)
             (root / "AGENTS.md").write_text("stale\n")
-            env["KERNEL_TEST_PAUSE_BEFORE_REPLACE_MS"] = "300"
+            env["KERNEL_TEST_PAUSE_BEFORE_REPLACE_MS"] = "1200"
             changed = subprocess.Popen([sys.executable, str(GEN), "--root", str(root)],
                                        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
-            time.sleep(0.05)
+            time.sleep(0.35)
             source = root / "governance/kernel.md.tmpl"
             source.write_text(source.read_text() + "changed concurrently\n")
             _out, err = changed.communicate(timeout=5)
@@ -269,6 +269,42 @@ class SyncTests(unittest.TestCase):
         result = run(sys.executable, str(SYNC), "audit", str(repo.parent), "--json")
         self.assertEqual(0, result.returncode, result.stderr)
         return json.loads(result.stdout)["repositories"][0]["state"]
+
+    def test_installed_skill_entrypoint_resolves_plugin_root_from_skill_cwd(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            installed = base / "cache/kernel-marketplace/kernel/8.1.1 with space\n"
+            skill_dir = installed / "skills/governance-sync"
+            (installed / "scripts").mkdir(parents=True)
+            skill_dir.mkdir(parents=True)
+            shutil.copy2(SYNC, installed / "scripts/governance-sync.py")
+            shutil.copy2(ROOT / "skills/governance-sync/SKILL.md", skill_dir / "SKILL.md")
+            audited = git_repo(base / "audited with space")
+
+            old = run(sys.executable, "scripts/governance-sync.py", "audit", str(audited),
+                      "--json", cwd=skill_dir)
+            self.assertNotEqual(0, old.returncode)
+
+            shell = (
+                'if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ]; then '
+                'KERNEL_GOVERNANCE_SYNC="$CLAUDE_PLUGIN_ROOT/scripts/governance-sync.py"; '
+                'else KERNEL_GOVERNANCE_SYNC="../../scripts/governance-sync.py"; fi; '
+                'python3 "$KERNEL_GOVERNANCE_SYNC" audit "$AUDIT_ROOT" --json'
+            )
+            for loader_env in ({"CLAUDE_PLUGIN_ROOT": str(installed)}, {}):
+                env = os.environ.copy()
+                env.pop("CLAUDE_PLUGIN_ROOT", None)
+                env.update(loader_env)
+                env["AUDIT_ROOT"] = str(audited)
+                result = run("bash", "-c", shell, cwd=skill_dir, env=env)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual(1, json.loads(result.stdout)["canonical_repo_count"])
+
+            skill = (skill_dir / "SKILL.md").read_text()
+            self.assertNotIn("python3 scripts/governance-sync.py", skill)
+            self.assertNotIn("$(", skill)
+            self.assertIn('$CLAUDE_PLUGIN_ROOT/scripts/governance-sync.py', skill)
+            self.assertIn('KERNEL_GOVERNANCE_SYNC="../../scripts/governance-sync.py"', skill)
 
     def test_manifest_aware_generated_state_machine(self):
         with tempfile.TemporaryDirectory() as td:
