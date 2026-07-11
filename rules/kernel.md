@@ -105,20 +105,27 @@ Serial execution is the exception. Parallel is the default.
 
 <rule id="frontmatter_protection" type="invariant" load="always">
 
-## Frontmatter Format (Commands, Skills, Agents)
+## Frontmatter Format (Skills, Agents)
 
 <invariant id="exact_frontmatter">
 YAML frontmatter MUST be exact. Claude Code plugin fails silently on malformed frontmatter.
 
-**Required format:**
+**Required format (skills):**
 ```yaml
 ---
-name: kernel:{name}
+name: {name}
 description: "{description with triggers}"
 user-invocable: true|false
 allowed-tools: Tool1, Tool2, ...
+kernel:
+  kind: methodology|workflow|state_transition|validator|operator
+  version: 1
+  side_effects: none|writes_meta|...
+  confirmation: none|required
 ---
 ```
+
+`name:` is bare (e.g. `name: checkpoint`), NOT `kernel:{name}` — plugin skills auto-namespace to `/kernel:<dir>`. Every v8 skill carries the `kernel:` taxonomy block; preserve it. Side-effecting/expensive skills also set `disable-model-invocation: true`.
 
 **On edit:** Preserve frontmatter EXACTLY as-is. Never:
 - Change field order
@@ -128,7 +135,7 @@ allowed-tools: Tool1, Tool2, ...
 </invariant>
 
 <invariant id="frontmatter_validation">
-Before committing any command/skill/agent edit:
+Before committing any skill/agent edit:
 1. Check frontmatter starts at line 1 with `---`
 2. Check frontmatter ends with `---` before content
 3. Verify `name:` field matches filename pattern

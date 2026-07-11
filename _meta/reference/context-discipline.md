@@ -10,8 +10,7 @@ Manage tokens as a scarce resource. Every token competes for attention. Manage r
 
 Don't load everything upfront. Load what's needed when it's needed.
 
-- Commands load on invocation
-- Skills load on demand
+- Skills load on demand (user-invocable ones on invocation, model-invocable ones when their triggers match)
 - Rules are always-on
 
 If information isn't needed for the current step, don't read it into context.

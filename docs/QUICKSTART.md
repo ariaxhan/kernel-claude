@@ -176,7 +176,7 @@ It saves this permanently so the mistake never happens again.
 |-----------|----------------|---------------|
 | **Memory** | AgentDB + `_meta/` | Remembers what worked, what broke, where you left off |
 | **Helpers** | Surgeon, Adversary, Researcher, Scout, Validator, Reviewer | Builds features, checks work, finds solutions, explores project, pre-commit checks, reviews code |
-| **Skills** | `/kernel:ingest`, `/kernel:validate`, `/kernel:handoff`, `/kernel:review`, `/kernel:tearitapart`, `/kernel:init`, `/kernel:help` | Start work, check work, save progress, review code, critical review, setup, help |
+| **Skills** | `/kernel:ingest`, `/kernel:validate`, `/kernel:handoff`, `/kernel:checkpoint`, `/kernel:review`, `/kernel:tearitapart`, `/kernel:init`, `/kernel:help` | Start work, check work, save progress, checkpoint mid-task, review code, critical review, setup, help |
 
 ### The Agents (Helpers)
 
@@ -246,7 +246,8 @@ If skills don't appear, make sure:
 |---------|--------------|
 | `/kernel:ingest` | Universal entry point. Classifies your task, determines scope, routes to the right agent. |
 | `/kernel:validate` | Pre-commit verification. Runs build, types, lint, tests, security scan. Blocks if anything fails. |
-| `/kernel:handoff` | Saves your progress. Creates a summary so you can pick up exactly where you left off. |
+| `/kernel:handoff` | Saves your progress as a YAML manifest so you can pick up exactly where you left off. |
+| `/kernel:checkpoint` | Bounded mid-task save. Records exact resume position for a safe context reset without a full handoff. |
 | `/kernel:review` | Code review for PRs or staged changes. Reports issues with >80% confidence. |
 | `/kernel:tearitapart` | Critical pre-implementation review. Finds problems before you write code. |
 | `/kernel:init` | Sets up KERNEL for your project. Run once when starting a new project. |
@@ -345,4 +346,4 @@ The more you use it, the smarter Claude Code gets about YOUR project specificall
 
 ---
 
-*Built with KERNEL v6.1.5 | [GitHub](https://github.com/ariaxhan/kernel-claude)*
+*Built with KERNEL v8.0.0 | [GitHub](https://github.com/ariaxhan/kernel-claude)*

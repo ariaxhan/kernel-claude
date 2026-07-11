@@ -94,7 +94,9 @@ Everything is a skill (v8): methodology skills (testing, security, debug, api, b
 | `/kernel:validate` | `/validate` | Pre-commit quality gates |
 | `/kernel:tearitapart` | `/tearitapart` | Critical pre-implementation review |
 | `/kernel:review` | `/review` | Code review for PRs |
-| `/kernel:handoff` | `/handoff` | Save progress for next session |
+| `/kernel:handoff` | `/handoff` | Save progress for next session — emits a canonical `kernel.handoff/v1` YAML manifest |
+| `/kernel:checkpoint` | `/checkpoint` | Bounded mid-task save — `kernel.checkpoint/v1` manifest for safe context resets |
+| `/kernel:landing-page` | `/landing-page` | Guided landing page generator — interview, scaffold, enforce, deploy |
 | `/kernel:init` | `/init` | Setup (run once per project) |
 | `/kernel:help` | `/help` | Show help |
 
@@ -169,6 +171,10 @@ Context graph inspired by [aDNA (Agentic DNA)](https://github.com/LatticeProtoco
 ### Experiment Engine
 
 107 hypotheses, 205 experiments, 22 graduated rules. Every rule in CLAUDE.md is a hypothesis until proven by evidence. The engine seeds rules, designs experiments against AgentDB telemetry, issues verdicts (supports/refutes/inconclusive), and graduates or kills rules based on Bayesian confidence scoring. Runs autonomously via `/kernel:experiment`.
+
+### Manifest Runtime (v8)
+
+YAML manifests are the canonical machine-readable representation of resumable state. State-transition skills (`/kernel:handoff`, `/kernel:checkpoint`, `/kernel:retrospective`) emit schema-validated manifests (`schemas/`: `kernel.handoff/v1`, `kernel.checkpoint/v1`, `kernel.retrospective-result/v1`, `kernel.context-receipt/v1`) instead of prose. The CLI at `orchestration/manifest/kernel-manifest` (`validate | latest | divergence | compile | resume | activate | deactivate`) drives resume: a fresh session compiles bounded task state from the manifest rather than inheriting a whole transcript. Context policies — **sealed** (forbidden globs are hook-blocked, fails closed), **bounded** (extra loads are ledgered into a receipt), **advisory** — are enforced by `hooks/scripts/guard-context.sh` reading the activated manifest (I0.15: hooks, not honor-system). Grounding: EXP-L21 showed load-bearing context stays flat (~50–70k tokens/decision) while attended context grows 7–11x per session, so resumes reconstruct minimal state instead of replaying history.
 
 ---
 
