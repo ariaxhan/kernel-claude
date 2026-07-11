@@ -644,6 +644,127 @@ test_session_start_calls_update_symlink() {
   }
 }
 
+# === KERNEL 8 runtime upgrade tests ===
+
+make_runtime_fixture() {
+  local root="$1" version="$2"
+  mkdir -p "$root/.claude-plugin" "$root/hooks/scripts" "$root/orchestration/agentdb"
+  printf '{"name":"kernel","version":"%s"}\n' "$version" > "$root/.claude-plugin/plugin.json"
+  : > "$root/hooks/scripts/common.sh"
+  : > "$root/orchestration/agentdb/agentdb"
+  chmod +x "$root/orchestration/agentdb/agentdb"
+}
+
+runtime_fixture() {
+  export HOME="$TEST_DIR/home with spaces"
+  export KERNEL_VAULTS="$TEST_DIR/Vaults with spaces"
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  mkdir -p "$cache" "$KERNEL_VAULTS/.local/bin" "$KERNEL_VAULTS/.claude/kernel"
+  make_runtime_fixture "$cache/7.23.0" "7.23.0"
+  make_runtime_fixture "$cache/8.0.0" "8.0.0"
+}
+
+test_runtime_validates_loaded_v8_root() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  kernel_validate_runtime_root "$cache/8.0.0"
+}
+
+test_runtime_upgrade_repairs_only_numbered_links() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/7.23.0/orchestration/agentdb/agentdb" "$KERNEL_VAULTS/.local/bin/agentdb"
+  ln -s "$cache/7.23.0/orchestration" "$KERNEL_VAULTS/.claude/kernel/orchestration"
+  ln -s "$cache/7.23.0/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  mkdir -p "$KERNEL_VAULTS/_meta/agentdb" "$KERNEL_VAULTS/_meta/handoffs"
+  echo precious > "$KERNEL_VAULTS/_meta/agentdb/agent.db"
+  echo state > "$KERNEL_VAULTS/_meta/handoffs/live.json"
+  local before; before=$(find "$KERNEL_VAULTS/_meta" -type f -exec shasum -a 256 {} \; | sort)
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
+  assert_equals "$cache/current/orchestration/agentdb/agentdb" "$(readlink "$KERNEL_VAULTS/.local/bin/agentdb")"
+  assert_equals "$cache/current/orchestration" "$(readlink "$KERNEL_VAULTS/.claude/kernel/orchestration")"
+  assert_equals "$cache/current/hooks" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
+  assert_equals "$before" "$(find "$KERNEL_VAULTS/_meta" -type f -exec shasum -a 256 {} \; | sort)" "project data must not change"
+}
+
+test_runtime_current_noop_and_missing_untouched() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/8.0.0" "$cache/current"
+  ln -s "$cache/current/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  local inode; inode=$(stat -f %i "$KERNEL_VAULTS/.claude/kernel/hooks" 2>/dev/null || stat -c %i "$KERNEL_VAULTS/.claude/kernel/hooks")
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
+  assert_equals "$inode" "$(stat -f %i "$KERNEL_VAULTS/.claude/kernel/hooks" 2>/dev/null || stat -c %i "$KERNEL_VAULTS/.claude/kernel/hooks")" "correct links must not churn"
+  [ ! -e "$KERNEL_VAULTS/.local/bin/agentdb" ] && [ ! -L "$KERNEL_VAULTS/.local/bin/agentdb" ]
+}
+
+test_runtime_refuses_user_owned_destinations() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  echo mine > "$KERNEL_VAULTS/.local/bin/agentdb"
+  mkdir "$KERNEL_VAULTS/.claude/kernel/orchestration"
+  ln -s "$TEST_DIR/unrelated" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  local output rc=0
+  output=$(KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ]
+  assert_contains "$output" "run /kernel:init"
+  assert_equals mine "$(cat "$KERNEL_VAULTS/.local/bin/agentdb")"
+  [ -d "$KERNEL_VAULTS/.claude/kernel/orchestration" ]
+  assert_equals "$TEST_DIR/unrelated" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
+}
+
+test_runtime_repairs_broken_relative_numbered_link() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  rm -rf "$cache/7.23.0"
+  local dest="$KERNEL_VAULTS/.claude/kernel/hooks"
+  local rel; rel=$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1],sys.argv[2]))' "$cache/7.23.0/hooks" "$(dirname "$dest")")
+  ln -s "$rel" "$dest"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
+  assert_equals "$cache/current/hooks" "$(readlink "$dest")"
+}
+
+test_runtime_rejects_malformed_cache_and_preserves_current() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  mkdir -p "$cache/9.0.0/.claude-plugin"
+  printf '{"name":"not-kernel","version":"9.0.0"}\n' > "$cache/9.0.0/.claude-plugin/plugin.json"
+  ln -s "$cache/8.0.0" "$cache/current"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  ! KERNEL_RUNTIME_ROOT="$cache/9.0.0" kernel_update_current
+  assert_equals "$cache/8.0.0" "$(readlink "$cache/current")"
+}
+
+test_runtime_authority_is_monotonic_but_override_can_rollback() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/8.0.0" "$cache/current"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_LOADED_ROOT="$cache/7.23.0" kernel_update_current
+  assert_equals "$cache/8.0.0" "$(readlink "$cache/current")" "old loaded session must not downgrade"
+  KERNEL_RUNTIME_ROOT="$cache/7.23.0" kernel_update_current
+  assert_equals "$cache/7.23.0" "$(readlink "$cache/current")" "explicit rollback must win"
+}
+
+test_runtime_failed_replacement_leaves_original() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  ln -s "$cache/7.23.0/hooks" "$KERNEL_VAULTS/.claude/kernel/hooks"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_ATOMIC_LINK_FAIL=1 ! kernel_repair_host_link "$KERNEL_VAULTS/.claude/kernel/hooks" "$cache/current/hooks" "$cache" "hooks"
+  assert_equals "$cache/7.23.0/hooks" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
+}
+
+test_runtime_startup_arms_reconciliation() {
+  grep -q 'kernel_reconcile_runtime' "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  grep -q '_kernel_hook_start' "$PLUGIN_ROOT/hooks/scripts/session-start.sh"
+}
+
 # === Security Hook Tests ===
 # Note: Secret values are built dynamically to avoid triggering detect-secrets on THIS file
 
@@ -3584,6 +3705,17 @@ run_test_suite() {
       run_test "pre-compact payload survives quotes" test_pre_compact_payload_survives_quotes
       run_test "lifecycle hooks guard main push" test_lifecycle_hooks_guard_main_push
       run_test "session-start shows checkpoint after compact" test_session_start_shows_checkpoint_after_compact
+      ;;
+    runtime_upgrade)
+      run_test "validated loaded v8 root" test_runtime_validates_loaded_v8_root
+      run_test "7.23 links repair and data is unchanged" test_runtime_upgrade_repairs_only_numbered_links
+      run_test "current no-op and missing untouched" test_runtime_current_noop_and_missing_untouched
+      run_test "user-owned destinations refused" test_runtime_refuses_user_owned_destinations
+      run_test "broken relative numbered link repaired" test_runtime_repairs_broken_relative_numbered_link
+      run_test "malformed cache rejected" test_runtime_rejects_malformed_cache_and_preserves_current
+      run_test "authority monotonic with explicit rollback" test_runtime_authority_is_monotonic_but_override_can_rollback
+      run_test "failed replacement preserves original" test_runtime_failed_replacement_leaves_original
+      run_test "startup arms reconciliation" test_runtime_startup_arms_reconciliation
       ;;
     security)
       run_test "no hardcoded secrets" test_no_hardcoded_secrets_in_plugin

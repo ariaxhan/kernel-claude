@@ -5,47 +5,122 @@
 # Dependency check: jq is required by most hooks for JSON parsing
 command -v jq >/dev/null 2>&1 || { echo "Warning: jq not found, some hooks may not work" >&2; }
 
-# Auto-update current symlink to latest version (fixes stale hook issue)
-# Claude Code downloads new versions AFTER session-start hooks run,
-# so we check on every hook invocation (throttled to once per 60s).
-# Uses BASH_SOURCE[0] (common.sh itself) to find cache dir reliably,
-# regardless of call depth or caller location.
-update_current_symlink() {
-  # common.sh lives at {cache}/{version}/hooks/scripts/common.sh
-  # So 3 levels up from common.sh = the plugin parent dir (e.g. kernel/)
-  local COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local CACHE_DIR="$(cd "$COMMON_DIR/../../.." && pwd)"
-
-  # Only run if we're in the plugin cache (not dev mode)
-  [[ "$CACHE_DIR" == *"plugins/cache"* ]] || return 0
-
-  # Throttle: skip if checked within last 60 seconds
-  local STAMP="$CACHE_DIR/.update_checked"
-  if [ -f "$STAMP" ]; then
-    local stamp_age
-    stamp_age=$(( $(date +%s) - $(stat -f %m "$STAMP" 2>/dev/null || stat -c %Y "$STAMP" 2>/dev/null || echo 0) ))
-    [ "$stamp_age" -lt 60 ] && return 0
-  fi
-  touch "$STAMP" 2>/dev/null || true
-
-  local LATEST
-  LATEST=$(ls -d "$CACHE_DIR"/[0-9]*/ 2>/dev/null \
-    | xargs -n1 basename 2>/dev/null \
-    | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' \
-    | sort -t. -k1,1n -k2,2n -k3,3n \
-    | tail -1 || true)
-
-  [ -z "$LATEST" ] && return 0
-
-  # Check if current symlink needs updating
-  local CURRENT_TARGET
-  CURRENT_TARGET=$(readlink "$CACHE_DIR/current" 2>/dev/null | xargs basename 2>/dev/null || true)
-
-  if [ "$CURRENT_TARGET" != "$LATEST" ]; then
-    ln -sfn "$CACHE_DIR/$LATEST" "$CACHE_DIR/current" 2>/dev/null && \
-      echo "**KERNEL auto-updated:** ${CURRENT_TARGET:-none} → $LATEST"
+# Runtime selection is based on the plugin Claude Code actually loaded. A cache
+# directory that merely has the largest number is not proof that it is active.
+kernel_loaded_root() {
+  if [ -n "${KERNEL_RUNTIME_ROOT:-}" ]; then
+    printf '%s\n' "$KERNEL_RUNTIME_ROOT"
+  elif [ -n "${KERNEL_LOADED_ROOT:-}" ]; then
+    printf '%s\n' "$KERNEL_LOADED_ROOT"
+  else
+    local common_dir
+    common_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd) || return 1
+    (cd "$common_dir/../.." && pwd)
   fi
 }
+
+kernel_cache_dir() {
+  printf '%s\n' "${KERNEL_CACHE_DIR:-$HOME/.claude/plugins/cache/kernel-marketplace/kernel}"
+}
+
+kernel_semver() { [[ "$1" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; }
+
+kernel_validate_runtime_root() {
+  local root="$1" manifest="$1/.claude-plugin/plugin.json" version base
+  [ -d "$root" ] && [ -f "$manifest" ] && [ -f "$root/hooks/scripts/common.sh" ] && \
+    [ -f "$root/orchestration/agentdb/agentdb" ] || return 1
+  version=$(jq -er '.version | select(type == "string")' "$manifest" 2>/dev/null) || return 1
+  [ "$(jq -er '.name' "$manifest" 2>/dev/null)" = kernel ] || return 1
+  kernel_semver "$version" || return 1
+  base=${root%/}; base=${base##*/}
+  case "$root" in
+    */plugins/cache/kernel-marketplace/kernel/*) [ "$base" = "$version" ] || return 1 ;;
+  esac
+  printf '%s\n' "$version"
+}
+
+kernel_version_lt() {
+  [ "$(printf '%s\n%s\n' "$1" "$2" | sort -t. -k1,1n -k2,2n -k3,3n | head -1)" = "$1" ] && [ "$1" != "$2" ]
+}
+
+kernel_atomic_link() {
+  local target="$1" dest="$2" tmp
+  tmp="${dest}.kernel-tmp.$$.$RANDOM"
+  [ -e "$tmp" ] || [ -L "$tmp" ] && return 1
+  ln -s "$target" "$tmp" || return 1
+  if [ "${KERNEL_ATOMIC_LINK_FAIL:-0}" = 1 ]; then rm -f "$tmp"; return 1; fi
+  python3 - "$tmp" "$dest" <<'PY' || { rm -f "$tmp"; return 1; }
+import os, sys
+os.replace(sys.argv[1], sys.argv[2])
+PY
+}
+
+kernel_update_current() {
+  local root cache current current_root new_version current_version explicit=0
+  root=$(kernel_loaded_root) || return 1
+  new_version=$(kernel_validate_runtime_root "$root") || { echo "kernel: refusing invalid runtime root: $root" >&2; return 1; }
+  cache=$(kernel_cache_dir); current="$cache/current"
+  [ -n "${KERNEL_RUNTIME_ROOT:-}" ] && explicit=1
+  mkdir -p "$cache" 2>/dev/null || return 1
+  if [ -L "$current" ]; then
+    current_root=$(readlink "$current")
+    case "$current_root" in /*) ;; *) current_root="$cache/$current_root" ;; esac
+    current_version=$(kernel_validate_runtime_root "$current_root" 2>/dev/null || true)
+    [ "$current_root" = "$root" ] && return 0
+    if [ "$explicit" -eq 0 ] && [ -n "$current_version" ] && kernel_version_lt "$new_version" "$current_version"; then
+      return 0
+    fi
+  elif [ -e "$current" ]; then
+    echo "kernel: refusing non-symlink runtime selector: $current" >&2; return 1
+  fi
+  kernel_atomic_link "$root" "$current" || { echo "kernel: could not update runtime selector: $current" >&2; return 1; }
+  echo "KERNEL runtime selected: $new_version"
+}
+
+kernel_lexical_target() {
+  python3 - "$1" "$2" <<'PY'
+import os, sys
+target, dest = sys.argv[1:]
+if "\n" in target or "\r" in target or "\0" in target:
+    raise SystemExit(1)
+print(os.path.normpath(target if os.path.isabs(target) else os.path.join(os.path.dirname(dest), target)))
+PY
+}
+
+kernel_repair_host_link() {
+  local dest="$1" wanted="$2" cache="$3" suffix="$4" raw lexical
+  if [ ! -e "$dest" ] && [ ! -L "$dest" ]; then return 0; fi
+  if [ ! -L "$dest" ]; then
+    echo "kernel: kept user-owned path $dest; run /kernel:init to resolve it" >&2; return 1
+  fi
+  raw=$(readlink "$dest") || return 1
+  lexical=$(kernel_lexical_target "$raw" "$dest") || {
+    echo "kernel: kept malformed link $dest; run /kernel:init to resolve it" >&2; return 1;
+  }
+  [ "$lexical" = "$wanted" ] && return 0
+  if [[ "$lexical" =~ ^${cache//./\\.}/(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)/${suffix}$ ]]; then
+    kernel_atomic_link "$wanted" "$dest" || {
+      echo "kernel: could not repair $dest; run /kernel:init" >&2; return 1;
+    }
+    echo "KERNEL repaired helper link: $dest"
+    return 0
+  fi
+  echo "kernel: kept unrelated link $dest; run /kernel:init to resolve it" >&2
+  return 1
+}
+
+kernel_reconcile_runtime() {
+  local vaults="$1" cache rc=0
+  cache=$(kernel_cache_dir)
+  kernel_update_current || rc=1
+  kernel_repair_host_link "$vaults/.local/bin/agentdb" "$cache/current/orchestration/agentdb/agentdb" "$cache" "orchestration/agentdb/agentdb" || rc=1
+  kernel_repair_host_link "$vaults/.claude/kernel/orchestration" "$cache/current/orchestration" "$cache" "orchestration" || rc=1
+  kernel_repair_host_link "$vaults/.claude/kernel/hooks" "$cache/current/hooks" "$cache" "hooks" || rc=1
+  return "$rc"
+}
+
+# Backward-compatible internal name used by existing checks.
+update_current_symlink() { kernel_update_current; }
 
 # Detect Vaults location - env var takes priority, then checks filesystem
 detect_vaults() {
@@ -97,8 +172,9 @@ _KERNEL_HOOK_START_MS=""
 _kernel_hook_start() {
   # macOS date doesn't support %N, use python for ms precision
   _KERNEL_HOOK_START_MS=$(python3 -c 'import time; print(int(time.time()*1000))' 2>/dev/null || echo "")
-  # Check for plugin updates on every hook (throttled to 60s in the function)
-  update_current_symlink 2>/dev/null || true
+  # Keep the selector and the three known KERNEL helper links aligned. Refusals
+  # are warnings: hooks continue, but mixed-version risk is never hidden.
+  kernel_reconcile_runtime "$(detect_vaults)" || true
 }
 
 _kernel_hook_end() {
