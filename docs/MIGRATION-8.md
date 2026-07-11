@@ -38,6 +38,10 @@ Replacement uses a collision-safe sibling link and an atomic rename. No updater 
 rollback command deletes caches, repositories, AgentDB, manifests, receipts, project
 configuration, or user Claude configuration.
 
+Normal errors and catchable signals remove the temporary sibling. `SIGKILL` cannot be
+trapped and can leave one `.kernel-tmp.*` symlink. A later matching operation removes
+only matching symlink residue; regular files with similar names remain untouched.
+
 ## Breaking changes
 
 - Canonical state is JSON: `kernel.handoff/v1`, `kernel.checkpoint/v1`,
@@ -73,7 +77,8 @@ the migration.
 Session-only rollback is least invasive:
 
 ```bash
-claude --plugin-dir /path/to/kernel-claude-7.23.0
+git worktree add /path/to/kernel-claude-7.23 54a0053
+claude --plugin-dir /path/to/kernel-claude-7.23
 ```
 
 To select a trusted local or cached runtime for host helpers:
@@ -82,7 +87,8 @@ To select a trusted local or cached runtime for host helpers:
 scripts/select-runtime.sh /path/to/kernel-runtime
 ```
 
-The selector validates plugin identity, exact semantic version, and required helper
+The selector uses KERNEL 8's own trusted helper code to validate the target as data;
+the older target does not need to contain KERNEL 8 functions. It validates plugin identity, exact semantic version, and required helper
 files. It refuses unsafe host objects and reports the selected root. Do not remove the
 marketplace or clear the whole plugin cache as normal rollback. If reinstall is needed,
 use `/plugin uninstall kernel@kernel-marketplace --keep-data` before reinstalling.

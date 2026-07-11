@@ -73,10 +73,11 @@ Missing links may be created. Correct links are unchanged. Recognizable numbered
 KERNEL links may be repaired. A regular file, directory, malformed link, or unrelated
 link is preserved and stops setup with an actionable message. Never force-replace links.
 
-Initialize the database with the selected runtime directly:
+Initialize the database through the shared helper, which pins AgentDB to the selected
+Vaults even when init was invoked from another directory:
 
 ```bash
-"$CACHE/current/orchestration/agentdb/agentdb" init
+kernel_init_agentdb "$VAULTS" "$CACHE"
 ```
 
 Do not edit a shell startup file automatically. If `$VAULTS/.local/bin` is not on

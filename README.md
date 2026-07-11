@@ -64,19 +64,24 @@ Breaking changes:
 
 ### Roll back without deleting data
 
-For one session, check out `v7.23.0` separately and run:
+For one session, check out the verified 7.23 release commit separately and run:
 
 ```bash
-claude --plugin-dir /path/to/kernel-claude-7.23.0
+git worktree add /path/to/kernel-claude-7.23 54a0053
+claude --plugin-dir /path/to/kernel-claude-7.23
 ```
 
 To deliberately select a validated local or cached runtime for the helper links:
 
 ```bash
-scripts/select-runtime.sh /path/to/kernel-claude-7.23.0
+scripts/select-runtime.sh /path/to/kernel-claude-7.23
 ```
 
 That explicit selection may move `current` backward; normal old sessions cannot. It does not convert KERNEL 8 JSON state to KERNEL 7 YAML. Do not delete the plugin cache or remove the marketplace as a normal rollback step.
+
+Runtime link changes clean temporary siblings on normal errors and catchable signals.
+An uncatchable process kill can leave a `.kernel-tmp.*` symlink; the next matching
+operation removes only KERNEL-shaped symlink residue and never a regular lookalike.
 
 ## Daily use
 

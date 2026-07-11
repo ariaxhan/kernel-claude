@@ -65,7 +65,8 @@ was removed.
 For a session-only rollback:
 
 ```bash
-claude --plugin-dir /path/to/kernel-claude-7.23.0
+git worktree add /path/to/kernel-claude-7.23 54a0053
+claude --plugin-dir /path/to/kernel-claude-7.23
 ```
 
 For an explicit helper-runtime selection:
