@@ -23,6 +23,7 @@ import re
 import subprocess
 import sys
 import hashlib
+import fnmatch
 from datetime import datetime, timezone
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -193,6 +194,7 @@ def cmd_validate(args):
 
 def cmd_latest(args):
     dirs = []
+    any_branch = "--any-branch" in args
     it = iter(args)
     for a in it:
         if a == "--dir":
@@ -200,12 +202,21 @@ def cmd_latest(args):
     if not dirs:
         dirs = ["_meta/checkpoints", "_meta/handoffs"]
     candidates = []
+    _, live_branch = git("branch", "--show-current")
     for d in dirs:
         if os.path.isdir(d):
             for f in os.listdir(d):
                 if f.endswith(".json") and not f.startswith("."):
                     p = os.path.join(d, f)
-                    candidates.append((os.path.getmtime(p), p))
+                    try:
+                        manifest = load_and_validate(p)
+                        created = (manifest.get("identity") or {}).get("created")
+                        branch = (manifest.get("provenance") or {}).get("branch")
+                        if not created or (not any_branch and branch != live_branch):
+                            continue
+                        candidates.append((created, p))
+                    except SystemExit:
+                        continue
     if not candidates:
         die(1, f"no manifests found in {dirs}")
     candidates.sort(reverse=True)
@@ -220,57 +231,107 @@ def git(*argv):
 
 def cmd_divergence(args):
     path = args[0]
+    json_mode = "--json" in args
     manifest = load_and_validate(path)
     prov = manifest.get("provenance", {})
     hard = False
+    events = []
+
+    def event(kind, status, **extra):
+        nonlocal hard
+        events.append({"event": kind, "status": status, **extra})
+        if status == "diverged":
+            hard = True
 
     rc, branch = git("branch", "--show-current")
     want = prov.get("branch", "")
     if rc != 0:
-        print("branch: UNKNOWN (not a git repo?)"); hard = True
+        event("branch_unknown", "diverged")
     elif branch == want:
-        print(f"branch: MATCH ({branch})")
+        event("branch_match", "match", branch=branch)
     else:
-        print(f"branch: DIVERGED (manifest={want} live={branch})"); hard = True
+        event("branch_diverged", "diverged", expected=want, actual=branch)
 
     commit = prov.get("commit", "")
     rc, head = git("rev-parse", "HEAD")
     if commit and rc == 0:
         if head == commit:
-            print(f"commit: MATCH ({head[:12]})")
+            event("commit_match", "match", commit=head)
         else:
             rc2, _ = git("merge-base", "--is-ancestor", commit, "HEAD")
             if rc2 == 0:
                 rc3, n = git("rev-list", "--count", f"{commit}..HEAD")
-                print(f"commit: ADVANCED ({n.strip() if rc3==0 else '?'} commits since manifest)")
+                event("commit_advanced", "warn", count=n.strip() if rc3 == 0 else None)
             else:
-                print(f"commit: DIVERGED (manifest {commit[:12]} is not an ancestor of HEAD {head[:12]})")
-                hard = True
+                event("commit_diverged", "diverged", expected=commit, actual=head)
     else:
-        print("commit: UNKNOWN"); hard = True
+        event("commit_unknown", "diverged")
 
     rc, status = git("status", "--porcelain")
     live_dirty = bool(status)
     want_dirty = bool(prov.get("dirty", False))
     if live_dirty == want_dirty:
-        print(f"dirty: MATCH ({live_dirty})")
+        event("dirty_match", "match", dirty=live_dirty)
     else:
-        print(f"dirty: WARN (manifest={want_dirty} live={live_dirty})")
+        event("dirty_changed", "warn", expected=want_dirty, actual=live_dirty)
 
     for art in prov.get("artifacts") or []:
         p, want_sha = art.get("path", ""), art.get("sha256", "")
-        if not os.path.isfile(p):
-            print(f"artifact: DIVERGED ({p} missing)"); hard = True
+        absolute = repo_path(p)
+        if not os.path.isfile(absolute):
+            event("artifact_missing", "diverged", path=p)
             continue
-        got = hashlib.sha256(open(p, "rb").read()).hexdigest()
+        got = hashlib.sha256(open(absolute, "rb").read()).hexdigest()
         if got == want_sha:
-            print(f"artifact: MATCH ({p})")
+            event("artifact_match", "match", path=p)
         else:
-            print(f"artifact: DIVERGED ({p} hash mismatch)"); hard = True
+            event("artifact_hash_mismatch", "diverged", path=p, expected=want_sha, actual=got)
+
+    phases = json.loads(json.dumps((manifest.get("workflow") or {}).get("phases") or []))
+    for rule in (manifest.get("workflow") or {}).get("invalidation_rules") or []:
+        when = rule.get("when") or {}
+        for ev in events:
+            if ev["event"] != when.get("event"):
+                continue
+            if when.get("path_glob") and not fnmatch.fnmatch(ev.get("path", ""), when["path_glob"]):
+                continue
+            for phase in phases:
+                if phase.get("name") in (rule.get("invalidates") or []):
+                    phase["status"] = "invalidated"
+
+    if json_mode:
+        print(dump_json({"events": events, "phases": phases, "hard_divergence": hard}), end="")
+    else:
+        for ev in events:
+            label = ev["event"].split("_", 1)[0]
+            detail = f" ({ev.get('path')}{' hash mismatch' if ev['event'] == 'artifact_hash_mismatch' else ''})" if ev.get("path") else ""
+            print(f"{label}: {ev['status'].upper()}{detail}")
 
     if hard:
         die(1, "divergence detected — live state wins; invalidate inherited phases per manifest workflow.invalidation_rules")
     print("divergence: CLEAN")
+
+
+def cmd_preflight(args):
+    manifest = load_and_validate(args[0])
+    allowed_argv = {("git", "status", "--short"), ("git", "diff", "--check")}
+    for check in (manifest.get("runtime") or {}).get("preflight") or []:
+        kind = check.get("check")
+        if kind == "current_branch":
+            rc, actual = git("branch", "--show-current")
+            ok = rc == 0 and actual == check.get("expected")
+        elif kind == "path_exists":
+            ok = os.path.exists(repo_path(check.get("path", "")))
+        elif kind == "argv":
+            argv = tuple(check.get("argv") or [])
+            if argv not in allowed_argv:
+                die(1, f"preflight argv not allowlisted: {list(argv)}")
+            ok = subprocess.run(argv, cwd=REPO_ROOT, check=False).returncode == 0
+        else:
+            die(1, f"unknown preflight check '{kind}'")
+        if not ok:
+            die(1, f"preflight failed: {kind}")
+    print("preflight: PASS")
 
 # ---------- compile (context selectors -> bundle + receipt) ----------
 
@@ -470,6 +531,8 @@ def cmd_activate(args):
         "schema": manifest.get("schema", ""),
         "mode": ((ctx.get("policy") or {}).get("mode")) or "advisory",
         "forbidden": ctx.get("forbidden") or [],
+        "allowlist": sorted({sel.get("path") for group in ("required", "optional")
+                             for sel in (ctx.get(group) or []) if sel.get("path")}),
         "activated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     os.makedirs(os.path.dirname(ACTIVE_POINTER), exist_ok=True)
@@ -524,6 +587,7 @@ COMMANDS = {
     "validate": (cmd_validate, 1),
     "latest": (cmd_latest, 0),
     "divergence": (cmd_divergence, 1),
+    "preflight": (cmd_preflight, 1),
     "compile": (cmd_compile, 1),
     "resume": (cmd_resume, 1),
     "activate": (cmd_activate, 1),

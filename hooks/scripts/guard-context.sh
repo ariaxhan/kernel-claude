@@ -65,6 +65,7 @@ pointer = json.load(open(pointer_path, encoding="utf-8"))
 tool = event.get("tool_name") or ""
 tool_input = event.get("tool_input") or {}
 forbidden = [g for g in pointer.get("forbidden") or [] if g]
+allowlist = [p.replace("\\", "/").lstrip("./") for p in pointer.get("allowlist") or [] if p]
 
 try:
     root = subprocess.run(
@@ -160,7 +161,11 @@ else:
         print(f"block\t'{candidate}' matches forbidden glob '{blocked}'\t{target}")
         sys.exit(0)
 
-print(f"allow\t\t{target}")
+target_parts = [p for p in target.split("|") if p]
+if any(p in allowlist for p in target_parts):
+    print(f"allowlisted\t\t{target}")
+else:
+    print(f"allow\t\t{target}")
 PY
 )
 
@@ -184,6 +189,7 @@ if [ "$MODE" = "sealed" ]; then
 fi
 
 if [ "$MODE" = "bounded" ]; then
+  [ "$ACTION" = "allowlisted" ] && exit 0
   [ -z "$TARGET" ] && TARGET="${TOOL:-unknown}:workspace"
   # Allow, but ledger the access for receipt accounting.
   printf '{"path":"%s","reason":"unstated (agent must justify in receipt)","ts":"%s"}\n' \

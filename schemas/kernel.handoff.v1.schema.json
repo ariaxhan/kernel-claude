@@ -211,14 +211,15 @@
           "description": "live-state triggers that flip inherited phases to required",
           "items": {
             "type": "object",
-            "required": [
-              "trigger",
-              "invalidates"
-            ],
+            "required": ["when", "invalidates"],
             "properties": {
-              "trigger": {
-                "type": "string",
-                "description": "e.g. 'artifact hash mismatch: schemas/*.json'"
+              "when": {
+                "type": "object",
+                "required": ["event"],
+                "properties": {
+                  "event": {"type": "string"},
+                  "path_glob": {"type": "string"}
+                }
               },
               "invalidates": {
                 "type": "array",
@@ -267,17 +268,12 @@
           "description": "checks ingest runs before resuming; failure = stop and report",
           "items": {
             "type": "object",
-            "required": [
-              "cmd"
-            ],
+            "required": ["check"],
             "properties": {
-              "cmd": {
-                "type": "string"
-              },
-              "expect": {
-                "type": "string",
-                "description": "substring expected in output; omit = exit 0 suffices"
-              }
+              "check": {"type": "string", "enum": ["current_branch", "path_exists", "argv"]},
+              "expected": {"type": "string"},
+              "path": {"type": "string"},
+              "argv": {"type": "array", "items": {"type": "string"}}
             }
           }
         }

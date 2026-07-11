@@ -2599,11 +2599,13 @@ MEOF
 
 test_manifest_latest_finds_newest() {
   mkdir -p _meta/handoffs _meta/checkpoints
-  printf '{"schema": "kernel.handoff/v1"}\n' > _meta/handoffs/old.json
+  cp "$FIXTURES/checkpoint-example.json" _meta/handoffs/old.json
+  python3 -c "import json;p='_meta/handoffs/old.json';m=json.load(open(p));m['identity']['created']='2026-01-01T00:00:00Z';json.dump(m,open(p,'w'))"
   sleep 1
-  printf '{"schema": "kernel.checkpoint/v1"}\n' > _meta/checkpoints/new.json
+  cp "$FIXTURES/checkpoint-example.json" _meta/checkpoints/new.json
+  python3 -c "import json;p='_meta/checkpoints/new.json';m=json.load(open(p));m['identity']['created']='2026-02-01T00:00:00Z';json.dump(m,open(p,'w'))"
   local output
-  output=$("$KM" latest)
+  output=$("$KM" latest --any-branch)
   assert_contains "$output" "_meta/checkpoints/new.json"
 }
 
@@ -2849,6 +2851,57 @@ p='m.json'; m=json.load(open(p)); m['provenance']['dirty']=True; m['provenance']
 PYEOF
   local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
   assert_exit_code 1 "$ec" "dirty checkpoint without tree hash must fail"
+}
+
+test_manifest_divergence_json_invalidates_phases() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  local head; head=$(git rev-parse HEAD)
+  cat > m.json <<MEOF
+{"schema":"kernel.handoff/v1","identity":{"name":"t","created":"2026-01-01T00:00:00Z"},"provenance":{"branch":"other","commit":"$head","dirty":true},"objective":{"goal":"t","success_conditions":["x"]},"workflow":{"phases":[{"name":"research","status":"inherited"}],"invalidation_rules":[{"when":{"event":"branch_diverged"},"invalidates":["research"]}]},"context":{"policy":{"mode":"advisory"}},"execution":{"entry_phase":"research"},"resume":{"prompt":"r"}}
+MEOF
+  local output ec=0; output=$("$KM" divergence m.json --json) || ec=$?
+  assert_exit_code 1 "$ec" "structured divergence keeps hard exit" || return 1
+  assert_contains "$output" '"event": "branch_diverged"' || return 1
+  assert_contains "$output" '"status": "invalidated"'
+}
+
+test_manifest_preflight_is_typed() {
+  touch CLAUDE.md
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['runtime']['preflight']=[{'cmd':'rm -rf /'}]; json.dump(m,open(p,'w'))
+PYEOF
+  local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "raw shell preflight must be rejected" || return 1
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['runtime']['preflight']=[{'check':'path_exists','path':'CLAUDE.md'}]; json.dump(m,open(p,'w'))
+PYEOF
+  "$KM" preflight m.json >/dev/null
+}
+
+test_manifest_latest_uses_identity_not_mtime() {
+  mkdir -p manifests
+  cp "$FIXTURES/checkpoint-example.json" manifests/new.json
+  cp "$FIXTURES/checkpoint-example.json" manifests/old.json
+  python3 - <<'PYEOF'
+import json
+for p,c in [('manifests/new.json','2026-02-01T00:00:00Z'),('manifests/old.json','2026-01-01T00:00:00Z')]:
+ m=json.load(open(p)); m['identity']['created']=c; json.dump(m,open(p,'w'))
+PYEOF
+  touch manifests/new.json; sleep 1; touch manifests/old.json
+  local output; output=$("$KM" latest --dir manifests --any-branch)
+  assert_contains "$output" "new.json"
+}
+
+test_guard_context_bounded_skips_allowlisted_access() {
+  mkdir -p _meta
+  cat > _meta/.active-manifest.json <<'JEOF'
+{"manifest":"m.json","schema":"kernel.handoff/v1","mode":"bounded","forbidden":[],"allowlist":["docs/a.md"]}
+JEOF
+  echo '{"tool_name":"Read","tool_input":{"file_path":"docs/a.md"}}' | "$PLUGIN_ROOT/hooks/scripts/guard-context.sh"
+  [ ! -f _meta/.context-ledger ] || { echo "FAIL: allowlisted read was ledgered"; return 1; }
 }
 
 test_guard_context_no_manifest_allows() {
@@ -3111,6 +3164,9 @@ run_test_suite() {
       run_test "budgets and selector shapes validate" test_manifest_rejects_invalid_budget_and_selector_shapes
       run_test "selector outcomes carry hashes" test_manifest_selector_outcomes_and_hashes
       run_test "dirty checkpoint requires hash" test_manifest_checkpoint_requires_dirty_tree_hashes
+      run_test "divergence JSON invalidates phases" test_manifest_divergence_json_invalidates_phases
+      run_test "preflight checks are typed" test_manifest_preflight_is_typed
+      run_test "latest uses identity timestamp" test_manifest_latest_uses_identity_not_mtime
       run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
       run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
       run_test "guard-context: sealed allows unforbidden" test_guard_context_sealed_allows_unforbidden
@@ -3121,6 +3177,7 @@ run_test_suite() {
       run_test "guard-context: sealed blocks parent-directory Grep" test_guard_context_sealed_blocks_parent_directory_grep
       run_test "guard-context: sealed blocks symlink read" test_guard_context_sealed_blocks_symlink_read
       run_test "guard-context: bounded ledgers access" test_guard_context_bounded_ledgers_access
+      run_test "guard-context: bounded skips allowlist" test_guard_context_bounded_skips_allowlisted_access
       run_test "guard-context: fails closed on broken pointer" test_guard_context_fails_closed_on_broken_pointer
       run_test "activate/deactivate roundtrip" test_manifest_activate_deactivate_roundtrip
       run_test "deactivate rewrites receipt once" test_manifest_deactivate_rewrites_receipt_without_duplicate_keys

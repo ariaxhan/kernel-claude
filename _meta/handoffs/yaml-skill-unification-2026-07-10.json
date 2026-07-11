@@ -93,14 +93,14 @@
     ],
     "invalidation_rules": [
       {
-        "trigger": "artifact hash mismatch: _meta/contracts/yaml-skill-unification-2026-07-10.md",
+        "when": {"event": "artifact_hash_mismatch", "path_glob": "_meta/contracts/yaml-skill-unification-2026-07-10.md"},
         "invalidates": [
           "recon",
           "migration"
         ]
       },
       {
-        "trigger": "branch diverged",
+        "when": {"event": "branch_diverged"},
         "invalidates": [
           "recon",
           "runtime",
@@ -121,11 +121,12 @@
     ],
     "preflight": [
       {
-        "cmd": "git branch --show-current",
-        "expect": "feat/yaml-skill-unification"
+      "check": "current_branch",
+      "expected": "feat/yaml-skill-unification"
       },
       {
-        "cmd": "ls schemas/"
+      "check": "path_exists",
+      "path": "schemas"
       }
     ]
   },
