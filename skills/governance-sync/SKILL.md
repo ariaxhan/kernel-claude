@@ -20,8 +20,10 @@ missing Claude or Codex adapter from one declared source. It never edits a confl
 
 Run `python3 scripts/governance-sync.py audit <root> --json`. The audit discovers
 canonical Git roots, ignores caches, deduplicates linked worktrees, and reports:
-missing both, Claude-only, AGENTS-only, both identical, drift, and scoped `.claude`
-states. Missing-both is compliant and remains untouched unless `init` is explicit.
+missing both, Claude-only, AGENTS-only, both identical, generated current, generated
+stale, incomplete generation, conflict, and scoped `.claude` states. Generated states
+are decided from manifest hashes and adapter provenance, not raw file equality.
+Missing-both is compliant and remains untouched unless `init` is explicit.
 
 ## Writes require confirmation
 
@@ -47,6 +49,7 @@ Writes are crash-consistent per file: each completed replacement is a whole, fsy
 file. An interruption can leave some files current and others stale; `check` reports
 that drift without changing anything, and rerunning the write operation converges it.
 There is no background lock, journal, rollback, or cleanup of unknown temporary files.
+An existing backup-directory symlink is always rejected before path resolution.
 
 Use `init REPO --backup-dir BACKUPS` only when the user explicitly wants governance
 created in a repository where both native files are absent.

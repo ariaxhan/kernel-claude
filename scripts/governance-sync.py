@@ -198,11 +198,32 @@ def classify(repo):
     codex = repo / "AGENTS.md"
     scoped = repo / ".claude/CLAUDE.md"
     manifest = manifest_path(repo)
-    if not manifest.exists() and claude.is_file() and codex.is_file():
-        if read_bytes(claude).startswith(ADAPTER_PREFIX.encode()) or read_bytes(codex).startswith(ADAPTER_PREFIX.encode()):
-            return "incomplete_generation"
+    if manifest.is_file() and not manifest.is_symlink():
+        try:
+            data = json.loads(manifest.read_text())
+            source_name, output_name = data["source"], data["output"]
+            if source_name not in SOURCES or output_name not in {"CLAUDE.md", "AGENTS.md"}:
+                return "conflict"
+            source, output = repo / source_name, repo / output_name
+            if source.is_symlink() or output.is_symlink() or not source.is_file() or not output.is_file():
+                return "generated_stale"
+            source_content, output_content = read_bytes(source), read_bytes(output)
+            current = (digest(source_content) == data.get("source_sha256")
+                       and digest(output_content) == data.get("output_sha256")
+                       and output_content == render_adapter(source_name, source_content))
+            return "generated_current" if current else "generated_stale"
+        except (OSError, KeyError, TypeError, json.JSONDecodeError):
+            return "conflict"
+    if manifest.exists() or manifest.is_symlink():
+        return "conflict"
+    incomplete_pairs = (("CLAUDE.md", claude, codex), ("AGENTS.md", codex, claude),
+                        (".claude/CLAUDE.md", scoped, codex))
+    for source_name, source, output in incomplete_pairs:
+        if source.is_file() and output.is_file() and not source.is_symlink() and not output.is_symlink():
+            if read_bytes(output) == render_adapter(source_name, read_bytes(source)):
+                return "incomplete"
     if claude.is_file() and codex.is_file():
-        return "both_identical" if read_bytes(claude) == read_bytes(codex) else "drift"
+        return "both_identical" if read_bytes(claude) == read_bytes(codex) else "conflict"
     if claude.is_file():
         return "claude_only"
     if codex.is_file() and scoped.is_file():
@@ -282,6 +303,36 @@ def preflight_backups(paths, backup_dir, repo):
     return plans
 
 
+def normalize_backup_dir(repo, supplied):
+    path = supplied.absolute()
+    if path.is_symlink():
+        die(f"backup directory must not be an existing symlink: {path}")
+    raw_cursor = path
+    raw_parts = []
+    while raw_cursor != raw_cursor.parent and raw_cursor.resolve(strict=False) != repo:
+        raw_parts.append(raw_cursor.name)
+        raw_cursor = raw_cursor.parent
+    if raw_cursor.resolve(strict=False) != repo:
+        die(f"backup directory must stay inside repository: {path}")
+    for part in reversed(raw_parts):
+        raw_cursor = raw_cursor / part
+        if exists_any(raw_cursor) and raw_cursor.is_symlink():
+            die(f"backup directory must not contain an existing symlink: {raw_cursor}")
+    path = path.resolve(strict=False)
+    try:
+        relative = path.relative_to(repo)
+    except ValueError:
+        die(f"backup directory must stay inside repository: {path}")
+    cursor = repo
+    for part in relative.parts:
+        cursor = cursor / part
+        if exists_any(cursor) and cursor.is_symlink():
+            die(f"backup directory must not contain an existing symlink: {cursor}")
+        if exists_any(cursor) and not cursor.is_dir():
+            die(f"backup path ancestor must be a directory: {cursor}")
+    return path
+
+
 def manifest_bytes(data):
     return (json.dumps(data, indent=2, sort_keys=True) + "\n").encode()
 
@@ -324,12 +375,14 @@ def adopt(args):
     desired_output = render_adapter(source_name, source_content)
     if output.is_file() and read_bytes(output) != desired_output:
         if not manifest_path(repo).is_file():
-            die(f"conflict: {output_name} differs; reconcile manually")
-        previous = load_manifest(repo)
-        if (previous["source"] != source_name or previous["output"] != output_name
-                or previous["output_sha256"] != digest(read_bytes(output))):
-            die(f"conflict: {output_name} differs from its recorded generated hash")
-    backup_dir = args.backup_dir.resolve()
+            if read_bytes(output) != source_content:
+                die(f"conflict: {output_name} differs; reconcile manually")
+        else:
+            previous = load_manifest(repo)
+            if (previous["source"] != source_name or previous["output"] != output_name
+                    or previous["output_sha256"] != digest(read_bytes(output))):
+                die(f"conflict: {output_name} differs from its recorded generated hash")
+    backup_dir = normalize_backup_dir(repo, args.backup_dir)
     backups = preflight_backups([source, output, manifest_path(repo)], backup_dir, repo)
     source_hash = digest(source_content)
     manifest = {
@@ -389,7 +442,7 @@ def generate(args):
     current_source_hash = digest(content)
     if current_source_hash != data["source_sha256"]:
         die("source hash changed; run adopt with a fresh backup after reviewing the edit")
-    backup_dir = args.backup_dir.resolve()
+    backup_dir = normalize_backup_dir(repo, args.backup_dir)
     backups = []
     if exists_any(output):
         current_output_hash = digest(read_bytes(output))
@@ -453,12 +506,10 @@ def check(args):
 
 def init_repo(args):
     repo = require_repo(args.repo)
-    if classify(repo) != "missing_both" or manifest_path(repo).exists():
-        die("init requires a repository with no governance files or manifest")
     source = safe_repo_path(repo, "CLAUDE.md", "source", missing_ok=True)
     output = safe_repo_path(repo, "AGENTS.md", "output", missing_ok=True)
-    safe_repo_path(repo, MANIFEST, "manifest", missing_ok=True)
-    backup_dir = args.backup_dir.resolve()
+    manifest_target = safe_repo_path(repo, MANIFEST, "manifest", missing_ok=True)
+    backup_dir = normalize_backup_dir(repo, args.backup_dir)
     preflight_backups([], backup_dir, repo)
     content = b"# Project governance\n\nAdd shared Claude and Codex instructions here.\n"
     source_hash = digest(content)
@@ -468,9 +519,25 @@ def init_repo(args):
         "source": "CLAUDE.md", "source_sha256": source_hash,
         "output": "AGENTS.md", "output_sha256": digest(desired_output),
     }
+    desired_manifest = manifest_bytes(manifest)
+    if manifest_target.is_file():
+        if classify(repo) == "generated_current":
+            print("governance already initialized")
+            return
+        die("init refuses an existing stale or conflicting manifest")
+    if source.is_file() and read_bytes(source) != content:
+        die("init refuses unrelated partial CLAUDE.md")
+    if output.is_file() and read_bytes(output) != desired_output:
+        die("init refuses unrelated partial AGENTS.md")
+    if output.is_file() and not source.is_file():
+        die("init refuses adapter without its recognized source")
     soft, hard = failure_values()
-    operations = [(source, content, 0o644), (output, desired_output, 0o644),
-                  (manifest_path(repo), manifest_bytes(manifest), 0o644)]
+    operations = []
+    if not source.is_file():
+        operations.append((source, content, 0o644))
+    if not output.is_file():
+        operations.append((output, desired_output, 0o644))
+    operations.append((manifest_target, desired_manifest, 0o644))
     for target, _content, _mode in operations:
         validate_write_path(repo, target)
     identities = {path: identity(path) for path, _, _ in operations}

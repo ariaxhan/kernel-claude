@@ -578,6 +578,38 @@
         "id": "CP-20260711112936-28806-7464",
         "ts": "2026-07-11T18:29:36.084Z",
         "type": "checkpoint"
+      },
+      {
+        "agent": "adversary",
+        "content": "{\n  \"result\": \"fail\",\n  \"evidence\": \"{\\\"tested\\\":[\\\"26 governance tests\\\",\\\"governance suite\\\",\\\"generator check\\\",\\\"successful adopt then audit\\\",\\\"adopt existing identical mirrors\\\",\\\"hard-killed init then rerun\\\",\\\"journal and lock removal inspection\\\",\\\"per-file atomic safety and docs inspection\\\"],\\\"evidence\\\":\\\"Journal machinery is absent and focused safety tests pass, but successful adoption audits as drift; identical native mirrors are rejected as conflict; interrupted init cannot be resumed by rerunning\\\",\\\"issues\\\":[\\\"manifest-backed generated adapters misclassified as drift\\\",\\\"safe identical-mirror adoption rejected\\\",\\\"init is not interruption-idempotent\\\",\\\"backup symlink documentation overstates refusal\\\"]}\"\n}",
+        "contract_id": "",
+        "id": "VD-20260711113222-36602-20171",
+        "ts": "2026-07-11T18:32:22.904Z",
+        "type": "verdict"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711104258-18886-29532\",\"agent\":\"reviewer\",\"commit\":\"ce32a90\",\"verdict\":\"REQUEST_CHANGES\",\"confidence\":98,\"did\":\"confirmed destructive recovery removal and found three governance state-machine regressions\",\"next\":\"make audit manifest-aware, accept identical mirror adoption, make init resumable; add focused tests\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711113222-36545-10659",
+        "ts": "2026-07-11T18:32:22.937Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"goal\":\"Fix governance adoption classification and resumable init state machine\",\"constraints\":{\"files\":[\"scripts/governance-sync.py\",\"tests/test_governance_generation.py\",\"tests/run-tests.sh\",\"skills/governance-sync/SKILL.md\",\"README.md\"]},\"failure\":\"Fresh adoption reports drift; identical pair rejected; interrupted init cannot resume; symlink policy docs mismatch; tests fail\",\"tier\":3,\"branch\":\"refactor/generated-governance\",\"max_budget_usd\":2,\"parent\":\"CR-20260711112207-88255-7314\"}",
+        "contract_id": "CR-20260711113223-36706-18721",
+        "id": "CR-20260711113223-36706-18721",
+        "ts": "2026-07-11T18:32:23.174Z",
+        "type": "contract"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711113223-36706-18721\",\"agent\":\"surgeon\",\"did\":\"made governance classification manifest-aware, allowed identical pair adoption, resumed only recognized init partials, and rejected backup symlinks before resolution\",\"tested\":[\"state machine 30/30\",\"governance 1/1\",\"manifest 65/65\",\"full 378/378\",\"compile/diff check\"],\"next\":\"final reviewer\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711113647-69396-14957",
+        "ts": "2026-07-11T18:36:47.358Z",
+        "type": "checkpoint"
       }
     ],
     "context_sessions": [
