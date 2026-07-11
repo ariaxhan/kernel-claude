@@ -170,6 +170,6 @@
     "completion": "kernel-manifest deactivate + agentdb write-end"
   },
   "resume": {
-    "prompt": "/kernel:ingest resume from _meta/handoffs/yaml-skill-unification-2026-07-10.yaml"
+    "prompt": "/kernel:ingest resume from _meta/handoffs/yaml-skill-unification-2026-07-10.json"
   }
 }

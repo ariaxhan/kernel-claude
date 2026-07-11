@@ -60,9 +60,9 @@ budget). They stop being read in 9.0. Regenerate important ones with `/kernel:ha
 
 ### 3. The manifest runtime
 
-`orchestration/manifest/kernel-manifest` (python3; stdlib JSON parsing, duplicate keys rejected
-to system ruby; with neither, validation fails LOUDLY — a sealed resume treats that as
-blocking):
+`orchestration/manifest/kernel-manifest` uses Python's standard JSON parser and rejects
+duplicate keys. No YAML parser or machine-dependent fallback chain participates in canonical
+state validation:
 
 ```
 kernel-manifest validate   <file>    # schema check

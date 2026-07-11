@@ -13,7 +13,7 @@
   },
   "task": {
     "goal": "Migrate kernel commands to unified yaml-first skills",
-    "handoff_ref": "_meta/handoffs/yaml-skill-unification-2026-07-10.yaml",
+    "handoff_ref": "_meta/handoffs/yaml-skill-unification-2026-07-10.json",
     "contract_ref": "_meta/contracts/yaml-skill-unification-2026-07-10.md"
   },
   "steps_completed": [
