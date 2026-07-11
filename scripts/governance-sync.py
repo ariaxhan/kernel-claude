@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 
 SCHEMA = "kernel.governance/v1"
 MANIFEST = ".kernel-governance.json"
@@ -42,15 +43,19 @@ def safe_repo_path(repo, relative, label, missing_ok=False):
     if relative not in SOURCES and relative not in {"CLAUDE.md", "AGENTS.md", MANIFEST}:
         die(f"unsafe {label} path: {relative}")
     path = repo / relative
-    cursor = path
-    while cursor != repo:
-        if cursor.is_symlink():
-            die(f"{label} must not use symlinks: {relative}")
-        cursor = cursor.parent
+    if repo.is_symlink() or not repo.is_dir():
+        die(f"repository root must be a real directory: {repo}")
+    cursor = repo
+    for part in Path(relative).parts[:-1]:
+        cursor = cursor / part
+        if cursor.is_symlink() or not cursor.is_dir():
+            die(f"{label} ancestor must be a real directory, not a symlink: {cursor}")
     if exists_any(path) and not path.is_file():
         die(f"{label} must be a regular non-symlink file: {relative}")
     if not missing_ok and not path.is_file():
         die(f"{label} must be a regular non-symlink file: {relative}")
+    if path.is_file() and path.stat(follow_symlinks=False).st_nlink != 1:
+        die(f"{label} must not be hardlinked: {relative}")
     try:
         if os.path.commonpath([str(repo), str(path.resolve(strict=False))]) != str(repo):
             die(f"{label} resolves outside repository: {relative}")
@@ -64,7 +69,10 @@ def git(repo, *args):
 
 
 def require_repo(path):
-    path = path.resolve()
+    supplied = path.absolute()
+    if supplied.is_symlink() or not supplied.is_dir():
+        die(f"repository root must be a real directory: {supplied}")
+    path = supplied.resolve()
     result = git(path, "rev-parse", "--show-toplevel")
     if result.returncode:
         die(f"not a Git repository: {path}")
@@ -126,7 +134,10 @@ def nested_scopes(repo):
             continue
         claude = "CLAUDE.md" in names
         agents = "AGENTS.md" in names
-        if claude and agents:
+        paths = [Path(current) / name for name in ("CLAUDE.md", "AGENTS.md") if name in names]
+        if any(path.is_symlink() or not path.is_file() for path in paths):
+            state = "unsafe_symlink"
+        elif claude and agents:
             state = "both_identical" if read_bytes(Path(current) / "CLAUDE.md") == read_bytes(Path(current) / "AGENTS.md") else "drift"
         else:
             state = "claude_only" if claude else "agents_only"
@@ -175,11 +186,80 @@ def preflight_backups(paths, backup_dir, repo):
     return plans
 
 
-def perform_backups(plans, backup_dir):
-    if plans:
-        backup_dir.mkdir(parents=True, exist_ok=True)
-    for source, target in plans:
-        shutil.copy2(source, target)
+def validate_write_target(path):
+    cursor = Path(path.anchor)
+    for part in path.parts[1:-1]:
+        cursor = cursor / part
+        if exists_any(cursor) and (cursor.is_symlink() or not cursor.is_dir()):
+            die(f"write ancestor must be a real directory, not a symlink: {cursor}")
+    if exists_any(path):
+        if path.is_symlink() or not path.is_file():
+            die(f"write target must be a regular non-symlink file: {path}")
+        if path.stat(follow_symlinks=False).st_nlink != 1:
+            die(f"write target must not be hardlinked: {path}")
+
+
+def transactional_write(writes):
+    """Stage all target bytes and roll every target back if any replace fails."""
+    if len(writes) != len(set(writes)):
+        die("transaction contains duplicate targets")
+    for path in writes:
+        validate_write_target(path)
+    originals = {path: read_bytes(path) if path.is_file() else None for path in writes}
+    created_dirs = []
+    staged = {}
+    try:
+        for path in writes:
+            missing = []
+            cursor = path.parent
+            while not cursor.exists():
+                missing.append(cursor)
+                cursor = cursor.parent
+            for directory in reversed(missing):
+                directory.mkdir()
+                created_dirs.append(directory)
+        for path, content in writes.items():
+            handle = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=f".{path.name}.stage.", delete=False)
+            try:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            finally:
+                handle.close()
+            staged[path] = Path(handle.name)
+        replaced = []
+        fail_after = int(os.environ.get("KERNEL_TEST_FAIL_AFTER_REPLACE", "0") or 0)
+        for path, stage in staged.items():
+            os.replace(stage, path)
+            replaced.append(path)
+            if fail_after and len(replaced) == fail_after:
+                raise OSError(f"injected failure after replace {fail_after}")
+    except Exception as exc:
+        for path in reversed(locals().get("replaced", [])):
+            original = originals[path]
+            if original is None:
+                path.unlink(missing_ok=True)
+            else:
+                rollback = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=f".{path.name}.rollback.", delete=False)
+                try:
+                    rollback.write(original)
+                    rollback.flush()
+                    os.fsync(rollback.fileno())
+                finally:
+                    rollback.close()
+                os.replace(rollback.name, path)
+        for stage in staged.values():
+            stage.unlink(missing_ok=True)
+        for directory in reversed(created_dirs):
+            try:
+                directory.rmdir()
+            except OSError:
+                pass
+        die(f"transaction rolled back: {exc}")
+
+
+def manifest_bytes(data):
+    return (json.dumps(data, indent=2, sort_keys=True) + "\n").encode()
 
 
 def manifest_path(repo):
@@ -239,8 +319,9 @@ def adopt(args):
         "output": output_name,
         "output_sha256": output_hash,
     }
-    perform_backups(backups, backup_dir)
-    write_manifest(repo, manifest)
+    writes = {target: read_bytes(source_path) for source_path, target in backups}
+    writes[manifest_path(repo)] = manifest_bytes(manifest)
+    transactional_write(writes)
     print(f"adopted {source_name}; adapter target {output_name}")
 
 
@@ -264,10 +345,11 @@ def generate(args):
             return
         backups = preflight_backups([output], backup_dir, repo)
     safe_repo_path(repo, MANIFEST, "manifest")
-    perform_backups(backups, backup_dir)
-    output.write_bytes(content)
+    writes = {target: read_bytes(source_path) for source_path, target in backups}
     data["output_sha256"] = digest(content)
-    write_manifest(repo, data)
+    writes[output] = content
+    writes[manifest_path(repo)] = manifest_bytes(data)
+    transactional_write(writes)
     print(f"generated {data['output']}")
 
 
@@ -308,9 +390,7 @@ def init_repo(args):
         "source": "CLAUDE.md", "source_sha256": source_hash,
         "output": "AGENTS.md", "output_sha256": source_hash,
     }
-    source.write_bytes(content)
-    output.write_bytes(content)
-    write_manifest(repo, manifest)
+    transactional_write({source: content, output: content, manifest_path(repo): manifest_bytes(manifest)})
     print("initialized CLAUDE.md and AGENTS.md")
 
 

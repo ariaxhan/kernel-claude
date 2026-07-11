@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -12,8 +13,8 @@ GEN = ROOT / "scripts" / "generate-governance.py"
 SYNC = ROOT / "scripts" / "governance-sync.py"
 
 
-def run(*args, cwd=ROOT):
-    return subprocess.run(args, cwd=cwd, text=True, capture_output=True)
+def run(*args, cwd=ROOT, env=None):
+    return subprocess.run(args, cwd=cwd, text=True, capture_output=True, env=env)
 
 
 def git_repo(path):
@@ -60,6 +61,17 @@ class GeneratorTests(unittest.TestCase):
         self.assertEqual(1, text.count("# BEGIN GENERATED KERNEL AMBIENT"))
         self.assertEqual(1, text.count("# END GENERATED KERNEL AMBIENT"))
 
+    def test_begin_and_end_markers_are_counted_independently(self):
+        for extra in ("# BEGIN GENERATED KERNEL AMBIENT\n", "# END GENERATED KERNEL AMBIENT\n"):
+            with self.subTest(extra=extra.strip()), tempfile.TemporaryDirectory() as td:
+                root = Path(td) / "root"
+                generator_fixture(root)
+                shell = root / "hooks/scripts/session-start.sh"
+                shell.write_text(extra + shell.read_text())
+                result = run(sys.executable, str(GEN), "--root", str(root))
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("exactly one begin and one end marker", result.stderr)
+
     def test_output_paths_are_exact_and_cannot_escape_root(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "root"
@@ -92,6 +104,30 @@ class GeneratorTests(unittest.TestCase):
                 self.assertIn("regular non-symlink file", result.stderr)
                 self.assertEqual(outside_before, outside.read_text())
 
+    def test_symlinked_ancestor_and_hardlinked_files_are_rejected(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            root = base / "root"
+            generator_fixture(root)
+            real_governance = root / "real-governance"
+            (root / "governance").rename(real_governance)
+            (root / "governance").symlink_to(real_governance, target_is_directory=True)
+            result = run(sys.executable, str(GEN), "--root", str(root))
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("ancestor", result.stderr)
+        for relative in ("governance/kernel.md.tmpl", "governance/adapters.json",
+                         "hooks/scripts/session-start.sh", "CLAUDE.md"):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as td:
+                root = Path(td) / "root"
+                generator_fixture(root)
+                path = root / relative
+                if not path.exists():
+                    path.write_text("old\n")
+                os.link(path, Path(td) / "external-hardlink")
+                result = run(sys.executable, str(GEN), "--root", str(root))
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("hardlinked", result.stderr)
+
     def test_preflight_rejects_all_outputs_before_first_write(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td) / "root"
@@ -103,6 +139,24 @@ class GeneratorTests(unittest.TestCase):
             result = run(sys.executable, str(GEN), "--root", str(root))
             self.assertNotEqual(0, result.returncode)
             self.assertEqual("keep me\n", (root / "CLAUDE.md").read_text())
+
+    def test_generation_rolls_back_after_each_replace_boundary(self):
+        for fail_after in ("1", "2"):
+            with self.subTest(fail_after=fail_after), tempfile.TemporaryDirectory() as td:
+                root = Path(td) / "root"
+                generator_fixture(root)
+                originals = {}
+                for relative in ("CLAUDE.md", "AGENTS.md", "hooks/scripts/session-start.sh"):
+                    path = root / relative
+                    if relative != "hooks/scripts/session-start.sh":
+                        path.write_text(f"old {relative}\n")
+                    originals[relative] = path.read_bytes()
+                env = os.environ.copy()
+                env["KERNEL_TEST_FAIL_AFTER_REPLACE"] = fail_after
+                result = run(sys.executable, str(GEN), "--root", str(root), env=env)
+                self.assertNotEqual(0, result.returncode)
+                for relative, original in originals.items():
+                    self.assertEqual(original, (root / relative).read_bytes(), relative)
 
     def test_ambient_rejects_heredoc_terminator_and_preserves_backslashes(self):
         with tempfile.TemporaryDirectory() as td:
@@ -223,6 +277,40 @@ class SyncTests(unittest.TestCase):
             (repo / ".kernel-governance.json").symlink_to(outside)
             self.assertNotEqual(0, run(sys.executable, str(SYNC), "check", str(repo)).returncode)
 
+    def test_sync_rejects_symlink_ancestors_and_hardlinks(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            repo = git_repo(base / "repo")
+            real = repo / "real-claude"
+            real.mkdir()
+            (real / "CLAUDE.md").write_text("rules\n")
+            (repo / ".claude").symlink_to(real, target_is_directory=True)
+            result = run(sys.executable, str(SYNC), "adopt", str(repo),
+                         "--source", ".claude/CLAUDE.md", "--backup-dir", str(base / "b"))
+            self.assertNotEqual(0, result.returncode)
+            self.assertIn("symlink", result.stderr)
+        for relative, phase in (("CLAUDE.md", "source"), ("AGENTS.md", "output"),
+                                (".kernel-governance.json", "manifest")):
+            with self.subTest(relative=relative), tempfile.TemporaryDirectory() as td:
+                base = Path(td)
+                repo = git_repo(base / "repo")
+                (repo / "CLAUDE.md").write_text("rules\n")
+                self.assertEqual(0, run(sys.executable, str(SYNC), "adopt", str(repo),
+                                        "--source", "CLAUDE.md", "--backup-dir", str(base / "adopt")).returncode)
+                if relative == "AGENTS.md":
+                    (repo / "AGENTS.md").write_text("rules\n")
+                path = repo / relative
+                os.link(path, base / "external-hardlink")
+                command = "check" if phase == "manifest" else ("adopt" if phase == "source" else "generate")
+                args = [sys.executable, str(SYNC), command, str(repo)]
+                if command == "adopt":
+                    args += ["--source", "CLAUDE.md", "--backup-dir", str(base / "again")]
+                elif command == "generate":
+                    args += ["--backup-dir", str(base / "generate")]
+                result = run(*args)
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn("hardlinked", result.stderr)
+
     def test_adopt_preflights_every_backup_before_writing_any(self):
         with tempfile.TemporaryDirectory() as td:
             base = Path(td)
@@ -255,6 +343,41 @@ class SyncTests(unittest.TestCase):
             ], record["nested_scopes"])
             self.assertFalse((repo / "packages/a/AGENTS.md").exists())
             self.assertFalse((repo / "packages/b/CLAUDE.md").exists())
+
+    def test_audit_classifies_nested_symlink_without_following_it(self):
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            repo = git_repo(base / "repo")
+            outside = base / "outside"
+            outside.write_text("secret\n")
+            (repo / "nested").mkdir()
+            (repo / "nested/CLAUDE.md").symlink_to(outside)
+            result = run(sys.executable, str(SYNC), "audit", str(base), "--json")
+            self.assertEqual(0, result.returncode, result.stderr)
+            scopes = json.loads(result.stdout)["repositories"][0]["nested_scopes"]
+            self.assertEqual([{"path": "nested", "state": "unsafe_symlink"}], scopes)
+
+    def test_sync_generate_rolls_back_after_each_replace_boundary(self):
+        for fail_after in ("1", "2"):
+            with self.subTest(fail_after=fail_after), tempfile.TemporaryDirectory() as td:
+                base = Path(td)
+                repo = git_repo(base / "repo")
+                (repo / "CLAUDE.md").write_text("v1\n")
+                self.assertEqual(0, run(sys.executable, str(SYNC), "adopt", str(repo),
+                                        "--source", "CLAUDE.md", "--backup-dir", str(base / "a1")).returncode)
+                self.assertEqual(0, run(sys.executable, str(SYNC), "generate", str(repo),
+                                        "--backup-dir", str(base / "g1")).returncode)
+                (repo / "CLAUDE.md").write_text("v2\n")
+                self.assertEqual(0, run(sys.executable, str(SYNC), "adopt", str(repo),
+                                        "--source", "CLAUDE.md", "--backup-dir", str(base / "a2")).returncode)
+                originals = {name: (repo / name).read_bytes() for name in ("AGENTS.md", ".kernel-governance.json")}
+                env = os.environ.copy()
+                env["KERNEL_TEST_FAIL_AFTER_REPLACE"] = fail_after
+                result = run(sys.executable, str(SYNC), "generate", str(repo),
+                             "--backup-dir", str(base / "g2"), env=env)
+                self.assertNotEqual(0, result.returncode)
+                for name, original in originals.items():
+                    self.assertEqual(original, (repo / name).read_bytes(), name)
 
     def test_skill_documents_separate_backup_phases(self):
         skill = (ROOT / "skills/governance-sync/SKILL.md").read_text()

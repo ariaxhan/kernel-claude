@@ -6,7 +6,9 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import os
 import sys
+import tempfile
 
 TOKEN_RE = re.compile(r"\{\{([A-Z][A-Z0-9_]*)\}\}")
 AMBIENT_RE = re.compile(
@@ -28,19 +30,73 @@ def require_regular(path, label, missing_ok=False):
         fail(f"{label} must be a regular non-symlink file: {path}")
     if not missing_ok and not path.is_file():
         fail(f"{label} must be a regular non-symlink file: {path}")
+    if path.is_file() and path.stat(follow_symlinks=False).st_nlink != 1:
+        fail(f"{label} must not be hardlinked: {path}")
 
 
 def require_contained(root, path, label):
     try:
-        if path.parent.resolve(strict=True) != root:
+        relative = path.relative_to(root)
+        cursor = root
+        if cursor.is_symlink() or not cursor.is_dir():
+            fail(f"plugin root must be a real directory, not a symlink: {root}")
+        for part in relative.parts[:-1]:
+            cursor = cursor / part
+            if cursor.is_symlink() or not cursor.is_dir():
+                fail(f"{label} ancestor must be a real directory, not a symlink: {cursor}")
+        if path.parent.resolve(strict=True) != path.parent or root not in (path.parent, *path.parent.parents):
             fail(f"{label} resolves outside the plugin root: {path}")
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         fail(f"cannot resolve {label}: {exc}")
+
+
+def transactional_write(changes):
+    """Stage every file, then replace all-or-restore exact original bytes."""
+    originals = {}
+    staged = {}
+    for path, content in changes.items():
+        require_regular(path, "transaction target", missing_ok=True)
+        originals[path] = path.read_bytes() if path.is_file() else None
+        handle = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=f".{path.name}.stage.", delete=False)
+        try:
+            handle.write(content.encode("utf-8") if isinstance(content, str) else content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        finally:
+            handle.close()
+        staged[path] = Path(handle.name)
+    replaced = []
+    fail_after = int(os.environ.get("KERNEL_TEST_FAIL_AFTER_REPLACE", "0") or 0)
+    try:
+        for path, stage in staged.items():
+            os.replace(stage, path)
+            replaced.append(path)
+            if fail_after and len(replaced) == fail_after:
+                raise OSError(f"injected failure after replace {fail_after}")
+    except Exception as exc:
+        for path in reversed(replaced):
+            original = originals[path]
+            if original is None:
+                path.unlink(missing_ok=True)
+            else:
+                rollback = tempfile.NamedTemporaryFile("wb", dir=path.parent, prefix=f".{path.name}.rollback.", delete=False)
+                try:
+                    rollback.write(original)
+                    rollback.flush()
+                    os.fsync(rollback.fileno())
+                finally:
+                    rollback.close()
+                os.replace(rollback.name, path)
+        for stage in staged.values():
+            stage.unlink(missing_ok=True)
+        fail(f"transaction rolled back: {exc}")
 
 
 def load(root):
     source_path = root / "governance/kernel.md.tmpl"
     config_path = root / "governance/adapters.json"
+    require_contained(root, source_path, "canonical source")
+    require_contained(root, config_path, "adapter config")
     require_regular(source_path, "canonical source")
     require_regular(config_path, "adapter config")
     try:
@@ -99,11 +155,14 @@ def render_outputs(root):
     if TOKEN_RE.search(ambient):
         fail("ambient source must be client-neutral; template token found")
     shell = root / "hooks/scripts/session-start.sh"
+    require_contained(root, shell, "session-start hook")
     require_regular(shell, "session-start hook")
     try:
         shell_text = shell.read_text(encoding="utf-8")
     except OSError as exc:
         fail(str(exc))
+    if shell_text.count(SHELL_BEGIN) != 1 or shell_text.count(SHELL_END) != 1:
+        fail("session-start.sh must contain exactly one begin and one end marker")
     pattern = re.compile(
         re.escape(SHELL_BEGIN) + r"\n.*?\n" + re.escape(SHELL_END), re.DOTALL
     )
@@ -119,10 +178,14 @@ def main():
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    root = args.root.resolve()
+    supplied_root = args.root.absolute()
+    if supplied_root.is_symlink() or not supplied_root.is_dir():
+        fail(f"plugin root must be a real directory, not a symlink: {supplied_root}")
+    root = supplied_root.resolve()
     _, outputs = render_outputs(root)
     stale = []
     for path in outputs:
+        require_contained(root, path, "generated output")
         require_regular(path, "generated output", missing_ok=path.name in {"CLAUDE.md", "AGENTS.md"})
     for path, expected in outputs.items():
         actual = path.read_text(encoding="utf-8") if path.is_file() else None
@@ -131,9 +194,10 @@ def main():
     if args.check and stale:
         fail("stale generated file(s): " + ", ".join(stale))
     if not args.check:
-        for path, expected in outputs.items():
-            if path.relative_to(root).as_posix() in stale:
-                path.write_text(expected, encoding="utf-8")
+        changes = {path: expected for path, expected in outputs.items()
+                   if path.relative_to(root).as_posix() in stale}
+        if changes:
+            transactional_write(changes)
     print("governance current" if args.check else "generated: " + ", ".join(stale or ["no changes"]))
 
 

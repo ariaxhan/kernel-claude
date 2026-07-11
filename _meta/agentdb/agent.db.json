@@ -474,6 +474,38 @@
         "id": "CP-20260711110122-2015-26291",
         "ts": "2026-07-11T18:01:22.626Z",
         "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"goal\":\"Make governance generation transactional and reject parent symlink, hardlink, marker multiplicity, and nested symlink states\",\"constraints\":{\"files\":[\"scripts/generate-governance.py\",\"scripts/governance-sync.py\",\"tests/test_governance_generation.py\",\"tests/run-tests.sh\"]},\"failure\":\"Ancestor symlink escape; hardlink overwrite; malformed markers accepted; partial state after late failure; nested symlink classified safe; tests fail\",\"tier\":3,\"branch\":\"refactor/generated-governance\",\"max_budget_usd\":3,\"parent\":\"CR-20260711105647-69185-24795\"}",
+        "contract_id": "CR-20260711110340-6731-3270",
+        "id": "CR-20260711110340-6731-3270",
+        "ts": "2026-07-11T18:03:40.376Z",
+        "type": "contract"
+      },
+      {
+        "agent": "adversary",
+        "content": "{\n  \"result\": \"fail\",\n  \"evidence\": \"{\\\"tested\\\":[\\\"16 governance unit tests\\\",\\\"governance suite\\\",\\\"generator check\\\",\\\"bash syntax\\\",\\\"all six prior armed reproductions\\\",\\\"symlinked parent chain\\\",\\\"hardlinked outputs in both tools\\\",\\\"absolute and traversal sources\\\",\\\"late-write partial failure\\\",\\\"heredoc whitespace CR backslash dollar backtick variants\\\",\\\"duplicate markers\\\",\\\"backup phase idempotence and collision\\\",\\\"nested symlink scope\\\",\\\"worktree dedupe\\\"],\\\"evidence\\\":\\\"Original direct exploits fixed; reproduced external rewrite through parent symlink, external hardlink overwrite in both tools, malformed duplicate marker acceptance, and partial adapter regeneration after late PermissionError\\\",\\\"issues\\\":[\\\"generator does not reject symlink ancestors\\\",\\\"both writers follow hardlinked targets\\\",\\\"duplicate markers accepted\\\",\\\"multi-file generation is non-transactional\\\",\\\"nested symlink scopes reported as ordinary files\\\"]}\"\n}",
+        "contract_id": "",
+        "id": "VD-20260711110340-6799-1395",
+        "ts": "2026-07-11T18:03:40.670Z",
+        "type": "verdict"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711104258-18886-29532\",\"agent\":\"reviewer\",\"commit\":\"c51384b\",\"verdict\":\"REQUEST_CHANGES\",\"confidence\":99,\"did\":\"replayed original exploits and adversarial variants\",\"next\":\"harden ancestor and hardlink checks, marker counts, transactional writes, nested symlink classification; add regression fixtures\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711110340-6787-28712",
+        "ts": "2026-07-11T18:03:40.694Z",
+        "type": "checkpoint"
+      },
+      {
+        "agent": "orchestrator",
+        "content": "{\"contract\":\"CR-20260711110340-6731-3270\",\"agent\":\"surgeon\",\"did\":\"added hardlink and ancestor checks, independent marker validation, transactional multi-file writes with exact rollback, and unsafe nested-scope classification\",\"tested\":[\"armed governance variants 22/22\",\"failure injection after replace 1 and 2 for both writers\",\"manifest 65/65\",\"full 378/378\",\"generator byte check\",\"python compile\",\"diff check\"],\"next\":\"reviewer re-review\",\"blocked\":\"none\"}",
+        "contract_id": null,
+        "id": "CP-20260711110824-39638-25256",
+        "ts": "2026-07-11T18:08:24.642Z",
+        "type": "checkpoint"
       }
     ],
     "context_sessions": [
