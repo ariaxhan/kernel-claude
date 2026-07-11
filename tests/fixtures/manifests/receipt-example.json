@@ -1,6 +1,8 @@
 {
   "schema": "kernel.context-receipt/v1",
   "manifest": "tests/fixtures/manifests/handoff-example.json",
+  "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "bundle_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
   "created": "2026-07-10T12:00:00Z",
   "manifest_tokens": 500,
   "project_instructions_tokens": 1000,
@@ -18,11 +20,15 @@
     {
       "selector": "[required] tests/fixtures/manifests/handoff-example.json :: ## Objective",
       "resolved": true,
+      "outcome": "resolved",
+      "resolved_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "estimated_tokens": 120
     },
     {
       "selector": "[required] CHANGELOG.md:1-10",
       "resolved": true,
+      "outcome": "resolved",
+      "resolved_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
       "estimated_tokens": 80
     }
   ],

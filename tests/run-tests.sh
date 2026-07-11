@@ -2789,6 +2789,68 @@ MEOF
   assert_contains "$output" "ERROR: unresolved required selector"
 }
 
+test_manifest_paths_anchor_to_repo_root() {
+  git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
+  mkdir -p docs sub _meta
+  echo anchored > docs/a.md
+  local head; head=$(git rev-parse HEAD)
+  cat > m.json <<MEOF
+{"schema":"kernel.checkpoint/v1","identity":{"name":"t","created":"2026-01-01T00:00:00Z"},"provenance":{"branch":"main","commit":"$head","dirty":true,"dirty_tree_sha256":"0000000000000000000000000000000000000000000000000000000000000000"},"task":{"goal":"t"},"steps_completed":[],"pending_steps":[],"resume":{"position":"p","next_operation":"n"},"context":{"policy":{"mode":"advisory"},"required":[{"path":"docs/a.md"}]}}
+MEOF
+  (cd sub && "$KM" compile ../m.json --bundle-out ../bundle.txt >/dev/null)
+  assert_contains "$(cat bundle.txt)" "anchored" || return 1
+  (cd sub && "$KM" activate ../m.json >/dev/null)
+  assert_file_exists "_meta/.active-manifest.json"
+}
+
+test_manifest_rejects_invalid_budget_and_selector_shapes() {
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['budget']={'target_tokens':20,'max_tokens':10}; json.dump(m,open(p,'w'))
+PYEOF
+  local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "target budget above max must fail" || return 1
+  cp "$FIXTURES/handoff-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['required'][0]['heading']='## X'; m['context']['required'][0]['grep']='X'; json.dump(m,open(p,'w'))
+PYEOF
+  ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "multiple selector refinements must fail"
+}
+
+test_manifest_selector_outcomes_and_hashes() {
+  printf 'one\ntwo\n' > a.md
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'path':'a.md','lines':'2-1'}]; json.dump(m,open(p,'w'))
+PYEOF
+  local output ec=0
+  output=$("$KM" compile m.json --bundle-out bundle.txt 2>&1) || ec=$?
+  assert_exit_code 4 "$ec" "reversed range must fail required selector" || return 1
+  assert_contains "$output" '"outcome": "invalid"' || return 1
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['context']['required']=[{'path':'a.md'}]; json.dump(m,open(p,'w'))
+PYEOF
+  output=$("$KM" compile m.json --bundle-out bundle.txt)
+  assert_contains "$output" '"manifest_sha256"' || return 1
+  assert_contains "$output" '"bundle_sha256"' || return 1
+  assert_contains "$output" '"resolved_sha256"'
+}
+
+test_manifest_checkpoint_requires_dirty_tree_hashes() {
+  cp "$FIXTURES/checkpoint-example.json" m.json
+  python3 - <<'PYEOF'
+import json
+p='m.json'; m=json.load(open(p)); m['provenance']['dirty']=True; m['provenance'].pop('dirty_tree_sha256',None); json.dump(m,open(p,'w'))
+PYEOF
+  local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+  assert_exit_code 1 "$ec" "dirty checkpoint without tree hash must fail"
+}
+
 test_guard_context_no_manifest_allows() {
   local ec=0
   echo '{"tool_input":{"file_path":"anything.md"}}' \
@@ -3045,6 +3107,10 @@ run_test_suite() {
       run_test "compile budget transitions" test_manifest_compile_budget_transitions
       run_test "compile selector types resolve" test_manifest_compile_selector_types_resolve
       run_test "compile reports missing required" test_manifest_compile_reports_missing_required
+      run_test "paths anchor to repo root" test_manifest_paths_anchor_to_repo_root
+      run_test "budgets and selector shapes validate" test_manifest_rejects_invalid_budget_and_selector_shapes
+      run_test "selector outcomes carry hashes" test_manifest_selector_outcomes_and_hashes
+      run_test "dirty checkpoint requires hash" test_manifest_checkpoint_requires_dirty_tree_hashes
       run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
       run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
       run_test "guard-context: sealed allows unforbidden" test_guard_context_sealed_allows_unforbidden

@@ -386,10 +386,12 @@
           "type": "object",
           "properties": {
             "target_tokens": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             },
             "max_tokens": {
-              "type": "integer"
+              "type": "integer",
+              "minimum": 1
             }
           }
         }

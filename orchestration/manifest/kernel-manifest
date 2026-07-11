@@ -27,8 +27,19 @@ from datetime import datetime, timezone
 
 PLUGIN_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCHEMA_DIR = os.path.join(PLUGIN_ROOT, "schemas")
-ACTIVE_POINTER = "_meta/.active-manifest.json"
-CONTEXT_LEDGER = "_meta/.context-ledger"
+
+def find_repo_root():
+    proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    return os.path.realpath(proc.stdout.strip()) if proc.returncode == 0 else os.path.realpath(os.getcwd())
+
+
+REPO_ROOT = find_repo_root()
+ACTIVE_POINTER = os.path.join(REPO_ROOT, "_meta", ".active-manifest.json")
+CONTEXT_LEDGER = os.path.join(REPO_ROOT, "_meta", ".context-ledger")
+
+
+def repo_path(path):
+    return path if os.path.isabs(path) else os.path.join(REPO_ROOT, path)
 
 # ---------- manifest loading (canonical JSON) ----------
 
@@ -117,8 +128,31 @@ def validate_selectors(manifest, errors):
         return
     for group in ("required", "optional"):
         for i, sel in enumerate(ctx.get(group) or []):
-            if isinstance(sel, dict) and not (sel.get("path") or sel.get("git_diff")):
-                errors.append(f"context.{group}[{i}]: selector needs 'path' or 'git_diff'")
+            if not isinstance(sel, dict):
+                continue
+            sources = sum(bool(sel.get(k)) for k in ("path", "git_diff"))
+            refinements = sum(bool(sel.get(k)) for k in ("lines", "heading", "grep"))
+            if sources != 1:
+                errors.append(f"context.{group}[{i}]: selector needs exactly one of 'path' or 'git_diff'")
+            if refinements > 1:
+                errors.append(f"context.{group}[{i}]: selector allows at most one refinement")
+            if refinements and not sel.get("path"):
+                errors.append(f"context.{group}[{i}]: refinement requires 'path'")
+
+
+def validate_invariants(manifest, errors):
+    ctx = manifest.get("context") or {}
+    budget = ctx.get("budget") or {}
+    target, maximum = budget.get("target_tokens"), budget.get("max_tokens")
+    mode = ((ctx.get("policy") or {}).get("mode"))
+    if target is not None and maximum is not None and target > maximum:
+        errors.append("context.budget: target_tokens must be <= max_tokens")
+    if mode in ("sealed", "bounded") and maximum is None:
+        errors.append(f"context.budget.max_tokens: required for {mode} mode")
+    if manifest.get("schema") == "kernel.checkpoint/v1":
+        prov = manifest.get("provenance") or {}
+        if prov.get("dirty") and not prov.get("dirty_tree_sha256"):
+            errors.append("provenance.dirty_tree_sha256: required when dirty is true")
 
 
 def schema_for(manifest):
@@ -138,6 +172,7 @@ def validate_manifest(manifest, path):
     validate_node(manifest, schema, "$", errors)
     if manifest.get("schema") in ("kernel.handoff/v1", "kernel.checkpoint/v1"):
         validate_selectors(manifest, errors)
+        validate_invariants(manifest, errors)
     if errors:
         for e in errors:
             print(f"INVALID {e}")
@@ -244,23 +279,26 @@ def estimate(text):
 
 
 def resolve_selector(sel):
-    """Return (summary, content_or_None, note)."""
+    """Return (summary, outcome, content_or_None, note)."""
     if sel.get("git_diff"):
         rc, out = git("diff", sel["git_diff"])
         if rc != 0:
-            return (f"git_diff:{sel['git_diff']}", None, "git diff failed")
-        return (f"git_diff:{sel['git_diff']}", out, "")
+            return (f"git_diff:{sel['git_diff']}", "invalid", None, "git diff failed")
+        return (f"git_diff:{sel['git_diff']}", "resolved" if out else "empty", out, "")
     path = sel.get("path", "")
-    if not os.path.isfile(path):
-        return (path, None, "file missing")
-    text = open(path, encoding="utf-8", errors="replace").read()
+    absolute = repo_path(path)
+    if not os.path.isfile(absolute):
+        return (path, "missing", None, "file missing")
+    text = open(absolute, encoding="utf-8", errors="replace").read()
     if sel.get("lines"):
         m = re.match(r"^(\d+)-(\d+)$", str(sel["lines"]))
         if not m:
-            return (f"{path}:{sel['lines']}", None, "bad line range")
+            return (f"{path}:{sel['lines']}", "invalid", None, "bad line range")
         a, b = int(m.group(1)), int(m.group(2))
+        if a < 1 or b < a:
+            return (f"{path}:{a}-{b}", "invalid", None, "invalid line range")
         text = "\n".join(text.splitlines()[a - 1:b])
-        return (f"{path}:{a}-{b}", text, "")
+        return (f"{path}:{a}-{b}", "resolved" if text else "empty", text, "")
     if sel.get("heading"):
         lines = text.splitlines()
         want = sel["heading"].strip()
@@ -276,21 +314,26 @@ def resolve_selector(sel):
             if capturing:
                 out.append(line)
         if not capturing:
-            return (f"{path} :: {want}", None, "heading not found")
-        return (f"{path} :: {want}", "\n".join(out), "")
+            return (f"{path} :: {want}", "missing", None, "heading not found")
+        content = "\n".join(out)
+        return (f"{path} :: {want}", "resolved" if content else "empty", content, "")
     if sel.get("grep"):
         n = int(sel.get("context", 3))
-        pat = re.compile(sel["grep"])
+        try:
+            pat = re.compile(sel["grep"])
+        except re.error as exc:
+            return (f"{path}?{sel['grep']}", "invalid", None, f"bad grep regex: {exc}")
         lines = text.splitlines()
         keep = set()
         for i, line in enumerate(lines):
             if pat.search(line):
                 keep.update(range(max(0, i - n), min(len(lines), i + n + 1)))
         if not keep:
-            return (f"{path}?{sel['grep']}", None, "no matches")
+            return (f"{path}?{sel['grep']}", "empty", None, "no matches")
         out = [lines[i] for i in sorted(keep)][:2000]
-        return (f"{path}?{sel['grep']}", "\n".join(out), "")
-    return (path, text, "")
+        content = "\n".join(out)
+        return (f"{path}?{sel['grep']}", "resolved", content, "")
+    return (path, "resolved" if text else "empty", text, "")
 
 
 def skill_tokens(names):
@@ -325,22 +368,26 @@ def cmd_compile(args):
     selections, bundle_parts, selected_tokens, unresolved_required = [], [], 0, []
     for group in ("required", "optional"):
         for sel in ctx.get(group) or []:
-            summary, content, note = resolve_selector(sel)
-            ok = content is not None
+            summary, outcome, content, note = resolve_selector(sel)
+            ok = outcome == "resolved"
             tok = estimate(content) if ok else 0
             selected_tokens += tok
             selections.append({"selector": f"[{group}] {summary}", "resolved": ok,
-                               "estimated_tokens": tok, **({"note": note} if note else {})})
+                               "outcome": outcome, "estimated_tokens": tok,
+                               **({"resolved_sha256": hashlib.sha256(content.encode()).hexdigest()} if ok else {}),
+                               **({"note": note} if note else {})})
             if ok:
                 bundle_parts.append(f"===== [{group}] {summary} =====\n{content}\n")
             if not ok and group == "required":
                 unresolved_required.append(f"{summary} ({note})")
                 print(f"WARN: required selector unresolved: {summary} ({note})", file=sys.stderr)
 
+    bundle = "".join(bundle_parts)
     project_instr = 0
     for p in ("CLAUDE.md", ".claude/CLAUDE.md"):
-        if os.path.isfile(p):
-            project_instr += estimate(open(p, encoding="utf-8", errors="replace").read())
+        absolute = repo_path(p)
+        if os.path.isfile(absolute):
+            project_instr += estimate(open(absolute, encoding="utf-8", errors="replace").read())
 
     manifest_tokens = estimate(open(path, encoding="utf-8").read())
     always = skill_tokens(["quality", "testing", "git"])  # ingest's always-set
@@ -360,6 +407,8 @@ def cmd_compile(args):
     receipt = {
         "schema": "kernel.context-receipt/v1",
         "manifest": path,
+        "manifest_sha256": hashlib.sha256(open(path, "rb").read()).hexdigest(),
+        "bundle_sha256": hashlib.sha256(bundle.encode()).hexdigest(),
         "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "manifest_tokens": manifest_tokens,
         "project_instructions_tokens": project_instr,
@@ -379,7 +428,7 @@ def cmd_compile(args):
     out = dump_json(receipt)
     if bundle_out:
         with open(bundle_out, "w", encoding="utf-8") as f:
-            f.write("".join(bundle_parts))
+            f.write(bundle)
     if receipt_out:
         with open(receipt_out, "w", encoding="utf-8") as f:
             f.write(out)

@@ -23,7 +23,8 @@
       "properties": {
         "branch": { "type": "string" },
         "commit": { "type": "string" },
-        "dirty": { "type": "boolean" }
+        "dirty": { "type": "boolean" },
+        "dirty_tree_sha256": { "type": "string", "description": "sha256 of `git diff --binary HEAD` when dirty is true" }
       }
     },
 
@@ -97,8 +98,8 @@
         "budget": {
           "type": "object",
           "properties": {
-            "target_tokens": { "type": "integer" },
-            "max_tokens": { "type": "integer" }
+            "target_tokens": { "type": "integer", "minimum": 1 },
+            "max_tokens": { "type": "integer", "minimum": 1 }
           }
         }
       }

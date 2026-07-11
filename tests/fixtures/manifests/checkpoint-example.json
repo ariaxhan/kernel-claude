@@ -8,7 +8,8 @@
   "provenance": {
     "branch": "feat/yaml-skill-unification",
     "commit": "0000000000000000000000000000000000000000",
-    "dirty": true
+    "dirty": true,
+    "dirty_tree_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
   },
   "task": {
     "goal": "Migrate kernel commands to unified yaml-first skills",
