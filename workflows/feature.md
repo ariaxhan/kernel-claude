@@ -1,7 +1,7 @@
 ---
 name: Feature Implementation
 trigger:
-  - command: /kernel:ingest
+  - skill: /kernel:ingest
   - issue_label: feature
   - task_type: feature
 tier: auto  # determined at classify step

@@ -11,14 +11,6 @@ FILE_PATH=$(echo "$INPUT" | jq -r '.file_path // .path // ""' 2>/dev/null)
 
 # Only validate files we care about
 case "$FILE_PATH" in
-  */commands/*.md)
-    # Commands must have frontmatter with name and user-invocable
-    if [ -f "$FILE_PATH" ]; then
-      if ! head -5 "$FILE_PATH" | grep -q "^---"; then
-        echo "WARN: Command file missing frontmatter: $FILE_PATH"
-      fi
-    fi
-    ;;
   */agents/*.md)
     # Agents must have frontmatter with name and description
     if [ -f "$FILE_PATH" ]; then

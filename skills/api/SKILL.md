@@ -2,6 +2,11 @@
 name: api
 description: "REST API design patterns. Resource naming, status codes, pagination, error responses, versioning. Triggers: api, rest, endpoint, route, http, status-code, pagination."
 allowed-tools: Read, Bash, Write, Edit, Grep, Glob
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="api">

@@ -1,11 +1,18 @@
 ---
-name: kernel:retrospective
+name: retrospective
 description: "Cross-session learning synthesis. Finds patterns, resolves contradictions, promotes insights into project skills, agents, and hooks. Triggers: retrospective, reflect, patterns, learnings, synthesis."
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
+kernel:
+  kind: state_transition
+  version: 1
+  side_effects: writes_repo
+  confirmation: on_side_effect
+  produces:
+    - kernel.retrospective-result/v1
 ---
 
-<command id="retrospective">
+<skill id="retrospective">
 
 <purpose>
 Cross-session learning synthesis. Reviews AgentDB learnings, finds patterns across sessions,
@@ -89,4 +96,4 @@ sentence in a doc is honor-system; an artifact fires on its own.
 - Active: {N} | Stale: {N} | Reinforced: {N}
 </output_format>
 
-</command>
+</skill>

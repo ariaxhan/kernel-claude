@@ -2,6 +2,11 @@
 name: build
 description: "Solution exploration and implementation. Generate 2-3 approaches, pick simplest. Never implement first idea. Triggers: build, implement, create, feature, add."
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Task
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 # BUILD SKILL

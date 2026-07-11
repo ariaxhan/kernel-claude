@@ -1,11 +1,16 @@
 ---
-name: kernel:dream
+name: dream
 description: "Deep creative exploration engine. Competing perspectives, stress-tested by a 4-persona council, scored by integrity. The approach that survives attack wins — not the one that sounds best."
 user-invocable: true
 allowed-tools: Agent, Bash, Read, Write, Grep, Glob, WebSearch
+kernel:
+  kind: workflow
+  version: 1
+  side_effects: writes_meta
+  confirmation: none
 ---
 
-<command id="dream">
+<skill id="dream">
 
 <purpose>
 Expand the solution space BEFORE committing.
@@ -187,4 +192,4 @@ on_domain:
 agentdb emit command "dream" "" '{"topic":"X","perspectives":3,"survived":N,"chosen":"pragmatist","integrity":0.85}'
 </telemetry>
 
-</command>
+</skill>

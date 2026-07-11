@@ -1,7 +1,7 @@
 ---
 name: Refactor
 trigger:
-  - command: /kernel:ingest
+  - skill: /kernel:ingest
   - issue_label: refactor
   - task_type: refactor
 tier: auto  # determined at classify step

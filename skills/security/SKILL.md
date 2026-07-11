@@ -2,6 +2,11 @@
 name: security
 description: "Security best practices and vulnerability prevention. Input validation, authentication, secrets management, OWASP top 10. Triggers: security, auth, authentication, secrets, credentials, vulnerability, injection, XSS, CSRF, rate-limit."
 allowed-tools: Read, Grep, Bash
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="security">

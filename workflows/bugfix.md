@@ -1,7 +1,7 @@
 ---
 name: Bugfix
 trigger:
-  - command: /kernel:ingest
+  - skill: /kernel:ingest
   - issue_label: bug
   - task_type: bug
 tier: auto  # determined at classify step

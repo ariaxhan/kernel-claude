@@ -1,11 +1,16 @@
 ---
-name: kernel:help
+name: help
 description: "Show KERNEL help. What commands do, how to use them, current plugin status. Triggers: help, how, what, commands."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
-<command id="help">
+<skill id="help">
 
 <purpose>
 Quick reference for KERNEL v7.23.0.
@@ -123,4 +128,4 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 - **Run retrospective**: After several sessions, synthesize what you've learned
 </tips>
 
-</command>
+</skill>

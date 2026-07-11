@@ -1,11 +1,16 @@
 ---
-name: kernel:review
+name: review
 description: "Code review for PRs or staged changes. >80% confidence threshold. Verdict: APPROVE, REQUEST CHANGES, or COMMENT. Triggers: review, pr, code review."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob
+kernel:
+  kind: validator
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
-<command id="review">
+<skill id="review">
 
 <purpose>
 Review code changes for quality, correctness, security.
@@ -141,4 +146,4 @@ agentdb write-end '{"command":"review","verdict":"X","critical":N,"high":N,"big5
 ```
 </on_complete>
 
-</command>
+</skill>

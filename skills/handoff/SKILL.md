@@ -1,11 +1,18 @@
 ---
-name: kernel:handoff
+name: handoff
 description: "Generate context handoff brief for session continuation. Saves state, decisions, next steps. Triggers: handoff, save, pause, context, continue later."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob
+kernel:
+  kind: state_transition
+  version: 1
+  side_effects: writes_meta
+  confirmation: none
+  produces:
+    - kernel.handoff/v1
 ---
 
-<command id="handoff">
+<skill id="handoff">
 
 <purpose>
 Save session state for seamless continuation.
@@ -129,4 +136,4 @@ agentdb write-end '{"command":"handoff","saved_to":"path","branch":"X","tier":N}
 ```
 </on_complete>
 
-</command>
+</skill>

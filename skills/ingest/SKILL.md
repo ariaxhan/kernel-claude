@@ -1,11 +1,19 @@
 ---
-name: kernel:ingest
+name: ingest
 description: "Guided entry point. Research → classify → scope → execute. Human confirms each phase. Triggers: start, begin, do, implement, build, fix, create."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob, Task, WebSearch, WebFetch
+kernel:
+  kind: workflow
+  version: 1
+  side_effects: writes_repo
+  confirmation: none
+  consumes:
+    - kernel.handoff/v1
+    - kernel.checkpoint/v1
 ---
 
-<command id="ingest">
+<skill id="ingest">
 
 <purpose>
 Guided entry: READ → CLASSIFY → RESEARCH → SCOPE → TESTS → EXECUTE → LEARN
@@ -258,4 +266,4 @@ task: one sentence | type: bug|feature|refactor | tier: 1|2|3 | status: research
 ask_file_location→search | code_without_research→step2 | code_without_tests→step4 | code_tier2+→surgeon | skip_agentdb→go_back
 </hard_stops>
 
-</command>
+</skill>

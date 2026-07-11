@@ -985,7 +985,7 @@ test_agentdb_numeric_injection_prune() {
 # === Command Structure Tests ===
 
 test_ingest_command_has_research_step() {
-  local cmd_file="$PLUGIN_ROOT/commands/ingest.md"
+  local cmd_file="$PLUGIN_ROOT/skills/ingest/SKILL.md"
   local content
   content=$(cat "$cmd_file")
   assert_contains "$content" "RESEARCH"
@@ -993,7 +993,7 @@ test_ingest_command_has_research_step() {
 }
 
 test_forge_command_has_loop() {
-  local cmd_file="$PLUGIN_ROOT/commands/forge.md"
+  local cmd_file="$PLUGIN_ROOT/skills/forge/SKILL.md"
   local content
   content=$(cat "$cmd_file")
   assert_contains "$content" "loop"
@@ -1001,20 +1001,17 @@ test_forge_command_has_loop() {
 }
 
 test_commands_use_structured_format() {
-  # Commands should use XML structure (like skills) with semantic tags
-  # or YAML code blocks - both are valid formats
+  # Workflow skills (former commands) use XML structure or YAML blocks
   local structured_count=0
-  local total_commands=0
-  for cmd in "$PLUGIN_ROOT/commands/"*.md; do
-    ((total_commands++))
-    # Check for XML structure (<command id="X">) or YAML blocks
-    if grep -qE '<command id=|```yaml' "$cmd" 2>/dev/null; then
+  local total=0
+  for s in ingest forge validate handoff retrospective diagnose dream experiment; do
+    ((total++))
+    if grep -qE '<skill id=|```yaml' "$PLUGIN_ROOT/skills/$s/SKILL.md" 2>/dev/null; then
       ((structured_count++))
     fi
   done
-  # Core commands must use structured format - at least 2
-  [ "$structured_count" -ge 2 ] || {
-    echo "FAIL: core commands should use structured format ($structured_count/$total_commands)"
+  [ "$structured_count" -ge "$total" ] || {
+    echo "FAIL: workflow skills should use structured format ($structured_count/$total)"
     return 1
   }
 }
@@ -1035,20 +1032,19 @@ test_claude_md_token_budget() {
 }
 
 test_commands_token_budget() {
-  # Commands should be focused single workflows. Guided generators
-  # (landing-page) and autonomous engines (forge) legitimately run long;
-  # cap reflects real command sizes rather than mutilating them.
+  # Skills should be focused. Guided generators (landing-page) and autonomous
+  # engines (forge) legitimately run long; cap reflects real sizes.
   local failed=0
-  for cmd in "$PLUGIN_ROOT/commands/"*.md; do
+  for skill in "$PLUGIN_ROOT/skills/"*/SKILL.md; do
     local lines
-    lines=$(wc -l < "$cmd" | tr -d ' ')
+    lines=$(wc -l < "$skill" | tr -d ' ')
     if [ "$lines" -gt 1000 ]; then
-      echo "  OVER BUDGET: $(basename "$cmd") = $lines lines (max 1000)"
+      echo "  OVER BUDGET: $skill = $lines lines (max 1000)"
       failed=1
     fi
   done
   [ "$failed" -eq 0 ] || {
-    echo "FAIL: some commands exceed token budget. Trim or use progressive disclosure."
+    echo "FAIL: some skills exceed token budget. Trim or use progressive disclosure."
     return 1
   }
 }
@@ -1107,7 +1103,7 @@ test_no_duplicate_big5_definitions() {
   # Commands/agents should reference, not redefine the full Big 5
   local full_definitions=0
   # Count files with full Big 5 definitions (all 5 checks with descriptions)
-  for f in "$PLUGIN_ROOT/commands/"*.md "$PLUGIN_ROOT/agents/"*.md; do
+  for f in "$PLUGIN_ROOT/skills/"*/SKILL.md "$PLUGIN_ROOT/agents/"*.md; do
     # If file has detailed Big 5 with detection commands, it's a full definition
     if grep -q 'input_validation' "$f" && \
        grep -q 'edge_cases' "$f" && \
@@ -1144,14 +1140,12 @@ test_progressive_disclosure_used() {
 # === Verification Tests ===
 
 test_commands_have_frontmatter() {
-  local missing=0
-  for cmd in "$PLUGIN_ROOT/commands/"*.md; do
-    if ! grep -q "^---" "$cmd" 2>/dev/null; then
-      echo "  Missing frontmatter in: $cmd"
-      missing=1
-    fi
-  done
-  assert_exit_code 0 "$missing" "all commands should have frontmatter"
+  # v8: the commands layer is gone. Guard against reintroduction.
+  [ ! -d "$PLUGIN_ROOT/commands" ] || { echo "FAIL: commands/ directory must not exist (unified skills, v8)"; return 1; }
+  if grep -q '"commands"' "$PLUGIN_ROOT/.claude-plugin/plugin.json"; then
+    echo "FAIL: plugin.json must not register commands (skills are auto-discovered)"
+    return 1
+  fi
 }
 
 test_skills_have_frontmatter() {
@@ -1249,12 +1243,13 @@ test_agentdb_metrics_shows_learnings() {
 }
 
 test_metrics_command_registered() {
-  grep -q "metrics.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+  # skills are auto-discovered from skills/; registration = the skill dir exists
+  [ -f "$PLUGIN_ROOT/skills/metrics/SKILL.md" ]
 }
 
 test_metrics_command_has_frontmatter() {
-  [ -f "$PLUGIN_ROOT/commands/metrics.md" ] || { echo "FAIL: metrics.md not found"; return 1; }
-  head -1 "$PLUGIN_ROOT/commands/metrics.md" | grep -q "^---"
+  [ -f "$PLUGIN_ROOT/skills/metrics/SKILL.md" ] || { echo "FAIL: metrics.md not found"; return 1; }
+  head -1 "$PLUGIN_ROOT/skills/metrics/SKILL.md" | grep -q "^---"
 }
 
 # === Learning Dedup Tests ===
@@ -1336,12 +1331,12 @@ test_migration_010_preserves_unparseable_ts() {
 # === Dreamer Tests ===
 
 test_dream_command_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/commands/dream.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/commands/dream.md" | grep -q "^---"
+  [ -f "$PLUGIN_ROOT/skills/dream/SKILL.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/skills/dream/SKILL.md" | grep -q "^---"
 }
 
 test_dream_command_registered_in_plugin_json() {
-  grep -q "dream.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+  [ -f "$PLUGIN_ROOT/skills/dream/SKILL.md" ]
 }
 
 # --- Version Sync Tests ---
@@ -1356,7 +1351,7 @@ test_version_sync_all() {
   mv=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/.claude-plugin/marketplace.json'))['plugins'][0]['version'])")
   [ "$mv" = "$v" ]                                                 || { echo "FAIL: marketplace.json ($mv) != plugin.json ($v)"; fail=1; }
   grep -qF "<kernel version=\"$v\">" "$PLUGIN_ROOT/CLAUDE.md"      || { echo "FAIL: CLAUDE.md <kernel version> != $v"; fail=1; }
-  grep -qF "KERNEL v$v" "$PLUGIN_ROOT/commands/help.md"            || { echo "FAIL: commands/help.md KERNEL version != $v"; fail=1; }
+  grep -qF "KERNEL v$v" "$PLUGIN_ROOT/skills/help/SKILL.md"            || { echo "FAIL: skills/help/SKILL.md KERNEL version != $v"; fail=1; }
   grep -qF "kernel-marketplace/kernel/$v" "$PLUGIN_ROOT/README.md" || { echo "FAIL: README.md install-path version != $v"; fail=1; }
   return $fail
 }
@@ -1373,11 +1368,11 @@ test_dreamer_agent_has_voice_definitions() {
 }
 
 test_dream_command_has_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/commands/dream.md"
+  grep -q "output_format" "$PLUGIN_ROOT/skills/dream/SKILL.md"
 }
 
 test_dream_command_has_github_integration() {
-  grep -q "github_integration\|GitHub\|gh " "$PLUGIN_ROOT/commands/dream.md"
+  grep -q "github_integration\|GitHub\|gh " "$PLUGIN_ROOT/skills/dream/SKILL.md"
 }
 
 # === Compaction Restore Tests ===
@@ -1484,51 +1479,51 @@ test_breaker_resets() {
 # === Diagnose Tests ===
 
 test_diagnose_command_exists() {
-  [ -f "$PLUGIN_ROOT/commands/diagnose.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/commands/diagnose.md" | grep -q "^---"
+  [ -f "$PLUGIN_ROOT/skills/diagnose/SKILL.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/skills/diagnose/SKILL.md" | grep -q "^---"
 }
 
 test_diagnose_registered() {
-  grep -q "diagnose.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+  [ -f "$PLUGIN_ROOT/skills/diagnose/SKILL.md" ]
 }
 
 test_diagnose_bug_mode() {
-  grep -q 'mode id="bug"' "$PLUGIN_ROOT/commands/diagnose.md"
+  grep -q 'mode id="bug"' "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
 }
 
 test_diagnose_refactor_mode() {
-  grep -q 'mode id="refactor"' "$PLUGIN_ROOT/commands/diagnose.md"
+  grep -q 'mode id="refactor"' "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
 }
 
 test_diagnose_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/commands/diagnose.md"
+  grep -q "output_format" "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
 }
 
 test_diagnose_loads_debug() {
-  grep -q "debug" "$PLUGIN_ROOT/commands/diagnose.md"
+  grep -q "debug" "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
 }
 
 # === Retrospective Tests ===
 
 test_retrospective_command_exists() {
-  [ -f "$PLUGIN_ROOT/commands/retrospective.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/commands/retrospective.md" | grep -q "^---"
+  [ -f "$PLUGIN_ROOT/skills/retrospective/SKILL.md" ] || return 1
+  head -1 "$PLUGIN_ROOT/skills/retrospective/SKILL.md" | grep -q "^---"
 }
 
 test_retrospective_registered() {
-  grep -q "retrospective.md" "$PLUGIN_ROOT/.claude-plugin/plugin.json"
+  [ -f "$PLUGIN_ROOT/skills/retrospective/SKILL.md" ]
 }
 
 test_retrospective_has_agentdb() {
-  grep -q "agentdb" "$PLUGIN_ROOT/commands/retrospective.md"
+  grep -q "agentdb" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
 }
 
 test_retrospective_has_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/commands/retrospective.md"
+  grep -q "output_format" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
 }
 
 test_retrospective_has_clusters() {
-  grep -q "Clusters\|cluster" "$PLUGIN_ROOT/commands/retrospective.md"
+  grep -q "Clusters\|cluster" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
 }
 
 # === GitHub Integration Tests ===
@@ -1585,10 +1580,10 @@ test_agents_have_github_layer() {
 }
 
 test_commands_have_github_layer() {
-  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/ingest.md" &&
-  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/forge.md" &&
-  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/handoff.md" &&
-  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/commands/retrospective.md"
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/skills/ingest/SKILL.md" &&
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/skills/forge/SKILL.md" &&
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/skills/handoff/SKILL.md" &&
+  grep -q "non-local\|_gh_\|GitHub\|github" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
 }
 
 # === Profile Detection Tests ===
@@ -2292,7 +2287,7 @@ test_warn_hardcoded_sources_common() {
 
 test_forge_has_entropy_measurement() {
   local content
-  content=$(cat "$PLUGIN_ROOT/commands/forge.md")
+  content=$(cat "$PLUGIN_ROOT/skills/forge/SKILL.md")
   assert_contains "$content" "Measure entropy" "forge.md should mention entropy measurement"
 }
 

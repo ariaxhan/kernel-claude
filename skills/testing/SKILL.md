@@ -2,6 +2,11 @@
 name: testing
 description: "Testing methodology, TDD included. Tests before code, prove behavior not implementation, edge cases first. Triggers: test, tests, tdd, test-first, red-green, coverage, assertion, mock, fixture, spec, verify."
 allowed-tools: Read, Bash, Write, Edit, Grep, Glob
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="testing">

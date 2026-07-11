@@ -1,11 +1,17 @@
 ---
-name: kernel:forge
+name: forge
 description: "Autonomous development engine with experimental self-correction. Heats solutions, hammers through iteration, quenches with quality gates, experiments on its own output. Runs until antifragile or reports why it can't be."
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, WebSearch, WebFetch
+disable-model-invocation: true
+kernel:
+  kind: workflow
+  version: 1
+  side_effects: writes_remote
+  confirmation: on_side_effect
 ---
 
-<command id="forge">
+<skill id="forge">
 
 <purpose>
 Fully autonomous. No human checkpoints. Iterate until the solution is antifragile.
@@ -275,4 +281,4 @@ See `skills/orchestration/SKILL.md` <max_budget_usd_invariant>.
   - The difference is the hypothesis step: the forge doesn't just retry, it asks WHY
 </experimental_behavior>
 
-</command>
+</skill>

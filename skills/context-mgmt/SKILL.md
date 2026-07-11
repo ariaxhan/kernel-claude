@@ -2,6 +2,11 @@
 name: context-mgmt
 description: "Context engineering and token management. Compaction strategies, progressive disclosure, structured note-taking via AgentDB. Triggers: tokens, compaction, memory, handoff, summarize, context window."
 allowed-tools: Read, Bash, Task
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="context-mgmt">

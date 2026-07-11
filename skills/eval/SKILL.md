@@ -2,6 +2,11 @@
 name: eval
 description: "Eval-Driven Development (EDD) for AI workflows. pass@k metrics, capability evals, regression evals. Triggers: eval, edd, pass@k, capability, regression, benchmark."
 allowed-tools: Read, Bash, Write, Edit, Grep, Glob
+kernel:
+  kind: methodology
+  version: 1
+  side_effects: none
+  confirmation: none
 ---
 
 <skill id="eval">
