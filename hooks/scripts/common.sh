@@ -247,26 +247,41 @@ get_project_root() {
   echo "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
 }
 
-# Normalize the two loader payload shapes used by advisory hooks. Claude sends
-# Write/Edit fields under tool_input; Codex sends an apply_patch document.
-kernel_hook_file_path() {
-  printf '%s' "$1" | jq -r '
-    .tool_input.file_path // .tool_input.path // .file_path // .path //
-    (if (.tool_input.patch | type) == "string" then
-       [.tool_input.patch | split("\n")[]
-        | select(test("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "))
-        | sub("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "; "")][0] // empty
-     else empty end)
+# Emit one compact JSON record per affected file: {path, content}. Claude
+# Write/Edit produces one record. Codex apply_patch preserves file order, keeps
+# added content scoped to its file, and treats Move to as the effective path.
+kernel_hook_file_records() {
+  printf '%s' "$1" | jq -c '
+    def finish:
+      if .current == null then .
+      else .records += [(.current | .content = (.content | join("\n")))]
+           | .current = null
+      end;
+    if (.tool_input.patch | type) == "string" then
+      (reduce (.tool_input.patch | split("\n")[]) as $line
+        ({records: [], current: null};
+         if ($line | test("^\\*\\*\\* (Add File|Update File|Delete File): ")) then
+           finish
+           | .current = {path: ($line | sub("^\\*\\*\\* (Add File|Update File|Delete File): "; "")), content: []}
+         elif ($line | startswith("*** Move to: ")) and .current != null then
+           .current.path = ($line | sub("^\\*\\*\\* Move to: "; ""))
+         elif ($line | startswith("+")) and .current != null then
+           .current.content += [$line[1:]]
+         else . end)
+       | finish | .records[])
+    else
+      {path: (.tool_input.file_path // .tool_input.path // .file_path // .path // ""),
+       content: (.tool_input.content // .tool_input.new_string // .content // .new_string // "")}
+    end
   ' 2>/dev/null || true
 }
 
+kernel_hook_file_path() {
+  kernel_hook_file_records "$1" | head -1 | jq -r '.path // empty' 2>/dev/null || true
+}
+
 kernel_hook_content() {
-  printf '%s' "$1" | jq -r '
-    .tool_input.content // .tool_input.new_string // .content // .new_string //
-    (if (.tool_input.patch | type) == "string" then
-       [.tool_input.patch | split("\n")[] | select(startswith("+"))] | join("\n")
-     else empty end)
-  ' 2>/dev/null || true
+  kernel_hook_file_records "$1" | head -1 | jq -r '.content // empty' 2>/dev/null || true
 }
 
 kernel_hook_error() {

@@ -5,10 +5,9 @@
 source "$(dirname "$0")/common.sh"
 
 INPUT=$(cat)
-FILE_PATH=$(kernel_hook_file_path "$INPUT")
-CONTENT=$(kernel_hook_content "$INPUT")
-
-# Only check component/style files
+while IFS= read -r RECORD; do
+FILE_PATH=$(printf '%s' "$RECORD" | jq -r '.path // empty' 2>/dev/null)
+CONTENT=$(printf '%s' "$RECORD" | jq -r '.content // empty' 2>/dev/null)
 case "$FILE_PATH" in
   *.tsx|*.jsx|*.svelte|*.vue|*.css)
     # Check for hardcoded hex colors
@@ -21,5 +20,6 @@ case "$FILE_PATH" in
     fi
     ;;
 esac
+done < <(kernel_hook_file_records "$INPUT")
 
 exit 0

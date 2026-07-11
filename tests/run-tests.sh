@@ -1467,6 +1467,51 @@ test_advisory_scripts_fail_open_without_false_positives() {
   assert_equals "" "$output" "safe advisory payload must not warn"
 }
 
+test_multifile_patch_records_are_isolated_and_complete() {
+  local root="$TEST_DIR/multifile" css="$TEST_DIR/multifile/safe.css"
+  local json="$TEST_DIR/multifile/later.json" agent="$TEST_DIR/multifile/agents/later.md"
+  local moved="$TEST_DIR/multifile/moved.json" patch payload output
+  mkdir -p "$(dirname "$agent")" "$TEST_PROJECT/_meta/agentdb"
+  echo 'body { color: var(--theme); }' > "$css"
+  echo '{bad' > "$json"
+  echo 'missing frontmatter' > "$agent"
+  echo '{bad' > "$moved"
+  printf -v patch '*** Begin Patch\n*** Update File: %s\n+body { color: var(--theme); }\n*** Update File: %s\n+{"color":"#abcdef"}\n*** Update File: %s\n+missing frontmatter\n*** Update File: old.txt\n*** Move to: %s\n+{bad\n*** End Patch' "$css" "$json" "$agent" "$moved"
+  payload=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{patch:$patch},error:{message:"multi failure"}}')
+
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" 2>&1)
+  assert_equals "" "$output" "JSON content must not be attributed to the CSS record" || return 1
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/validate-json-schema.sh" 2>&1)
+  assert_contains "$output" "$json" "later JSON file must be validated" || return 1
+  assert_contains "$output" "$moved" "rename destination must be the effective path" || return 1
+  output=$(printf '%s\n' "$payload" | "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" 2>&1)
+  assert_contains "$output" "$agent" "later agent file must be structurally checked" || return 1
+
+  KERNEL_VAULTS="$TEST_PROJECT" AGENTDB_ROOT="$TEST_PROJECT" agentdb init >/dev/null
+  printf '%s\n' "$payload" | KERNEL_VAULTS="$TEST_PROJECT" AGENTDB_ROOT="$TEST_PROJECT" \
+    "$PLUGIN_ROOT/hooks/scripts/capture-error.sh" >/dev/null 2>&1 || return 1
+  assert_equals "4" "$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM errors WHERE error='multi failure';")" "capture-error must record every patch file"
+}
+
+test_log_write_multifile_and_json_roundtrip() {
+  local root="$TEST_DIR/log-json" patch payload weird log
+  mkdir -p "$root"
+  printf -v patch '*** Begin Patch\n*** Update File: first.css\n+safe\n*** Update File: old.json\n*** Move to: later.json\n+{}\n*** End Patch'
+  payload=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{patch:$patch}}')
+  printf '%s\n' "$payload" | CLAUDE_PROJECT_DIR="$root" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+    "$PLUGIN_ROOT/hooks/scripts/log-write.sh" >/dev/null 2>&1 || return 1
+  log="$root/_meta/logs/actions.jsonl"
+  assert_equals "2" "$(wc -l < "$log" | tr -d ' ')" "log-write must log every patch record" || return 1
+  assert_equals "first.css,later.json" "$(jq -rs 'map(.file)|join(",")' "$log")" "rename must log destination in order" || return 1
+
+  weird=$'quote" slash\\ line\nnext'
+  payload=$(jq -n --arg p "$weird" '{tool_name:"Write",tool_input:{file_path:$p,content:"safe"}}')
+  printf '%s\n' "$payload" | CLAUDE_PROJECT_DIR="$root" CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" \
+    "$PLUGIN_ROOT/hooks/scripts/log-write.sh" >/dev/null 2>&1 || return 1
+  jq -e . "$log" >/dev/null || return 1
+  assert_equals "$weird" "$(tail -1 "$log" | jq -r .file)" "quote/backslash/newline must round-trip through valid JSON"
+}
+
 test_critical_guard_scripts_unchanged_for_802() {
   local expected actual file
   while read -r expected file; do
@@ -4301,6 +4346,8 @@ run_test_suite() {
       run_test "log-write is advisory and leaves no child" test_log_write_is_advisory_and_leaves_no_child
       run_test "advisory scripts consume dual-loader payloads" test_advisory_scripts_consume_dual_loader_payloads
       run_test "advisory scripts fail open without false positives" test_advisory_scripts_fail_open_without_false_positives
+      run_test "multifile patch records are isolated and complete" test_multifile_patch_records_are_isolated_and_complete
+      run_test "log-write multifile and JSON round-trip" test_log_write_multifile_and_json_roundtrip
       run_test "critical guard scripts unchanged for 8.0.2" test_critical_guard_scripts_unchanged_for_802
       run_test "session-start has compact quick reference" test_session_start_workflow_present
       run_test "session-start points at skill routing" test_session_start_skill_routing

@@ -5,9 +5,8 @@
 source "$(dirname "$0")/common.sh"
 
 INPUT=$(cat)
-FILE_PATH=$(kernel_hook_file_path "$INPUT")
-
-# Only validate files we care about
+while IFS= read -r RECORD; do
+FILE_PATH=$(printf '%s' "$RECORD" | jq -r '.path // empty' 2>/dev/null)
 case "$FILE_PATH" in
   */agents/*.md)
     # Agents must have frontmatter with name and description
@@ -26,6 +25,7 @@ case "$FILE_PATH" in
     fi
     ;;
 esac
+done < <(kernel_hook_file_records "$INPUT")
 
 # Always pass — warnings only, never block
 exit 0
