@@ -6,10 +6,10 @@ if [ -z "$ROOT" ]; then
   echo "Usage: scripts/select-runtime.sh /path/to/kernel-runtime" >&2
   exit 2
 fi
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+source "$SCRIPT_DIR/../hooks/scripts/common.sh"
+kernel_safe_path "$ROOT" || { echo "kernel: runtime root contains control characters" >&2; exit 1; }
 ROOT=$(cd "$ROOT" 2>/dev/null && pwd) || { echo "kernel: runtime root does not exist: $ROOT" >&2; exit 1; }
-[ -f "$ROOT/hooks/scripts/common.sh" ] || { echo "kernel: missing hooks/scripts/common.sh in $ROOT" >&2; exit 1; }
-
-source "$ROOT/hooks/scripts/common.sh"
 KERNEL_RUNTIME_ROOT="$ROOT"
 export KERNEL_RUNTIME_ROOT
 version=$(kernel_validate_runtime_root "$ROOT") || { echo "kernel: invalid KERNEL runtime: $ROOT" >&2; exit 1; }

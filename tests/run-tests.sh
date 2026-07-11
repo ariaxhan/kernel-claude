@@ -719,13 +719,13 @@ test_runtime_refuses_user_owned_destinations() {
 
 test_runtime_repairs_broken_relative_numbered_link() {
   runtime_fixture
-  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
-  rm -rf "$cache/7.23.0"
   local dest="$KERNEL_VAULTS/.claude/kernel/hooks"
-  local rel; rel=$(python3 -c 'import os,sys; print(os.path.relpath(sys.argv[1],sys.argv[2]))' "$cache/7.23.0/hooks" "$(dirname "$dest")")
+  local cache="$(dirname "$dest")/cache"
+  make_runtime_fixture "$cache/8.0.0" 8.0.0
+  local rel="cache/7.23.0/hooks"
   ln -s "$rel" "$dest"
   source "$PLUGIN_ROOT/hooks/scripts/common.sh"
-  KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
+  KERNEL_CACHE_DIR="$cache" KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
   assert_equals "$cache/current/hooks" "$(readlink "$dest")"
 }
 
@@ -780,6 +780,87 @@ test_select_runtime_supports_explicit_local_rollback() {
   output=$(KERNEL_CACHE_DIR="$cache" KERNEL_VAULTS="$KERNEL_VAULTS" "$PLUGIN_ROOT/scripts/select-runtime.sh" "$local_root")
   assert_equals "$local_root" "$(readlink "$cache/current")"
   assert_contains "$output" "KERNEL runtime: 7.23.0"
+}
+
+test_select_runtime_accepts_real_legacy_common() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  local legacy="$TEST_DIR/real legacy 7.23"
+  mkdir -p "$legacy/.claude-plugin" "$legacy/hooks/scripts" "$legacy/orchestration/agentdb"
+  git -C "$PLUGIN_ROOT" show 54a0053:hooks/scripts/common.sh > "$legacy/hooks/scripts/common.sh" 2>/dev/null || {
+    # CI uses a shallow checkout. This is the relevant legacy behavior: the target
+    # common exists but has none of KERNEL 8's selector functions.
+    printf '#!/bin/bash\nupdate_current_symlink() { :; }\n' > "$legacy/hooks/scripts/common.sh"
+  }
+  git -C "$PLUGIN_ROOT" show 54a0053:orchestration/agentdb/agentdb > "$legacy/orchestration/agentdb/agentdb" 2>/dev/null || cp "$PLUGIN_ROOT/orchestration/agentdb/agentdb" "$legacy/orchestration/agentdb/agentdb"
+  chmod +x "$legacy/orchestration/agentdb/agentdb"
+  printf '{"name":"kernel","version":"7.23.0"}\n' > "$legacy/.claude-plugin/plugin.json"
+  ! grep -q 'kernel_validate_runtime_root' "$legacy/hooks/scripts/common.sh"
+  KERNEL_CACHE_DIR="$cache" KERNEL_VAULTS="$KERNEL_VAULTS" "$PLUGIN_ROOT/scripts/select-runtime.sh" "$legacy" >/dev/null
+  assert_equals "$legacy" "$(readlink "$cache/current")"
+}
+
+test_runtime_rejects_helper_escape_and_special_files() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  local bad="$cache/9.0.0" outside="$TEST_DIR/outside"
+  make_runtime_fixture "$bad" 9.0.0
+  mkdir -p "$outside/hooks/scripts"
+  : > "$outside/hooks/scripts/common.sh"
+  rm "$bad/hooks/scripts/common.sh"
+  ln -s "$outside/hooks/scripts/common.sh" "$bad/hooks/scripts/common.sh"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  ! kernel_validate_runtime_root "$bad"
+  rm "$bad/hooks/scripts/common.sh"
+  mkdir "$bad/hooks/scripts/common.sh"
+  ! kernel_validate_runtime_root "$bad"
+  rm -rf "$bad/hooks/scripts/common.sh"
+  mkfifo "$bad/hooks/scripts/common.sh"
+  ! kernel_validate_runtime_root "$bad"
+}
+
+test_runtime_rejects_control_paths_and_traversal_links() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  ! KERNEL_RUNTIME_ROOT="$cache/8.0.0" KERNEL_CACHE_DIR="$cache/line"$'\n'"break" kernel_update_current
+  ! KERNEL_VAULTS="$TEST_DIR/vault"$'\n'"break" detect_vaults >/dev/null
+  local dest="$KERNEL_VAULTS/.claude/kernel/hooks"
+  ln -s "$cache/junk/../7.23.0/hooks" "$dest"
+  ! kernel_repair_host_link "$dest" "$cache/current/hooks" "$cache" hooks
+  assert_equals "$cache/junk/../7.23.0/hooks" "$(readlink "$dest")"
+}
+
+test_atomic_link_scavenges_only_matching_symlink_residue() {
+  local dest="$TEST_DIR/current" target="$TEST_DIR/target"
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  ln -s "$target" "$dest.kernel-tmp.111.222"
+  echo mine > "$dest.kernel-tmp.user"
+  kernel_atomic_link "$target" "$dest"
+  [ ! -L "$dest.kernel-tmp.111.222" ]
+  assert_equals mine "$(cat "$dest.kernel-tmp.user")"
+}
+
+test_init_agentdb_targets_selected_vaults() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel" elsewhere="$TEST_DIR/elsewhere"
+  cp "$PLUGIN_ROOT/orchestration/agentdb/agentdb" "$cache/8.0.0/orchestration/agentdb/agentdb"
+  cp "$PLUGIN_ROOT/orchestration/agentdb/schema.sql" "$cache/8.0.0/orchestration/agentdb/schema.sql"
+  cp -R "$PLUGIN_ROOT/orchestration/agentdb/migrations" "$cache/8.0.0/orchestration/agentdb/migrations"
+  chmod +x "$cache/8.0.0/orchestration/agentdb/agentdb"
+  mkdir -p "$elsewhere/_meta/agentdb" "$KERNEL_VAULTS/_meta/agentdb"
+  echo keep > "$KERNEL_VAULTS/_meta/agentdb/sentinel"
+  AGENTDB_ROOT="$KERNEL_VAULTS" "$cache/8.0.0/orchestration/agentdb/agentdb" init >/dev/null
+  local before sentinel_before
+  before=$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/agent.db")
+  sentinel_before=$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/sentinel")
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_update_current >/dev/null || return 1
+  (cd "$elsewhere" && kernel_init_agentdb "$KERNEL_VAULTS" "$cache") || return 1
+  [ -f "$KERNEL_VAULTS/_meta/agentdb/agent.db" ] || return 1
+  [ ! -f "$elsewhere/_meta/agentdb/agent.db" ] || return 1
+  assert_equals "$before" "$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/agent.db")" "existing AgentDB unchanged"
+  assert_equals "$sentinel_before" "$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/sentinel")"
 }
 
 # === Security Hook Tests ===
@@ -3764,6 +3845,11 @@ run_test_suite() {
       run_test "failed replacement preserves original" test_runtime_failed_replacement_leaves_original
       run_test "startup arms reconciliation" test_runtime_startup_arms_reconciliation
       run_test "rollback tool selects a lower local runtime" test_select_runtime_supports_explicit_local_rollback
+      run_test "rollback tool accepts real legacy common" test_select_runtime_accepts_real_legacy_common
+      run_test "helper escapes and special files rejected" test_runtime_rejects_helper_escape_and_special_files
+      run_test "control paths and traversal links rejected" test_runtime_rejects_control_paths_and_traversal_links
+      run_test "atomic link cleans only matching symlink residue" test_atomic_link_scavenges_only_matching_symlink_residue
+      run_test "init AgentDB targets selected Vaults" test_init_agentdb_targets_selected_vaults
       ;;
     security)
       run_test "no hardcoded secrets" test_no_hardcoded_secrets_in_plugin
