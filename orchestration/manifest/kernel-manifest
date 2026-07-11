@@ -180,6 +180,11 @@ def validate_invariants(manifest, errors):
     created = ((manifest.get("identity") or {}).get("created"))
     if created is not None:
         try:
+            if not isinstance(created, str) or not re.fullmatch(
+                r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})",
+                created,
+            ):
+                raise ValueError("strict RFC3339 lexical form required")
             parsed = datetime.fromisoformat(created.replace("Z", "+00:00"))
             if parsed.tzinfo is None:
                 raise ValueError("timezone required")

@@ -2948,8 +2948,9 @@ test_manifest_committed_state_files_are_checked() {
     case "$path" in
       *.json)
         "$KM" validate "$PLUGIN_ROOT/$path" >/dev/null 2>&1 || bad=1
-        ec=0; "$KM" divergence "$PLUGIN_ROOT/$path" --json >/dev/null 2>&1 || ec=$?
-        [ "$ec" -le 1 ] || bad=1
+        local divergence_output
+        ec=0; divergence_output=$("$KM" divergence "$PLUGIN_ROOT/$path" --json 2>/dev/null) || ec=$?
+        manifest_divergence_result_valid "$ec" "$divergence_output" || bad=1
         ;;
       *.yaml|*.yml) ec=0; "$KM" validate "$PLUGIN_ROOT/$path" >/dev/null 2>&1 || ec=$?; [ "$ec" -eq 2 ] || bad=1 ;;
     esac
@@ -2957,8 +2958,30 @@ test_manifest_committed_state_files_are_checked() {
   assert_exit_code 0 "$bad" "committed canonical manifests validate and YAML is non-authoritative"
 }
 
-test_manifest_committed_gate_invokes_divergence() {
-  assert_contains "$(declare -f test_manifest_committed_state_files_are_checked)" 'divergence "$PLUGIN_ROOT/$path"'
+manifest_divergence_result_valid() {
+  local ec="$1" output="$2"
+  [ "$ec" -eq 0 ] || [ "$ec" -eq 1 ] || return 1
+  printf '%s' "$output" | python3 -c '
+import json,sys
+try: doc=json.load(sys.stdin)
+except (json.JSONDecodeError, UnicodeDecodeError): raise SystemExit(1)
+if not isinstance(doc,dict): raise SystemExit(1)
+if type(doc.get("hard_divergence")) is not bool: raise SystemExit(1)
+if not isinstance(doc.get("events"),list): raise SystemExit(1)
+if not isinstance(doc.get("phases"),list): raise SystemExit(1)
+for event in doc["events"]:
+ if not isinstance(event,dict) or not isinstance(event.get("event"),str) or not isinstance(event.get("status"),str): raise SystemExit(1)
+for phase in doc["phases"]:
+ if not isinstance(phase,dict) or not isinstance(phase.get("name"),str) or phase.get("status") not in ("inherited","required","invalidated"): raise SystemExit(1)
+'
+}
+
+test_manifest_committed_gate_validates_divergence_protocol() {
+  manifest_divergence_result_valid 1 '{"hard_divergence":true,"events":[{"event":"branch_diverged","status":"diverged"}],"phases":[{"name":"x","status":"invalidated"}]}' || return 1
+  if manifest_divergence_result_valid 1 ''; then echo "FAIL: empty exit1 accepted"; return 1; fi
+  if manifest_divergence_result_valid 1 'Traceback: boom'; then echo "FAIL: non-JSON exit1 accepted"; return 1; fi
+  if manifest_divergence_result_valid 1 '{"hard_divergence":true}'; then echo "FAIL: incomplete protocol accepted"; return 1; fi
+  if manifest_divergence_result_valid 1 '{"hard_divergence":"yes","events":[],"phases":[]}'; then echo "FAIL: wrong protocol types accepted"; return 1; fi
 }
 
 test_manifest_cli_paths_are_rooted_from_subdirs() {
@@ -3015,6 +3038,30 @@ p='m.json'; m=json.load(open(p)); m['identity']['created']='zzzz'; json.dump(m,o
 PYEOF
   local ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
   assert_exit_code 1 "$ec" "identity.created must be RFC3339"
+}
+
+test_manifest_created_timestamp_is_strict_rfc3339() {
+  local value ec
+  for value in '2026-01-01T00:00:00+0000' '2026-01-01T00:00:00+00' \
+               '2026-01-01 00:00:00Z' '2026-02-30T00:00:00Z' \
+               '2026-01-01T25:00:00Z' '2026-01-01T00:00:00+24:00' \
+               '2026-01-01t00:00:00z'; do
+    cp "$FIXTURES/checkpoint-example.json" m.json
+    python3 - "$value" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['identity']['created']=sys.argv[1]; json.dump(m,open(p,'w'))
+PYEOF
+    ec=0; "$KM" validate m.json >/dev/null 2>&1 || ec=$?
+    assert_exit_code 1 "$ec" "strict RFC3339 must reject $value" || return 1
+  done
+  for value in '2026-01-01T00:00:00Z' '2026-01-01T00:00:00+00:00' '2026-01-01T00:00:00.123456Z'; do
+    cp "$FIXTURES/checkpoint-example.json" m.json
+    python3 - "$value" <<'PYEOF'
+import json,sys
+p='m.json'; m=json.load(open(p)); m['identity']['created']=sys.argv[1]; json.dump(m,open(p,'w'))
+PYEOF
+    "$KM" validate m.json >/dev/null || return 1
+  done
 }
 
 test_manifest_latest_missing_dir_value_is_controlled() {
@@ -3291,10 +3338,11 @@ run_test_suite() {
       run_test "dirty tree hash divergence" test_manifest_divergence_checks_dirty_tree_hash
       run_test "schema fields name enforcement owner" test_manifest_schema_fields_name_enforcement_owner
       run_test "committed manifests are checked" test_manifest_committed_state_files_are_checked
-      run_test "committed gate invokes divergence" test_manifest_committed_gate_invokes_divergence
+      run_test "committed gate validates divergence protocol" test_manifest_committed_gate_validates_divergence_protocol
       run_test "CLI paths root from subdirectories" test_manifest_cli_paths_are_rooted_from_subdirs
       run_test "manifest paths stay in repo" test_manifest_rejects_paths_outside_repo
       run_test "created timestamp validates" test_manifest_rejects_bad_created_timestamp
+      run_test "created timestamp is strict RFC3339" test_manifest_created_timestamp_is_strict_rfc3339
       run_test "latest missing dir is controlled" test_manifest_latest_missing_dir_value_is_controlled
       run_test "guard-context: no manifest allows" test_guard_context_no_manifest_allows
       run_test "guard-context: sealed blocks forbidden" test_guard_context_sealed_blocks_forbidden
