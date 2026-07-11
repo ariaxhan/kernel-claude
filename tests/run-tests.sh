@@ -671,6 +671,17 @@ test_runtime_validates_loaded_v8_root() {
   kernel_validate_runtime_root "$cache/8.0.0"
 }
 
+test_runtime_selection_message_is_locally_suppressible() {
+  runtime_fixture
+  local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel" output
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  output=$(KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_update_current)
+  assert_contains "$output" "KERNEL runtime selected: 8.0.0" "normal runtime selection must stay visible" || return 1
+  rm "$cache/current"
+  output=$(KERNEL_RUNTIME_QUIET=1 KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_update_current)
+  assert_equals "" "$output" "quiet selection must be local to high-frequency hooks"
+}
+
 test_runtime_upgrade_repairs_only_numbered_links() {
   runtime_fixture
   local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
@@ -1971,9 +1982,22 @@ test_retrospective_has_clusters() {
 test_retrospective_queries_current_learning_schema() {
   local content
   content=$(cat "$PLUGIN_ROOT/skills/retrospective/SKILL.md")
-  assert_contains "$content" "SELECT id, type, insight, evidence, hit_count, load_count, ts FROM learnings ORDER BY ts DESC" "retrospective must query current AgentDB columns"
+  assert_contains "$content" "SELECT id, type, insight, evidence, hit_count, load_count, ts, last_hit FROM learnings ORDER BY ts DESC" "retrospective must query current AgentDB columns" || return 1
+  assert_contains "$content" "COALESCE(last_hit, ts) < datetime('now', '-30 days')" "staleness must use last recall when available" || return 1
   if grep -qE 'content, evidence, reinforced, created_at|ORDER BY created_at' "$PLUGIN_ROOT/skills/retrospective/SKILL.md"; then
     echo "FAIL: retrospective still names removed learning columns"
+    return 1
+  fi
+}
+
+test_ship_bump_targets_are_truthful() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/ship/SKILL.md")
+  for target in '.claude-plugin/plugin.json' '.claude-plugin/marketplace.json' 'AGENTS.md' 'CLAUDE.md' 'skills/help/SKILL.md'; do
+    assert_contains "$content" "$target" "ship bump prose must name $target" || return 1
+  done
+  if grep -q 'README install path' "$PLUGIN_ROOT/skills/ship/SKILL.md"; then
+    echo "FAIL: bump-version.sh does not update a README install path"
     return 1
   fi
 }
@@ -4050,6 +4074,7 @@ run_test_suite() {
       ;;
     runtime_upgrade)
       run_test "validated loaded v8 root" test_runtime_validates_loaded_v8_root
+      run_test "runtime selection message is locally suppressible" test_runtime_selection_message_is_locally_suppressible
       run_test "7.23 links repair and data is unchanged" test_runtime_upgrade_repairs_only_numbered_links
       run_test "current no-op and missing untouched" test_runtime_current_noop_and_missing_untouched
       run_test "user-owned destinations refused" test_runtime_refuses_user_owned_destinations
@@ -4221,6 +4246,7 @@ run_test_suite() {
       run_test "retrospective has cluster analysis" test_retrospective_has_clusters
       run_test "retrospective queries current learning schema" test_retrospective_queries_current_learning_schema
       run_test "methodology carries cross-loader release lessons" test_methodology_carries_cross_loader_release_lessons
+      run_test "ship bump targets are truthful" test_ship_bump_targets_are_truthful
       run_test "resolved contradictions have learning mutation evidence" test_retrospective_contradictions_have_mutation_evidence
       ;;
     github_integration)

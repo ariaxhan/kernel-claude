@@ -11,7 +11,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Load shared functions
 source "$SCRIPT_DIR/common.sh"
-_kernel_hook_start
+# UserPromptSubmit is a high-frequency fallback hook. Keep its setup silent; the
+# real SessionStart path still reports a runtime change when one is selected.
+KERNEL_RUNTIME_QUIET=1 _kernel_hook_start
 
 # Detect paths
 VAULTS=$(detect_vaults)

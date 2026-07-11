@@ -47,7 +47,11 @@ kernel:
 
 5. **Version + Tag** *(on a release)*
    - Semver: patch=fix, minor=feature or behavior-preserving refactor, major=breaking. Confirm the number with the user.
-   - Bump ALL canonical declarations in one shot: `scripts/bump-version.sh X.Y.Z` (updates plugin.json, marketplace.json, CLAUDE.md `<kernel version>`, help.md, README install path). NEVER hand-edit one location — drift fails `test_version_sync_all`.
+   - Bump ALL canonical declarations in one shot: `scripts/bump-version.sh X.Y.Z`
+     updates `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`,
+     `AGENTS.md` and `CLAUDE.md` `<kernel version>` declarations, and
+     `skills/help/SKILL.md`. NEVER hand-edit one location — drift fails
+     `test_version_sync_all`.
    - Human-author the release prose the script does NOT touch: the plugin/marketplace `description` highlight + a `CHANGELOG.md` entry (`## [X.Y.Z] - DATE` + Added/Changed/Fixed).
    - (gate: `bash tests/run-tests.sh` green — `test_version_sync_all` confirms no stale version anywhere.)
    - If a native manifest validator rejects required safety metadata, do not

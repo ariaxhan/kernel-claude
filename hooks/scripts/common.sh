@@ -112,7 +112,7 @@ kernel_update_current() {
     echo "kernel: refusing non-symlink runtime selector: $current" >&2; return 1
   fi
   kernel_atomic_link "$root" "$current" || { echo "kernel: could not update runtime selector: $current" >&2; return 1; }
-  echo "KERNEL runtime selected: $new_version"
+  [ "${KERNEL_RUNTIME_QUIET:-0}" = "1" ] || echo "KERNEL runtime selected: $new_version"
 }
 
 kernel_lexical_target() {
