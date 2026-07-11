@@ -64,6 +64,30 @@ Common skills:
 - State: `/kernel:checkpoint`, `/kernel:handoff`, `/kernel:retrospective`
 - Setup/reference: `/kernel:init`, `/kernel:help`
 
+## Safe resumes and context limits
+
+Handoffs and checkpoints are canonical JSON: the JSON file is the source of truth,
+not a Markdown summary or an old YAML file. On resume, KERNEL discovers the newest
+state, validates it, checks whether the repository changed, runs only typed preflight
+checks, compiles the allowed context with a receipt, activates its context policy,
+and resumes at the recorded operation. Changed inputs invalidate inherited phases
+instead of silently treating stale work as complete.
+
+Context policies can be `advisory`, `bounded`, or `sealed`. Bounded mode records extra
+file loads in the context receipt. Sealed mode makes hooks block forbidden paths.
+Receipts record selected inputs, integrity hashes, and budget status so the next
+session can show what it actually loaded.
+
+The underlying runtime commands are:
+
+```text
+kernel-manifest validate | latest | divergence | preflight | compile | resume | activate | deactivate
+```
+
+Most users should call `/kernel:ingest` (or `$kernel:ingest` in Codex) and let it run
+that sequence. A manifest that fails validation or exceeds its maximum context budget
+is a stop condition, not permission to fall back to the whole conversation.
+
 ## Update from 7.23.0
 
 Claude Code:
