@@ -32,6 +32,9 @@ Skill-specific: skills/security/reference/security-research.md
 3. LEAST PRIVILEGE: Minimum access needed. No admin-by-default.
 4. DEFENSE IN DEPTH: Multiple layers. Don't rely on single control.
 5. FAIL SECURE: Errors should deny access, not grant it.
+6. NORMALIZE BEFORE ALLOWLISTS: reject lexical `.` / `..` path segments and
+   resolve the candidate into the intended root before prefix or regex checks.
+   An allowlisted prefix is not containment when traversal is still present.
 </core_principles>
 
 <flow>

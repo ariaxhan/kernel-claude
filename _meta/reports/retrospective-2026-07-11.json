@@ -1,0 +1,114 @@
+{
+  "schema": "kernel.retrospective-result/v1",
+  "identity": {
+    "created": "2026-07-11T07:48:39Z",
+    "session": "CR-20260711004627-26290-27345",
+    "scope": "kernel-claude 8.0 release and Claude-Codex compatibility"
+  },
+  "analyzed": {
+    "learnings": 19,
+    "clusters": 7,
+    "merged": 1,
+    "archived": 0,
+    "contradictions_resolved": 1
+  },
+  "mutations": [
+    {
+      "op": "modify",
+      "artifact_type": "skill",
+      "path": "skills/retrospective/SKILL.md",
+      "reason": "The workflow's documented query named columns removed from the current AgentDB schema and failed before analysis began.",
+      "evidence": "AgentDB rejected content, reinforced, and created_at; learnings currently exposes insight, hit_count, load_count, and ts.",
+      "reinforced": 1,
+      "status": "applied"
+    },
+    {
+      "op": "modify",
+      "artifact_type": "skill",
+      "path": "skills/testing/SKILL.md",
+      "reason": "Promote cross-loader payload, disposable upgrade, documentation command, and resource-bound verification into reusable test methodology.",
+      "evidence": "Claude-shaped parsers silently inspected empty Codex apply_patch fields; source-checkout tests missed installed-cache upgrade behavior; unbounded suite execution crashed the host.",
+      "reinforced": 4,
+      "status": "applied"
+    },
+    {
+      "op": "modify",
+      "artifact_type": "skill",
+      "path": "skills/security/SKILL.md",
+      "reason": "Make path normalization before allowlist evaluation a standing security rule.",
+      "evidence": "Two adversary findings demonstrated that an allowlisted raw prefix accepted .claude/rules/../generated/x.md.",
+      "reinforced": 2,
+      "status": "applied"
+    },
+    {
+      "op": "modify",
+      "artifact_type": "skill",
+      "path": "skills/ship/SKILL.md",
+      "reason": "Make multi-loader schema validation, installed-copy upgrade checks, resource ceilings, and validator-conflict handling part of release gates.",
+      "evidence": "The 8.0 audit found pinned 7.23 helper links, loader-specific hook payloads, and a native Codex manifest validator conflict.",
+      "reinforced": 4,
+      "status": "applied"
+    },
+    {
+      "op": "modify",
+      "artifact_type": "hook",
+      "path": "tests/run-tests.sh",
+      "reason": "Prevent the retrospective schema query and promoted release methodology from silently drifting again.",
+      "evidence": "The stale retrospective query survived until literal execution; regression checks now pin current columns and promoted safety gates.",
+      "reinforced": 1,
+      "status": "applied"
+    },
+    {
+      "op": "promote",
+      "artifact_type": "learning",
+      "path": "agentdb://learnings/path-normalization-before-allowlists",
+      "reason": "Merge two duplicate traversal findings into the stronger containment rule.",
+      "evidence": "Both findings share the same cause: raw-prefix allowlisting before lexical traversal rejection.",
+      "reinforced": 2,
+      "status": "applied"
+    },
+    {
+      "op": "promote",
+      "artifact_type": "learning",
+      "path": "agentdb://learnings/cross-loader-armed-payloads",
+      "reason": "Record the reusable distinction between shared hook matchers and loader-specific payload behavior.",
+      "evidence": "Codex invoked the hook but the Claude-only parser inspected empty data.",
+      "reinforced": 1,
+      "status": "applied"
+    },
+    {
+      "op": "promote",
+      "artifact_type": "learning",
+      "path": "agentdb://learnings/disposable-plugin-release-tests",
+      "reason": "Record installed-copy testing as the release proof for install, upgrade, rollback, and documentation commands.",
+      "evidence": "The 7.23 to 8.0 helper-link migration and marketplace-only recovery were invisible from the source checkout alone.",
+      "reinforced": 1,
+      "status": "applied"
+    },
+    {
+      "op": "promote",
+      "artifact_type": "learning",
+      "path": "agentdb://learnings/native-manifest-validator-conflict",
+      "reason": "Preserve the safety-first decision when loader schemas cannot both validate.",
+      "evidence": "The native Codex validator rejected required Claude safety metadata; the proven compatibility loader remained available.",
+      "reinforced": 1,
+      "status": "applied"
+    },
+    {
+      "op": "promote",
+      "artifact_type": "learning",
+      "path": "agentdb://learnings/resource-bounded-test-execution",
+      "reason": "Treat host exhaustion as a verification-system failure rather than a tolerable test cost.",
+      "evidence": "Repeated unbounded test-suite attempts crashed the workstation before this release audit.",
+      "reinforced": 1,
+      "status": "applied"
+    }
+  ],
+  "project_fit": {
+    "missing": [
+      "Native Codex manifest remains intentionally deferred until the official validator accepts the required safety metadata.",
+      "Codex has no equivalent SessionEnd plugin event; durable end-of-session parity needs an upstream capability or a separately proven lifecycle design."
+    ],
+    "dormant": []
+  }
+}

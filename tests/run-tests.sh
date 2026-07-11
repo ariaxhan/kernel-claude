@@ -1967,6 +1967,24 @@ test_retrospective_has_clusters() {
   grep -q "Clusters\|cluster" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
 }
 
+test_retrospective_queries_current_learning_schema() {
+  local content
+  content=$(cat "$PLUGIN_ROOT/skills/retrospective/SKILL.md")
+  assert_contains "$content" "SELECT id, type, insight, evidence, hit_count, load_count, ts FROM learnings ORDER BY ts DESC" "retrospective must query current AgentDB columns"
+  if grep -qE 'content, evidence, reinforced, created_at|ORDER BY created_at' "$PLUGIN_ROOT/skills/retrospective/SKILL.md"; then
+    echo "FAIL: retrospective still names removed learning columns"
+    return 1
+  fi
+}
+
+test_methodology_carries_cross_loader_release_lessons() {
+  grep -q "one real payload fixture per loader" "$PLUGIN_ROOT/skills/testing/SKILL.md" &&
+    grep -q "NORMALIZE BEFORE ALLOWLISTS" "$PLUGIN_ROOT/skills/security/SKILL.md" &&
+    grep -q "disposable plugin/cache copy" "$PLUGIN_ROOT/skills/ship/SKILL.md" &&
+    grep -q "native manifest validator rejects required safety metadata" "$PLUGIN_ROOT/skills/ship/SKILL.md" &&
+    grep -q "resource ceiling" "$PLUGIN_ROOT/skills/ship/SKILL.md"
+}
+
 # === GitHub Integration Tests ===
 
 test_github_integration_exists() {
@@ -4155,6 +4173,8 @@ run_test_suite() {
       run_test "retrospective has agentdb integration" test_retrospective_has_agentdb
       run_test "retrospective has output format" test_retrospective_has_output_format
       run_test "retrospective has cluster analysis" test_retrospective_has_clusters
+      run_test "retrospective queries current learning schema" test_retrospective_queries_current_learning_schema
+      run_test "methodology carries cross-loader release lessons" test_methodology_carries_cross_loader_release_lessons
       ;;
     github_integration)
       run_test "github-integration.sh exists" test_github_integration_exists

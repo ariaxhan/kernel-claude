@@ -84,6 +84,19 @@ test harness performs).
 - Test-environment parity: anything the harness sets up (migrations, bindings,
   seeded state), the real runtime must also get, or its absence must be a named,
   loud condition.
+- Multi-loader integrations need one real payload fixture per loader. Sharing a
+  matcher or entry point does not prove that Claude, Codex, an IDE, or CI sends
+  the same field names. Assert both the decision and the non-empty data the
+  safety check actually inspected; an armed hook reading an empty field is a
+  silent no-op.
+- Install and upgrade behavior gets a disposable-copy test: fresh install,
+  supported prior-version upgrade, user-owned collision, and rollback from a
+  working directory outside the source checkout. Documentation commands must be
+  executed verbatim there, not merely found with grep.
+- Bound heavyweight verification by time, process count, and memory when the
+  runner supports it. Start with the narrow suite, record resource use, then run
+  the full suite once. A test command that can freeze the workstation is a
+  failed test design even if it eventually turns green.
 
 ## Verification Gate
 

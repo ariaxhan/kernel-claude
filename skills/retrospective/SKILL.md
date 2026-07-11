@@ -24,7 +24,7 @@ sentence in a doc is honor-system; an artifact fires on its own.
 <execution>
 1. Pull all learnings from AgentDB:
    ```bash
-   agentdb query "SELECT id, type, content, evidence, reinforced, created_at FROM learnings ORDER BY created_at DESC"
+   agentdb query "SELECT id, type, insight, evidence, hit_count, load_count, ts FROM learnings ORDER BY ts DESC"
    ```
 
 2. Pull recent checkpoints for session context:
@@ -37,7 +37,7 @@ sentence in a doc is honor-system; an artifact fires on its own.
    - **Duplicates**: Identify learnings that say the same thing differently, merge into strongest form
    - **Contradictions**: Find learnings that conflict, resolve with evidence, archive the loser
    - **Stale**: Flag learnings not reinforced in 30+ days with no recent evidence
-   - **Promotable**: Identify patterns worth encoding as artifacts (reinforced 2+, OR reinforced 1x
+   - **Promotable**: Identify patterns worth encoding as artifacts (hit_count 2+, OR hit_count 1x
      when the failure mode is quiet/expensive, don't wait for a third burn on a costly lesson)
    - **Project fit**: Audit the host project's `.claude/` against its actual work. A recurring
      manual pattern with no skill → skill candidate. A repeated safety catch with no hook → hook
