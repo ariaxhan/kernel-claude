@@ -11,7 +11,9 @@ It is for people who use Claude Code on real repositories and want work to survi
 - Claude Code in VS Code, which uses the same plugin configuration and may ask for a restart after changes.
 - Codex CLI and the Codex app through Codex's legacy Claude-plugin compatibility loader.
 
-KERNEL skills are namespaced: `/kernel:ingest`, `/kernel:validate`, and so on. Cursor and Claude chat Personal plugins are not supported installation targets here.
+KERNEL skills are namespaced. Claude Code invokes `/kernel:ingest`; Codex invokes
+`$kernel:ingest`. Cursor and Claude chat Personal plugins are not supported
+installation targets here.
 
 KERNEL 8 intentionally does not ship a native `.codex-plugin` manifest yet. Claude's
 explicit-only skill marker and Codex's native plugin validator currently disagree;
@@ -57,6 +59,8 @@ Restart the Codex session or app after installation. Verify with:
 ```bash
 codex plugin list
 ```
+
+Then explicitly invoke `$kernel:init`; use `$kernel:help` for the Codex skill index.
 
 ## Upgrading from 7.23.0
 
@@ -136,7 +140,11 @@ Useful skill groups:
 - Methods: `build`, `testing`, `debug`, `security`, `architecture`, `git`, `frontend`, and more
 - Setup/reference: `init`, `help`, `landing-page`
 
-There are 33 skills and 15 specialized agent definitions in this release. `/kernel:help` is the live index.
+There are 33 skills and 15 specialized Claude Code agent definitions in this release.
+Codex loads the skills and SessionStart rules, but it does not register those 15
+Claude agent files as native Codex agents; KERNEL maps the same roles onto Codex's
+available subagents during orchestration. Use `/kernel:help` in Claude Code or
+`$kernel:help` in Codex.
 
 ## What KERNEL writes
 
@@ -147,7 +155,14 @@ KERNEL keeps durable data in the selected Vaults, found in this order: valid `KE
 - `_meta/agents/`, `_meta/logs/`, and small session-status files: runtime records.
 - `.claude/kernel/` and `.local/bin/agentdb`: links created only by explicit init; startup only repairs recognized old numbered KERNEL links.
 
-KERNEL hooks can inspect repository state, run configured checks, and write these records. Some workflows can use GitHub when the project profile enables it. KERNEL does not promise that all processing stays local when you invoke a workflow that uses external tools. Review Claude Code permissions and the repository's own instructions before granting access.
+KERNEL hooks can inspect repository state, run configured checks, and write these records.
+Claude Code runs the full declared lifecycle. Codex runs supported synchronous hook
+events, including the write guards and SessionStart context; it skips asynchronous
+command hooks and has no plugin SessionEnd event, so end-of-session recording in Codex
+must be invoked explicitly with `$kernel:handoff`. Some workflows can use GitHub when
+the project profile enables it. KERNEL does not promise that all processing stays
+local when you invoke a workflow that uses external tools. Review host permissions
+and the repository's own instructions before granting access.
 
 ## Safety model
 

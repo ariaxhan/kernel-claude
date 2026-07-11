@@ -18,6 +18,12 @@ One primitive: skills (methodology, workflows, state transitions, validators,
 operators). Agents, manifests, philosophy, and current plugin status.
 </purpose>
 
+<host_invocation>
+Claude Code invokes skills as `/kernel:<name>`. Codex invokes them as
+`$kernel:<name>`. Tables below use Claude Code syntax; Codex users replace the
+leading slash with a dollar sign.
+</host_invocation>
+
 <on_start>
 Before showing help, check the actual state of the plugin as loaded in your context:
 1. Is the session-start hook output visible? (Look for "# KERNEL" at conversation start)
@@ -117,6 +123,9 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 </tiers>
 
 <agents>
+These are Claude Code agent definitions. Codex does not register the files as native
+agents; KERNEL applies the role contracts to available Codex subagents.
+
 | Agent | Role |
 |-------|------|
 | **Surgeon** | Minimal diff implementation. Only touches contract-listed files. |
@@ -127,6 +136,13 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 | **Validator** | Pre-commit quality gate, build, types, lint, tests, security. |
 | **Dreamer** | Multi-perspective debate, minimalist/maximalist/pragmatist. |
 </agents>
+
+<lifecycle>
+Claude Code runs the full declared plugin lifecycle. Codex runs supported synchronous
+events, including SessionStart and write guards, but skips asynchronous command hooks
+and has no plugin SessionEnd event. In Codex, use `$kernel:handoff` explicitly when
+durable end-of-session state is required.
+</lifecycle>
 
 <philosophy>
 <principle id="research_first">Research anti-patterns before solutions. Most problems are already solved.</principle>

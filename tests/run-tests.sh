@@ -935,6 +935,71 @@ test_detect_secrets_allows_clean_code() {
   assert_exit_code 0 "$exit_code" "clean code should pass"
 }
 
+test_detect_secrets_blocks_codex_apply_patch() {
+  local key="AKIA"; key+="IOSFODNN7EXAMPLE"
+  local patch json ec=0
+  patch=$(printf '*** Begin Patch\n*** Add File: config.ts\n+const key = "%s";\n*** End Patch' "$key")
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "Codex apply_patch secret must be blocked by the armed hook"
+}
+
+test_detect_secrets_allows_codex_secret_removal() {
+  local key="AKIA"; key+="IOSFODNN7EXAMPLE"
+  local patch json
+  patch=$(printf '*** Begin Patch\n*** Update File: config.ts\n@@\n-const key = "%s";\n+const key = process.env.API_KEY;\n*** End Patch' "$key")
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  assert_exit_code 0 "$?" "Codex must be able to remove an existing secret"
+}
+
+test_guard_config_blocks_codex_apply_patch() {
+  local patch json ec=0
+  patch=$'*** Begin Patch\n*** Add File: .claude/generated/foo.md\n+generated\n*** End Patch'
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "Codex apply_patch into .claude/generated must be blocked by the armed hook"
+}
+
+test_guard_config_allows_codex_apply_patch_rule() {
+  local patch json
+  patch=$'*** Begin Patch\n*** Add File: .claude/rules/safe.md\n+safe\n*** End Patch'
+  json=$(jq -n --arg patch "$patch" '{tool_input:{patch:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1
+  assert_exit_code 0 "$?" "Codex apply_patch into .claude/rules must be allowed"
+}
+
+test_codex_explicit_only_skill_policies() {
+  local skill policy
+  for skill in init forge experiment landing-page; do
+    policy="$PLUGIN_ROOT/skills/$skill/agents/openai.yaml"
+    [ -f "$policy" ] || { echo "FAIL: missing Codex policy for $skill"; return 1; }
+    grep -q '^policy:' "$policy" || return 1
+    grep -q '^  allow_implicit_invocation: false$' "$policy" || return 1
+    grep -q '^disable-model-invocation: true$' "$PLUGIN_ROOT/skills/$skill/SKILL.md" || return 1
+  done
+}
+
+test_codex_apply_patch_guards_are_wired() {
+  jq -e '
+    .hooks.PreToolUse[]
+    | select(.matcher == "Write|Edit")
+    | [.hooks[].command]
+    | index("${CLAUDE_PLUGIN_ROOT}/hooks/scripts/detect-secrets.sh") != null
+      and index("${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-config.sh") != null
+  ' "$PLUGIN_ROOT/hooks/hooks.json" >/dev/null
+}
+
+test_session_start_includes_dual_loader_tier_rules() {
+  local output
+  output=$(HOME="$TEST_DIR/home" KERNEL_VAULTS="$TEST_PROJECT" \
+    "$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>/dev/null)
+  assert_contains "$output" "Tier 2+: create an AgentDB contract"
+  assert_contains "$output" "surgeon"
+  assert_contains "$output" "adversary"
+  assert_contains "$output" "Codex"
+}
+
 test_guard_bash_blocks_force_push() {
   echo '{"tool_input":{"command":"git push --force origin main"}}' \
     | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
@@ -1675,6 +1740,16 @@ test_release_docs_separate_claude_and_codex_lifecycle() {
   done
   grep -q 'codex plugin marketplace add ariaxhan/kernel-claude' "$PLUGIN_ROOT/README.md"
   grep -q 'codex plugin marketplace add ariaxhan/kernel-claude' "$PLUGIN_ROOT/docs/QUICKSTART.md"
+}
+
+test_release_docs_explain_codex_invocation_and_boundaries() {
+  local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md skills/help/SKILL.md) file
+  for file in "${files[@]}"; do
+    grep -Fq '/kernel:' "$PLUGIN_ROOT/$file" || return 1
+    grep -Fq '$kernel:' "$PLUGIN_ROOT/$file" || return 1
+    grep -Fqi 'Claude Code agent' "$PLUGIN_ROOT/$file" || return 1
+    grep -Fq 'SessionEnd' "$PLUGIN_ROOT/$file" || return 1
+  done
 }
 
 test_release_changelog_v8_is_current_and_history_preserved() {
@@ -3955,12 +4030,19 @@ run_test_suite() {
       run_test "detect-secrets blocks OpenAI key" test_detect_secrets_blocks_openai_key
       run_test "detect-secrets blocks private key" test_detect_secrets_blocks_private_key
       run_test "detect-secrets allows clean code" test_detect_secrets_allows_clean_code
+      run_test "detect-secrets blocks Codex apply_patch" test_detect_secrets_blocks_codex_apply_patch
+      run_test "detect-secrets allows Codex secret removal" test_detect_secrets_allows_codex_secret_removal
       run_test "guard-bash blocks force push" test_guard_bash_blocks_force_push
       run_test "guard-bash allows safe commands" test_guard_bash_allows_safe_commands
       run_test "guard-bash allows git log" test_guard_bash_allows_git_log
       run_test "guard-config blocks .claude/ write" test_guard_config_blocks_claude_dir_write
       run_test "guard-config allows CLAUDE.md" test_guard_config_allows_claude_md
       run_test "guard-config allows rules" test_guard_config_allows_rules
+      run_test "guard-config blocks Codex apply_patch" test_guard_config_blocks_codex_apply_patch
+      run_test "guard-config allows Codex apply_patch rule" test_guard_config_allows_codex_apply_patch_rule
+      run_test "Codex risky skills are explicit-only" test_codex_explicit_only_skill_policies
+      run_test "Codex apply_patch guards are wired" test_codex_apply_patch_guards_are_wired
+      run_test "SessionStart includes dual-loader tier rules" test_session_start_includes_dual_loader_tier_rules
       run_test "auto-approve allows git status" test_auto_approve_allows_git_status
       run_test "auto-approve allows npm test" test_auto_approve_allows_npm_test
       run_test "auto-approve rejects rm -rf" test_auto_approve_rejects_rm_rf
@@ -4119,6 +4201,7 @@ run_test_suite() {
       run_test "metadata and inventory truthful" test_release_metadata_and_inventory_are_truthful
       run_test "rollback works outside a checkout" test_release_docs_rollback_works_outside_a_checkout
       run_test "Claude and Codex lifecycle commands are separate" test_release_docs_separate_claude_and_codex_lifecycle
+      run_test "Codex invocation and lifecycle boundaries are documented" test_release_docs_explain_codex_invocation_and_boundaries
       ;;
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol

@@ -44,7 +44,7 @@ agentdb status
 readlink "$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current"
 ```
 
-Then use `/kernel:help`.
+Then use `/kernel:help` in Claude Code or `$kernel:help` in Codex.
 
 ## Daily workflow
 
@@ -53,6 +53,9 @@ Then use `/kernel:help`.
    risk, and blast radius—not file count.
 3. `/kernel:validate` checks the result. `/kernel:handoff` creates a bounded JSON
    resume point when another session must continue.
+
+Common skills below use Claude Code syntax. In Codex, replace the leading `/` with
+`$`, for example `$kernel:validate`.
 
 Common skills:
 
@@ -89,6 +92,19 @@ The update does not replace project files, AgentDB, manifests, or receipts. KERN
 uses canonical JSON state and cannot promise that KERNEL 7 will resume KERNEL 8 state.
 `/kernel:design` is now `/kernel:frontend`; the old command-file implementation layer
 was removed.
+
+## Codex behavior boundaries
+
+Codex loads all 33 KERNEL skills, with explicit calls written as `$kernel:<name>`.
+The four side-effecting skills (`init`, `forge`, `experiment`, and `landing-page`)
+also carry Codex-native policy that forbids automatic invocation.
+
+The 15 files under `agents/` are Claude Code agent definitions. Codex does not
+register them as native agents; KERNEL applies their role contracts when coordinating
+available Codex subagents. Codex runs supported synchronous hooks, including
+SessionStart and the write guards. It skips asynchronous command hooks and has no
+plugin SessionEnd event, so finish Codex work with `$kernel:handoff` when durable
+end-state is required.
 
 For a session-only rollback:
 

@@ -39,6 +39,16 @@ file is constrained to the top-level fields accepted by both loaders. If Codex r
 `unknown field version` for `hooks/hooks.json`, it is reading a 7.23 cache; upgrade and
 restart Codex rather than editing that cache.
 
+Explicit skill syntax differs by host: Claude Code uses `/kernel:<name>` and Codex
+uses `$kernel:<name>`. KERNEL adds Codex-native explicit-only policies for `init`,
+`forge`, `experiment`, and `landing-page`; their existing Claude markers remain.
+
+Codex loads KERNEL's SessionStart context and synchronous write guards. It skips
+asynchronous command hooks and has no plugin SessionEnd event. The 15 files in
+`agents/` remain Claude Code agent definitions rather than native Codex agents;
+Codex orchestration applies the same role contracts to available Codex subagents.
+Use `$kernel:handoff` explicitly when a Codex session needs durable closing state.
+
 ## Automatic helper migration
 
 Claude Code installs 8.0 beside 7.23 in a versioned cache. KERNEL validates the root
@@ -67,7 +77,8 @@ only matching symlink residue; regular files with similar names remain untouched
   `kernel.retrospective-result/v1`, and `kernel.context-receipt/v1`. Historical YAML
   is retained as history but is not an active KERNEL 8 resume input.
 - Workflow/state/validator/operator definitions now all live under `skills/`; the
-  old `commands/` layer is removed. Namespaced invocations remain `/kernel:<skill>`.
+  old `commands/` layer is removed. Invoke `/kernel:<skill>` in Claude Code or
+  `$kernel:<skill>` in Codex.
 - `/kernel:design` is renamed `/kernel:frontend`.
 - A KERNEL 7 session can keep old code loaded until reload/restart. Cache presence is
   not active-version authority.

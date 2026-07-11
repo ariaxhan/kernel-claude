@@ -14,22 +14,33 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+FILE_PATHS=$(echo "$INPUT" | jq -r '
+  if (.tool_input.file_path | type) == "string" then .tool_input.file_path
+  elif (.tool_input.patch | type) == "string" then
+    .tool_input.patch
+    | split("\n")[]
+    | select(test("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "))
+    | sub("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "; "")
+  else empty end
+')
 
-[ -z "$FILE_PATH" ] && exit 0
+[ -z "$FILE_PATHS" ] && exit 0
 
-# Only care about .claude/ paths
-if ! echo "$FILE_PATH" | grep -q '\.claude/'; then
-    exit 0
-fi
+while IFS= read -r FILE_PATH; do
+  [ -z "$FILE_PATH" ] && continue
+  # Only care about .claude/ paths.
+  echo "$FILE_PATH" | grep -q '\.claude/' || continue
 
-# Allow: CLAUDE.md, rules/*.md, commands/*.md, agents/*.md, skills/*.md, hooks/*.sh, settings*.json
-if echo "$FILE_PATH" | grep -qE '\.claude/(CLAUDE\.md|rules/.*\.md|commands/.*\.md|agents/.*\.md|skills/.*\.md|hooks/.*\.sh|settings.*\.json|projects/.*/memory/.*)$'; then
-    exit 0
-fi
+  # Allow: CLAUDE.md, rules/*.md, commands/*.md, agents/*.md, skills/*.md, hooks/*.sh, settings*.json
+  if echo "$FILE_PATH" | grep -qE '\.claude/(CLAUDE\.md|rules/.*\.md|commands/.*\.md|agents/.*\.md|skills/.*\.md|hooks/.*\.sh|settings.*\.json|projects/.*/memory/.*)$'; then
+    continue
+  fi
 
-# Block: anything else in .claude/ (generated content should go to _meta/)
-echo "BLOCKED: .claude/ is for config only. Generated content goes to _meta/" >&2
-echo "  Attempted: $FILE_PATH" >&2
-echo "  Allowed: CLAUDE.md, rules/*.md, commands/*.md, agents/*.md, skills/*.md, hooks/*.sh, settings*.json" >&2
-exit 2
+  # Block: anything else in .claude/ (generated content should go to _meta/).
+  echo "BLOCKED: .claude/ is for config only. Generated content goes to _meta/" >&2
+  echo "  Attempted: $FILE_PATH" >&2
+  echo "  Allowed: CLAUDE.md, rules/*.md, commands/*.md, agents/*.md, skills/*.md, hooks/*.sh, settings*.json" >&2
+  exit 2
+done <<< "$FILE_PATHS"
+
+exit 0
