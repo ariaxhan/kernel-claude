@@ -29,9 +29,9 @@ Every rule below is a HYPOTHESIS. Run /kernel:experiment to prove or disprove.
 </purpose>
 
 <skill_load>
-always: skills/quality/SKILL.md, skills/design/SKILL.md
+always: skills/quality/SKILL.md, skills/frontend/SKILL.md
 on_domain:
-  frontend: skills/design/SKILL.md
+  frontend: skills/frontend/SKILL.md
 reference: _meta/research/ai-landing-page-failures-2026.md
 </skill_load>
 

@@ -37,7 +37,7 @@ on_classify:
 on_domain:
   api:      skills/api/SKILL.md, skills/backend/SKILL.md
   auth:     skills/security/SKILL.md
-  frontend: skills/design/SKILL.md
+  frontend: skills/frontend/SKILL.md
   backend:  skills/backend/SKILL.md
 on_tier:
   2+:       skills/orchestration/SKILL.md

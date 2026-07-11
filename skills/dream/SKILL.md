@@ -31,7 +31,7 @@ agentdb read-start   # prior dreams + learnings seed the perspectives; don't re-
 always: skills/quality/SKILL.md, skills/architecture/SKILL.md
 on_domain:
   api:      skills/api/SKILL.md, skills/backend/SKILL.md
-  frontend: skills/design/SKILL.md
+  frontend: skills/frontend/SKILL.md
   backend:  skills/backend/SKILL.md
   security: skills/security/SKILL.md
 </skill_load>

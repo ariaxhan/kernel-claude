@@ -17,6 +17,10 @@ conversations.
   workflow changes; no aliases shipped. `plugin.json` no longer registers commands.
 - **experiment collision resolved**: the autonomous engine (former command) and the
   methodology (former skill) merged into one `skills/experiment/SKILL.md`.
+- **design skill renamed to `frontend`.** `skills/design/` -> `skills/frontend/`,
+  invoked as `/kernel:frontend` (was `/kernel:design`). Renamed to avoid colliding with
+  Claude's native `/design` command in the Desktop/Cursor unprefixed form. Behavior,
+  mood variants (abyss, spatial, verdant, ...), and reference docs are unchanged.
 
 ### Added
 - **Manifest runtime** `orchestration/manifest/kernel-manifest`: validate | latest |

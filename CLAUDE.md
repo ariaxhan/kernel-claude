@@ -226,7 +226,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
 
   <!-- WORKFLOW -->
   <skill id="git" triggers="commit, branch, merge, PR">Atomic commits, conventional messages, branch strategies, merge protocols.</skill>
-  <skill id="design" triggers="UI, frontend, styling, visual">/design command. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
+  <skill id="frontend" triggers="UI, frontend, styling, visual">/kernel:frontend skill. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
   <skill id="app-dev" triggers="app, mobile, store submission, build, deploy, fastlane">Mobile/web build pipeline: fastlane-first local builds, store submission, pre-submission checklists. EAS only as a stated exception.</skill>
 
   <!-- EXPERIMENTATION -->
@@ -235,7 +235,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <rule>Load relevant skill before acting. Match triggers to task. Reference research docs when methodology applies.</rule>
 </skills>
 
-<!-- Design: skills/design/SKILL.md. Load for frontend work. -->
+<!-- Frontend: skills/frontend/SKILL.md. Load for frontend work. -->
 <!-- Output validation: rules/kernel.md -->
 
 <anti_patterns>
