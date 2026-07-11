@@ -1785,10 +1785,19 @@ test_release_docs_explain_codex_invocation_and_boundaries() {
 }
 
 test_release_changelog_v8_is_current_and_history_preserved() {
-  local v8
-  v8=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
-  [[ "$v8" == *"strict JSON"* ]] && [[ "$v8" == *"preflight"* ]] && [[ "$v8" == *"select-runtime.sh"* ]]
+  local v801 v800
+  v801=$(awk '/^## \[8\.0\.1\]/{on=1} /^## \[8\.0\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
+  v800=$(awk '/^## \[8\.0\.0\]/{on=1} /^## \[7\.23\.0\]/{on=0} on' "$PLUGIN_ROOT/CHANGELOG.md")
+  [[ "$v801" == *"incomplete"* ]] && [[ "$v801" == *"Codex"* ]] && [[ "$v801" == *"363"* ]] || return 1
+  [[ "$v800" == *"strict JSON"* ]] && [[ "$v800" == *"preflight"* ]] && [[ "$v800" == *"select-runtime.sh"* ]] || return 1
   grep -q '^## \[7.23.0\] - 2026-07-06' "$PLUGIN_ROOT/CHANGELOG.md"
+}
+
+test_release_docs_use_current_801_runtime() {
+  grep -q 'kernel/8\.0\.1/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
+  ! grep -q 'kernel/8\.0\.0/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
+  # Historical 8.0.0 release and upgrade references remain valid outside active runtime commands.
+  grep -q '^## \[8\.0\.0\] - 2026-07-11' "$PLUGIN_ROOT/CHANGELOG.md"
 }
 
 test_release_metadata_and_inventory_are_truthful() {
@@ -1802,7 +1811,7 @@ import json, pathlib, sys
 r=pathlib.Path(sys.argv[1])
 p=json.loads((r/'.claude-plugin/plugin.json').read_text())
 m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
-assert p['version']==m['version']=='8.0.0'
+assert p['version']==m['version']=='8.0.1'
 for x in (p,m):
     assert 'JSON' in x['description'] and '33 skills' in x['description'] and '15 specialized agent' in x['description']
 PY
@@ -4314,6 +4323,7 @@ run_test_suite() {
     release_docs)
       run_test "active docs reject stale claims" test_release_docs_reject_stale_live_claims
       run_test "8.0 changelog current and 7.x history preserved" test_release_changelog_v8_is_current_and_history_preserved
+      run_test "active release docs use 8.0.1 runtime" test_release_docs_use_current_801_runtime
       run_test "metadata and inventory truthful" test_release_metadata_and_inventory_are_truthful
       run_test "rollback works outside a checkout" test_release_docs_rollback_works_outside_a_checkout
       run_test "Claude and Codex lifecycle commands are separate" test_release_docs_separate_claude_and_codex_lifecycle

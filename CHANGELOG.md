@@ -2,6 +2,44 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.0.1] - 2026-07-11
+
+KERNEL 8.0.1 is the corrected KERNEL 8 release. An incomplete 8.0.0 candidate reached
+the public `main` branch before the full release gate had finished. Users who installed
+or refreshed 8.0.0 should upgrade to 8.0.1 and restart Claude Code or Codex so the
+versioned plugin cache cannot keep serving the incomplete build.
+
+### Fixed
+- Completed the strict-JSON manifest runtime with typed divergence and preflight
+  checks, canonical receipts and hashes, safe path handling, and transactional ledger
+  and deactivation behavior.
+- Added validated runtime selection, forward-only normal upgrades, explicit rollback,
+  and ownership-safe repair for the three KERNEL helper links without overwriting user
+  files, directories, malformed links, or unrelated links.
+- Rewrote the README, setup guide, and migration guide around the actual KERNEL 8 user
+  flow, including executable Claude Code and Codex install, upgrade, reinstall, and
+  rollback commands plus honest data-preservation and compatibility boundaries.
+- Made the shared hook configuration parse in both Claude Code and Codex. Codex
+  `apply_patch` payloads now reach the secret and configuration guards; dot-segment
+  traversal and malformed hook JSON fail closed, while removing an existing secret
+  remains possible.
+- Added Codex-native explicit-only policies for `init`, `forge`, `experiment`, and
+  `landing-page`, corrected Codex invocation syntax to `$kernel:<skill>`, and documented
+  that Claude agent definitions, asynchronous hooks, and SessionEnd do not become
+  native Codex lifecycle features through the compatibility loader.
+- Restored essential tier-2 orchestration rules through SessionStart for plugin users
+  who do not receive repository `AGENTS.md` automatically.
+- Made no-marker compaction restoration silent without hiding legitimate runtime
+  selection messages in other paths.
+- Made retrospective staleness use `COALESCE(last_hit, ts)` so recently recalled older
+  learnings are not archived, and corrected release instructions to name the exact
+  canonical files changed by `scripts/bump-version.sh`.
+
+### Verification
+- The corrected candidate passes the bounded full suite: **363 passed, 0 failed**, plus
+  focused runtime-upgrade, release-documentation, cross-loader hook, retrospective,
+  compaction, and version-synchronization gates.
+
 ## [8.0.0] - 2026-07-11
 
 KERNEL 8 unifies its public operations as skills, makes strict JSON the canonical

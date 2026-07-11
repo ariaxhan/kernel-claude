@@ -117,7 +117,7 @@ claude --plugin-dir "$HOME/kernel-claude-7.23"
 To deliberately select a validated local or cached runtime for the helper links:
 
 ```bash
-"$HOME/.claude/plugins/cache/kernel-marketplace/kernel/8.0.0/scripts/select-runtime.sh" /path/to/kernel-claude-7.23
+"$HOME/.claude/plugins/cache/kernel-marketplace/kernel/8.0.1/scripts/select-runtime.sh" /path/to/kernel-claude-7.23
 ```
 
 That explicit selection may move `current` backward; normal old sessions cannot. It does not convert KERNEL 8 JSON state to KERNEL 7 YAML. Do not delete the plugin cache or remove the marketplace as a normal rollback step.
