@@ -481,6 +481,19 @@ test_hooks_json_has_session_end() {
   fi
 }
 
+test_hooks_json_has_no_lifecycle_autopush() {
+  python3 - "$PLUGIN_ROOT/hooks/hooks.json" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1]))
+commands = [
+    hook.get("command", "")
+    for group in data.get("hooks", {}).get("SessionEnd", [])
+    for hook in group.get("hooks", [])
+]
+assert not any("autopush.sh" in command and "sweep" in command for command in commands), commands
+PY
+}
+
 test_session_start_workflow_present() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
@@ -4375,6 +4388,7 @@ run_test_suite() {
       run_test "detect-secrets clean file" test_detect_secrets_clean
       run_test "hooks.json has SessionStart" test_hooks_json_has_session_start
       run_test "hooks.json has SessionEnd" test_hooks_json_has_session_end
+      run_test "hooks.json has no lifecycle autopush" test_hooks_json_has_no_lifecycle_autopush
       run_test "hooks.json supports Claude and Codex loaders" test_hooks_json_cross_loader_schema
       run_test "advisory hooks are synchronous and complete" test_advisory_hooks_are_synchronous_and_complete
       run_test "six advisory hook commands are retained" test_six_advisory_hook_commands_are_retained

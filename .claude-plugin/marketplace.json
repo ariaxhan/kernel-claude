@@ -7,8 +7,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8 includes 34 skills and 15 specialized agent definitions.",
-      "version": "8.1.3"
+      "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.1.4 removes automatic lifecycle network and push sweeps.",
+      "version": "8.1.4"
     }
   ]
 }

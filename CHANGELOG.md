@@ -2,6 +2,20 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.1.4] - 2026-07-15
+
+Patch release removing automatic network and push work from the plugin lifecycle.
+
+### Fixed
+- **SessionEnd no longer runs `autopush.sh sweep`.** Under Codex compatibility handling, the
+  generated adapter exposed this as a per-turn Stop hook. Its vault-wide, unbounded `git fetch`
+  exceeded Codex's 60-second hook budget and could leave an orphan fetch after the hook parent
+  was killed.
+- **Explicit push is now consistent across the published hook manifest.** Kernel retains
+  `autopush.sh sweep` as a manual primitive, but no ambient lifecycle event invokes it.
+- **Cross-loader regression coverage now forbids lifecycle autopush.** A future release fails
+  tests if `SessionEnd` reintroduces `autopush.sh sweep`.
+
 ## [8.1.3] - 2026-07-15
 
 Hotfix for a SessionStart boot failure introduced in 8.1.2.
