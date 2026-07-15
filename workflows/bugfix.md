@@ -34,7 +34,7 @@ tier: auto  # determined at classify step
    - constraint: fix must make failing test pass, no unrelated changes
 
 5. **Verify** -- Confirm fix and check for regressions
-   - agent: adversary (tier 2-3) OR validator (tier 1)
+   - agent: adversary
    - output: verdict to AgentDB
    - checks: failing test now passes, all existing tests still green
    - on_reject: return to step 4 with feedback

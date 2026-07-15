@@ -19,7 +19,7 @@ agentdb inject-context surgeon
 </on_start>
 
 <skill_load>
-Load: skills/quality/SKILL.md, skills/build/SKILL.md, skills/refactor/SKILL.md
+Load: skills/build/SKILL.md, skills/debug/SKILL.md, skills/architecture/SKILL.md
 Reference: skills/quality/reference/quality-research.md
 </skill_load>
 

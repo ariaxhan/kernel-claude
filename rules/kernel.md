@@ -73,12 +73,10 @@ Commits attributed to human author only.
 
 ## Parallel Execution
 
-<invariant id="parallel_first">
-Serial execution is the exception. Parallel is the default.
+<invariant id="spawn_cost_test">
+Inline, single-threaded is the default. A subagent carries a fixed tax (prompt, spawn, wait, merge); pay it only when it buys back more than it costs.
 
-**Detection:** Before taking action, ask: "Can this be split into 2+ independent steps?"
-- If yes → spawn parallel agents with separate contracts
-- If no → execute directly
+**Spawn only when:** the work would bloat the main context (delegate, keep the conclusion), OR several heavy file-disjoint lanes beat serial wall-clock even after the tax, OR the human explicitly asked, OR you need independent verification. Independence alone is NOT a reason. Otherwise execute inline.
 
 **Pattern:** Single message with multiple Task calls. All agents write files directly. Wait for all agents. Merge/review results.
 

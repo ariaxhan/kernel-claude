@@ -2,6 +2,40 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.1.2] - 2026-07-15
+
+KERNEL 8.1.2 is the de-bloat release. It removes maximal-delegation doctrine and
+never-fired surfaces that a current strong model no longer needs, grounded in an evidence
+sweep of ~1,900 real sessions. Same guardrails, far less ceremony and context weight.
+
+### Changed
+- **Delegation is now cost-gated, not tier-mandated.** The ambient block and governance no
+  longer say "the coordinating agent does not implement." Default is inline; spawn a subagent
+  only to protect context, buy real wall-clock on heavy file-disjoint work, on explicit
+  request, or for independent verification, never for independence alone.
+- **Tiering is by reversibility x blast radius, not file count.** Removed the "1-2 / 3-5 / 6+
+  files" tables from ingest and diagnose; the `parallel_first` invariant is now the
+  `spawn_cost_test` heuristic.
+- **Worktrees are opt-in (I0.14), not a per-agent default** — they caused ref-lock races and
+  out-of-project writes when used reflexively.
+- SessionStart caps the dynamic AgentDB dump so the static rules always survive truncation.
+- `landing-page` skill trimmed from 929 lines to a lean interview -> scaffold -> deploy contract.
+
+### Removed
+- 10 never-fired skills (api, backend, e2e, performance, testing, refactor, git, security,
+  quality, validate) — the work still happens; the model does it directly, the hooks remain
+  the real guardrails.
+- 7 never-fired / redundant agents (validator, triage, approval-learner, analyzer,
+  cartographer, coroner, pre-ship).
+
+### Added
+- `lane-worker` agent — isolated, file-disjoint implementation lane for commissioned parallel
+  bursts (bakes in the worktree/no-commit/follow-the-pilot contract).
+- `transcript-archaeologist` agent — read-only forensic miner of session transcripts + git
+  history; returns cited conclusions, not the raw pile.
+
+Net: 34 -> 24 skills, 15 -> 10 agents. 349 tests pass.
+
 ## [8.1.1] - 2026-07-11
 
 KERNEL 8.1.1 fixes the installed entrypoint for the new governance-sync operator.

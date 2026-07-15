@@ -18,7 +18,7 @@ agentdb inject-context reviewer
 </on_start>
 
 <skill_load>
-Load: skills/quality/SKILL.md, skills/testing/SKILL.md, skills/security/SKILL.md
+Load: skills/review/SKILL.md, skills/debug/SKILL.md, skills/architecture/SKILL.md
 Reference: skills/quality/reference/quality-research.md
 </skill_load>
 
