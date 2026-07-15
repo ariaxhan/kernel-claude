@@ -140,12 +140,6 @@
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-end.sh",
             "timeout": 210,
             "statusMessage": "Running tests + cleaning up session..."
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autopush.sh sweep",
-            "timeout": 60,
-            "statusMessage": "Pushing any unpushed commits..."
           }
         ]
       }
