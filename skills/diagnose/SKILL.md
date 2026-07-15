@@ -97,7 +97,7 @@ Load: skills/debug/SKILL.md, skills/testing/SKILL.md, skills/architecture/SKILL.
         Produce restructuring plan with safety constraints.
         List files that change, in what order.
         Identify tests that must pass before AND after.
-        Determine tier based on file count.
+        Determine tier by reversibility x blast radius (file count is only a weak hint).
       </step>
       <step id="handoff">
         Output structured diagnosis.

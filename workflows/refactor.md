@@ -15,7 +15,7 @@ tier: auto  # determined at classify step
    - mandatory: true (refactors touch structure, must map first)
 
 2. **Baseline** -- Snapshot current test state
-   - agent: validator
+   - agent: adversary
    - output: full test suite results saved to AgentDB
    - required: all tests must pass before refactor begins
    - on_failure: fix failing tests first (separate task)
@@ -34,7 +34,7 @@ tier: auto  # determined at classify step
    - constraint: add characterization tests first when behavior is not already covered
 
 5. **Verify Baseline** -- Confirm no behavior change
-   - agent: validator
+   - agent: adversary
    - output: test suite results diffed against baseline
    - check: test results identical to step 2 (same pass/fail, same count)
    - on_reject: return to step 4 with diff of what changed

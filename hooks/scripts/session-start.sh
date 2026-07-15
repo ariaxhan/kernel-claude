@@ -131,10 +131,9 @@ agentdb write-end '{"did":"X","learned":["Y"]}'    # at session end
 agentdb wtf                                        # confused? full ref: agentdb guide
 ```
 
-Tier by reversibility x silence x blast radius (T1 execute, T2 plan+verify, T3 confirm); file count is only a weak hint.
-Tier 2+: create an AgentDB contract, run tearitapart, delegate implementation to a surgeon, then use an adversary/reviewer to verify. The coordinating agent does not implement.
+Optimize for the fastest correct, robust path. Tier by reversibility x blast radius, NOT file count. Gate hard only where an op is irreversible. T1 execute, T2 plan+verify, T3 confirm.
+Default is inline. Spawn a subagent only to protect context, to buy real wall-clock on heavy file-disjoint work, when explicitly asked, or for independent verification, never for independence alone. When work is genuinely high-blast-radius or delegated, contract it, then verify with an adversary.
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
-Native repo governance lives in CLAUDE.md for Claude and AGENTS.md for Codex. This SessionStart output carries the essential shared rules because plugin users do not receive either repository file automatically.
 KERNEL_CONTEXT
 # END GENERATED KERNEL AMBIENT
 
@@ -157,14 +156,16 @@ fi
 
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   echo ""
+  # Cap the always-loaded agentdb dump so the static rules always survive; only the
+  # dynamic memory tail is truncated (uncapped dumps were the SessionStart truncation cause).
   if [ "$VAULTS_CONTINUITY_ACTIVE" -eq 1 ]; then
     "$AGENTDB" read-start 2>/dev/null | awk '
       /^## Last Checkpoint/ { skip=1; next }
       skip && /^## / { skip=0 }
       !skip { print }
-    '
+    ' | head -n 50
   else
-    "$AGENTDB" read-start 2>/dev/null
+    "$AGENTDB" read-start 2>/dev/null | head -n 50
   fi
   echo ""
 

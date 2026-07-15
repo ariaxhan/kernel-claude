@@ -30,20 +30,18 @@ Authority order (highest wins) — a manifest is a map, not the territory:
 </purpose>
 
 <skill_load>
-always: skills/quality/SKILL.md, skills/testing/SKILL.md, skills/git/SKILL.md
+always: skills/debug/SKILL.md
 on_classify:
-  bug:      skills/debug/SKILL.md, skills/testing/SKILL.md
+  bug:      skills/debug/SKILL.md
   feature:  skills/build/SKILL.md, skills/architecture/SKILL.md
-  refactor: skills/refactor/SKILL.md, skills/architecture/SKILL.md
-  review:   skills/testing/SKILL.md, skills/security/SKILL.md
+  refactor: skills/architecture/SKILL.md
+  review:   skills/review/SKILL.md
 on_domain:
-  api:      skills/api/SKILL.md, skills/backend/SKILL.md
-  auth:     skills/security/SKILL.md
-  frontend: skills/frontend/SKILL.md, skills/e2e/SKILL.md
-  backend:  skills/backend/SKILL.md
+  frontend: skills/frontend/SKILL.md
+  app:      skills/app-dev/SKILL.md
 on_tier:
   2+:       skills/orchestration/SKILL.md
-reference: skills/quality/reference/quality-research.md
+reference: skills/build/reference/build-research.md
 </skill_load>
 
 <on_start>
@@ -190,10 +188,10 @@ count: N
 tier: 1|2|3
 
 <tiers>
-1: 1-2 files → execute directly
-2: 3-5 files → contract + surgeon
-3: 6+ files → contract + surgeon + adversary
-ambiguous: assume higher
+1: reversible + loud if wrong → execute inline
+2: persistent or moderately quiet → plan, execute inline; delegate a surgeon only for heavy file-disjoint work; verify
+3: hard to undo, quiet if wrong, or wide blast radius → contract + surgeon + adversary
+ambiguous: assume higher. File count is only a weak hint, never the trigger.
 </tiers>
 
 <ask_user>

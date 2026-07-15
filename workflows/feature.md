@@ -32,7 +32,7 @@ tier: auto  # determined at classify step
    - retry: max 3 with feedback
 
 5. **Verify** -- QA and validation
-   - agent: adversary (tier 2-3) OR validator (tier 1)
+   - agent: adversary
    - output: verdict to AgentDB
    - on_reject: return to step 4 with feedback
 

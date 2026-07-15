@@ -1,6 +1,6 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: ec3a44cd76f569cf41f611286604fa8a326ab5695d11e0f3af0ca3b2e7ad9e51; adapter: claude -->
-<kernel version="8.1.1">
+     source-sha256: 31979f53e284df31ea133589c270c16cc072ec4d6194d8d17b7dbd0396e7c411; adapter: claude -->
+<kernel version="8.1.2">
 
 
 <!-- ============================================ -->
@@ -30,7 +30,7 @@ Every AI-written line is a liability. Research proves solutions before coding.
 AgentDB-first. Read at start, write at end. Continuity depends on it.
 Stable governance lives here. Fast-changing run state lives in AgentDB and `_meta/`, not in governance docs.
 Most SWE work is solved problems. Find the solution, don't invent it.
-Orchestrate, don't implement (tier 2+). Agents write code, you coordinate.
+Default to implementing inline. Delegate only to protect context, buy real parallel wall-clock, or get independent verification, never for independence alone.
 Slow down to speed up. Knowledge mining before coding saves multiples of its time investment.
 Pre-load over ask. Mine history upfront, inject context before work starts, don't discover at runtime.
 Fallback-first. When uncertain: deny. When scanner fails: block. When budget exceeded: stop. Never degrade a safety gate.
@@ -59,11 +59,11 @@ Location: _meta/agentdb/agent.db
 
 <tiers>
   <tier n="1" risk="low" role="executor">Easy to undo + loud if wrong + narrow blast radius. Execute directly.</tier>
-  <tier n="2" risk="durable" role="orchestrator">Persistent or moderately quiet. Contract → surgeon if useful → adversary/review.</tier>
+  <tier n="2" risk="durable" role="executor">Persistent or moderately quiet. Plan, then execute inline. Delegate a surgeon only for heavy file-disjoint work; verify with adversary/review.</tier>
   <tier n="3" risk="high" role="orchestrator">Hard to undo, quiet if wrong, or wide blast radius. Contract → surgeon → adversary → verify.</tier>
 
   <rule>Tier by reversibility × silence × blast radius. File count is only a weak hint. Ambiguous = assume higher tier.</rule>
-  <rule>IF tier >= 2: create contract, spawn agents, read AgentDB. DO NOT write code.</rule>
+  <rule>Read AgentDB at every tier. Implement inline by default; delegate to agents only when the work is heavy and file-disjoint, explicitly requested, or needs independent verification.</rule>
   <rule>IF tier >= 2: run /kernel:tearitapart before implementation.</rule>
 </tiers>
 
@@ -77,23 +77,18 @@ Location: _meta/agentdb/agent.db
   <agent id="reviewer">agents/reviewer.md. PR/code review. Checks logic, security, performance, maintainability. >80% confidence threshold. APPROVE/REQUEST CHANGES/COMMENT verdict. Load: testing, security skills.</agent>
   <agent id="researcher">agents/researcher.md. Pre-implementation research. Triggered by unfamiliar tech, package selection, integration decisions. Load: build skill + build-research.</agent>
   <agent id="scout">agents/scout.md. Codebase reconnaissance. Triggered on first interaction or discovery requests. Maps structure, detects tooling, identifies risk zones. Load: context, architecture skills.</agent>
-  <agent id="validator">agents/validator.md. Pre-commit quality gate. Runs: build, types, lint, tests, security scan. Blocks commit on failure. Load: testing, security skills.</agent>
-  <agent id="triage">agents/triage.md. Haiku complexity classifier. Single fast call before expensive work. Low/medium/high/epic classification plus a cheap viability pre-flight before surgeon spawns.</agent>
-  <agent id="approval-learner">agents/approval-learner.md. Sonnet observer. Extracts patterns from human review decisions. Progressive rule promotion with confidence scoring.</agent>
-  <agent id="analyzer">agents/analyzer.md. Cross-task intelligence. Dependency detection, batch analysis, systemic patterns, priority recommendation.</agent>
-  <agent id="cartographer">agents/cartographer.md. Opus whole-codebase mapper. 1M context for holistic understanding. Maps modules, dependencies, risk zones.</agent>
-  <agent id="coroner">agents/coroner.md. Sonnet post-mortem analyst. Structured cause-of-death for failed contracts using AgentDB telemetry.</agent>
-  <agent id="pre-ship">agents/pre-ship.md. Composite release gate. Spawns 4 parallel validators, aggregates into SHIP/NO-SHIP verdict.</agent>
+  <agent id="lane-worker">agents/lane-worker.md. Isolated implementation lane for a commissioned parallel burn. Owns one file-disjoint slice, follows the pilot/contract verbatim, checkpoints to AgentDB, never commits. Load: build, testing skills.</agent>
+  <agent id="transcript-archaeologist">agents/transcript-archaeologist.md. Forensic miner of session transcripts + git history. Extracts failure timelines, recurring patterns, cited evidence from JSONL corpora. Read-only. Load: context skill.</agent>
   <agent id="blind-evaluator">agents/blind-evaluator.md. Structurally separate evaluator. Receives ONLY the problem statement + rubric, never the solution. For high-stakes assessment where self-scoring inflates.</agent>
   <agent id="deep-diver">agents/deep-diver.md. Pre-implementation failure-mode research. Merges GitHub-issue + production-case channels into a failure-mode map at _meta/research/. Gates non-trivial native/infra/schema work.</agent>
   <agent id="dreamer">agents/dreamer.md. Multi-perspective debate. Generates minimalist, maximalist, and pragmatist approaches grounded in actual codebase context.</agent>
-  <rule>Tier 2+: you orchestrate. Agents write to AgentDB, not conversation.</rule>
+  <rule>When you delegate, agents write to AgentDB, not conversation.</rule>
   <rule>Every agent must load relevant skills/*/SKILL.md and reference skills/*/reference/*-research.md when applicable.</rule>
 </agents>
 
 <flow>
   Read context (agentdb read-start, _meta/research/) → research anti-patterns before solutions →
-  tier the work → define success before coding → execute (tier 1 directly; tier 2+ contract → surgeon → verify) → learn (agentdb learn).
+  tier the work → define success before coding → execute (inline by default; delegate heavy file-disjoint work → surgeon → verify) → learn (agentdb learn).
   Never implement the first idea: generate 2-3 approaches, choose simplest. Details live in the skills, not here.
 </flow>
 
@@ -163,7 +158,6 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <skill id="metrics" kind="workflow" file="skills/metrics/SKILL.md">Observability dashboard. Sessions, agents, hooks, learnings.</skill>
   <skill id="experiment" kind="workflow" no-ambient="true" file="skills/experiment/SKILL.md">Autonomous experimentation engine + methodology (merged v8). Every rule is a hypothesis: seed, test, graduate, kill.</skill>
 
-  <skill id="validate" kind="validator" file="skills/validate/SKILL.md">Pre-commit verification loop. Build → types → lint → tests → security. Blocks on failure.</skill>
   <skill id="tearitapart" kind="validator" file="skills/tearitapart/SKILL.md">Critical pre-implementation review. Verdict: PROCEED/REVISE/RETHINK.</skill>
   <skill id="review" kind="validator" file="skills/review/SKILL.md">Code review, >80% confidence threshold. APPROVE/REQUEST CHANGES/COMMENT.</skill>
 
@@ -209,28 +203,16 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
 
   <!-- IMPLEMENTATION -->
   <skill id="build" triggers="new feature, implementation, coding">Solution exploration. Generate 2-3 approaches, pick simplest. Never implement first idea.</skill>
-  <skill id="refactor" triggers="refactor, restructure, clean up">Behavior-preserving transformations. Tests green before AND after. No feature changes.</skill>
-  <skill id="backend" triggers="API, database, server, caching, queues">Repository pattern, service layer, N+1 prevention, cache-aside, transactions.</skill>
-  <skill id="api" triggers="REST, endpoints, routes">Resource naming, HTTP status codes, cursor pagination, error responses, versioning.</skill>
 
-  <!-- TESTING -->
-  <skill id="testing" triggers="test, tdd, test-first, red-green, coverage, assertions">Testing methodology, TDD included. Tests before code, red-green-refactor, edge cases over happy paths, regression tests for every fix.</skill>
-  <skill id="e2e" triggers="E2E, Playwright, integration test">Playwright patterns. Page Object Model. Flaky test strategies. CI/CD integration.</skill>
   <skill id="eval" triggers="eval, benchmark, pass@k">Eval-Driven Development. pass@k metrics, capability evals, regression evals, grader types.</skill>
 
-  <!-- QUALITY -->
-  <skill id="quality" triggers="Big 5, ai code, review, validate, pre-commit">AI code quality. The Big 5: input validation, edge cases, error handling, duplication, complexity. Load before any review/validate.</skill>
   <skill id="debug" triggers="bug, error, broken, not working">Systematic debugging. Reproduce → hypothesize → isolate → fix. Binary search isolation.</skill>
-  <skill id="security" triggers="auth, validation, secrets, OWASP">Zod validation, SQL injection prevention, XSS/DOMPurify, CSRF tokens, file upload validation, rate limiting.</skill>
-  <skill id="performance" triggers="slow, optimize, latency, profiling">Measure before optimizing. Identify bottlenecks. Avoid premature optimization.</skill>
 
   <!-- ARCHITECTURE -->
   <skill id="architecture" triggers="system design, structure, modules">Modular design, interface stability, dependency management, coupling analysis.</skill>
   <skill id="orchestration" triggers="multi-agent, parallel, tier 2+">Multi-agent coordination. AgentDB contracts, 4 fault tolerance layers, context transfer.</skill>
   <skill id="context-mgmt" triggers="compaction, handoff, memory, tokens">Context engineering. Progressive disclosure, AgentDB offloading, compaction strategies. Use native /context for usage check.</skill>
 
-  <!-- WORKFLOW -->
-  <skill id="git" triggers="commit, branch, merge, PR">Atomic commits, conventional messages, branch strategies, merge protocols.</skill>
   <skill id="frontend" triggers="UI, frontend, styling, visual">/kernel:frontend skill. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
   <skill id="app-dev" triggers="app, mobile, store submission, build, deploy, fastlane">Mobile/web build pipeline: fastlane-first local builds, store submission, pre-submission checklists. EAS only as a stated exception.</skill>
 
@@ -251,7 +233,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <block action="solution_before_antipattern">Search what breaks BEFORE what works.</block>
   <block action="code_without_success_criteria">Define done before coding.</block>
   <block action="skip_learning">Every task teaches. Capture it or lose it.</block>
-  <block action="write_code_tier_2+">You orchestrate, not implement.</block>
+  <block action="spawn_for_independence_alone">Independence alone never justifies a subagent. Spawn only to protect context, buy real parallel wall-clock, on explicit request, or for verification. Otherwise implement inline.</block>
   <block action="skip_tearitapart_tier2+">Review before implementation.</block>
   <block action="new_dependency_without_justification">Built-in beats library. Prove you need it.</block>
   <block action="report_done_off_commit">"Done" = verified live, not committed. Committed ≠ pushed ≠ deployed ≠ working. Run a verification command (deploy check, curl the served asset, the passing test, the exercised path) before claiming done. Un-headless-verifiable → "deployed, your check," never "it works."</block>
@@ -280,11 +262,11 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
     intervention, gate failure) as canonical.
   </invariant>
 
-  <invariant id="I0.14" name="worktree-isolation-for-parallel-agents">
-    Parallel agents (tier 2+ concurrent surgeons) run in isolated git worktrees, never in the
-    main worktree. Use Claude Code's `isolation: "worktree"` on the Agent tool. Failed work is
-    discarded by deleting the worktree, never by reverting commits on main. This is the only
-    way to safely run concurrent surgeons without N-way merge conflicts.
+  <invariant id="I0.14" name="worktrees-opt-in-not-default">
+    Worktrees are OPT-IN, not a default. Only when you genuinely run multiple concurrent surgeons
+    whose file sets would collide do you isolate them in git worktrees (`isolation: "worktree"`),
+    discarding failed work by deleting the worktree. A single agent, or file-disjoint lanes, needs
+    no worktree, worktree-per-agent as a reflex causes ref-lock races and out-of-project writes.
   </invariant>
 
   <invariant id="I0.15" name="hooks-not-honor-system">

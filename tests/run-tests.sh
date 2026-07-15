@@ -486,7 +486,7 @@ test_session_start_workflow_present() {
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
   # Compact static block: agentdb quick reference + tier rule
   assert_contains "$output" "agentdb recall"
-  assert_contains "$output" "Tier by reversibility x silence x blast radius"
+  assert_contains "$output" "Tier by reversibility x blast radius"
 }
 
 test_session_start_skill_routing() {
@@ -1589,7 +1589,7 @@ test_commands_use_structured_format() {
   # Workflow skills (former commands) use XML structure or YAML blocks
   local structured_count=0
   local total=0
-  for s in ingest forge validate handoff retrospective diagnose dream experiment; do
+  for s in ingest forge handoff retrospective diagnose dream experiment; do
     ((total++))
     if grep -qE '<skill id=|```yaml' "$PLUGIN_ROOT/skills/$s/SKILL.md" 2>/dev/null; then
       ((structured_count++))
@@ -4192,7 +4192,7 @@ test_manifest_checkpoint_resume_position_surfaced() {
 test_migration_every_command_has_destination() {
   # contract table section 3: every former command name resolves to a skill dir
   local missing=0
-  for name in ingest forge validate tearitapart review handoff retrospective \
+  for name in ingest forge tearitapart review handoff retrospective \
               diagnose dream metrics init help experiment landing-page checkpoint; do
     [ -f "$PLUGIN_ROOT/skills/$name/SKILL.md" ] || { echo "  no destination: $name"; missing=1; }
   done
@@ -4570,7 +4570,6 @@ run_test_suite() {
       run_test "retrospective has output format" test_retrospective_has_output_format
       run_test "retrospective has cluster analysis" test_retrospective_has_clusters
       run_test "retrospective queries current learning schema" test_retrospective_queries_current_learning_schema
-      run_test "methodology carries cross-loader release lessons" test_methodology_carries_cross_loader_release_lessons
       run_test "ship bump targets are truthful" test_ship_bump_targets_are_truthful
       run_test "resolved contradictions have learning mutation evidence" test_retrospective_contradictions_have_mutation_evidence
       ;;
@@ -4650,25 +4649,12 @@ run_test_suite() {
     phase2_agents)
       run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
       run_test "reviewer has confidence scoring" test_reviewer_has_confidence_scoring
-      run_test "validator has safety_chain" test_validator_has_safety_chain
-      run_test "validator has 9 gates" test_validator_has_9_gates
       ;;
     triage_understudier)
-      run_test "triage.md exists with frontmatter" test_triage_exists_with_frontmatter
-      run_test "triage.md has model: haiku" test_triage_model_haiku
-      run_test "triage.md has complexity classification" test_triage_has_complexity_classification
-      run_test "triage.md carries the viability pre-flight" test_triage_has_viability_preflight
       run_test "understudier stays deleted" test_understudier_is_gone
       run_test "researcher model is not pinned" test_researcher_model_not_pinned
-      run_test "CLAUDE.md references triage agent" test_claude_md_references_triage
       ;;
     approval_rfactor)
-      run_test "approval-learner exists with frontmatter" test_approval_learner_exists_with_frontmatter
-      run_test "approval-learner model is sonnet" test_approval_learner_model_sonnet
-      run_test "approval-learner has confidence scoring" test_approval_learner_has_confidence_scoring
-      run_test "approval-learner has progressive trust" test_approval_learner_has_progressive_trust
-      run_test "quality keeps Big 5 greps, no r_factor/adsr" test_quality_has_big5_greps
-      run_test "CLAUDE.md references approval-learner" test_claude_md_references_approval_learner
       ;;
     learning_system)
       run_test "migration 005 file exists" test_migration_005_file_exists
@@ -4679,22 +4665,10 @@ run_test_suite() {
       run_test "agentdb antibody searches learnings" test_agentdb_antibody_searches
       ;;
     cartographer_coroner)
-      run_test "cartographer.md exists with frontmatter" test_cartographer_exists_with_frontmatter
-      run_test "cartographer.md has model: opus" test_cartographer_model_opus
-      run_test "cartographer.md has codebase map output" test_cartographer_has_codebase_map_output
-      run_test "coroner.md exists with frontmatter" test_coroner_exists_with_frontmatter
-      run_test "coroner.md has model: sonnet" test_coroner_model_sonnet
-      run_test "coroner.md has post-mortem analysis" test_coroner_has_post_mortem_analysis
-      run_test "CLAUDE.md references cartographer" test_claude_md_references_cartographer
-      run_test "CLAUDE.md references coroner" test_claude_md_references_coroner
       ;;
     phase4_agents)
-      run_test "analyzer agent exists with frontmatter" test_analyzer_agent_exists_with_frontmatter
-      run_test "analyzer agent has dependency detection" test_analyzer_agent_has_dependency_detection
-      run_test "analyzer agent has model opus" test_analyzer_agent_has_model_opus
       run_test "orchestration defines the lane contract" test_orchestration_has_lane_contract
       run_test "orchestration carries worker-model doctrine" test_orchestration_has_worker_model_doctrine
-      run_test "CLAUDE.md references analyzer" test_claude_md_references_analyzer
       ;;
     phase4_extensions)
       run_test "agentdb co-change command exists" test_agentdb_co_change_exists
@@ -4720,13 +4694,9 @@ run_test_suite() {
       run_test "validate-structure.sh sources common.sh" test_validate_structure_sources_common
       ;;
     pre_ship_app)
-      run_test "pre-ship.md exists with frontmatter" test_pre_ship_exists_with_frontmatter
-      run_test "pre-ship.md has composite verdict" test_pre_ship_has_composite_verdict
-      run_test "pre-ship.md spawns parallel validators" test_pre_ship_spawns_parallel_validators
       run_test "app-dev SKILL.md exists" test_app_dev_skill_exists
       run_test "app-dev SKILL.md has store submission" test_app_dev_has_store_submission
       run_test "app-dev SKILL.md has triggers" test_app_dev_has_triggers
-      run_test "CLAUDE.md references pre-ship" test_claude_md_references_pre_ship
       run_test "CLAUDE.md references app-dev" test_claude_md_references_app_dev
       ;;
     entropy_adaptive)
