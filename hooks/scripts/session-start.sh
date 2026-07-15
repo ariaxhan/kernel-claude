@@ -158,14 +158,18 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   echo ""
   # Cap the always-loaded agentdb dump so the static rules always survive; only the
   # dynamic memory tail is truncated (uncapped dumps were the SessionStart truncation cause).
+  # Cap to 50 printed lines WITHOUT closing the pipe early: awk reads all input and
+  # only emits the first 50, so upstream `read-start` never gets SIGPIPE (which, under
+  # `set -eo pipefail`, would abort the whole hook with exit 141). `head -n` closed the
+  # pipe early and did exactly that on Codex boot.
   if [ "$VAULTS_CONTINUITY_ACTIVE" -eq 1 ]; then
     "$AGENTDB" read-start 2>/dev/null | awk '
       /^## Last Checkpoint/ { skip=1; next }
       skip && /^## / { skip=0 }
-      !skip { print }
-    ' | head -n 50
+      !skip { if (n < 50) print; n++ }
+    '
   else
-    "$AGENTDB" read-start 2>/dev/null | head -n 50
+    "$AGENTDB" read-start 2>/dev/null | awk 'NR<=50'
   fi
   echo ""
 
@@ -213,13 +217,17 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   BLOCKERS=""
 
   # Check for stale contracts (>24h with no checkpoint)
-  STALE_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM context WHERE type='contract' AND ts < datetime('now', '-1 day') AND contract_id NOT IN (SELECT COALESCE(contract_id, '') FROM context WHERE type='verdict');" 2>/dev/null || echo "0")
+  # `agentdb query` prints a formatted table (header + separator + value), so pull the
+  # last numeric line and coerce to an int (+0) before any `-gt` comparison.
+  STALE_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM context WHERE type='contract' AND ts < datetime('now', '-1 day') AND contract_id NOT IN (SELECT COALESCE(contract_id, '') FROM context WHERE type='verdict');" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
+  STALE_COUNT=${STALE_COUNT:-0}
   if [ "$STALE_COUNT" -gt 0 ]; then
     BLOCKERS="${BLOCKERS}\n- $STALE_COUNT stale contract(s) >24h without verdict"
   fi
 
   # Check for recent errors (>3 in last hour)
-  ERROR_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM errors WHERE ts > datetime('now', '-1 hour');" 2>/dev/null || echo "0")
+  ERROR_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM errors WHERE ts > datetime('now', '-1 hour');" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
+  ERROR_COUNT=${ERROR_COUNT:-0}
   if [ "$ERROR_COUNT" -gt 3 ]; then
     BLOCKERS="${BLOCKERS}\n- $ERROR_COUNT errors in last hour (possible loop)"
   fi

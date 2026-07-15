@@ -2,6 +2,21 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.1.3] - 2026-07-15
+
+Hotfix for a SessionStart boot failure introduced in 8.1.2.
+
+### Fixed
+- **SessionStart no longer aborts with exit 141 (SIGPIPE).** The 8.1.2 agentdb dump cap
+  (`| head -n 50`) closed the pipe early; under `set -eo pipefail` the upstream
+  `agentdb read-start` died with SIGPIPE and took the whole hook down. Replaced with an
+  `awk` cap that reads all input and prints only the first 50 lines, so upstream never gets
+  a broken pipe. This was breaking Codex boot.
+- **Silenced `[: COUNT(*): integer expression expected` stderr spam on every boot.** The
+  stale-contract and error-count checks compared a full `agentdb query` table (header +
+  separator + value) against an integer. Both now extract the trailing numeric via
+  `awk '/^[0-9]/{v=$1} END{print v+0}'` before the comparison.
+
 ## [8.1.2] - 2026-07-15
 
 KERNEL 8.1.2 is the de-bloat release. It removes maximal-delegation doctrine and
