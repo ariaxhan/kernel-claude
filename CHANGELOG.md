@@ -2,6 +2,36 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.1.5] - 2026-07-16
+
+Consolidates the destructive-command guard: the shipped `guard-bash.sh` now covers the
+whole-category dangers it previously left to per-project overlays, adds interpreter-escape
+detection, and gives every block a recovery path. Research-grounded (AgentAbstain 2607.10059
+on post-hoc irreversible-action failure; the deterministic-pre-action-gate literature).
+
+### Added
+- **Destructive-category coverage in `guard-bash.sh`** (previously only in Vaults-local
+  overlays; now shipped to every kernel user): DROP/TRUNCATE SQL; git `reset --hard`,
+  `clean -f`, `branch -D`, history rewrite (filter-repo/branch/bfg); infra teardown
+  (terraform/pulumi/cdk/sst destroy, serverless remove); cloud deletes (wrangler/aws/
+  gcloud/az); `dd`/`mkfs`/fork-bomb; raw-disk redirect; recursive `chmod`/`chown` of
+  root/home; `find -delete`/`-exec rm` rooted at root/home; `mv` of root/home itself.
+- **Interpreter-escape detection.** `python -c` / `perl -e` / `node -e` / `ruby -e`
+  one-liners performing recursive tree deletion (`rmtree`, `fs.rmSync`, `rimraf`, ...) —
+  the class that carries no `rm`/`dd` keyword for a plain grep to catch.
+- **Recovery-path block messages.** Every hard block now states the safer alternative and
+  the `DANGER_OK=1` override, so a blocked agent hands off to the human instead of
+  reformulating the command into an evasion.
+- **20 regression tests** in `tests/run-tests.sh` (`security_hooks` suite): a block case
+  per category plus over-block guards (soft `git reset`, `terraform plan`, `SELECT`,
+  harmless `python -c`, `aws s3 ls`, `dd_helper`) all pass.
+
+### Unchanged (deliberately)
+- Existing force-push-to-main/master, recursive-`rm`-of-root/home, and the rm/rmdir
+  submodule/tracked-dir investigation gate (`CONFIRM_DELETE=1`) keep their exact prior
+  logic — additive change, not a rewrite. No deep deobfuscation is attempted; the guard is
+  honest harm-reduction against accidental agent self-harm, not a security sandbox.
+
 ## [8.1.4] - 2026-07-15
 
 Patch release removing automatic network and push work from the plugin lifecycle.

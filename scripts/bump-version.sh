@@ -39,8 +39,10 @@ def sub(path, pattern, repl):
 
 sub('.claude-plugin/plugin.json',      r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(")',     rf'\g<1>{new}\g<2>')
 sub('.claude-plugin/marketplace.json', r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(")',     rf'\g<1>{new}\g<2>')
-sub('governance/kernel.md.tmpl',       r'(<kernel version=")[0-9]+\.[0-9]+\.[0-9]+(">)',  rf'\g<1>{new}\g<2>')
 sub('skills/help/SKILL.md',            r'(KERNEL v)[0-9]+\.[0-9]+\.[0-9]+',               rf'\g<1>{new}')
+# NOTE: governance/kernel.md.tmpl no longer carries a hardcoded version — it uses the
+# {{VERSION}} token, which generate-governance.py derives from plugin.json below. So the
+# template is not stamped here; regenerating governance is what propagates the version.
 
 # validate JSON still parses and carries the new version
 assert json.load(open('.claude-plugin/plugin.json'))['version'] == new, "plugin.json"

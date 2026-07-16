@@ -234,7 +234,16 @@ def render_kernel_reference(repo):
     if config.get("outputs") != KERNEL_OUTPUTS or not isinstance(config.get("tokens"), dict):
         raise ValueError("invalid KERNEL adapter config")
     source = template_path.read_text()
-    tokens = config["tokens"]
+    tokens = dict(config["tokens"])
+    # VERSION is derived from the canonical manifest (plugin.json), not adapters.json —
+    # single source of truth. Injected only when the template references {{VERSION}}, kept
+    # in lockstep with scripts/generate-governance.py (the two renderers must agree).
+    if "{{VERSION}}" in source:
+        try:
+            version = json.loads((repo / ".claude-plugin/plugin.json").read_text())["version"]
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+            raise ValueError(f"cannot read version from .claude-plugin/plugin.json: {exc}")
+        tokens["VERSION"] = {client: version for client in KERNEL_OUTPUTS}
     found = set(KERNEL_TOKEN_RE.findall(source))
     if found != set(tokens):
         raise ValueError("KERNEL template token drift")
