@@ -472,7 +472,8 @@ class SyncTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             repo = git_repo(Path(td) / "kernel-copy")
             (repo / "governance").mkdir()
-            for relative in ("governance/adapters.json", "governance/kernel.md.tmpl", "CLAUDE.md", "AGENTS.md"):
+            for relative in ("governance/adapters.json", "governance/kernel.md.tmpl", "CLAUDE.md", "AGENTS.md",
+                             ".claude-plugin/plugin.json"):
                 source = ROOT / relative
                 target = repo / relative
                 target.parent.mkdir(parents=True, exist_ok=True)

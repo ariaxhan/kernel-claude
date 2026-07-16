@@ -1159,6 +1159,37 @@ test_guard_bash_allows_subdir_rm() {
   assert_exit_code 0 "$?" "rm -rf of a home subdir must be allowed"
 }
 
+# === guard-bash 8.1.5: consolidated destructive-category coverage ===
+# Each _blocks_ test expects exit 2; each _allows_ test expects exit 0 (no over-block).
+_gb() {  # helper: pipe a command JSON into the guard, return its exit code
+  echo "{\"tool_input\":{\"command\":\"$1\"}}" | "$PLUGIN_ROOT/hooks/scripts/guard-bash.sh" >/dev/null 2>&1
+}
+
+test_guard_bash_blocks_drop_table()   { _gb 'wrangler d1 execute db --command \"DROP TABLE users\"'; assert_exit_code 2 "$?" "DROP TABLE must be blocked"; }
+test_guard_bash_blocks_truncate()     { _gb 'psql -c \"TRUNCATE TABLE payments\"';                    assert_exit_code 2 "$?" "TRUNCATE TABLE must be blocked"; }
+test_guard_bash_blocks_reset_hard()   { _gb 'git reset --hard HEAD~3';                                assert_exit_code 2 "$?" "git reset --hard must be blocked"; }
+test_guard_bash_blocks_clean_f()      { _gb 'git clean -fd';                                          assert_exit_code 2 "$?" "git clean -fd must be blocked"; }
+test_guard_bash_blocks_branch_D()     { _gb 'git branch -D feature/x';                                assert_exit_code 2 "$?" "git branch -D must be blocked"; }
+test_guard_bash_blocks_tf_destroy()   { _gb 'terraform destroy -auto-approve';                        assert_exit_code 2 "$?" "terraform destroy must be blocked"; }
+test_guard_bash_blocks_wrangler_del() { _gb 'wrangler kv namespace delete --namespace-id abc';        assert_exit_code 2 "$?" "wrangler delete must be blocked"; }
+test_guard_bash_blocks_aws_s3_rm()    { _gb 'aws s3 rm --recursive s3://bucket';                      assert_exit_code 2 "$?" "aws s3 rm --recursive must be blocked"; }
+test_guard_bash_blocks_dd()           { _gb 'dd if=/dev/zero of=/dev/disk0';                          assert_exit_code 2 "$?" "dd to disk must be blocked"; }
+test_guard_bash_blocks_disk_redir()   { _gb 'cat img.bin > /dev/disk2';                               assert_exit_code 2 "$?" "raw disk redirect must be blocked"; }
+test_guard_bash_blocks_chmod_root()   { _gb 'chmod -R 777 /';                                         assert_exit_code 2 "$?" "recursive chmod of / must be blocked"; }
+test_guard_bash_blocks_py_rmtree()    { _gb "python3 -c \\\"import shutil; shutil.rmtree('/')\\\"";   assert_exit_code 2 "$?" "python rmtree must be blocked"; }
+test_guard_bash_blocks_mv_home()      { _gb 'mv ~ /dev/null';                                         assert_exit_code 2 "$?" "mv of home itself must be blocked"; }
+
+# DANGER_OK=1 must override a hard block (recovery path).
+test_guard_bash_danger_ok_override()  { _gb 'DANGER_OK=1 terraform destroy -auto-approve';            assert_exit_code 0 "$?" "DANGER_OK=1 must override a hard block"; }
+
+# Must NOT over-block legitimate commands that merely resemble a category.
+test_guard_bash_allows_reset_soft()   { _gb 'git reset HEAD~1';                assert_exit_code 0 "$?" "soft git reset must pass"; }
+test_guard_bash_allows_tf_plan()      { _gb 'terraform plan';                  assert_exit_code 0 "$?" "terraform plan must pass"; }
+test_guard_bash_allows_select()       { _gb 'psql -c \"SELECT * FROM users\"'; assert_exit_code 0 "$?" "SELECT must pass"; }
+test_guard_bash_allows_py_print()     { _gb "python3 -c \\\"print(1)\\\"";     assert_exit_code 0 "$?" "harmless python -c must pass"; }
+test_guard_bash_allows_aws_ls()       { _gb 'aws s3 ls';                       assert_exit_code 0 "$?" "aws s3 ls must pass"; }
+test_guard_bash_allows_dd_helper()    { _gb 'dd_helper --version';             assert_exit_code 0 "$?" "dd_helper (not dd) must pass"; }
+
 # Regression: a safe prefix must not auto-approve a chained dangerous tail.
 test_auto_approve_defers_chained_command() {
   local output
@@ -1535,7 +1566,7 @@ test_critical_guard_scripts_unchanged_for_802() {
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-16fb49cbedb3bdc875c4add7cb1de0c993e6528fa4d9d520fc9ee2cba6641a93 guard-bash.sh
+025a7a5087d8bd15d5a71d788ca96bae5eada514dae33b9a99a1fd15a98f13b9 guard-bash.sh
 79b46dabd8c9e890d503548cddd98358ec59d888ada4e738e34b05b7ca4f1da1 guard-config.sh
 d3611267b4f135c5b96e8a4a8af60f296b196efc135e3dfbef63d7683065608c detect-secrets.sh
 dbf6680d56dfd5676a420f69f75dcfc5405f0fd53879063859a43b4dcaa5085b guard-context.sh
@@ -4479,6 +4510,26 @@ run_test_suite() {
       run_test "guard-bash blocks force push" test_guard_bash_blocks_force_push
       run_test "guard-bash allows safe commands" test_guard_bash_allows_safe_commands
       run_test "guard-bash allows git log" test_guard_bash_allows_git_log
+      run_test "guard-bash blocks DROP TABLE" test_guard_bash_blocks_drop_table
+      run_test "guard-bash blocks TRUNCATE" test_guard_bash_blocks_truncate
+      run_test "guard-bash blocks reset --hard" test_guard_bash_blocks_reset_hard
+      run_test "guard-bash blocks clean -fd" test_guard_bash_blocks_clean_f
+      run_test "guard-bash blocks branch -D" test_guard_bash_blocks_branch_D
+      run_test "guard-bash blocks terraform destroy" test_guard_bash_blocks_tf_destroy
+      run_test "guard-bash blocks wrangler delete" test_guard_bash_blocks_wrangler_del
+      run_test "guard-bash blocks aws s3 rm --recursive" test_guard_bash_blocks_aws_s3_rm
+      run_test "guard-bash blocks dd to disk" test_guard_bash_blocks_dd
+      run_test "guard-bash blocks raw disk redirect" test_guard_bash_blocks_disk_redir
+      run_test "guard-bash blocks chmod -R /" test_guard_bash_blocks_chmod_root
+      run_test "guard-bash blocks python rmtree" test_guard_bash_blocks_py_rmtree
+      run_test "guard-bash blocks mv home" test_guard_bash_blocks_mv_home
+      run_test "guard-bash DANGER_OK override" test_guard_bash_danger_ok_override
+      run_test "guard-bash allows soft reset" test_guard_bash_allows_reset_soft
+      run_test "guard-bash allows terraform plan" test_guard_bash_allows_tf_plan
+      run_test "guard-bash allows SELECT" test_guard_bash_allows_select
+      run_test "guard-bash allows harmless python" test_guard_bash_allows_py_print
+      run_test "guard-bash allows aws s3 ls" test_guard_bash_allows_aws_ls
+      run_test "guard-bash allows dd_helper" test_guard_bash_allows_dd_helper
       run_test "guard-config blocks .claude/ write" test_guard_config_blocks_claude_dir_write
       run_test "guard-config allows CLAUDE.md" test_guard_config_allows_claude_md
       run_test "guard-config allows rules" test_guard_config_allows_rules

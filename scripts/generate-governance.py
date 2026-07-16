@@ -122,6 +122,17 @@ def load(root):
     outputs = config.get("outputs")
     if not isinstance(tokens, dict) or not isinstance(outputs, dict):
         fail("adapters.json requires object fields: tokens and outputs")
+    # VERSION is DERIVED from the canonical manifest (plugin.json), never hand-authored
+    # in adapters.json or the template. Single source of truth: bump plugin.json only,
+    # regenerate, and every {{VERSION}} in the governance docs follows. Injected only when
+    # the template actually references {{VERSION}}, so minimal templates aren't forced to.
+    if "{{VERSION}}" in source:
+        try:
+            version = json.loads(
+                (root / ".claude-plugin/plugin.json").read_text(encoding="utf-8"))["version"]
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
+            fail(f"cannot read version from .claude-plugin/plugin.json: {exc}")
+        tokens["VERSION"] = {client: version for client in EXACT_OUTPUTS}
     if outputs != EXACT_OUTPUTS:
         fail("outputs must use exact native output paths: CLAUDE.md and AGENTS.md")
     clients = set(EXACT_OUTPUTS)
