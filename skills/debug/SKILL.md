@@ -19,8 +19,10 @@ The failure you see is NOT where the bug is. Binary search upstream.
 Systematic methodology beats ad-hoc guessing. The process is the multiplier.
 </purpose>
 
-<prerequisite>AgentDB read-start has run; check past failures, you may have seen this
-pattern. Reference on demand: skills/debug/reference/debug-research.md.</prerequisite>
+<prerequisite>Run `agentdb recall` with the exact error text, subsystem/library, failing
+test, and known files/symbols. Recall again when the hypothesis changes or a new failure
+appears; that is a new retrieval question. Reference on demand:
+skills/debug/reference/debug-research.md.</prerequisite>
 
 <steps>
 1. **REPRODUCE**: get specific before touching code.

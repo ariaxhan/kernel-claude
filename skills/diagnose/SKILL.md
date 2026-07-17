@@ -19,7 +19,9 @@ Mixing diagnosis with implementation means the surgeon starts cutting before the
 </purpose>
 
 <on_start>
-agentdb read-start   # surface prior failures/gotchas first — a known bug class shortcuts the diagnosis
+agentdb recall "<exact error> <subsystem> <test> <files/symbols>" --global
+# Recall again after isolation reveals better symbols, when the hypothesis changes,
+# or when a different failure appears.
 </on_start>
 
 <skill_load>

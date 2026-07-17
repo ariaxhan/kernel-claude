@@ -1,12 +1,12 @@
 ---
 name: landing-page
-description: "Guided landing page generator. Interview → scaffold → enforce → deploy. Static HTML/CSS optimized for Cloudflare Pages. All architectural decisions are hypotheses until proven by /kernel:experiment."
+description: "Explicit landing-page build and deployment operator. Loads marketing strategy and frontend judgment, scaffolds the smallest suitable site, verifies rendered behavior, and deploys to the user's or project's configured target."
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, WebSearch, WebFetch
 disable-model-invocation: true
 kernel:
   kind: operator
-  version: 1
+  version: 2
   side_effects: deploys
   confirmation: on_side_effect
 ---
@@ -14,65 +14,58 @@ kernel:
 <skill id="landing-page">
 
 <purpose>
-Ship a fast, distinctive static landing page. Interview the human for the real inputs,
-scaffold a minimal static site, enforce the non-negotiable quality bars, deploy. Explicit
-invocation only, it deploys. Keep this skill small: the model already knows how to build a
-static page, this just supplies the interview, the guardrails, and the deploy path.
+Build, verify, and optionally deploy a focused landing page. This is the explicit operator;
+strategy and aesthetics come from the methodology skills it composes.
 </purpose>
 
-<skill_load>skills/frontend/SKILL.md</skill_load>
+<skill_load>
+Load `skills/marketing-site/SKILL.md` and `skills/frontend/SKILL.md` before writing.
+</skill_load>
 
-<interview>
-Ask the human, briefly, before writing anything (skip any the human already gave):
-1. What is this page for, one sentence, and who lands on it?
-2. The single action you want them to take (the primary CTA).
-3. Brand: name, any existing colors/font/logo, and a reference site whose feel you like.
-4. Content: headline, subhead, 2-4 value points, social proof if any, footer links.
-5. Domain + where it deploys (default: Cloudflare Pages).
-Do not invent brand facts. Unknown = ask, never fill with a plausible guess.
-</interview>
+<inputs>
+Use answers already present in the request/repository. Resolve only what materially changes
+the build: audience, desired action, offer/proof, brand/assets, required content/legal pages,
+real CTA destination, domain, and deploy target. Never invent brand facts or proof.
+</inputs>
 
-<build>
-- Static only by default: one `index.html`, one `styles.css`, assets in `/assets`. Add JS
-  only for a real interaction, never for layout. No framework unless the human asks.
-- Follow skills/frontend for aesthetic: no generic AI look, no Inter-by-default, no emoji
-  chrome. Pick a distinctive type + color system grounded in the brand answers.
-- Responsive by construction: verify at 375 / 768 / 1440. Content never overflows the body.
-- One clear CTA above the fold, repeated once lower. Everything serves that action.
-- Accessibility: semantic landmarks, alt text, visible focus, keyboard reaches every control,
-  contrast passes AA.
-</build>
+<scaffold>
+- Follow the existing repository and stack first. For a new simple page, prefer static
+  HTML/CSS with JavaScript only for real behavior; add a framework only when requirements earn it.
+- Build the content argument with `marketing-site`; build the visual system with `frontend`.
+- Add only the pages and integrations the brief needs. If forms, analytics, cookies, payments,
+  embeds, or accounts touch data, create/update a privacy page that matches the real behavior.
+- Keep secrets and deploy credentials out of source.
+</scaffold>
 
-<enforce>
-Before deploy, these are hard bars, not suggestions:
-- Loads with zero console errors at all three breakpoints.
-- Largest Contentful Paint image is sized/compressed; no multi-MB hero.
-- No secrets, analytics keys, or tokens in the committed source.
-- Every link resolves; the CTA points somewhere real.
-- Lighthouse-style sanity: no render-blocking bloat, fonts subset or system.
-</enforce>
+<verify-local>
+- Render and do visual QA at 375 / 768 / 1440 widths unless the product defines better targets.
+- Check hierarchy, realistic content, overflow, keyboard/focus, reduced motion, contrast, images,
+  console errors, links, metadata, and CTA/form success plus error paths.
+- Confirm the privacy policy matches actual collection and third parties.
+- Run the repository's tests/build/lint and fix failures before deployment.
+</verify-local>
 
 <deploy>
-- Cloudflare Pages by default (`wrangler pages deploy ./` or the project's configured path).
-- Confirm the deploy target with the human before pushing (this skill has side_effects: deploys).
-- After deploy, VERIFY LIVE: curl the deployed URL, confirm 200 + the headline is in the HTML.
-  "Deployed" is not "working" until the served asset is checked. Report the live URL.
+- Use the project's configured deploy command and provider. If none exists, choose the smallest
+  provider-appropriate static deployment; Cloudflare Workers Static Assets is one option, not a
+  universal default.
+- If the user already named the deploy target and asked to deploy, that counts as confirmation.
+  Otherwise surface the resolved account/project/domain before the side effect.
+- After deploy, verify the live URL: status 200, headline/content marker, nested assets, legal
+  page, and conversion path. Static assets can propagate briefly, so retry a short bounded check
+  before diagnosing a successful deploy as broken.
 </deploy>
 
-<hypotheses>
-Architecture choices here (static-first, single CTA, system fonts) are defaults, not dogma.
-A repeated better result promotes via /kernel:experiment, it does not get hardcoded as a rule.
-</hypotheses>
-
-<hard_stops>
-- Never deploy without explicit human confirmation of the target.
-- Never commit secrets or a key into the page source.
-- Never report the page done off a commit, verify the live URL first.
-</hard_stops>
+<hard-stops>
+- No fabricated proof, shippable placeholders, fake form success, or dead CTA.
+- No secrets in committed source.
+- No “done” claim based only on source, build, commit, or deploy output; inspect the rendered
+  page locally and the served page after deployment.
+</hard-stops>
 
 <on_end>
-Report: the live URL (verified), the breakpoints checked, and any bar you could not meet
-(state it plainly, never claim a green you did not observe).
+Report the live URL if deployed, target widths and paths checked, claims/proof source, privacy
+behavior, and any verification bar not observed.
 </on_end>
 
 </skill>

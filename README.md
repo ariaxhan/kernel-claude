@@ -137,10 +137,10 @@ Useful skill groups:
 - Workflows: `ingest`, `diagnose`, `dream`, `metrics`, `forge`, `experiment`
 - State: `handoff`, `checkpoint`, `retrospective`
 - Validation: `validate`, `review`, `tearitapart`
-- Methods: `build`, `testing`, `debug`, `security`, `architecture`, `git`, `frontend`, and more
+- Methods: `build`, `testing`, `debug`, `security`, `architecture`, `git`, `frontend`, `marketing-site`, and more
 - Setup/reference: `init`, `help`, `landing-page`
 
-There are 24 skills and 10 specialized Claude Code agent definitions in this release.
+There are 35 skills and 15 specialized Claude Code agent definitions in this release.
 
 `governance-sync` is explicit-only. It audits Git repositories for `CLAUDE.md` /
 `AGENTS.md` gaps and can generate a missing native adapter after showing conflicts,
@@ -178,8 +178,10 @@ quality yourself with `orchestration/agentdb/eval/run_eval.py` against a gold se
 Because recall is now task-driven, the SessionStart context is lean: a learning count, a
 `agentdb recall` pointer, and the top few highest-hit failures — about 950 tokens, down
 from ~3,700 when startup dumped ~50 task-blind learnings every session. The agent recalls
-what its task needs instead of receiving everything up front. Run `agentdb read-start`
-explicitly (no flag) any time you want the full weighted memory dump.
+what its task needs instead of receiving everything up front. Recall with concrete nouns:
+feature + subsystem/library + discovered files/symbols + exact error or desired outcome.
+Run it again after discovery, when scope or hypothesis changes, or when a new failure appears.
+Run `agentdb read-start` explicitly (no flag) only when you want the full weighted memory dump.
 
 KERNEL hooks can inspect repository state, run configured checks, and write these records.
 Claude Code runs the full declared lifecycle. Codex runs supported synchronous hook

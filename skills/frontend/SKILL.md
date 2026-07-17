@@ -1,10 +1,10 @@
 ---
 name: frontend
-description: "Frontend aesthetics and UI implementation. Break generic AI aesthetic patterns. Create distinctive, surprising interfaces. Supports mood variants that guide aesthetic direction without constraining execution. Triggers: frontend, ui, styling, css, visual, theme, component, layout, aesthetic, abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal."
+description: "Context-led frontend design and UI implementation. Derives art direction from the product, audience, brand, content, and existing design system; prevents generic AI defaults without imposing a Kernel house style. Triggers: frontend, ui, styling, css, visual, theme, component, layout, responsive, accessibility, design system, aesthetic, abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal."
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 kernel:
   kind: methodology
-  version: 1
+  version: 2
   side_effects: none
   confirmation: none
 ---
@@ -12,101 +12,97 @@ kernel:
 <skill id="frontend">
 
 <purpose>
-Break distributional convergence. Every generation must feel intentional and distinct.
-Generic AI aesthetic ("slop") is the failure mode.
-You are good at CSS. You are bad at breaking patterns. This skill fixes the latter.
+Make interfaces feel intentional because their visual choices fit the actual product.
+Distinctiveness is not a pile of effects. It is a coherent point of view with fewer
+unexamined defaults.
 </purpose>
 
-<invocation>
-/design                      → No variant. Choose your own direction. Surprise.
-/design --variant={name}     → Load variants/{name}.md for mood guidance.
+<context-fit>
+Before styling, recover the evidence already present in the task and repository:
 
-Variant files define VIBE not implementation.
-You choose fonts, colors, spacing, motion.
-Never copy same font/palette/layout between generations even within same variant.
-</invocation>
+1. Product: what the interface does and which action matters most.
+2. Audience and use context: device, environment, familiarity, urgency, accessibility needs.
+3. Brand: existing tokens, logo, type, imagery, voice, screenshots, and reference qualities.
+4. Content: real density, length, hierarchy, empty/error/loading states, and localization risk.
+5. Technical constraints: current stack, component library, performance budget, supported browsers.
+
+Preserve and extend the existing design system when one exists. Do not replace a coherent
+brand because a variant or personal preference is louder. If the evidence is incomplete,
+make the smallest reversible assumption and state it; ask only when the answer changes the
+product direction.
+</context-fit>
+
+<art-direction>
+Write a tiny direction before implementation:
+
+- desired feeling in 2-3 plain words;
+- one dominant visual idea;
+- typography, color, layout, imagery, and motion choices tied to evidence;
+- 2-3 defaults to avoid for this specific project.
+
+No choice is universally premium. A system font can be correct for speed or platform
+familiarity. Symmetry can communicate calm. Flat color can be the strongest choice. Huge
+type, gradients, glass, noise, asymmetry, and animation are tools—not proof of taste.
+</art-direction>
 
 <variants>
-abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal
-
-Read variants/ directory for full mood definitions.
-Each defines sensory direction and emotional target—not specs.
+Optional lenses: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.
+Load `variants/{name}.md` when the user names one or when exploration genuinely benefits.
+Variants describe mood, never mandatory components, fonts, palettes, effects, or layouts.
 </variants>
 
-<principles type="always-active">
+<hard-bars>
+- Hierarchy: the primary action and reading order are obvious without explanation.
+- Responsive: content fits and remains usable at the project breakpoints; touch targets are
+  at least 44px where touch is expected.
+- Accessible: semantic structure, keyboard operation, visible focus, useful labels/alt text,
+  AA contrast, reduced-motion support, and no meaning encoded by color alone.
+- Content-real: test realistic long/short copy plus empty, error, loading, and disabled states
+  when the interface has them.
+- Performance: avoid decorative weight that delays the main content; size images, subset or
+  avoid webfonts, and use JavaScript only for behavior that needs it.
+- System-fit: reuse the repository's components, tokens, naming, and state patterns unless the
+  task explicitly includes changing the system.
+</hard-bars>
 
-<typography>
-1. Distinctive fonts only — NEVER: Inter, Roboto, Arial, Open Sans, system-ui, Helvetica, SF Pro
-2. Pair weight extremes (300 + 700+). Avoid 400–500 middle zone entirely.
-3. Headers 3x+ body size minimum. Tight tracking on large, relaxed on small.
-4. (gate: if same font used in last 3 outputs → pick a different one)
-</typography>
+<implementation>
+Use the smallest structure the product needs. Reusable components should follow the existing
+stack; a one-off static section does not need a component framework. Centralize repeated
+visual decisions in tokens. Prefer CSS for presentation, semantic HTML for structure, and
+progressive enhancement for interaction.
 
-<color>
-1. CSS custom properties for all colors. One dominant + one sharp accent.
-2. Dark modes require 5+ background shade layers. Single dark color = amateur.
-3. Warm text on dark: bone/cream tones. Never pure white on dark.
-4. (gate: palette derives from variant mood, not memorized hex values)
-</color>
-
-<motion>
-1. CSS-only first. JS only when CSS literally cannot achieve it.
-2. One orchestrated entrance beats scattered micro-interactions.
-3. Organic easing always: cubic-bezier curves, never linear. Breathing > snapping.
-4. (gate: vary timing per project — no reused duration scale)
-</motion>
-
-<layout>
-1. Asymmetry over symmetry. Grid-break moments over uniform grids.
-2. Whitespace is a design element. Use aggressively to create tension.
-3. Full-bleed mixed with contained sections creates rhythm.
-4. (gate: uniform section heights = amateur → vary intentionally)
-</layout>
-
-<surfaces>
-1. NEVER flat single-color backgrounds.
-2. Layer: gradients, translucent surfaces, backdrop-blur, subtle noise.
-3. Cards need visible depth: shadow, border, or background differentiation.
-4. Dark backgrounds need hue tint. Light from within (glow) beats external illumination.
-</surfaces>
-
-<core>
-1. Prompt for taste, not implementation. Describe WHAT the user should feel; model chooses HOW.
-2. Component-first. Build pieces (nav, hero, cards), then compose. Never full pages in one shot.
-3. Mobile-first as constraint: specify column limits and 44px touch targets upfront.
-4. Functional color (encodes meaning: status, priority, state) beats decorative color.
-5. Accessibility = design advantage. WCAG contrast forces better color decisions.
-</core>
-
-<reference>
-Skill-specific: skills/frontend/reference/design-research.md
-</reference>
-
-</principles>
+Motion must explain change, guide attention, or provide feedback. If it does none of those,
+remove it. Decorative texture, depth, and unusual composition need the same justification.
+</implementation>
 
 <anti-convergence>
-After generating, ask: "Have I seen this exact combination before?"
-If yes → change the most dominant visual element immediately.
-If variant starts producing similar outputs → interpret it more loosely.
-Constraints breed creativity. Variant mood is springboard not cage.
+Generic output usually comes from an unexamined default, not from a forbidden ingredient.
+Before finishing, name the most dominant visual decision and ask:
+
+1. What evidence caused this choice?
+2. Is it inherited from the product, or copied from recent model habits?
+3. Would removing it make the interface clearer or more specific?
+
+Common warning signs—not automatic bans—include purple gradient startup pages, identical
+rounded cards, default component-library styling, ornamental dashboards, centered-everything
+layouts, decorative blobs, fake testimonials, and a fashionable font with no brand reason.
+Change a warning sign when it is unexamined; keep it when the context earns it.
 </anti-convergence>
 
-<anti-patterns>
-<block>System/generic fonts (Inter, Roboto, Arial, system-ui)</block>
-<block>Purple-gradient-on-white (the AI slop signature)</block>
-<block>Neon cyan + pink + purple together (vaporwave cliché)</block>
-<block>Flat single-color backgrounds</block>
-<block>Uniform section heights and widths</block>
-<block>Heavy font weights on everything (use weight contrast)</block>
-<block>Repeating same aesthetic across generations</block>
-<block>Following variant too literally (it's a vibe not a spec)</block>
-<block>Centered everything (break the symmetry)</block>
-<block>Stock icon libraries without customization</block>
-<block>Rounded corners on everything (vary or eliminate)</block>
-</anti-patterns>
+<verification>
+Do visual QA on rendered output, not source alone. Inspect screenshots at the task's target
+sizes (for a general web page, start with 375, 768, and 1440 widths), then exercise keyboard,
+focus, hover/touch, overflow, and reduced motion. Fix the largest hierarchy or usability
+problem first and re-check. Never claim visual completion without seeing the rendered result.
+</verification>
+
+<reference>
+Read `skills/frontend/reference/design-research.md` when deeper rationale is useful.
+</reference>
 
 <on_complete>
-agentdb write-end '{"skill":"design","variant":"<if-used>","fonts":["<list-for-tracking>"],"aesthetic":"<2-word-summary>","dominant_color":"<name-not-hex>"}'
+Report the art direction, evidence behind the dominant choices, sizes/states visually checked,
+and any accessibility or performance bar not verified.
 </on_complete>
 
 </skill>

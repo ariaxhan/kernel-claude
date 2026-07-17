@@ -1,6 +1,6 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: b53fd6d863129a557069864b752ccc2713ae6de4641fa45c5c5cdc71bd46aeaf; adapter: claude -->
-<kernel version="8.4.0">
+     source-sha256: 217e339d59806b5839c31d163a34b1dca2e8ad6e64888d2aaa1cd3705749c02f; adapter: claude -->
+<kernel version="8.5.0">
 
 
 <!-- ============================================ -->
@@ -27,7 +27,7 @@
 
 <philosophy>
 Every AI-written line is a liability. Research proves solutions before coding.
-AgentDB-first. Read at start, write at end. Continuity depends on it.
+AgentDB-first. Recall before acting, write at end. Continuity depends on it.
 Stable governance lives here. Fast-changing run state lives in AgentDB and `_meta/`, not in governance docs.
 Most SWE work is solved problems. Find the solution, don't invent it.
 Default to implementing inline. Delegate only to protect context, buy real parallel wall-clock, or get independent verification, never for independence alone.
@@ -43,7 +43,8 @@ Ask at decision points. A 5-second question saves 5 minutes of wrong-direction w
 <!-- ============================================ -->
 
 <agentdb>
-agentdb read-start                                           # ON_START (mandatory)
+agentdb recall "<feature> <subsystem> <files/symbols> <error/outcome>" --global  # Before acting
+agentdb read-start                                           # Full audit/resume context only
 agentdb write-end '{"did":"X","next":"Y","blocked":"Z"}'    # ON_END (mandatory)
 agentdb learn failure|pattern "what" "evidence"              # When discovered
 agentdb contract '{"goal":"X","constraints":"Y","tier":N}'  # Tier 2+
@@ -51,6 +52,9 @@ agentdb verdict pass|fail '{"tested":[],"evidence":"","issues":[]}'  # Adversary
 agentdb query "SELECT ..."                                   # Read agent output
 
 Location: _meta/agentdb/agent.db
+Use concrete task nouns, library/subsystem names, discovered paths/symbols, and exact
+errors or desired outcomes. Recall again after repo inspection reveals better terms,
+when scope or hypothesis changes, and whenever a new failure appears.
 </agentdb>
 
 <!-- ============================================ -->
@@ -63,7 +67,7 @@ Location: _meta/agentdb/agent.db
   <tier n="3" risk="high" role="orchestrator">Hard to undo, quiet if wrong, or wide blast radius. Contract → surgeon → adversary → verify.</tier>
 
   <rule>Tier by reversibility × silence × blast radius. File count is only a weak hint. Ambiguous = assume higher tier.</rule>
-  <rule>Read AgentDB at every tier. Implement inline by default; delegate to agents only when the work is heavy and file-disjoint, explicitly requested, or needs independent verification.</rule>
+  <rule>Recall from AgentDB at every tier. Implement inline by default; delegate to agents only when the work is heavy and file-disjoint, explicitly requested, or needs independent verification.</rule>
   <rule>IF tier >= 2: run /kernel:tearitapart before implementation.</rule>
 </tiers>
 
@@ -87,7 +91,7 @@ Location: _meta/agentdb/agent.db
 </agents>
 
 <flow>
-  Read context (agentdb read-start, _meta/research/) → research anti-patterns before solutions →
+  Recall task context (agentdb recall with concrete keywords, _meta/research/) → research anti-patterns before solutions →
   tier the work → define success before coding → execute (inline by default; delegate heavy file-disjoint work → surgeon → verify) → learn (agentdb learn).
   Never implement the first idea: generate 2-3 approaches, choose simplest. Details live in the skills, not here.
 </flow>
@@ -213,7 +217,8 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <skill id="orchestration" triggers="multi-agent, parallel, tier 2+">Multi-agent coordination. AgentDB contracts, 4 fault tolerance layers, context transfer.</skill>
   <skill id="context-mgmt" triggers="compaction, handoff, memory, tokens">Context engineering. Progressive disclosure, AgentDB offloading, compaction strategies. Use native /context for usage check.</skill>
 
-  <skill id="frontend" triggers="UI, frontend, styling, visual">/kernel:frontend skill. Anti-convergence aesthetic. Mood variants: abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal.</skill>
+  <skill id="frontend" triggers="UI, frontend, styling, visual">Context-led interface design. Derive art direction from product, audience, brand, content, and the existing design system; mood variants are optional lenses.</skill>
+  <skill id="marketing-site" triggers="marketing site, landing page, company website, client website, conversion, positioning, CTA">Honest marketing-site strategy: audience, offer, proof, objections, action, privacy, art direction, and client handoff.</skill>
   <skill id="app-dev" triggers="app, mobile, store submission, build, deploy, fastlane">Mobile/web build pipeline: fastlane-first local builds, store submission, pre-submission checklists. EAS only as a stated exception.</skill>
 
   <!-- EXPERIMENTATION -->
@@ -227,7 +232,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
 
 <anti_patterns>
   <!-- Critical only. Extended rules: _meta/reference/heuristics.md, conventions.md -->
-  <block action="skip_agentdb_read">Read at start, prior failures and patterns inform this session.</block>
+  <block action="skip_agentdb_recall">Recall before acting and again when the task's files, scope, hypothesis, or failure changes.</block>
   <block action="skip_agentdb_write">Write at end, next session needs your learnings.</block>
   <block action="skip_research">Reinvent solved problems. Check _meta/research/ first.</block>
   <block action="solution_before_antipattern">Search what breaks BEFORE what works.</block>

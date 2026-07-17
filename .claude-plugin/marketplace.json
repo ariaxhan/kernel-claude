@@ -7,8 +7,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.4.0 cuts SessionStart context ~74% (a lean startup surface replaces the task-blind 50-learning dump; the agent recalls what its task needs via 8.3.0 semantic recall), on top of local semantic recall (fastembed/MiniLM, RRF fusion) and the 8.2.0 six-threat-class security guard.",
-      "version": "8.4.0"
+      "description": "Durable project memory, bounded JSON handoffs, 35 engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.5.0 adds context-led frontend and honest marketing-site methods, plus concrete repeatable AgentDB recall prompts while preserving the lean 8.4.0 startup surface.",
+      "version": "8.5.0"
     }
   ]
 }

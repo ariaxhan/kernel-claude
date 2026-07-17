@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "8.4.0",
-  "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.1.4 removes automatic lifecycle network and push sweeps.",
+  "version": "8.5.0",
+  "description": "Durable project memory, bounded JSON handoffs, 35 engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.5.0 adds context-led frontend and honest marketing-site methods, plus concrete repeatable AgentDB recall prompts.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"

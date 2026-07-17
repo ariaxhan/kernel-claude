@@ -2,6 +2,34 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.5.0] - 2026-07-16 "context before style"
+
+Turns frontend guidance from a fixed visual recipe into product judgment, adds an
+ambient marketing/client-site methodology, and makes semantic recall easier to use well.
+
+### Added
+- **`marketing-site` methodology** for landing pages, product/company sites, portfolios,
+  campaigns, and client websites. It covers audience, positioning, offer, proof,
+  objections, CTA, privacy reality, and client delivery without deploying on its own.
+- **Client delivery checklist** for approvals, asset rights, account ownership,
+  launch/rollback, editable handoff, and ongoing privacy/maintenance responsibility.
+- **Regression contracts** for skill composition, ambient/explicit safety, context-led
+  frontend behavior, concrete recall keywords, rerun triggers, and lean-output size.
+
+### Changed
+- **`frontend` v2 is context-led.** Product, audience, brand, content, repository design
+  system, accessibility, performance, and rendered visual QA are hard bars. Fonts,
+  asymmetry, gradients, layered dark surfaces, huge type, and motion are contextual tools,
+  not Kernel's mandatory house style. Existing mood variants remain optional lenses.
+- **`landing-page` v2 composes `marketing-site` + `frontend`.** It stays explicit-only,
+  follows the project's configured stack/deploy target, treats a user's named deploy
+  request as confirmation, verifies 375/768/1440 output, and checks live nested assets,
+  legal pages, and conversion paths after deployment.
+- **AgentDB recall now teaches a concrete query recipe:** feature + subsystem/library +
+  files/symbols + exact error or desired outcome. Startup, build, debug, diagnose, help,
+  and the CLI guide say to recall again after discovery, scope/hypothesis changes, or a
+  new failure. The lean startup surface remains capped by regression at 12 lines.
+
 ## [8.4.0] - 2026-07-16 "lean session"
 
 Cuts the SessionStart context injection from ~3,700 tokens to ~950 — a **74% reduction
