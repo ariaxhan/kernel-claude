@@ -1,11 +1,11 @@
 #!/bin/bash
 # KERNEL AgentDB CLI
-# Every agent reads on start, writes on end. No exceptions.
+# Every agent recalls task context before acting and writes on end. No exceptions.
 #
 # USAGE:
 #   agentdb init                    # Initialize per-project DB
-#   agentdb read-start              # Generic top-N learnings (session start)
-#   agentdb recall <keywords>       # RELEVANCE search — the right learning for THIS task (FTS5)
+#   agentdb recall <keywords>       # Task-relevant context; rerun as the task changes
+#   agentdb read-start              # Full generic top-N context for audit/resume
 #   agentdb write-end <json>        # Checkpoint before stopping
 #   agentdb learn <type> <insight>  # Record learning
 #   agentdb contract <json>         # Create contract
@@ -513,7 +513,9 @@ cmd_read_start() {
       local n_all n_fail top_fail
       n_all=$(db_exec "SELECT COUNT(*) FROM learnings WHERE archived_at IS NULL;" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
       n_fail=$(db_exec "SELECT COUNT(*) FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha');" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
-      echo "## Memory: ${n_all} learnings (${n_fail} failures/gotchas). For this task run: agentdb recall \"<keywords>\""
+      echo "## Memory: ${n_all} learnings (${n_fail} failures/gotchas)."
+      echo "Recall now: agentdb recall \"<feature> <subsystem> <files/symbols> <error/outcome>\" [--global]"
+      echo "Recall again when scope, files, hypothesis, or failure changes. Use concrete nouns, not prose."
       echo ""
       top_fail=$(db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha') ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null)
       if [ -n "$top_fail" ]; then
@@ -1117,7 +1119,9 @@ cmd_guide() {
   cat <<'GUIDE'
 # AgentDB Quick Reference
 
-Starting work?      agentdb read-start
+Starting work?      agentdb recall "<feature> <subsystem> <files/symbols> <error/outcome>" --global
+New files/failure?  Recall again with the new concrete nouns
+Full audit/resume?  agentdb read-start
 Something broke?    agentdb wtf
 Learned something?  agentdb learn failure "description" "evidence"
                     agentdb learn pattern "description" "evidence"
@@ -1160,7 +1164,10 @@ cmd_schema() {
 # repopulates _migrations). Used by both export-json and import-json.
 _is_snapshot_table() {
   case "$1" in
-    *_fts|*_fts_*|sqlite_*|_migrations) return 1 ;;
+    # Derived tables are NOT mirrored — they rebuild on restore. FTS shadow tables
+    # rebuild from content; learning_edges (migration 016) rebuilds via `graph build`
+    # from the embeddings + [[links]], so mirroring it would bloat the tracked JSON.
+    *_fts|*_fts_*|sqlite_*|_migrations|learning_edges) return 1 ;;
     *) return 0 ;;
   esac
 }
@@ -1905,6 +1912,16 @@ _embed_run() {
   "$py" "$script" "$@" 2>/dev/null
 }
 
+# Run graph.py (learning graph + promotion, migration 016). Uses the embed venv's
+# python if set (numpy = faster cosine), else python3 (struct fallback). Errors surface.
+_graph_run() {
+  local py script
+  py=$(_embed_python); script="$SCHEMA_DIR/graph.py"
+  [ -f "$script" ] || { echo "graph.py not found next to agentdb" >&2; return 3; }
+  command -v "$py" >/dev/null 2>&1 || py=python3
+  "$py" "$script" "$@"
+}
+
 # Emit _recall_emit-format rows for an explicit newline-list of ids (used to pull
 # display text for semantic-only hits that FTS did not match). Visibility/archived
 # filtered like _recall_emit. <origin> tags the rows for reinforcement routing.
@@ -1941,7 +1958,10 @@ _emit_rows_by_ids() {
 # A row missing from a ranker simply contributes 0 from that side. Small N -> an
 # O(n^2) selection sort is fine and keeps this dependency-free.
 _hybrid_rerank() {
-  awk -F'@@US@@' -v semf="$1" -v ftsf="$2" -v k=60 '
+  # RRF constant: lower k sharpens the top-rank contribution (better recall@1),
+  # higher k blends more evenly. 60 is the literature standard; AGENTDB_RRF_K tunes it.
+  local rrf_k="${AGENTDB_RRF_K:-60}"
+  awk -F'@@US@@' -v semf="$1" -v ftsf="$2" -v k="$rrf_k" '
     BEGIN{
       while((getline l < semf) > 0){ n=split(l,a,"\t"); if(n>=2) semr[a[1]]=a[2] }
       while((getline l < ftsf) > 0){ n=split(l,a,"\t"); if(n>=2) ftsr[a[1]]=a[2] }
@@ -2511,6 +2531,8 @@ case "${1:-help}" in
   embed-sync)  shift; _ensure_embedding_cols; _embed_run sync "$DB" ;;
   embed-status) shift; _embed_run backend || { echo "no embedding backend installed — recall is FTS-only (see: agentdb embed-init)"; exit 0; } ;;
   embed-init)  shift; cmd_embed_init "$@" ;;
+  graph)       shift; _graph_run "${1:-build}" "$DB" "${@:2}" ;;
+  promote)     shift; _graph_run promote "$DB" "$@" ;;
   export)      cmd_export ;;
   export-json) shift; cmd_export_json "$@" ;;
   import-json) shift; cmd_import_json "$@" ;;
@@ -2524,7 +2546,8 @@ case "${1:-help}" in
     echo "CORE COMMANDS:"
     echo "  init                    Initialize DB + apply migrations"
     echo "  preflight               Validate schema + environment health"
-    echo "  read-start              Context for starting work"
+    echo "  recall <keywords> [--global]  Task context; rerun as files/scope/failure change"
+    echo "  read-start              Full generic context for audit/resume"
     echo "  write-end <json>        Checkpoint before stopping"
     echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"
     echo "  contract <json>         Create new contract"
