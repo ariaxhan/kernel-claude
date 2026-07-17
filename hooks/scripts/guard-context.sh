@@ -32,9 +32,25 @@ fi
 POINTER="$ROOT/_meta/.active-manifest.json"
 LEDGER="$ROOT/_meta/.context-ledger"
 
-[ -f "$POINTER" ] || exit 0
-
 INPUT=$(cat)
+
+# --- 8.2.0: the approval-token store is unreadable to the agent, always ---
+# (KERNEL_APPROVE codes are for the HUMAN to read out-of-band; see guard-bash.sh.)
+# Raw substring match on the hook JSON covers file_path, pattern, and glob inputs.
+_deny_approvals_read() {
+  echo "BLOCKED: read of the kernel approval-token store. Approval codes are minted for the HUMAN to read and relay -- the agent never reads them." >&2
+  exit 2
+}
+case "$INPUT" in
+  *".kernel/approvals"*) _deny_approvals_read ;;
+esac
+if [ -n "${KERNEL_APPROVALS_DIR:-}" ]; then
+  case "$INPUT" in
+    *"$KERNEL_APPROVALS_DIR"*) _deny_approvals_read ;;
+  esac
+fi
+
+[ -f "$POINTER" ] || exit 0
 
 if ! command -v jq >/dev/null 2>&1; then
   echo "guard-context: manifest active but jq missing — cannot verify context policy. Blocking (install jq or run kernel-manifest deactivate)." >&2
