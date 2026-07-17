@@ -1005,6 +1005,20 @@ test_guard_config_blocks_codex_dot_segment_bypass() {
   assert_exit_code 2 "$ec" "dot segments must not escape the .claude allowlist"
 }
 
+test_guard_config_allows_harness_session_data() {
+  local json
+  json=$(jq -n --arg fp "$HOME/.claude/projects/-Users-x-proj/abc123/workflows/scripts/audit.js" '{tool_input:{file_path:$fp}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1
+  assert_exit_code 0 "$?" "harness session data under ~/.claude/projects/ must not be treated as config"
+}
+
+test_guard_config_blocks_harness_traversal_escape() {
+  local json ec=0
+  json=$(jq -n --arg fp "$HOME/.claude/projects/../settings.json" '{tool_input:{file_path:$fp}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "dot-segment traversal must not ride the harness-projects exemption"
+}
+
 test_guard_config_fails_closed_on_malformed_json() {
   local ec=0
   printf '{malformed\n' | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1 || ec=$?
@@ -1722,7 +1736,7 @@ test_critical_guard_scripts_unchanged_for_820() {
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
 16e5c6d2e357ed225f31c319c4af2a797afd4bcdb85b8cdd01fc874a14b0af18 guard-bash.sh
-8e8ff30a76fc4056ef5b3347e04ea7a1b44507baa89aa79a98b40fd23c334da3 guard-config.sh
+115785e567cecaa9292565c88e963911ff62e8802b4e2e99d676e71084aced6a guard-config.sh
 d3611267b4f135c5b96e8a4a8af60f296b196efc135e3dfbef63d7683065608c detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
 EOF
@@ -4911,6 +4925,8 @@ run_test_suite() {
       run_test "guard-config blocks Codex apply_patch" test_guard_config_blocks_codex_apply_patch
       run_test "guard-config allows Codex apply_patch rule" test_guard_config_allows_codex_apply_patch_rule
       run_test "guard-config blocks Codex dot segment bypass" test_guard_config_blocks_codex_dot_segment_bypass
+      run_test "guard-config allows harness session data" test_guard_config_allows_harness_session_data
+      run_test "guard-config blocks harness traversal escape" test_guard_config_blocks_harness_traversal_escape
       run_test "guard-config fails closed on malformed JSON" test_guard_config_fails_closed_on_malformed_json
       run_test "detect-secrets fails closed on malformed JSON" test_detect_secrets_fails_closed_on_malformed_json
       run_test "Codex risky skills are explicit-only" test_codex_explicit_only_skill_policies

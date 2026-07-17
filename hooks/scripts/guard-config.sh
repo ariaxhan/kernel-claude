@@ -80,6 +80,15 @@ while IFS= read -r FILE_PATH; do
     exit 2
   fi
 
+  # Harness-managed session data (~/.claude/projects/): transcripts, per-project
+  # memory, workflow scripts, subagent state. Machine-owned state, not config --
+  # the config allowlist does not apply. Placed AFTER the dot-segment check so a
+  # traversal like ~/.claude/projects/../settings.json is still blocked. (8.5.2:
+  # the guard wrongly blocked the harness editing its own workflow scripts.)
+  case "$FILE_PATH" in
+    "$HOME/.claude/projects/"*) continue ;;
+  esac
+
   # Allow: CLAUDE.md, rules/*.md, commands/*.md, agents/*.md, skills/*.md, hooks/*.sh, settings*.json
   if echo "$FILE_PATH" | grep -qE '\.claude/(CLAUDE\.md|rules/.*\.md|commands/.*\.md|agents/.*\.md|skills/.*\.md|hooks/.*\.sh|settings.*\.json|projects/.*/memory/.*)$'; then
     continue
