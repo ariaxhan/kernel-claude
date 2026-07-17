@@ -156,33 +156,19 @@ fi
 
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   echo ""
-  # Cap the always-loaded agentdb dump so the static rules always survive; only the
-  # dynamic memory tail is truncated (uncapped dumps were the SessionStart truncation cause).
-  # Cap to 50 printed lines WITHOUT closing the pipe early: awk reads all input and
-  # only emits the first 50, so upstream `read-start` never gets SIGPIPE (which, under
-  # `set -eo pipefail`, would abort the whole hook with exit 141). `head -n` closed the
-  # pipe early and did exactly that on Codex boot.
-  if [ "$VAULTS_CONTINUITY_ACTIVE" -eq 1 ]; then
-    "$AGENTDB" read-start 2>/dev/null | awk '
-      /^## Last Checkpoint/ { skip=1; next }
-      skip && /^## / { skip=0 }
-      !skip { if (n < 50) print; n++ }
-    '
-  else
-    "$AGENTDB" read-start 2>/dev/null | awk 'NR<=50'
-  fi
+  # LEAN session surface (8.4.0): a count + recall pointer + the top few failures.
+  # The old weighted-75 dump injected ~50 task-blind learnings (~2.8k tokens) into
+  # EVERY session — obsolete now that recall is semantic (migration 015). The agent
+  # recalls what its task needs; startup only surfaces the unconditional "avoid these"
+  # failures. Explicit `agentdb read-start` still gives the full weighted dump on demand.
+  # (--lean output is small, so the old 50-line SIGPIPE cap is no longer needed.)
+  "$AGENTDB" read-start --lean 2>/dev/null
   echo ""
 
   # Prune stale learnings (0 hits, >30 days old)
   "$AGENTDB" query "DELETE FROM learnings WHERE hit_count = 0 AND ts < datetime('now', '-30 days');" 2>/dev/null || true
 
-  # Surface high-hit learnings
-  TOP_LEARNINGS=$("$AGENTDB" query "SELECT '- ' || insight FROM learnings WHERE hit_count >= 3 ORDER BY hit_count DESC LIMIT 3;" 2>/dev/null)
-  if [ -n "$TOP_LEARNINGS" ]; then
-    echo "## Top Learnings"
-    echo "$TOP_LEARNINGS"
-    echo ""
-  fi
+  # (Top-learnings surfacing folded into the --lean dump above — no separate section.)
 
   # Check for recent compaction checkpoint (auto-handoff)
   LAST_CHECKPOINT=""

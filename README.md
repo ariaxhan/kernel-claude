@@ -173,6 +173,14 @@ opt-in. The embedding vectors are derived data: they are excluded from the track
 JSON mirror and rebuilt with `agentdb embed-sync` on a fresh clone. Measure retrieval
 quality yourself with `orchestration/agentdb/eval/run_eval.py` against a gold set.
 
+### Lean session start (8.4.0)
+
+Because recall is now task-driven, the SessionStart context is lean: a learning count, a
+`agentdb recall` pointer, and the top few highest-hit failures — about 950 tokens, down
+from ~3,700 when startup dumped ~50 task-blind learnings every session. The agent recalls
+what its task needs instead of receiving everything up front. Run `agentdb read-start`
+explicitly (no flag) any time you want the full weighted memory dump.
+
 KERNEL hooks can inspect repository state, run configured checks, and write these records.
 Claude Code runs the full declared lifecycle. Codex runs supported synchronous hook
 events, including the write guards and SessionStart context; it skips asynchronous

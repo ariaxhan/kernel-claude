@@ -2826,6 +2826,39 @@ test_read_start_outputs_gotchas() {
   assert_contains "$output" "[gotcha] always escape SQL inputs"
 }
 
+test_read_start_lean_is_minimal() {
+  # 8.4.0: --lean is the SessionStart surface. It emits a memory count + a recall
+  # pointer + only the top failures, and SKIPS the full weighted dump, the recent-
+  # errors tail, and the active-contract/checkpoint tail (the hook emits those).
+  agentdb init >/dev/null
+  agentdb learn failure "prod outage from missing validation" "postmortem" >/dev/null
+  # seed enough non-failure patterns that the full weighted dump is genuinely bigger
+  local i; for i in $(seq 1 12); do agentdb learn pattern "cache computation number $i" "perf $i" >/dev/null; done
+  local lean full
+  lean=$(agentdb read-start --lean)
+  full=$(agentdb read-start)
+  assert_contains "$lean" "## Memory:" || return 1
+  assert_contains "$lean" "agentdb recall" || return 1
+  # failures surface unconditionally; the 12 plain patterns do NOT (recall-on-demand)
+  assert_contains "$lean" "prod outage" || return 1
+  echo "$lean" | grep -q "cache computation number" && { echo "lean must NOT dump non-failure patterns"; return 1; }
+  # lean must skip the weighted-dump heading + the errors/contract tail
+  echo "$lean" | grep -q "Mode: weighted-75" && { echo "lean must not emit the weighted dump"; return 1; }
+  echo "$lean" | grep -q "## Recent Errors" && { echo "lean must skip the recent-errors tail"; return 1; }
+  # at realistic volume lean is materially smaller than the full dump
+  local ll fl; ll=$(printf '%s\n' "$lean" | wc -l); fl=$(printf '%s\n' "$full" | wc -l)
+  [ "$ll" -lt "$fl" ] || { echo "lean ($ll lines) should be smaller than full ($fl lines)"; return 1; }
+}
+
+test_read_start_full_still_has_weighted_and_tail() {
+  # Explicit `read-start` (no flag) must stay FULL for the skills that call it on demand.
+  agentdb init >/dev/null
+  agentdb learn failure "x fails" "e" >/dev/null
+  local out; out=$(agentdb read-start)
+  assert_contains "$out" "Mode: weighted-75" || return 1
+  assert_contains "$out" "## Recent Errors"
+}
+
 test_read_start_bumps_load_count_not_hit_count() {
   # Migration 013: read-start bumps load_count (session-open telemetry), and must
   # NOT touch hit_count, hit_count is relevance feedback, earned only via recall.
@@ -4959,6 +4992,8 @@ run_test_suite() {
       ;;
     read_start)
       run_test "read-start outputs Known Gotchas section" test_read_start_outputs_gotchas
+      run_test "read-start --lean is minimal (8.4.0)" test_read_start_lean_is_minimal
+      run_test "read-start full keeps weighted + tail" test_read_start_full_still_has_weighted_and_tail
       run_test "read-start bumps load_count not hit_count" test_read_start_bumps_load_count_not_hit_count
       ;;
     recall)
