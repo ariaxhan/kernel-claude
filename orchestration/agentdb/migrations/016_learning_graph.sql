@@ -1,0 +1,18 @@
+-- Migration 016: learning knowledge graph (edges + promotion).
+--
+-- WHY (agentdb rethink, 2026-07-16): after embeddings (015) gave semantic distance,
+-- the second lever is a graph OVER the learnings — edges connect semantically-related
+-- or [[link]]-referenced learnings, so you can traverse related lessons, dedup, and
+-- detect recurring-failure clusters worth promoting to doctrine. This is distinct from
+-- the context-load telemetry in `nodes`/`edges` (migration 002), which tracks which
+-- skill/file co-loads with which, not learning-to-learning meaning.
+--
+-- The `learning_edges` table is DERIVED: it rebuilds from the embeddings + learning
+-- text via `agentdb graph build`, so it is excluded from the JSON mirror (like the
+-- embedding BLOBs) and self-creates via graph.py's DDL. This marker records provenance;
+-- the CREATE lives in orchestration/agentdb/graph.py (CREATE TABLE IF NOT EXISTS) so a
+-- graph command works on any DB without a schema migration step.
+--   learning_edges(src, dst, relation IN ('similar','near_duplicate','references'), weight, ts)
+--
+-- Commands: `agentdb graph build|neighbors|stats`, `agentdb promote [--min N]`.
+INSERT OR IGNORE INTO _migrations (name) VALUES ('016_learning_graph');

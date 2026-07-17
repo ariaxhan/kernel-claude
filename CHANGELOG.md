@@ -2,6 +2,40 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.5.1] - 2026-07-17 "learning graph"
+
+The second AgentDB lever after embeddings: a knowledge graph OVER the learnings, plus a
+promotion detector for recurring failures. Builds on 8.3.0 semantic recall — the same
+vectors now power edges and clustering. Fully additive; no change to recall or session
+behavior.
+
+### Added
+- **`agentdb graph build | neighbors | stats`** — a `learning_edges` table connecting
+  learnings that are semantically related (cosine over the migration-015 embeddings) or
+  explicitly `[[link]]`-referenced. `neighbors <id>` lists a learning's related lessons;
+  `stats` summarizes edge counts. Distinct from the context-load telemetry in
+  `nodes`/`edges` (migration 002).
+- **`agentdb promote [--min N]`** — clusters recurring failures (connected components over
+  cohesive edges, similarity ≥ 0.55, default min cluster size 3) and surfaces them as
+  candidate doctrine themes for review. It never auto-writes doctrine. `hit_count` is
+  deliberately NOT used as a signal — it measures recall relevance, not recurrence, and is
+  inflated by surfacing.
+- **`orchestration/agentdb/graph.py`** — the engine (numpy-optional; pure-Python cosine
+  fallback). Migration 016 records provenance; the table self-creates via the engine's DDL.
+
+### Changed
+- `learning_edges` is **excluded from the JSON mirror** — derived data that rebuilds from
+  the embeddings + `[[links]]` via `agentdb graph build`, like the embedding BLOBs and FTS.
+- Recall eval (`eval/run_eval.py`) now reports **recall@1/@3/@10 + MRR**, and the RRF
+  fusion constant is tunable via `AGENTDB_RRF_K` (default 60, confirmed optimal on a sweep).
+
+### Verified
+- On a real 47-learning corpus: 29 semantic edges; `promote` surfaces one coherent cluster
+  (three Codex-hooks-in-the-vault failures) and nothing spurious. Widened recall gold set
+  (48 queries) shows hybrid's real win is ranking precision: recall@1 +0.146, MRR +0.107.
+- Tests: 4 new graph tests (build, promote-finds-cluster, promote-empty, mirror-exclusion);
+  full source suite green.
+
 ## [8.5.0] - 2026-07-16 "context before style"
 
 Turns frontend guidance from a fixed visual recipe into product judgment, adds an

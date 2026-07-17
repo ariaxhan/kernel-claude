@@ -47,23 +47,42 @@ def recall_ids(db, query, env_extra, k):
     return [ln.strip() for ln in out.splitlines() if ln.strip()][:k]
 
 
+K_LIST = (1, 3, 5, 10)
+
+
+def _reciprocal_rank(got, relevant):
+    for i, gid in enumerate(got, 1):
+        if gid in relevant:
+            return 1.0 / i
+    return 0.0
+
+
 def score(gold, db, env_extra, k):
-    recalls, hits = [], []
+    # Retrieve top-max(K_LIST) once per query; score recall@k for every k + MRR.
+    retrieve_n = max(max(K_LIST), k)
+    per_k_recall = {kk: [] for kk in K_LIST}
+    rrs = []
+    primary_recall, primary_hits = [], []
     per_query = []
     for item in gold:
         relevant = set(item["relevant"])
         if not relevant:
             continue
-        got = recall_ids(db, item["query"], env_extra, k)
-        topk = set(got[:k])
-        inter = relevant & topk
-        r = len(inter) / len(relevant)
-        recalls.append(r)
-        hits.append(1.0 if inter else 0.0)
+        got = recall_ids(db, item["query"], env_extra, retrieve_n)
+        for kk in K_LIST:
+            inter = relevant & set(got[:kk])
+            per_k_recall[kk].append(len(inter) / len(relevant))
+        rrs.append(_reciprocal_rank(got, relevant))
+        inter_k = relevant & set(got[:k])
+        r = len(inter_k) / len(relevant)
+        primary_recall.append(r)
+        primary_hits.append(1.0 if inter_k else 0.0)
         per_query.append({"query": item["query"], "recall": r,
                           "got": got[:k], "relevant": sorted(relevant)})
     mean = lambda xs: (sum(xs) / len(xs)) if xs else 0.0
-    return mean(recalls), mean(hits), per_query
+    metrics = {"recall_at": {kk: round(mean(v), 4) for kk, v in per_k_recall.items()},
+               "mrr": round(mean(rrs), 4)}
+    return mean(primary_recall), mean(primary_hits), per_query, metrics
 
 
 def main(argv):
@@ -85,18 +104,22 @@ def main(argv):
     if args.embed_python:
         hyb_env["AGENTDB_EMBED_PYTHON"] = args.embed_python
 
-    r_base, h_base, pq_base = score(gold, args.db, base_env, args.k)
-    r_hyb, h_hyb, pq_hyb = score(gold, args.db, hyb_env, args.k)
+    r_base, h_base, pq_base, m_base = score(gold, args.db, base_env, args.k)
+    r_hyb, h_hyb, pq_hyb, m_hyb = score(gold, args.db, hyb_env, args.k)
 
     if not args.quiet:
-        print("=" * 60)
-        print("agentdb recall eval  (k=%d, %d gold queries)" % (args.k, len(gold)))
-        print("  backend: %s" % (args.backend or "auto"))
-        print("-" * 60)
-        print("  FTS-only   recall@%d = %.3f   hit@%d = %.3f" % (args.k, r_base, args.k, h_base))
-        print("  HYBRID     recall@%d = %.3f   hit@%d = %.3f" % (args.k, r_hyb, args.k, h_hyb))
-        print("  delta      recall    = %+.3f            hit    = %+.3f" % (r_hyb - r_base, h_hyb - h_base))
-        print("=" * 60)
+        print("=" * 64)
+        print("agentdb recall eval  (%d gold queries, backend: %s)" % (len(gold), args.backend or "auto"))
+        print("-" * 64)
+        print("  %-10s %8s %8s %8s %8s %8s" % ("arm", "r@1", "r@3", "r@5", "r@10", "MRR"))
+        for label, m in (("FTS-only", m_base), ("HYBRID", m_hyb)):
+            ra = m["recall_at"]
+            print("  %-10s %8.3f %8.3f %8.3f %8.3f %8.3f" % (
+                label, ra[1], ra[3], ra[5], ra[10], m["mrr"]))
+        dra = {kk: m_hyb["recall_at"][kk] - m_base["recall_at"][kk] for kk in K_LIST}
+        print("  %-10s %+8.3f %+8.3f %+8.3f %+8.3f %+8.3f" % (
+            "delta", dra[1], dra[3], dra[5], dra[10], m_hyb["mrr"] - m_base["mrr"]))
+        print("=" * 64)
         # show queries where hybrid changed the outcome
         for b, hq in zip(pq_base, pq_hyb):
             if abs(hq["recall"] - b["recall"]) > 1e-9:
@@ -108,6 +131,7 @@ def main(argv):
         "recall_baseline": round(r_base, 4), "recall_hybrid": round(r_hyb, 4),
         "hit_baseline": round(h_base, 4), "hit_hybrid": round(h_hyb, 4),
         "delta_recall": round(r_hyb - r_base, 4),
+        "baseline_metrics": m_base, "hybrid_metrics": m_hyb,
     }))
     return 0
 

@@ -7,8 +7,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Durable project memory, bounded JSON handoffs, 35 engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.5.0 adds context-led frontend and honest marketing-site methods, plus concrete repeatable AgentDB recall prompts while preserving the lean 8.4.0 startup surface.",
-      "version": "8.5.0"
+      "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.5.1 adds a learning graph over AgentDB memory (semantic edges + recurring-failure promotion to doctrine candidates), on top of 8.5.0 marketing/frontend skills, 8.4.0 lean session start, 8.3.0 local semantic recall, and the 8.2.0 six-threat security guard.",
+      "version": "8.5.1"
     }
   ]
 }

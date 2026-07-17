@@ -1164,7 +1164,10 @@ cmd_schema() {
 # repopulates _migrations). Used by both export-json and import-json.
 _is_snapshot_table() {
   case "$1" in
-    *_fts|*_fts_*|sqlite_*|_migrations) return 1 ;;
+    # Derived tables are NOT mirrored — they rebuild on restore. FTS shadow tables
+    # rebuild from content; learning_edges (migration 016) rebuilds via `graph build`
+    # from the embeddings + [[links]], so mirroring it would bloat the tracked JSON.
+    *_fts|*_fts_*|sqlite_*|_migrations|learning_edges) return 1 ;;
     *) return 0 ;;
   esac
 }
@@ -1909,6 +1912,16 @@ _embed_run() {
   "$py" "$script" "$@" 2>/dev/null
 }
 
+# Run graph.py (learning graph + promotion, migration 016). Uses the embed venv's
+# python if set (numpy = faster cosine), else python3 (struct fallback). Errors surface.
+_graph_run() {
+  local py script
+  py=$(_embed_python); script="$SCHEMA_DIR/graph.py"
+  [ -f "$script" ] || { echo "graph.py not found next to agentdb" >&2; return 3; }
+  command -v "$py" >/dev/null 2>&1 || py=python3
+  "$py" "$script" "$@"
+}
+
 # Emit _recall_emit-format rows for an explicit newline-list of ids (used to pull
 # display text for semantic-only hits that FTS did not match). Visibility/archived
 # filtered like _recall_emit. <origin> tags the rows for reinforcement routing.
@@ -1945,7 +1958,10 @@ _emit_rows_by_ids() {
 # A row missing from a ranker simply contributes 0 from that side. Small N -> an
 # O(n^2) selection sort is fine and keeps this dependency-free.
 _hybrid_rerank() {
-  awk -F'@@US@@' -v semf="$1" -v ftsf="$2" -v k=60 '
+  # RRF constant: lower k sharpens the top-rank contribution (better recall@1),
+  # higher k blends more evenly. 60 is the literature standard; AGENTDB_RRF_K tunes it.
+  local rrf_k="${AGENTDB_RRF_K:-60}"
+  awk -F'@@US@@' -v semf="$1" -v ftsf="$2" -v k="$rrf_k" '
     BEGIN{
       while((getline l < semf) > 0){ n=split(l,a,"\t"); if(n>=2) semr[a[1]]=a[2] }
       while((getline l < ftsf) > 0){ n=split(l,a,"\t"); if(n>=2) ftsr[a[1]]=a[2] }
@@ -2515,6 +2531,8 @@ case "${1:-help}" in
   embed-sync)  shift; _ensure_embedding_cols; _embed_run sync "$DB" ;;
   embed-status) shift; _embed_run backend || { echo "no embedding backend installed — recall is FTS-only (see: agentdb embed-init)"; exit 0; } ;;
   embed-init)  shift; cmd_embed_init "$@" ;;
+  graph)       shift; _graph_run "${1:-build}" "$DB" "${@:2}" ;;
+  promote)     shift; _graph_run promote "$DB" "$@" ;;
   export)      cmd_export ;;
   export-json) shift; cmd_export_json "$@" ;;
   import-json) shift; cmd_import_json "$@" ;;
