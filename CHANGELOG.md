@@ -2,6 +2,67 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.2.0] - 2026-07-16 "security"
+
+A comprehensive security release covering six threat classes, grounded in real 2025-26
+incidents (Replit prod-DB wipe, Nx s1ngularity, EchoLeak CVE-2025-32711, CamoLeak
+CVE-2025-59145, CurXecute CVE-2025-54135, MCPoison CVE-2025-54136). The policy line is
+**reversibility**: irreversible or hard-to-reverse operations hard-block and SURFACE;
+recoverable ones warn. Injection detection ships warn-only so false positives can be
+tuned on real traffic before anything blocks.
+
+### Added
+- **KERNEL_APPROVE one-time approval** (replaces `DANGER_OK=1`, which was a plain
+  substring any prompt-injected command could set on itself). A hard block now mints a
+  random single-use code bound to a hash of the exact command, stores it in
+  `~/.kernel/approvals/` (0700/0600, 15-minute TTL), and surfaces the block. The HUMAN
+  opens the token file out-of-band and re-runs the command as `KERNEL_APPROVE=<code> <cmd>`.
+  Wrong code, expired code, reused code, or a code minted for a different command all
+  block. The token path is unreadable to the agent (guarded in guard-bash, guard-config,
+  and guard-context).
+- **T3 exfiltration blocks** in `guard-bash.sh`: a literal secret (AWS/OpenAI/GitHub/
+  Slack tokens, private-key headers, JWTs), a credential file (`~/.ssh`, `~/.aws`,
+  `~/.gnupg`, `.env`, `id_*` keys), or a macOS keychain read appearing in the same
+  command as a network egress tool (curl/wget/nc/ncat/sftp) is blocked - exfiltration
+  cannot be undone. Env-var references (`$API_KEY`) pass; localhost-only targets
+  downgrade to a warning; `ssh`/`scp -i` identity usage is exempt.
+- **T5 scope-escape blocks**: spawning any tool with `--dangerously-skip-permissions` /
+  `--yolo` / `--trust-all-tools` (the Nx s1ngularity signature); `crontab` writes
+  (silently replace the whole crontab); redirects into shell startup files (silent
+  persistence); deleting the guard's own scripts; any access to the approval-token store.
+- **T6 supply-chain blocks**: `curl|sh` / `wget|bash` pipe-to-shell, `base64 -d | sh`
+  obfuscated execution, `eval $(curl ...)`.
+- **T2/T4 injection tripwire** (`scan-output.sh` + `scan-output.py`, new PostToolUse
+  hook on `WebFetch|WebSearch|mcp__.*`): scans tool OUTPUT for invisible-character
+  smuggling (Unicode Tags U+E0000-E007F, zero-width floods, bidi overrides) and
+  instruction-override phrasing ("ignore previous instructions", concealment
+  instructions, persona hijacks, imperatives inside pseudo-system tags). **Warn-only**:
+  a finding feeds a visible warning back to the model to treat the content as untrusted
+  data; nothing is blocked. Content that merely discusses prompt injection passes.
+- **Sensitive-path write blocks** in `guard-config.sh` (Write/Edit + Codex apply_patch):
+  credential roots (`~/.ssh`, `~/.aws`, `~/.gnupg`), shell startup files, `.git/hooks/`,
+  MCP config (`.mcp.json`, `.cursor/mcp.json` - the CurXecute/MCPoison class), launchd/
+  cron persistence paths, and the approval-token store. The line: anything that makes
+  code auto-run later without a human in the loop blocks and surfaces.
+- **41 new regression tests** (89 in the security_hooks suite): block coverage per threat
+  class, the full approval lifecycle (mint / allow-once / reuse / wrong-code /
+  cross-command), and a false-positive corpus (env-var auth curls, `scp -i`, localhost
+  env-files, rc-file reads, download-without-exec, rc-lookalike filenames, mcp.json
+  fixtures, injection *discussions*).
+
+### Changed
+- `DANGER_OK=1` no longer bypasses anything; the guard explains the retirement and points
+  at the approval flow. `CONFIRM_DELETE=1` (investigation gate, a speed bump by design)
+  is unchanged.
+- Guard tamper-pin test refreshed to the 8.2.0 checksums.
+
+### Honest scope (unchanged truth, restated)
+The hooks are a tripwire, not a sandbox: heuristic injection detection is ~40-84%
+effective in the literature, and a determined multi-step evasion can still route around
+a text guard. Real containment is the OS sandbox (Claude Code `/sandbox`, Codex
+network-off default) + egress control that these hooks sit inside. The guard's job is to
+stop the accidental catastrophe and raise the cost of the injected one.
+
 ## [8.1.5] - 2026-07-16
 
 Consolidates the destructive-command guard: the shipped `guard-bash.sh` now covers the

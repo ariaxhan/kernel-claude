@@ -7,8 +7,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.1.5 expands the destructive-command guard (SQL/infra/disk/cloud + interpreter escapes) with recovery-path messaging.",
-      "version": "8.1.5"
+      "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.2.0 is a security release: a six-threat-class guard (self-destruct, exfiltration, scope-escape, supply-chain, sensitive-config writes, warn-only injection tripwire) with unforgeable one-time human approval replacing the DANGER_OK substring.",
+      "version": "8.2.0"
     }
   ]
 }

@@ -12,6 +12,11 @@
 #   3. High-blast external ops — DROP/TRUNCATE SQL, infra teardown (terraform/pulumi/cdk/
 #      sst destroy, serverless remove), cloud deletes (wrangler/aws/gcloud/az), and
 #      interpreter one-liners that call the same destruction (python -c shutil.rmtree ...).
+#   4. (8.2.0) Exfiltration — literal secrets / credential files / keychain reads
+#      combined with a network egress tool in one command.
+#   5. (8.2.0) Scope escape — --dangerously-skip-permissions spawns, crontab writes,
+#      redirects into shell startup files, tampering with the guard or approval tokens.
+#   6. (8.2.0) Supply chain — curl|sh, base64|sh, eval-of-download.
 # Plus a soft INVESTIGATION gate on rm/rmdir of git submodules and tracked directories.
 #
 # It does NOT attempt deep deobfuscation (base64|sh, hex/unicode-confusable evasion,
@@ -22,7 +27,12 @@
 #
 # Escape hatches (recovery paths — a block states them so the agent hands off to the
 # human instead of reformulating into an evasion):
-#   * DANGER_OK=1 <cmd>      — override a hard block (intentional destructive op).
+#   * KERNEL_APPROVE=<code> <cmd> — one-time human approval of a hard block (8.2.0).
+#     A block MINTS a code tied to the exact command and writes it to a token file
+#     only the human should open; the human re-runs the command with the code. The
+#     code never appears in the model-visible stream, so injected instructions
+#     cannot forge it. (Replaces DANGER_OK=1, which was a plain substring any
+#     injected command could set on itself.)
 #   * CONFIRM_DELETE=1 <cmd> — override the rm submodule/tracked-dir investigation gate.
 #
 # Does NOT source circuit-breaker.sh: a safety gate must always run and must never
@@ -39,22 +49,89 @@ fi
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 [ -z "$COMMAND" ] && exit 0
 
-# Global override for the hard blocks. Scoped word-match so it can't be a substring accident.
+# --- One-time human approval (8.2.0; replaces the forgeable DANGER_OK=1) ---
+# On a hard block the guard mints a random code bound to a hash of the exact
+# command, stores it under APPROVALS_DIR (0700/0600), and tells the agent to
+# surface the block. The HUMAN opens the token file themselves and re-runs the
+# command prefixed with KERNEL_APPROVE=<code>. Single-use, short TTL. The token
+# path is guarded against agent reads (here, guard-config, guard-context) —
+# honest caveat: that is cost-raising, not a sandbox; a multi-step evasion can
+# still reach the file. Real containment is the OS sandbox this hook sits inside.
+APPROVALS_DIR="${KERNEL_APPROVALS_DIR:-$HOME/.kernel/approvals}"
+APPROVAL_TTL_MIN=15
+
+_sha256() { if command -v shasum >/dev/null 2>&1; then shasum -a 256; else sha256sum; fi; }
+_cmd_id() { printf '%s' "$1" | _sha256 | awk '{print substr($1,1,16)}'; }
+
+BARE_COMMAND=$COMMAND
+APPROVE_CODE=""
 case "$COMMAND" in
-  *DANGER_OK=1*) exit 0 ;;
+  KERNEL_APPROVE=*)
+    APPROVE_CODE=${COMMAND#KERNEL_APPROVE=}
+    APPROVE_CODE=${APPROVE_CODE%%[[:space:]]*}
+    BARE_COMMAND=${COMMAND#KERNEL_APPROVE="$APPROVE_CODE"}
+    while [ "${BARE_COMMAND# }" != "$BARE_COMMAND" ]; do BARE_COMMAND=${BARE_COMMAND# }; done
+    ;;
+esac
+
+if [ -n "$APPROVE_CODE" ]; then
+  _tok="$APPROVALS_DIR/$(_cmd_id "$BARE_COMMAND").token"
+  if [ -f "$_tok" ] && [ -n "$(find "$_tok" -mmin "-$APPROVAL_TTL_MIN" 2>/dev/null)" ] \
+     && [ "$(head -n1 "$_tok" 2>/dev/null)" = "$APPROVE_CODE" ]; then
+    rm -f "$_tok"   # single-use: consumed on approval
+    exit 0          # human-approved — allow this exact command, once
+  fi
+  echo "BLOCKED: KERNEL_APPROVE code is invalid, expired (${APPROVAL_TTL_MIN}m), already used, or minted for a different command." >&2
+  echo "  Re-attempt the bare command to mint a fresh code, then have the HUMAN read the token file and re-run." >&2
+  exit 2
+fi
+
+# DANGER_OK=1 is retired: it was a substring an injected command could set on itself.
+case "$COMMAND" in
+  *DANGER_OK=1*)
+    echo "guard-bash: DANGER_OK=1 no longer bypasses (retired in 8.2.0 -- forgeable by prompt injection). Hard blocks now mint a KERNEL_APPROVE one-time code for the human." >&2 ;;
 esac
 
 # Lowercased, whitespace-collapsed view for case-insensitive keyword matching. Path
 # extraction and the rm gate below still use the raw $COMMAND (paths are case-sensitive).
 LOW=$(printf '%s' "$COMMAND" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
 
-# block <reason> <recovery-hint> : print a structured refusal + how to proceed, then exit 2.
+# block <reason> <recovery-hint> : print a structured refusal + the human approval
+# path, mint a one-time code for this exact command, then exit 2.
 block() {
   echo "BLOCKED: $1" >&2
   [ -n "$2" ] && echo "  $2" >&2
-  echo "  If this is intentional, re-run prefixed with DANGER_OK=1 -- or hand it to the human." >&2
+  _mint_approval
   exit 2
 }
+
+_mint_approval() {
+  mkdir -p "$APPROVALS_DIR" 2>/dev/null || return 0
+  chmod 700 "$APPROVALS_DIR" 2>/dev/null
+  find "$APPROVALS_DIR" -name '*.token' -mmin "+$APPROVAL_TTL_MIN" -delete 2>/dev/null
+  local tok code
+  tok="$APPROVALS_DIR/$(_cmd_id "$BARE_COMMAND").token"
+  if [ ! -f "$tok" ]; then   # keep the same code across repeat attempts within the TTL
+    code=$(od -An -N4 -tx4 /dev/urandom 2>/dev/null | tr -d ' \n')
+    [ -n "$code" ] || return 0
+    ( umask 077; { echo "$code"; echo "# approves exactly: $BARE_COMMAND"; } > "$tok" ) 2>/dev/null
+  fi
+  {
+    echo "  This block SURFACES: report it to the human with the reason above."
+    echo "  If the HUMAN truly intends this, they (never the agent) open:  $tok"
+    echo "  and re-run the exact command prefixed with the code:  KERNEL_APPROVE=<code> <command>"
+    echo "  One-time use, expires in ${APPROVAL_TTL_MIN}m. The agent must NOT read that file -- the path is guarded."
+  } >&2
+}
+
+# --- Self-preservation: approval tokens and the guard's own scripts are off-limits ---
+case "$COMMAND" in
+  *"$APPROVALS_DIR"*|*".kernel/approvals"*)
+    echo "BLOCKED: command references the kernel approval-token store. Approval codes are for the HUMAN to read; the agent never touches that path." >&2
+    exit 2 ;;   # deliberately unmintable — no approval code for reading approval codes
+esac
+printf '%s' "$COMMAND" | grep -qE '\brm\b[^;|&]*(guard-bash|guard-config|guard-context|detect-secrets|scan-output)\.(sh|py)' \
+  && { echo "BLOCKED: attempt to delete a kernel security hook. The guard does not remove itself; hand this to the human." >&2; exit 2; }
 
 # --- Block force push to main/master (any flag form, any position) ---
 # Catches: --force, -f, --force-with-lease, +refspec, before or after the refspec.
@@ -147,6 +224,47 @@ if printf '%s' "$LOW" | grep -qE '(python[0-9.]*|perl|ruby|node)[[:space:]]+(-e|
   printf '%s' "$LOW" | grep -qE 'rmtree|removedirs|rimraf|rmsync|rmdirsync|fs\.rm|rm[[:space:]]+-[a-z]*r[a-z]*f' \
     && block "interpreter one-liner performing recursive/tree deletion." "Refusing indirect recursive rm via python/perl/node/ruby; do it explicitly so it's reviewable."
 fi
+
+# --- T3 EXFILTRATION: secret material + network egress in one command (irreversible) ---
+# Egress tools that carry data out. ssh/scp identity flags are excluded from the
+# credential-path rule below to avoid false-positives on `scp -i ~/.ssh/key` usage.
+if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[:space:]]|$)'; then
+  # A LITERAL secret token inline with an egress tool. Env-var references ($KEY) pass.
+  printf '%s' "$COMMAND" | grep -qE 'AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN[A-Z ]*PRIVATE KEY|eyJ[A-Za-z0-9_-]{17,}\.eyJ' \
+    && block "a literal secret appears in the same command as a network egress tool -- exfiltration cannot be undone." "Reference secrets via environment variables (\$VAR), never inline."
+  # Credential files fed into the same command as an egress tool (EchoLeak/Nx class).
+  # Localhost-only targets are treated as non-egress (downgraded to a warning).
+  if printf '%s' "$COMMAND" | grep -qE '(~|\$HOME|\$\{HOME\}|/Users/[^[:space:]/]+|/home/[^[:space:]/]+)/\.(ssh|aws|gnupg|config/gh)/|(^|[[:space:]/=@])\.env([[:space:].,;)]|$)|id_rsa|id_ed25519|id_ecdsa'; then
+    if printf '%s' "$LOW" | grep -qE '(curl|wget|nc|ncat)[^;|&]*(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])'; then
+      echo "guard-bash WARN: credential file + network tool in one command (target looks local, allowed). Verify intent." >&2
+    else
+      block "a credential file (~/.ssh, ~/.aws, .env, private key) is referenced in the same command as a network egress tool." "This is the exfiltration signature (Nx s1ngularity class). Separate the read from any network call, or hand to the human."
+    fi
+  fi
+  printf '%s' "$LOW" | grep -qE 'security[[:space:]]+find-(generic|internet)-password' \
+    && block "keychain read combined with network egress in one command." "Extract-and-send of keychain secrets is exfiltration."
+fi
+
+# --- T5 SCOPE ESCAPE: permission bypass, silent persistence, auto-executed config ---
+# Spawning an agent with its permission system off is the Nx s1ngularity signature.
+printf '%s' "$LOW" | grep -qE '[[:space:]]--(dangerously-skip-permissions|yolo|trust-all-tools)([[:space:]=]|$)' \
+  && block "spawning a tool with permission checks disabled (--dangerously-skip-permissions / --yolo / --trust-all-tools)." "This flag is how the Nx supply-chain attack weaponized agent CLIs. Run without it."
+# crontab write replaces the ENTIRE crontab silently; prior entries are unrecoverable.
+if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&])crontab([[:space:]]|$)'; then
+  printf '%s' "$LOW" | grep -qE 'crontab[[:space:]]+-l([[:space:]]|$)' \
+    || block "crontab write (replaces the whole crontab silently; installs scheduled code)." "crontab -l to inspect first; persistence changes go through the human."
+fi
+# Redirect into a shell startup file = code that auto-runs on every future shell.
+printf '%s' "$COMMAND" | grep -qE '>>?[[:space:]]*"?(~|\$HOME|\$\{HOME\}|/Users/[^[:space:]/]+|/home/[^[:space:]/]+)?/?\.(bashrc|zshrc|zshenv|zprofile|profile|bash_profile)"?([[:space:]]|$)' \
+  && block "redirect into a shell startup file (auto-executed on every shell -- silent persistence)." "Show the human the exact line; they add it, or approve this command."
+
+# --- T6 SUPPLY CHAIN: pipe-to-shell and obfuscated execution ---
+printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da)?sh([[:space:]]|$)' \
+  && block "piping a downloaded script straight into a shell (curl|sh) executes unreviewed remote code." "Download to a file first (curl -o install.sh URL), read it, then run it."
+printf '%s' "$LOW" | grep -qE 'base64[[:space:]]+(-d|--decode)[^;|&]*\|[[:space:]]*(sudo[[:space:]]+)?(ba|z|da)?sh([[:space:]]|$)' \
+  && block "piping base64-decoded content into a shell (obfuscated execution)." "Decode to a file and inspect it before running anything."
+printf '%s' "$LOW" | grep -qE 'eval[[:space:]]+.?["$(]*(curl|wget)[[:space:]]' \
+  && block "eval of downloaded content executes unreviewed remote code." "Fetch to a file, inspect, then run."
 
 # --- Investigation gate: rm/rmdir of git submodules or tracked directories ---
 # NOT a hard block. Surfaces what the target actually IS and requires a conscious
