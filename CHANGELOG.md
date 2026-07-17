@@ -2,6 +2,18 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.5.2] - 2026-07-17 "harness-projects guard fix"
+
+### Fixed
+- **guard-config.sh no longer blocks harness session data.** The `.claude/` config guard
+  pattern-matched ANY path containing `.claude/`, which swept in `~/.claude/projects/`:
+  the harness's own machine-managed state (session transcripts, per-project memory,
+  workflow scripts, subagent state). This blocked Claude Code from editing its own
+  persisted workflow scripts mid-run. `$HOME/.claude/projects/` is now exempt from the
+  config allowlist. The exemption sits AFTER the dot-segment traversal check, so paths
+  like `~/.claude/projects/../settings.json` remain blocked. Repo-level `.claude/` dirs
+  and all 8.2.0 sensitive-path blocks are unchanged. Two regression tests added.
+
 ## [8.5.1] - 2026-07-17 "learning graph"
 
 The second AgentDB lever after embeddings: a knowledge graph OVER the learnings, plus a
