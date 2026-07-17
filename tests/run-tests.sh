@@ -2828,6 +2828,61 @@ test_read_start_outputs_gotchas() {
   assert_contains "$output" "[gotcha] always escape SQL inputs"
 }
 
+# === migration 016: learning graph + promotion (CI-safe via hash backend) ===
+test_graph_build_creates_edges() {
+  agentdb init >/dev/null
+  agentdb learn failure "launchd scheduled job on macos failed permission denied" "a" >/dev/null
+  agentdb learn failure "launchd scheduled job on macos permission error tcc" "b" >/dev/null
+  agentdb learn failure "launchd scheduled job on macos denied full disk access" "c" >/dev/null
+  agentdb learn pattern "reticulate splines in the frobnicator widget" "z" >/dev/null
+  agentdb recall warmup >/dev/null 2>&1
+  env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb embed-sync >/dev/null 2>&1
+  local out
+  out=$(env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb graph build 2>/dev/null)
+  echo "$out" | grep -qE 'similar' || { echo "graph build produced no summary: $out"; return 1; }
+  local n
+  n=$(sqlite3 "$CLAUDE_PROJECT_DIR/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM learning_edges;" 2>/dev/null)
+  [ "${n:-0}" -ge 1 ] || { echo "expected >=1 edge, got $n"; return 1; }
+}
+
+test_graph_promote_finds_cluster() {
+  agentdb init >/dev/null
+  agentdb learn failure "launchd scheduled job on macos failed permission denied" "a" >/dev/null
+  agentdb learn failure "launchd scheduled job on macos permission error tcc" "b" >/dev/null
+  agentdb learn failure "launchd scheduled job on macos denied full disk access" "c" >/dev/null
+  agentdb recall warmup >/dev/null 2>&1
+  env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb embed-sync >/dev/null 2>&1
+  env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb graph build >/dev/null 2>&1
+  local out
+  out=$(env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 AGENTDB_SIM_PROMOTE=0.2 agentdb promote --min 3 2>/dev/null)
+  echo "$out" | grep -qiE 'cohesive|candidate' || { echo "expected a promotion candidate, got: $out"; return 1; }
+}
+
+test_graph_promote_empty_when_no_cluster() {
+  agentdb init >/dev/null
+  agentdb learn failure "totally unrelated alpha beta gamma" "a" >/dev/null
+  agentdb learn failure "completely different delta epsilon zeta" "b" >/dev/null
+  agentdb recall warmup >/dev/null 2>&1
+  env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb embed-sync >/dev/null 2>&1
+  env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb graph build >/dev/null 2>&1
+  local out
+  out=$(env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb promote --min 3 2>/dev/null)
+  echo "$out" | grep -qi "no promotion candidates" || { echo "expected no candidates, got: $out"; return 1; }
+}
+
+test_graph_edges_excluded_from_mirror() {
+  agentdb init >/dev/null
+  agentdb learn failure "launchd job permission denied macos" "a" >/dev/null
+  agentdb learn failure "launchd job permission error macos tcc" "b" >/dev/null
+  agentdb recall warmup >/dev/null 2>&1
+  env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb embed-sync >/dev/null 2>&1
+  env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb graph build >/dev/null 2>&1
+  agentdb export-json >/dev/null 2>&1
+  grep -q "learning_edges" "$CLAUDE_PROJECT_DIR/_meta/agentdb/agent.db.json" \
+    && { echo "learning_edges must be excluded from the mirror (derived data)"; return 1; }
+  return 0
+}
+
 test_read_start_lean_is_minimal() {
   # 8.4.0: --lean is the SessionStart surface. It emits a memory count + a recall
   # pointer + only the top failures, and SKIPS the full weighted dump, the recent-
@@ -5044,6 +5099,10 @@ run_test_suite() {
       run_test "read-start --lean is minimal (8.4.0)" test_read_start_lean_is_minimal
       run_test "session-start gives concrete recall recipe" test_session_start_has_concrete_recall_recipe
       run_test "read-start full keeps weighted + tail" test_read_start_full_still_has_weighted_and_tail
+      run_test "graph build creates edges (016)" test_graph_build_creates_edges
+      run_test "graph promote finds a cluster" test_graph_promote_finds_cluster
+      run_test "graph promote empty when no cluster" test_graph_promote_empty_when_no_cluster
+      run_test "graph edges excluded from mirror" test_graph_edges_excluded_from_mirror
       run_test "read-start bumps load_count not hit_count" test_read_start_bumps_load_count_not_hit_count
       ;;
     marketing)

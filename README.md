@@ -183,6 +183,14 @@ feature + subsystem/library + discovered files/symbols + exact error or desired 
 Run it again after discovery, when scope or hypothesis changes, or when a new failure appears.
 Run `agentdb read-start` explicitly (no flag) only when you want the full weighted memory dump.
 
+### Learning graph + promotion (8.5.1)
+
+With embeddings present, `agentdb graph build` connects related learnings (semantic
+cosine + `[[links]]`) into a `learning_edges` table; `agentdb graph neighbors <id>` shows
+a learning's related lessons. `agentdb promote` clusters recurring failures and surfaces
+candidate doctrine themes for review (it never auto-writes doctrine). The edges are derived
+data — excluded from the JSON mirror and rebuilt by `graph build`, like the embeddings.
+
 KERNEL hooks can inspect repository state, run configured checks, and write these records.
 Claude Code runs the full declared lifecycle. Codex runs supported synchronous hook
 events, including the write guards and SessionStart context; it skips asynchronous

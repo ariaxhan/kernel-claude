@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "8.5.0",
+  "version": "8.5.1",
   "description": "Durable project memory, bounded JSON handoffs, 35 engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.5.0 adds context-led frontend and honest marketing-site methods, plus concrete repeatable AgentDB recall prompts.",
   "author": {
     "name": "Aria Han",
