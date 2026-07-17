@@ -2231,17 +2231,19 @@ test_release_metadata_and_inventory_are_truthful() {
   local skills agents
   skills=$(find "$PLUGIN_ROOT/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
   agents=$(find "$PLUGIN_ROOT/agents" -maxdepth 1 -name '*.md' ! -name README.md | wc -l | tr -d ' ')
-  assert_equals 34 "$skills" "skill inventory"
+  assert_equals 35 "$skills" "skill inventory"
   assert_equals 15 "$agents" "agent inventory"
   python3 - "$PLUGIN_ROOT" <<'PY'
 import json, pathlib, sys
 r=pathlib.Path(sys.argv[1])
 p=json.loads((r/'.claude-plugin/plugin.json').read_text())
 m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
-assert p['version']==m['version']=='8.1.1'
+assert p['version']==m['version']=='8.5.0'
 for x in (p,m):
-    assert 'JSON' in x['description'] and '34 skills' in x['description'] and '15 specialized agent' in x['description']
+    assert '35 engineering skills' in x['description'] and '8.5.0' in x['description']
 PY
+  grep -q 'There are 35 skills and 15 specialized Claude Code agent definitions' "$PLUGIN_ROOT/README.md" || return 1
+  grep -q 'Codex loads all 35 KERNEL skills' "$PLUGIN_ROOT/docs/QUICKSTART.md" || return 1
   grep -q 'validate | latest | divergence | preflight | compile | resume | activate | deactivate' "$PLUGIN_ROOT/README.md"
 }
 
@@ -2839,6 +2841,8 @@ test_read_start_lean_is_minimal() {
   full=$(agentdb read-start)
   assert_contains "$lean" "## Memory:" || return 1
   assert_contains "$lean" "agentdb recall" || return 1
+  assert_contains "$lean" '<feature> <subsystem> <files/symbols> <error/outcome>' || return 1
+  assert_contains "$lean" "Recall again when scope, files, hypothesis, or failure changes" || return 1
   # failures surface unconditionally; the 12 plain patterns do NOT (recall-on-demand)
   assert_contains "$lean" "prod outage" || return 1
   echo "$lean" | grep -q "cache computation number" && { echo "lean must NOT dump non-failure patterns"; return 1; }
@@ -2848,6 +2852,16 @@ test_read_start_lean_is_minimal() {
   # at realistic volume lean is materially smaller than the full dump
   local ll fl; ll=$(printf '%s\n' "$lean" | wc -l); fl=$(printf '%s\n' "$full" | wc -l)
   [ "$ll" -lt "$fl" ] || { echo "lean ($ll lines) should be smaller than full ($fl lines)"; return 1; }
+  [ "$ll" -le 12 ] || { echo "lean keyword guidance grew too large ($ll lines, max 12)"; return 1; }
+}
+
+test_session_start_has_concrete_recall_recipe() {
+  local output
+  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
+  assert_contains "$output" '<feature> <subsystem> <files/symbols> <error/outcome>' || return 1
+  assert_contains "$output" "Recall again after discovery" || return 1
+  assert_contains "$output" "scope/hypothesis changes" || return 1
+  assert_contains "$output" "new failure" || return 1
 }
 
 test_read_start_full_still_has_weighted_and_tail() {
@@ -4539,6 +4553,41 @@ test_migration_side_effecting_skills_not_ambient() {
   assert_exit_code 0 "$bad" "side-effecting skills must not fire ambiently"
 }
 
+# === Marketing + Frontend Skill Tests ===
+
+test_marketing_site_methodology_contract() {
+  local skill="$PLUGIN_ROOT/skills/marketing-site/SKILL.md"
+  local ui="$PLUGIN_ROOT/skills/marketing-site/agents/openai.yaml"
+  assert_file_exists "$skill" || return 1
+  assert_file_exists "$ui" || return 1
+  grep -q '^  kind: methodology' "$skill" || return 1
+  ! grep -q '^disable-model-invocation: true' "$skill" || return 1
+  grep -q 'skills/frontend/SKILL.md' "$skill" || return 1
+  grep -q 'testimonials.*metrics.*guarantees\|metrics.*testimonials.*guarantees' "$skill" || return 1
+  grep -q 'privacy' "$skill" || return 1
+  grep -q 'client' "$skill" || return 1
+  grep -q '\$marketing-site' "$ui"
+}
+
+test_frontend_is_context_led_not_house_style() {
+  local skill="$PLUGIN_ROOT/skills/frontend/SKILL.md"
+  grep -q '<context-fit>' "$skill" || return 1
+  grep -q 'Preserve and extend the existing design system' "$skill" || return 1
+  grep -q 'visual QA' "$skill" || return 1
+  ! grep -q 'Distinctive fonts only — NEVER' "$skill" || return 1
+  ! grep -q 'NEVER flat single-color backgrounds' "$skill"
+}
+
+test_landing_page_composes_marketing_and_frontend() {
+  local skill="$PLUGIN_ROOT/skills/landing-page/SKILL.md"
+  grep -q '^disable-model-invocation: true' "$skill" || return 1
+  grep -q 'skills/marketing-site/SKILL.md' "$skill" || return 1
+  grep -q 'skills/frontend/SKILL.md' "$skill" || return 1
+  grep -q 'user already named the deploy target' "$skill" || return 1
+  grep -q '375 / 768 / 1440' "$skill" || return 1
+  grep -q 'project.*configured.*deploy' "$skill"
+}
+
 test_migration_kernel_taxonomy_blocks_parse() {
   # every SKILL.md frontmatter parses and carries kernel.kind
   python3 - "$PLUGIN_ROOT" <<'PYINNER'
@@ -4993,8 +5042,14 @@ run_test_suite() {
     read_start)
       run_test "read-start outputs Known Gotchas section" test_read_start_outputs_gotchas
       run_test "read-start --lean is minimal (8.4.0)" test_read_start_lean_is_minimal
+      run_test "session-start gives concrete recall recipe" test_session_start_has_concrete_recall_recipe
       run_test "read-start full keeps weighted + tail" test_read_start_full_still_has_weighted_and_tail
       run_test "read-start bumps load_count not hit_count" test_read_start_bumps_load_count_not_hit_count
+      ;;
+    marketing)
+      run_test "marketing-site is ambient methodology" test_marketing_site_methodology_contract
+      run_test "frontend is context-led, not a house style" test_frontend_is_context_led_not_house_style
+      run_test "landing-page composes marketing + frontend" test_landing_page_composes_marketing_and_frontend
       ;;
     recall)
       run_test "recall dedups identical insights" test_recall_dedups_identical_insights
@@ -5140,6 +5195,7 @@ main() {
     run_test_suite "pre_ship_app"
     run_test_suite "entropy_adaptive"
     run_test_suite "read_start"
+    run_test_suite "marketing"
     run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"

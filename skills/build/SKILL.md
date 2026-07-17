@@ -11,8 +11,9 @@ kernel:
 
 # BUILD SKILL
 
-Prerequisite: AgentDB read-start has run. Reference on demand:
-skills/build/reference/build-research.md.
+Prerequisite: run `agentdb recall` with the feature, subsystem/library, known files or
+symbols, and desired outcome. Run it again after repository inspection reveals better
+paths/symbols or the scope changes. Reference on demand: skills/build/reference/build-research.md.
 
 ## Goal first
 

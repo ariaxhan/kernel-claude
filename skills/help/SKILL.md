@@ -13,7 +13,7 @@ kernel:
 <skill id="help">
 
 <purpose>
-Quick reference for KERNEL v8.4.0.
+Quick reference for KERNEL v8.5.0.
 One primitive: skills (methodology, workflows, state transitions, validators,
 operators). Agents, manifests, philosophy, and current plugin status.
 </purpose>
@@ -32,7 +32,7 @@ Before showing help, check the actual state of the plugin as loaded in your cont
 4. Report what you see, don't just recite docs.
 
 ```bash
-agentdb read-start
+agentdb recall "<feature> <subsystem> <files/symbols> <error/outcome>" --global
 ```
 </on_start>
 
@@ -147,7 +147,7 @@ durable end-of-session state is required.
 <philosophy>
 <principle id="research_first">Research anti-patterns before solutions. Most problems are already solved.</principle>
 <principle id="tests_first">Define success before coding. Tests before implementation.</principle>
-<principle id="agentdb">Read at start. Write at end. Memory persists across sessions.</principle>
+<principle id="agentdb">Recall task context before acting. Recall again as the task changes. Write at end.</principle>
 <principle id="big5">Big 5: input validation, edge cases, error handling, duplication, complexity.</principle>
 <principle id="builtin">Built-in beats library. Library beats custom. Prove you need complexity.</principle>
 </philosophy>

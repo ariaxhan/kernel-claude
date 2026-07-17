@@ -125,11 +125,13 @@ cat << 'KERNEL_CONTEXT'
 ## KERNEL quick reference
 
 ```
-agentdb recall "<task keywords>" [--global]        # relevance lookup before acting
+agentdb recall "<feature> <subsystem> <files/symbols> <error/outcome>" [--global]
 agentdb learn failure|pattern|gotcha "what" "why"  # capture as discovered
 agentdb write-end '{"did":"X","learned":["Y"]}'    # at session end
 agentdb wtf                                        # confused? full ref: agentdb guide
 ```
+
+Recall with concrete nouns, not prose. Recall again after discovery, when scope/hypothesis changes, or on a new failure.
 
 Optimize for the fastest correct, robust path. Tier by reversibility x blast radius, NOT file count. Gate hard only where an op is irreversible. T1 execute, T2 plan+verify, T3 confirm.
 Default is inline. Spawn a subagent only to protect context, to buy real wall-clock on heavy file-disjoint work, when explicitly asked, or for independent verification, never for independence alone. When work is genuinely high-blast-radius or delegated, contract it, then verify with an adversary.

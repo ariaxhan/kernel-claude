@@ -126,9 +126,10 @@ Tested with and without design prompts across multiple generations:
    adjust weight/width/style dynamically are the foundation of responsive typography.
    Use variable fonts as default, not just distinctive static fonts.
 
-2. Calling out specific anti-patterns works better than positive instructions.
-   "Never use Inter" is more effective than "use interesting fonts." The model
-   needs to know what to AVOID more than what to DO.
+2. Calling out project-specific anti-patterns works better than vague positive
+   instructions. "Do not fall back to the component-library demo styling" is useful
+   when that is the observed default. Permanent ingredient bans merely create a new
+   default and can fight an existing brand or platform convention.
 
 3. The distilled aesthetics prompt (typography + color + motion + backgrounds)
    consistently outperforms any single-dimension prompt. All four dimensions
@@ -158,8 +159,8 @@ Why it works: anchors quality expectations to known high-bar products.
 Why it works: functional constraints produce better design than aesthetic ones.
 
 ### Pattern 4: Anti-Pattern Callout
-"No generic AI aesthetic. No purple gradients. No Inter. Surprise me."
-Why it works: removes the model's safe defaults, forces creative choices.
+"Keep our existing type system. Avoid the default rounded-card dashboard composition."
+Why it works: names the actual convergence risk without imposing unrelated taste.
 
 ### Pattern 5: Emotional Target
 "The user should feel calm confidence. Like a well-organized workspace."
@@ -219,7 +220,7 @@ their training distribution. Specific manifestations:
 
 Mitigations that work:
 - Rotate aesthetic references between generations.
-- Explicitly ban recently-used fonts/palettes in the prompt.
+- Name recently repeated choices as warnings and require a reason to reuse them.
 - Use variant system (abyss, ember, arctic, etc.) to force different starting points.
 - Request unexpected combinations: "editorial typography with brutalist layout."
 - Include randomization directive: "Make a choice I wouldn't expect."
@@ -238,8 +239,9 @@ From Lovable and v0's patterns, the optimal structure:
 1. Global tokens: CSS custom properties for colors, spacing, typography scale.
    Defined once, referenced everywhere. This is the only place hex codes belong.
 
-2. Component library: shadcn/ui as base (AI tools are optimized for it).
-   Customize via CSS variables, not by forking components.
+2. Component library: use the repository's established library and extension pattern.
+   A new project may choose a battle-tested base such as shadcn/ui, but tool familiarity
+   is not a product reason by itself.
 
 3. Layout patterns: define page-level compositions separate from components.
    "Dashboard layout" is not a component; it's a composition of components.
@@ -258,50 +260,31 @@ For any design task, include these in order of importance:
 
 1. WHO uses this and in what context (user, device, environment)
 2. WHAT it should feel like (mood, 2-3 adjectives, emotional target)
-3. WHAT to avoid (specific anti-patterns, banned defaults)
+3. WHAT to avoid (specific unexamined defaults seen in this project or recent output)
 4. CONSTRAINTS (max colors, mobile-first, accessibility requirements)
 5. REFERENCE quality level (what products/sites set the bar)
 
-Skip: exact hex codes, exact font names, exact pixel values, implementation details.
-Those are execution decisions. Let the model make them within your constraints.
+Existing brand tokens, fonts, and layout rules are evidence, not over-specification.
+For a greenfield direction, avoid premature pixel-level instructions and choose execution
+details within the stated constraints.
 
 ---
 
-## Principles Rationale (moved from SKILL.md 2026-05-28)
+## Contextual heuristics (updated 2026-07-16)
 
-### Typography — expanded rules
-- Weight extremes: pair 300 with 700+. Avoid the 400–500 middle zone entirely.
-- Size contrast: headers 3x+ body minimum. Go bigger.
-- Tracking: tight on large text, relaxed on small. Never default.
-- CRITICAL: If you've used the same font in your last 3 outputs, pick a different one.
+These are options to test, not universal rules:
 
-### Color — expanded rules
-- One dominant + one sharp accent beats even distribution every time.
-- Dark modes need 5+ background shade layers. Single dark color = amateur.
-- Derive palette from variant mood. Never memorized hex values.
-- Warm text colors. Bone/cream tones on dark. Never pure white on dark.
-
-### Motion — expanded rules
-- One orchestrated entrance beats scattered micro-interactions.
-- Organic easing always: cubic-bezier curves, never linear.
-- Breathing > snapping. Drift > jump. Ease > instant.
-- Vary timing per project. Don't reuse same duration scale.
-
-### Layout — expanded rules
-- Whitespace as design element. Use aggressively where it creates tension.
-- Full-bleed mixed with contained sections creates rhythm.
-- Uniform section heights = amateur. Vary intentionally.
-- Let content dictate structure, not templates.
-
-### Surfaces — expanded rules
-- Layer: gradients, translucent surfaces, backdrop-blur, subtle noise.
-- Cards need visible depth: shadow, border, or background differentiation.
-- Dark backgrounds need hue tint. Never pure black or pure gray.
-- Light from within (glow, shadow-color) beats external illumination.
-
-### Core principles — rationale
-- Prompt for taste, not implementation: Describe WHAT the user should feel; let the model choose HOW. Intent over specification. Mood, constraints, and anti-patterns beat hex codes and font names.
-- Component-first builds pieces (nav, hero, cards), then composes. Never generate full pages in one shot.
-- Mobile-first as constraint, not afterthought. Specify column limits and touch targets upfront.
-- Functional color encodes meaning (status, priority, state) — always beats decorative color.
-- Accessibility is a design advantage. WCAG contrast ratios force better color decisions. 44px touch targets prevent cramped layouts.
+- Typography contrast can clarify hierarchy, but editorial restraint, platform-native type,
+  or a narrow brand scale may be the better fit.
+- A dominant color and accent can focus attention, while monochrome or a broader semantic
+  palette may better serve the content.
+- Layered dark surfaces can explain depth; a deliberately flat field can be cleaner and more
+  memorable. Count neither shades nor effects as quality.
+- Asymmetry and mixed-width sections can create energy; symmetry and repetition can create
+  trust, speed, or calm. Let the message and task choose.
+- Motion should explain change, guide attention, or provide feedback. One entrance animation
+  is not automatically better than none.
+- Components improve repeated behavior. One-off static composition should not be forced into
+  component machinery merely to satisfy a ritual.
+- Accessibility, responsive behavior, realistic content states, and rendered visual QA remain
+  hard constraints because they improve the actual interface rather than enforce a style.

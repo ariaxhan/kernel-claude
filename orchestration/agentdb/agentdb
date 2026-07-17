@@ -1,11 +1,11 @@
 #!/bin/bash
 # KERNEL AgentDB CLI
-# Every agent reads on start, writes on end. No exceptions.
+# Every agent recalls task context before acting and writes on end. No exceptions.
 #
 # USAGE:
 #   agentdb init                    # Initialize per-project DB
-#   agentdb read-start              # Generic top-N learnings (session start)
-#   agentdb recall <keywords>       # RELEVANCE search — the right learning for THIS task (FTS5)
+#   agentdb recall <keywords>       # Task-relevant context; rerun as the task changes
+#   agentdb read-start              # Full generic top-N context for audit/resume
 #   agentdb write-end <json>        # Checkpoint before stopping
 #   agentdb learn <type> <insight>  # Record learning
 #   agentdb contract <json>         # Create contract
@@ -513,7 +513,9 @@ cmd_read_start() {
       local n_all n_fail top_fail
       n_all=$(db_exec "SELECT COUNT(*) FROM learnings WHERE archived_at IS NULL;" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
       n_fail=$(db_exec "SELECT COUNT(*) FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha');" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
-      echo "## Memory: ${n_all} learnings (${n_fail} failures/gotchas). For this task run: agentdb recall \"<keywords>\""
+      echo "## Memory: ${n_all} learnings (${n_fail} failures/gotchas)."
+      echo "Recall now: agentdb recall \"<feature> <subsystem> <files/symbols> <error/outcome>\" [--global]"
+      echo "Recall again when scope, files, hypothesis, or failure changes. Use concrete nouns, not prose."
       echo ""
       top_fail=$(db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha') ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null)
       if [ -n "$top_fail" ]; then
@@ -1117,7 +1119,9 @@ cmd_guide() {
   cat <<'GUIDE'
 # AgentDB Quick Reference
 
-Starting work?      agentdb read-start
+Starting work?      agentdb recall "<feature> <subsystem> <files/symbols> <error/outcome>" --global
+New files/failure?  Recall again with the new concrete nouns
+Full audit/resume?  agentdb read-start
 Something broke?    agentdb wtf
 Learned something?  agentdb learn failure "description" "evidence"
                     agentdb learn pattern "description" "evidence"
@@ -2524,7 +2528,8 @@ case "${1:-help}" in
     echo "CORE COMMANDS:"
     echo "  init                    Initialize DB + apply migrations"
     echo "  preflight               Validate schema + environment health"
-    echo "  read-start              Context for starting work"
+    echo "  recall <keywords> [--global]  Task context; rerun as files/scope/failure change"
+    echo "  read-start              Full generic context for audit/resume"
     echo "  write-end <json>        Checkpoint before stopping"
     echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"
     echo "  contract <json>         Create new contract"
