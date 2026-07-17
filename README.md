@@ -159,6 +159,20 @@ KERNEL keeps durable data in the selected Vaults, found in this order: valid `KE
 - `_meta/agents/`, `_meta/logs/`, and small session-status files: runtime records.
 - `.claude/kernel/` and `.local/bin/agentdb`: links created only by explicit init; startup only repairs recognized old numbered KERNEL links.
 
+### Semantic recall (8.3.0, optional)
+
+By default `agentdb recall` is FTS5 keyword search. Run `agentdb embed-init` once to
+add local semantic search: it creates a venv beside the DB, installs `fastembed`
+(ONNX all-MiniLM-L6-v2, ~50MB, no torch, fully on-machine — nothing leaves your
+computer), embeds your learnings, and prints an `AGENTDB_EMBED_PYTHON` export to make
+it permanent. Recall then fuses keyword bm25 with cosine similarity (reciprocal-rank
+fusion) and surfaces learnings whose wording differs from your query. On a real
+47-learning corpus this lifted recall@5 from 0.75 to 0.85 with no regressions. Install
+nothing and recall stays exactly as before — semantic search is strictly additive and
+opt-in. The embedding vectors are derived data: they are excluded from the tracked
+JSON mirror and rebuilt with `agentdb embed-sync` on a fresh clone. Measure retrieval
+quality yourself with `orchestration/agentdb/eval/run_eval.py` against a gold set.
+
 KERNEL hooks can inspect repository state, run configured checks, and write these records.
 Claude Code runs the full declared lifecycle. Codex runs supported synchronous hook
 events, including the write guards and SessionStart context; it skips asynchronous

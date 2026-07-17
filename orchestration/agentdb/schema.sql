@@ -21,7 +21,10 @@ CREATE TABLE IF NOT EXISTS learnings (
   visibility TEXT DEFAULT 'agent',     -- agent | human_only | operational
   sensitivity TEXT DEFAULT 'low',      -- low | medium | high
   archived_at TEXT,                    -- migration 014: derived cache of latest archived event (NULL = live)
-  archived_reason TEXT                 -- migration 014: reason from that archived event
+  archived_reason TEXT,                -- migration 014: reason from that archived event
+  embedding BLOB,                      -- migration 015: little-endian float32 sentence vector (NULL until embed-sync)
+  embedding_model TEXT,                -- migration 015: model id that produced `embedding`
+  embedding_ts TEXT                    -- migration 015: when embedded (staleness vs ts detectable)
 );
 
 CREATE INDEX IF NOT EXISTS idx_learnings_type ON learnings(type);

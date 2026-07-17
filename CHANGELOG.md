@@ -2,6 +2,53 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.3.0] - 2026-07-16 "semantic recall"
+
+AgentDB recall gains optional local semantic search, fused with the existing FTS
+keyword ranking. Measured on a real 47-learning corpus with a 20-query gold set:
+**recall@5 rose 0.75 → 0.85 (+0.10)** with zero regressions — the gain comes
+entirely from queries whose wording shares no keywords with the stored learning
+(e.g. "two background jobs writing the same repository" → the fcntl.flock git-mutex
+learning). Everything degrades gracefully: with no embedding backend installed,
+recall is byte-for-byte the previous FTS-only behavior. No new hard dependency.
+
+### Added
+- **Local sentence embeddings (migration 015).** A new `embedding` BLOB column on
+  `learnings` (plus `embedding_model` / `embedding_ts`), populated by
+  `agentdb embed-sync`. Backend is pluggable and tried in order: `fastembed`
+  (ONNX all-MiniLM-L6-v2, 384-dim, ~50MB, no torch), then `sentence-transformers`
+  (same model, torch), then a deterministic dependency-free `hash` backend used
+  only by the test suite. All yield L2-normalized float32 vectors.
+- **Hybrid recall via reciprocal-rank fusion.** When vectors exist, `agentdb recall`
+  fuses the FTS bm25 ranking with a brute-force cosine ranking (RRF, k=60) and
+  surfaces semantically-related learnings the keyword query missed. Corpus is small
+  (hundreds of rows) so cosine is plain numpy/pure-Python — no vector DB, no ANN.
+- **`agentdb embed-init`** — opt-in bootstrap: creates a venv beside the DB, installs
+  fastembed, embeds existing learnings, and prints the `AGENTDB_EMBED_PYTHON` export
+  to make it permanent. Explicit only; never runs on its own.
+- **`agentdb embed-sync` / `embed-status`** — (re)embed learnings whose vector is
+  missing/stale; report the active backend.
+- **`agentdb recall --ids`** — side-effect-free machine-readable recall (surfaced ids
+  only, no events, no hit_count bumps). Powers the eval harness.
+- **Recall eval harness** (`orchestration/agentdb/eval/run_eval.py`) — runs the REAL
+  shipped recall against a gold set in two arms (FTS-only via `AGENTDB_NO_EMBED=1`,
+  and hybrid) and reports recall@k / hit@k with the delta. A portable fixture corpus
+  + gold set ship in `tests/fixtures/agentdb-eval/` so CI proves the mechanism with
+  the hash backend and no model download.
+- **7 regression tests** (recall suite): backend selection, no-backend degradation,
+  vector write, `--ids` side-effect-freedom, hybrid-never-regresses-on-fixture, and
+  FTS-identical-when-no-vectors.
+
+### Changed
+- The JSON mirror (`agent.db.json`) **excludes** the embedding columns: they are
+  derived data that rebuilds from insight text via `embed-sync` on restore, exactly
+  like the FTS index. This keeps the mirror text-diffable and BLOB-free (sqlite-mirror
+  rule). Round-trip verified: export → restore → embed-sync reproduces every vector.
+
+### Unchanged (deliberately)
+- With no embedding backend, recall, read-start, and the mirror are byte-for-byte the
+  8.2.0 behavior. Semantic recall is strictly additive and opt-in.
+
 ## [8.2.0] - 2026-07-16 "security"
 
 A comprehensive security release covering six threat classes, grounded in real 2025-26

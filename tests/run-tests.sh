@@ -2841,6 +2841,89 @@ test_read_start_bumps_load_count_not_hit_count() {
 
 # --- Recall Tests (FTS5 relevance retrieval, v7.15 quality pass) ---
 
+# === migration 015: semantic recall (embeddings) — CI-safe via the hash backend ===
+# The hash backend is deterministic + dependency-free (pure Python), so these tests
+# need NO model download. Real semantic quality (fastembed on the live corpus) is
+# proven separately in the release chronicle, not in CI.
+_AGENTDB_DIR="$PLUGIN_ROOT/orchestration/agentdb"
+
+test_embed_status_reports_hash_backend() {
+  local out
+  out=$(AGENTDB_EMBED_BACKEND=hash python3 "$_AGENTDB_DIR/embed.py" backend 2>/dev/null)
+  case "$out" in hash\ *) : ;; *) echo "expected 'hash ...', got: $out"; return 1 ;; esac
+}
+
+test_embed_no_backend_exits_3() {
+  # No backend installed + not forced -> exit 3 (caller falls back to FTS).
+  local ec=0
+  env -u AGENTDB_EMBED_BACKEND python3 "$_AGENTDB_DIR/embed.py" backend >/dev/null 2>&1 || ec=$?
+  # 3 = no backend; if a real backend happens to be installed in CI, 0 is also fine.
+  [ "$ec" = "3" ] || [ "$ec" = "0" ] || { echo "expected exit 3 or 0, got $ec"; return 1; }
+}
+
+test_embed_sync_writes_vectors() {
+  agentdb init >/dev/null
+  agentdb learn pattern "fuse keyword and semantic ranking with reciprocal rank fusion" "rrf" >/dev/null
+  agentdb recall "warmup" >/dev/null 2>&1   # ensures embedding cols + fts exist
+  AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb embed-sync >/dev/null 2>&1
+  local n
+  n=$(sqlite3 "$CLAUDE_PROJECT_DIR/_meta/agentdb/agent.db" "SELECT count(*) FROM learnings WHERE embedding IS NOT NULL;")
+  [ "$n" -ge 1 ] || { echo "expected >=1 embedded row, got $n"; return 1; }
+}
+
+test_recall_ids_flag_is_side_effect_free() {
+  agentdb init >/dev/null
+  agentdb learn gotcha "SessionStart hook exited 141 SIGPIPE under pipefail" "sig" >/dev/null
+  local before after
+  before=$(sqlite3 "$CLAUDE_PROJECT_DIR/_meta/agentdb/agent.db" "SELECT COALESCE(SUM(hit_count),0) FROM learnings;")
+  agentdb recall --ids "sigpipe hook" >/dev/null 2>&1
+  after=$(sqlite3 "$CLAUDE_PROJECT_DIR/_meta/agentdb/agent.db" "SELECT COALESCE(SUM(hit_count),0) FROM learnings;")
+  [ "$before" = "$after" ] || { echo "--ids must not bump hit_count ($before -> $after)"; return 1; }
+}
+
+test_recall_ids_flag_prints_only_ids() {
+  agentdb init >/dev/null
+  agentdb learn pattern "serialize concurrent git writes with an flock mutex" "flock" >/dev/null
+  agentdb recall "warmup" >/dev/null 2>&1
+  local out
+  out=$(agentdb recall --ids "concurrent git writes" 2>/dev/null)
+  # every non-empty line must look like a learning id (LRN-...), no markdown header
+  printf '%s\n' "$out" | grep -qv '^LRN-' && { echo "non-id line in --ids output: $out"; return 1; }
+  printf '%s\n' "$out" | grep -q '^LRN-' || { echo "expected at least one LRN- id, got: $out"; return 1; }
+}
+
+test_hybrid_never_regresses_on_fixture() {
+  # Load the portable fixture corpus, embed with hash, run the eval. Hybrid recall@5
+  # must be >= FTS-only recall@5 (fusion never hurts) — the CI-safe mechanism proof.
+  local db="$CLAUDE_PROJECT_DIR/_meta/agentdb/agent.db"
+  agentdb init >/dev/null
+  agentdb recall "warmup" >/dev/null 2>&1   # create fts + embedding cols
+  sqlite3 "$db" < "$PLUGIN_ROOT/tests/fixtures/agentdb-eval/corpus.sql"
+  sqlite3 "$db" "INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');" 2>/dev/null
+  AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb embed-sync >/dev/null 2>&1
+  local json base hyb
+  json=$(AGENTDB_EMBED_BACKEND=hash python3 "$_AGENTDB_DIR/eval/run_eval.py" \
+    --db "$db" --gold "$PLUGIN_ROOT/tests/fixtures/agentdb-eval/gold.json" \
+    --k 5 --backend hash --embed-python python3 --quiet 2>/dev/null)
+  base=$(printf '%s' "$json" | sed -E 's/.*"recall_baseline": ([0-9.]+).*/\1/')
+  hyb=$(printf '%s' "$json" | sed -E 's/.*"recall_hybrid": ([0-9.]+).*/\1/')
+  [ -n "$base" ] && [ -n "$hyb" ] || { echo "eval produced no numbers: $json"; return 1; }
+  awk -v b="$base" -v h="$hyb" 'BEGIN{exit !(h+1e-9 >= b)}' \
+    || { echo "hybrid recall@5 ($hyb) regressed below FTS ($base)"; return 1; }
+}
+
+test_recall_fts_only_when_no_vectors() {
+  # With embedding cols present but NO vectors synced, recall must behave exactly
+  # like pure FTS (the graceful-degradation guarantee).
+  agentdb init >/dev/null
+  agentdb learn pattern "kernel governance is generated from a template" "gen" >/dev/null
+  agentdb recall "warmup" >/dev/null 2>&1
+  local with_backend without
+  without=$(agentdb recall --ids "governance template" 2>/dev/null)
+  with_backend=$(AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb recall --ids "governance template" 2>/dev/null)
+  [ "$without" = "$with_backend" ] || { echo "recall differs with/without backend when no vectors exist"; return 1; }
+}
+
 test_recall_dedups_identical_insights() {
   agentdb init >/dev/null
   # Three identical insights (the clone problem). recall must return exactly one.
@@ -4887,6 +4970,13 @@ run_test_suite() {
       run_test "recall --global never leaks human_only" test_recall_global_no_human_leak
       run_test "recall survives sqlite control-char escaping" test_recall_survives_sqlite_control_char_escaping
       run_test "decay spares loaded (load_count>0) learnings" test_decay_spares_loaded_learnings
+      run_test "embed-status reports hash backend" test_embed_status_reports_hash_backend
+      run_test "embed no-backend exits 3 (FTS fallback)" test_embed_no_backend_exits_3
+      run_test "embed-sync writes vectors" test_embed_sync_writes_vectors
+      run_test "recall --ids is side-effect-free" test_recall_ids_flag_is_side_effect_free
+      run_test "recall --ids prints only ids" test_recall_ids_flag_prints_only_ids
+      run_test "hybrid never regresses on fixture (recall@5)" test_hybrid_never_regresses_on_fixture
+      run_test "recall FTS-only when no vectors (degradation)" test_recall_fts_only_when_no_vectors
       ;;
     learn)
       run_test "learn auto-populates domain from PWD" test_learn_auto_populates_domain

@@ -1,0 +1,14 @@
+[
+  {"query": "how do I stop many processes racing on the same repository lock file", "relevant": ["L01"]},
+  {"query": "boot script crashed with a broken pipe signal during startup", "relevant": ["L02"]},
+  {"query": "combine lexical and vector search results into one ranking", "relevant": ["L03"]},
+  {"query": "should a security scanner turn itself off when it errors", "relevant": ["L04"]},
+  {"query": "storing a database file in version control diffs", "relevant": ["L05"]},
+  {"query": "unforgeable human approval token instead of an environment override", "relevant": ["L06"]},
+  {"query": "when is it worth delegating work to a parallel worker", "relevant": ["L07"]},
+  {"query": "scheduled background job on mac fails with a permissions error", "relevant": ["L08"]},
+  {"query": "why verifying against a live check matters more than a commit", "relevant": ["L09"]},
+  {"query": "an empty nested repository directory that should not be removed", "relevant": ["L10"]},
+  {"query": "hook output parsed as structured data breaking the tool", "relevant": ["L11"]},
+  {"query": "detect hidden characters trying to override the model instructions", "relevant": ["L12"]}
+]

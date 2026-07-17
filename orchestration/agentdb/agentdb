@@ -125,6 +125,20 @@ _ensure_softdelete_cols() {
   return 0
 }
 
+# Migration 015: embedding columns, delegated to code (idempotent under force re-read,
+# like _ensure_softdelete_cols). Inert until an embedding backend + embed-sync run.
+_ensure_embedding_cols() {
+  [ -f "$DB" ] || return 0
+  local has
+  has=$(db_exec "SELECT 1 FROM pragma_table_info('learnings') WHERE name='embedding' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has" ]; then
+    db_exec "ALTER TABLE learnings ADD COLUMN embedding BLOB;" 2>/dev/null || true
+    db_exec "ALTER TABLE learnings ADD COLUMN embedding_model TEXT;" 2>/dev/null || true
+    db_exec "ALTER TABLE learnings ADD COLUMN embedding_ts TEXT;" 2>/dev/null || true
+  fi
+  return 0
+}
+
 # Return a SQL literal for a text value: '<escaped>' for a non-empty string, or
 # bare NULL for an empty one (absence = UNKNOWN, never an empty-string fact; the
 # null-semantics contract, design 5.2).
@@ -1137,7 +1151,18 @@ cmd_export_json() {
   echo '{}' > "$acc"
   for t in $tables; do
     _is_snapshot_table "$t" || continue
-    db_exec_opts "-json" "SELECT * FROM \"$t\" ORDER BY rowid;" > "$tdir/$t.json" 2>/dev/null
+    # DERIVED columns are NOT mirrored (sqlite-mirror rule): the embedding BLOBs
+    # (migration 015) rebuild from insight text via `agentdb embed-sync` on restore,
+    # exactly like the FTS index. Mirroring them would put 1.5KB of binary per row
+    # into the tracked JSON (unreadable, un-diffable) and BLOBs don't round-trip
+    # through sqlite3 -json / json_extract cleanly. So select an explicit column
+    # list minus embedding* for any table that carries them; plain SELECT * otherwise.
+    local _sel="*" _cols
+    _cols=$(db_exec "SELECT group_concat('\"'||name||'\"', ',') FROM pragma_table_info('$t') WHERE name NOT IN ('embedding','embedding_model','embedding_ts');" 2>/dev/null)
+    if [ -n "$_cols" ] && db_exec "SELECT 1 FROM pragma_table_info('$t') WHERE name='embedding' LIMIT 1;" 2>/dev/null | grep -q 1; then
+      _sel="$_cols"
+    fi
+    db_exec_opts "-json" "SELECT $_sel FROM \"$t\" ORDER BY rowid;" > "$tdir/$t.json" 2>/dev/null
     [ -s "$tdir/$t.json" ] || echo '[]' > "$tdir/$t.json"
     jq -S --arg t "$t" --slurpfile rows "$tdir/$t.json" '. + {($t): $rows[0]}' "$acc" \
       > "$acc.tmp" && mv "$acc.tmp" "$acc"
@@ -1827,16 +1852,141 @@ _recall_emit() {
   fi
 }
 
+# === Semantic recall (migration 015) — optional, degrades to FTS-only ===
+# The embedding backend lives in embed.py next to this script. It runs under a
+# python that has fastembed or sentence-transformers; if neither is installed (or
+# no vectors exist yet), every call here fails and recall stays pure FTS.
+_embed_py() { echo "$SCHEMA_DIR/embed.py"; }
+_embed_python() { echo "${AGENTDB_EMBED_PYTHON:-python3}"; }
+
+# Run embed.py; echo stdout, return its exit code. Silent on failure.
+_embed_run() {
+  local py script
+  py=$(_embed_python); script=$(_embed_py)
+  [ -f "$script" ] || return 3
+  command -v "$py" >/dev/null 2>&1 || return 3
+  "$py" "$script" "$@" 2>/dev/null
+}
+
+# Emit _recall_emit-format rows for an explicit newline-list of ids (used to pull
+# display text for semantic-only hits that FTS did not match). Visibility/archived
+# filtered like _recall_emit. <origin> tags the rows for reinforcement routing.
+_emit_rows_by_ids() {
+  local db="$1" ids="$2" tag="$3" origin="${4:-local}"
+  [ -f "$db" ] || return 0
+  [ -n "$ids" ] || return 0
+  local in_list=""
+  local id
+  while IFS= read -r id; do
+    [ -z "$id" ] && continue
+    in_list="${in_list:+$in_list,}'$(sql_escape "$id")'"
+  done <<< "$ids"
+  [ -z "$in_list" ] && return 0
+  local arch=""
+  if sqlite3 "$db" "SELECT 1 FROM pragma_table_info('learnings') WHERE name='archived_at' LIMIT 1;" 2>/dev/null | grep -q 1; then
+    arch="AND archived_at IS NULL"
+  fi
+  sqlite3 "$db" "
+    SELECT lower(substr(insight,1,200)) || '@@US@@' ||
+           '- [' || type || '] ' || insight || '$tag' ||
+           CASE WHEN evidence IS NOT NULL AND evidence != ''
+                THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END
+           || '@@US@@' || id || '@@US@@' || '$origin'
+    FROM learnings
+    WHERE id IN ($in_list)
+      AND (visibility = 'agent' OR visibility IS NULL)
+      $arch;" 2>/dev/null || true
+}
+
+# Reciprocal-rank fusion of FTS and semantic rankings. Args: sem-rank file and
+# fts-rank file (each "id<TAB>rank"); union display lines on stdin. Emits the same
+# lines reordered by RRF score = 1/(k+fts_rank) + 1/(k+sem_rank), k=60 (standard).
+# A row missing from a ranker simply contributes 0 from that side. Small N -> an
+# O(n^2) selection sort is fine and keeps this dependency-free.
+_hybrid_rerank() {
+  awk -F'@@US@@' -v semf="$1" -v ftsf="$2" -v k=60 '
+    BEGIN{
+      while((getline l < semf) > 0){ n=split(l,a,"\t"); if(n>=2) semr[a[1]]=a[2] }
+      while((getline l < ftsf) > 0){ n=split(l,a,"\t"); if(n>=2) ftsr[a[1]]=a[2] }
+    }
+    { id=$3; if(id!="" && !(id in disp)){ disp[id]=$0; ord[++cnt]=id } }
+    END{
+      for(i=1;i<=cnt;i++){ id=ord[i]; s=0;
+        if(id in ftsr) s += 1.0/(k+ftsr[id]);
+        if(id in semr) s += 1.0/(k+semr[id]);
+        sc[id]=s }
+      for(i=1;i<=cnt;i++) for(j=i+1;j<=cnt;j++)
+        if(sc[ord[j]] > sc[ord[i]]){ t=ord[i]; ord[i]=ord[j]; ord[j]=t }
+      for(i=1;i<=cnt;i++) print disp[ord[i]]
+    }'
+}
+
+# Given FTS candidate rows (raw) + the query, fuse in semantic ranking if a backend
+# and stored vectors exist. Echoes the reordered/expanded candidate rows. On any
+# failure echoes $raw unchanged (pure FTS — the exact pre-015 behavior).
+_maybe_hybrid() {
+  local db="$1" query="$2" raw="$3" limit="$4"
+  # Escape hatch: force pure FTS (used by the eval's baseline arm, and any user who
+  # wants to pin keyword-only behavior even with a backend installed).
+  [ "${AGENTDB_NO_EMBED:-0}" = "1" ] && { printf '%s' "$raw"; return 0; }
+  local sem_pairs
+  sem_pairs=$(_embed_run query "$db" "$query") || { printf '%s' "$raw"; return 0; }
+  [ -n "$sem_pairs" ] || { printf '%s' "$raw"; return 0; }
+  local semf ftsf union
+  semf=$(mktemp); ftsf=$(mktemp)
+  # sem-rank: id<TAB>rank (cosine order). Cap the semantic pool at limit*3.
+  printf '%s\n' "$sem_pairs" | awk -F'\t' 'NF>=1 && $1!=""{print $1"\t"NR}' \
+    | head -n $((limit * 3)) > "$semf"
+  # fts-rank: id<TAB>rank from the raw FTS candidate order (field 3 = id).
+  printf '%s\n' "$raw" | awk -F'@@US@@' 'NF>=4 && $3!=""{print $3"\t"(++n)}' > "$ftsf"
+  # Pull display rows for semantic ids that FTS missed, so semantic can surface them.
+  local sem_ids fts_ids missing
+  sem_ids=$(cut -f1 "$semf")
+  fts_ids=$(cut -f1 "$ftsf")
+  missing=$(comm -23 <(printf '%s\n' "$sem_ids" | sort -u) <(printf '%s\n' "$fts_ids" | sort -u) 2>/dev/null)
+  local raw_sem=""
+  [ -n "$missing" ] && raw_sem=$(_emit_rows_by_ids "$db" "$missing" "" "local")
+  union=$(printf '%s\n%s\n' "$raw" "$raw_sem" | grep -v '^[[:space:]]*$')
+  printf '%s\n' "$union" | _hybrid_rerank "$semf" "$ftsf"
+  rm -f "$semf" "$ftsf"
+}
+
+# Opt-in bootstrap for the semantic-recall backend. Creates a venv beside the DB
+# and installs fastembed (ONNX all-MiniLM-L6-v2, ~50MB, no torch), then syncs.
+# Explicit only — never runs on its own; a user who never calls this keeps FTS-only.
+cmd_embed_init() {
+  local venv="$DB_DIR/.venv" py
+  echo "Bootstrapping semantic recall (fastembed, local, ~50MB)…"
+  if [ ! -x "$venv/bin/python" ]; then
+    python3 -m venv "$venv" || { echo "failed to create venv at $venv" >&2; exit 1; }
+  fi
+  py="$venv/bin/python"
+  "$py" -m pip install --quiet --upgrade pip >/dev/null 2>&1 || true
+  if ! "$py" -c "import fastembed" >/dev/null 2>&1; then
+    echo "Installing fastembed…"
+    "$py" -m pip install --quiet fastembed || { echo "pip install fastembed failed" >&2; exit 1; }
+  fi
+  echo "Backend ready. Point recall at it by exporting:"
+  echo "  export AGENTDB_EMBED_PYTHON=\"$py\""
+  echo "Embedding existing learnings…"
+  _ensure_embedding_cols
+  AGENTDB_EMBED_PYTHON="$py" _embed_run sync "$DB"
+  echo "Done. Add AGENTDB_EMBED_PYTHON to your shell profile to make it permanent."
+}
+
 cmd_recall() {
   # Parse --global (cross-project) out of the args; the rest is the query.
   local use_global=0
   local -a qargs=()
   local a
+  local ids_only=0
   for a in "$@"; do
-    if [ "$a" = "--global" ]; then use_global=1; else qargs+=("$a"); fi
+    if [ "$a" = "--global" ]; then use_global=1
+    elif [ "$a" = "--ids" ]; then ids_only=1      # eval mode: print surfaced ids, no side effects
+    else qargs+=("$a"); fi
   done
   local query="${qargs[*]:-}"  # :- guards empty array under set -u on bash 3.2 (macOS)
-  [ -z "$query" ] && { echo "Usage: agentdb recall <keywords> [--global]"; exit 1; }
+  [ -z "$query" ] && { echo "Usage: agentdb recall <keywords> [--global] [--ids]"; exit 1; }
   [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
   local limit="${RECALL_LIMIT:-8}"
 
@@ -1871,6 +2021,7 @@ cmd_recall() {
     run_pending_migrations "recall:applied_migration" >/dev/null 2>&1 || true
   fi
   _ensure_softdelete_cols  # guarantee the local archived_at filter is valid (design 3.7)
+  _ensure_embedding_cols   # migration 015: embedding columns present (inert without a backend)
 
   # Resolve the global brain only if requested.
   local global_db=""
@@ -1878,9 +2029,11 @@ cmd_recall() {
     global_db=$(find_global_db || true)
   fi
 
-  echo "## Recall: $query"
-  [ -n "$global_db" ] && echo "_(+ global brain: $global_db)_"
-  echo ""
+  if [ "$ids_only" != "1" ]; then
+    echo "## Recall: $query"
+    [ -n "$global_db" ] && echo "_(+ global brain: $global_db)_"
+    echo ""
+  fi
 
   # Collect local first (so a lesson present in both wins as the local copy), then
   # global, then dedup by 200-char insight key and cut to the limit. bm25() cannot
@@ -1892,10 +2045,21 @@ cmd_recall() {
   # the ACTUALLY-displayed rows, not the raw match set (the D9 / 5.1 bump-vs-display fix).
   local raw_local raw_global dedup out
   raw_local=$(_recall_emit "$DB" "$fts_query" "$like_clause" "" "$limit" 1 "local")
+  # Migration 015: fuse in semantic ranking when an embedding backend + vectors exist.
+  # No backend / no vectors -> raw_local returns unchanged (pure FTS, pre-015 behavior).
+  raw_local=$(_maybe_hybrid "$DB" "$query" "$raw_local" "$limit")
   raw_global=""
   [ -n "$global_db" ] && raw_global=$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0 "global")
   dedup=$(printf '%s\n%s\n' "$raw_local" "$raw_global" | grep -v '^[[:space:]]*$' \
         | awk -F'@@US@@' '!seen[$1]++' | head -n "$limit")
+
+  # Eval mode: emit the surfaced ids only, in ranked order, with ZERO side effects
+  # (no events, no hit_count bumps) so repeated eval runs never mutate the corpus.
+  if [ "$ids_only" = "1" ]; then
+    printf '%s\n' "$dedup" | awk -F'@@US@@' 'NF>=4{print $3}'
+    return 0
+  fi
+
   out=$(printf '%s\n' "$dedup" | awk -F'@@US@@' 'NF{print $2}')
 
   if [ -n "$out" ]; then
@@ -2307,6 +2471,9 @@ case "${1:-help}" in
   resurrect)   shift; cmd_resurrect "$@" ;;
   antibody)    shift; cmd_antibody "$@" ;;
   recall)      shift; cmd_recall "$@" ;;
+  embed-sync)  shift; _ensure_embedding_cols; _embed_run sync "$DB" ;;
+  embed-status) shift; _embed_run backend || { echo "no embedding backend installed — recall is FTS-only (see: agentdb embed-init)"; exit 0; } ;;
+  embed-init)  shift; cmd_embed_init "$@" ;;
   export)      cmd_export ;;
   export-json) shift; cmd_export_json "$@" ;;
   import-json) shift; cmd_import_json "$@" ;;
