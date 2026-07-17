@@ -2849,7 +2849,7 @@ _AGENTDB_DIR="$PLUGIN_ROOT/orchestration/agentdb"
 
 test_embed_status_reports_hash_backend() {
   local out
-  out=$(AGENTDB_EMBED_BACKEND=hash python3 "$_AGENTDB_DIR/embed.py" backend 2>/dev/null)
+  out=$(env AGENTDB_EMBED_BACKEND=hash python3 "$_AGENTDB_DIR/embed.py" backend 2>/dev/null)
   case "$out" in hash\ *) : ;; *) echo "expected 'hash ...', got: $out"; return 1 ;; esac
 }
 
@@ -2902,7 +2902,7 @@ test_hybrid_never_regresses_on_fixture() {
   sqlite3 "$db" "INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');" 2>/dev/null
   AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb embed-sync >/dev/null 2>&1
   local json base hyb
-  json=$(AGENTDB_EMBED_BACKEND=hash python3 "$_AGENTDB_DIR/eval/run_eval.py" \
+  json=$(env AGENTDB_EMBED_BACKEND=hash python3 "$_AGENTDB_DIR/eval/run_eval.py" \
     --db "$db" --gold "$PLUGIN_ROOT/tests/fixtures/agentdb-eval/gold.json" \
     --k 5 --backend hash --embed-python python3 --quiet 2>/dev/null)
   base=$(printf '%s' "$json" | sed -E 's/.*"recall_baseline": ([0-9.]+).*/\1/')
@@ -2920,7 +2920,7 @@ test_recall_fts_only_when_no_vectors() {
   agentdb recall "warmup" >/dev/null 2>&1
   local with_backend without
   without=$(agentdb recall --ids "governance template" 2>/dev/null)
-  with_backend=$(AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb recall --ids "governance template" 2>/dev/null)
+  with_backend=$(env AGENTDB_EMBED_BACKEND=hash AGENTDB_EMBED_PYTHON=python3 agentdb recall --ids "governance template" 2>/dev/null)
   [ "$without" = "$with_backend" ] || { echo "recall differs with/without backend when no vectors exist"; return 1; }
 }
 
