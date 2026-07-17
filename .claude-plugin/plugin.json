@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "8.1.5",
+  "version": "8.2.0",
   "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.1.4 removes automatic lifecycle network and push sweeps.",
   "author": {
     "name": "Aria Han",
