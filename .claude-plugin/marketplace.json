@@ -7,8 +7,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.2.0 is a security release: a six-threat-class guard (self-destruct, exfiltration, scope-escape, supply-chain, sensitive-config writes, warn-only injection tripwire) with unforgeable one-time human approval replacing the DANGER_OK substring.",
-      "version": "8.2.0"
+      "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.3.0 adds optional local semantic recall: sentence embeddings (fastembed/MiniLM, on-machine) fused with FTS keyword search via reciprocal-rank fusion, measured +0.10 recall@5, degrading gracefully to FTS-only with no backend.",
+      "version": "8.3.0"
     }
   ]
 }

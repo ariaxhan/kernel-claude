@@ -1,0 +1,20 @@
+-- Migration 015: semantic-recall embedding columns on learnings.
+--
+-- WHY (agentdb rethink, 2026-07-16): recall was FTS5 keyword-match only. It misses
+-- a learning whose wording differs from the task ("git write races" vs "index.lock
+-- contention"). This adds a stored sentence-embedding per learning so recall can
+-- fuse keyword (FTS bm25) with semantic (cosine) ranking via reciprocal-rank fusion.
+--
+-- DEGRADES GRACEFULLY: the column is inert until an embedding backend (fastembed or
+-- sentence-transformers, both -> all-MiniLM-L6-v2 / 384-dim) is installed and
+-- `agentdb embed-sync` has run. With no backend, `embedding` stays NULL and recall
+-- is byte-for-byte the old FTS-only behavior. No new hard dependency for any user.
+--
+-- COLUMNS (delegated to code like migrations 004/009/013/014): a raw ALTER here
+-- throws "duplicate column name" when preflight force-re-reads every migration to
+-- repair a dropped table. `_ensure_embedding_cols` owns the ALTER idempotently;
+-- schema.sql carries them for fresh DBs. This file records the marker only.
+--   embedding        BLOB  -- little-endian float32 vector (384 dims for MiniLM)
+--   embedding_model  TEXT  -- model id that produced it; a mismatch triggers re-embed
+--   embedding_ts     TEXT  -- when embedded; staleness vs learnings.ts is detectable
+INSERT OR IGNORE INTO _migrations (name) VALUES ('015_learning_embeddings');
