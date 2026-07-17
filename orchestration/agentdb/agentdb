@@ -501,6 +501,32 @@ cmd_read_start() {
       loaded_ids=$(db_exec "SELECT id FROM learnings WHERE (hit_count > 5 OR type IN ('failure','gotcha') OR julianday('now') - julianday(ts) < 7) AND archived_at IS NULL;" 2>/dev/null); sf_mode="tiered"
       ;;
 
+    --lean)
+      # Minimal session-start surface (the SessionStart hook default since 8.4.0).
+      # A count + a recall pointer + only the highest-hit failures/gotchas — the
+      # few worth surfacing UNCONDITIONALLY because you can't know to recall a
+      # mistake before you make it. Everything else is recall-on-demand now that
+      # recall is semantic (migration 015). Dumping ~50 task-blind learnings on
+      # every single session (weighted-75, ~2.8k tokens) was the pre-8.4 waste;
+      # this is ~10x smaller and task-appropriate. Explicit `read-start` (no flag)
+      # still gives the full weighted dump for an agent that wants deep context.
+      local n_all n_fail top_fail
+      n_all=$(db_exec "SELECT COUNT(*) FROM learnings WHERE archived_at IS NULL;" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
+      n_fail=$(db_exec "SELECT COUNT(*) FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha');" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
+      echo "## Memory: ${n_all} learnings (${n_fail} failures/gotchas). For this task run: agentdb recall \"<keywords>\""
+      echo ""
+      top_fail=$(db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha') ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null)
+      if [ -n "$top_fail" ]; then
+        echo "### Highest-hit failures (avoid these; recall the rest by task):"
+        echo "$top_fail"
+      fi
+      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE id IN (
+        SELECT id FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha')
+        ORDER BY hit_count DESC, ts DESC LIMIT 5);" 2>/dev/null
+      loaded_ids=$(db_exec "SELECT id FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha')
+        ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null); sf_mode="lean"
+      ;;
+
     --weighted|*)
       # Default: WEIGHTED-75 (~3.4K tokens, 84% failure coverage). H078 graduated.
       # Score = (hit_count * 10) + (failure_bonus * 50) + (recency_7d * 10) + (recency_14d * 5)
@@ -557,12 +583,21 @@ cmd_read_start() {
     fi
   fi
 
-  echo ""
-  echo "## Recent Errors"
-  db_exec "SELECT '- [' || tool || '] ' || substr(error, 1, 120) FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
-  echo ""
+  # Post-dump tail: recent errors + replay detection + active contract + last
+  # checkpoint. SKIPPED in --lean mode — the SessionStart hook emits contract /
+  # blockers / resume-checkpoint itself (so these would just duplicate), and a
+  # 5-error traceback dump is startup noise. Replay detection (the one signal the
+  # hook lacks) is kept but only when there's an actual match. Full modes keep it all.
+  if [ "$sf_mode" != "lean" ]; then
+    echo ""
+    echo "## Recent Errors"
+    db_exec "SELECT '- [' || tool || '] ' || substr(error, 1, 120) FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || echo "None"
+    echo ""
+  fi
 
-  # Error replay detection: warn if recent errors match known failure patterns
+  # Error replay detection: warn if recent errors match known failure patterns.
+  # Runs in every mode (incl. lean) but only PRINTS on a real match — a high-value,
+  # low-cost safety signal the hook's error-count blocker can't give.
   local replay_warnings
   replay_warnings=$(db_exec "
     SELECT DISTINCT '- REPLAY RISK: \"' || substr(e.error, 1, 60) || '\" matches: ' || l.insight
@@ -582,12 +617,14 @@ cmd_read_start() {
     echo ""
   fi
 
-  echo "## Active Contract"
-  db_exec "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
-  echo ""
+  if [ "$sf_mode" != "lean" ]; then
+    echo "## Active Contract"
+    db_exec "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
+    echo ""
 
-  echo "## Last Checkpoint"
-  db_exec "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
+    echo "## Last Checkpoint"
+    db_exec "SELECT content FROM context WHERE type='checkpoint' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "None"
+  fi
 }
 
 cmd_write_end() {

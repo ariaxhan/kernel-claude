@@ -2,6 +2,40 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.4.0] - 2026-07-16 "lean session"
+
+Cuts the SessionStart context injection from ~3,700 tokens to ~950 — a **74% reduction
+on every session**, interactive and headless. The old startup dumped ~50 task-blind
+learnings (the "weighted-75" mode, ~2,800 tokens) into every session regardless of what
+you were doing. Now that recall is semantic (8.3.0), that is obsolete: the agent recalls
+what its task needs, and startup only surfaces the handful of highest-hit failures worth
+knowing unconditionally (you can't know to recall a mistake before you make it).
+
+### Added
+- **`agentdb read-start --lean`** — a minimal session surface: a learning count, a
+  `agentdb recall "<keywords>"` pointer, and the top 5 failures/gotchas by hit count.
+  Skips the full weighted dump, the 5-error traceback tail, and the active-contract /
+  checkpoint tail (the SessionStart hook emits contract/blockers/checkpoint itself, so
+  those were duplicated). Replay detection (an error matching a known failure) is kept in
+  every mode but only prints on a real match.
+
+### Changed
+- **The SessionStart hook now uses `--lean`.** Every session starts light. The obsolete
+  50-line SIGPIPE cap (8.1.3) is removed — lean output is small by construction.
+- Explicit `agentdb read-start` (no flag) is **unchanged** — still the full weighted-75
+  dump for the skills that call it on demand (ingest, handoff, tearitapart, forge, …) and
+  for an agent that deliberately wants deep memory context.
+- Removed the redundant "Top Learnings" section from the SessionStart hook (folded into
+  the lean surface).
+
+### Why this is safe
+- Nothing is lost: every learning is still one `agentdb recall` away, now ranked
+  semantically instead of dumped blind. The unconditional "avoid these" failures still
+  surface at startup.
+- Verified: full SessionStart 106 lines/~3,683 tok → 57 lines/~966 tok on the live
+  47-learning corpus; explicit `read-start` still emits the full dump; 4 read_start tests
+  (lean-is-minimal, full-keeps-weighted-and-tail, + the existing two) green.
+
 ## [8.3.0] - 2026-07-16 "semantic recall"
 
 AgentDB recall gains optional local semantic search, fused with the existing FTS
