@@ -1,6 +1,6 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
      source-sha256: 4fbcc9b73bf3c2936a721491fe4c05eb2acf373cd190c710a2a69a1f61b61019; adapter: claude -->
-<kernel version="8.6.0">
+<kernel version="8.6.1">
 
 
 <!-- ============================================ -->

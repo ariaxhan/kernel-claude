@@ -3508,6 +3508,19 @@ test_knowledge_graph_installer_optin_installs() {
   assert_contains "$content" "code-only" "hook must extract code-only (never graphify update)"
 }
 
+test_knowledge_graph_session_start_auto_orientation() {
+  # session-start.sh must contain the ambient auto-orientation block (god-nodes injection)
+  local content; content=$(cat "$PLUGIN_ROOT/hooks/scripts/session-start.sh")
+  assert_contains "$content" "auto-orientation" "session-start must inject graph orientation" || return 1
+  assert_contains "$content" "god-nodes" "auto-orientation must emit god-nodes (architectural hubs)"
+}
+
+test_knowledge_graph_auto_orientation_self_gates() {
+  # the block must be guarded by a graph-exists check (silent when no graph)
+  local content; content=$(cat "$PLUGIN_ROOT/hooks/scripts/session-start.sh")
+  assert_contains "$content" 'graphify-out/graph.json' "auto-orientation must gate on graph.json existing"
+}
+
 test_knowledge_graph_installer_preserves_foreign_hook() {
   # must NEVER clobber a foreign post-commit
   git init -q "$TEST_PROJECT" 2>/dev/null
@@ -4756,6 +4769,8 @@ run_test_suite() {
       run_test "installer is opt-in (no stamp without KERNEL_GRAPH_ON)" test_knowledge_graph_installer_is_optin
       run_test "installer stamps marked hook with KERNEL_GRAPH_ON=1" test_knowledge_graph_installer_optin_installs
       run_test "installer preserves a foreign post-commit" test_knowledge_graph_installer_preserves_foreign_hook
+      run_test "session-start injects auto-orientation (god-nodes)" test_knowledge_graph_session_start_auto_orientation
+      run_test "auto-orientation self-gates on graph existence" test_knowledge_graph_auto_orientation_self_gates
       ;;
     manifest)
       run_test "schemas parse as JSON" test_manifest_schemas_parse_as_json

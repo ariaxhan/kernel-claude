@@ -56,6 +56,15 @@ never-linked nodes are dead-code / consolidation candidates. Also available as a
 (`query_graph`, `shortest_path`, `get_neighbors`) for repeated structured access.
 </query>
 
+<automatic>
+The graph pays off only if it is CONSULTED. A skill telling the agent to reach for it is opt-in
+and unreliable, so the orientation layer is AMBIENT: when the working repo has a graph, the
+session-start hook injects its architectural spine (top god-nodes + the query commands) directly
+into context — the agent boots already oriented, no tool call, no human ask. Deep on-demand
+queries ("what calls this exact function") still go through `graphify query`/`path`/`affected`
+or the MCP tools; those are available + steered, but the baseline map arrives for free.
+</automatic>
+
 <continuous>
 A stale graph is worse than none. Keep it fresh, cheaply:
 - **Code layer (free):** `graphify extract <path> --code-only` is incremental via its AST cache
