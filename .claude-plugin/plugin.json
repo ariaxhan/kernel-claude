@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "8.5.2",
-  "description": "Durable project memory, bounded JSON handoffs, 35 engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.5.0 adds context-led frontend and honest marketing-site methods, plus concrete repeatable AgentDB recall prompts.",
+  "version": "8.6.0",
+  "description": "Durable project memory, bounded JSON handoffs, engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.6.0 adds the knowledge-graph skill: a deterministic, local, free code graph (graphify) that cuts agent orientation-token cost, with opt-in post-commit freshness.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"

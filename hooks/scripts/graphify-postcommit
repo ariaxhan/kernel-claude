@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# [kernel-knowledge-graph] post-commit: refresh the repo's code-layer knowledge graph,
+# detached + incremental, ONLY when code files changed. Deterministic tree-sitter AST via
+# graphify --code-only: no LLM, no API, no cost, no network. Never blocks the commit.
+# Degrades to a silent no-op if graphify is not installed.
+#
+# graphify-out/ is DERIVED: it must be gitignored + rebuilt, never committed.
+set -u
+command -v graphify >/dev/null 2>&1 || exit 0
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[ -n "$ROOT" ] || exit 0
+if git diff --name-only HEAD~1 HEAD 2>/dev/null \
+   | grep -qE '\.(py|sh|ts|tsx|js|jsx|go|rs|rb|java|cs|swift|kt|lua|php|c|cc|cpp|h|hpp|scala|zig|ex|dart)$'; then
+  ( graphify extract "$ROOT" --code-only >/dev/null 2>&1 & )
+fi
+exit 0

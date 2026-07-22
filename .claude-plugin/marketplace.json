@@ -7,8 +7,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Durable project memory, bounded JSON handoffs, engineering workflows, and independent verification for Claude Code and Codex. KERNEL 8.5.2 fixes the config guard misfiring on harness session data (~/.claude/projects). 8.5.1 adds a learning graph over AgentDB memory (semantic edges + recurring-failure promotion to doctrine candidates), on top of 8.5.0 marketing/frontend skills, 8.4.0 lean session start, 8.3.0 local semantic recall, and the 8.2.0 six-threat security guard.",
-      "version": "8.5.2"
+      "description": "Durable project memory, bounded JSON handoffs, engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.6.0 adds the knowledge-graph skill: a deterministic, local, free code graph (graphify) that cuts agent orientation-token cost, with opt-in post-commit freshness. 8.5.x: config-guard fix, learning graph, semantic recall, six-threat security guard.",
+      "version": "8.6.0"
     }
   ]
 }
