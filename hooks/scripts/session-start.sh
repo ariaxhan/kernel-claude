@@ -239,6 +239,27 @@ else
   echo ""
 fi
 
+# --- Knowledge-graph auto-orientation (8.6.1) ---
+# If this repo has a code graph, inject its architectural spine so the agent boots ALREADY
+# oriented instead of file-crawling to rebuild the map every session. This is the automatic
+# half of the knowledge-graph capability: ambient context, not a tool the agent must remember
+# to call. Self-gating: silent when no graph exists, so users without graphs see no change.
+if command -v graphify >/dev/null 2>&1; then
+  for _gj in "$PROJECT_ROOT/graphify-out/graph.json" "$PROJECT_ROOT/_meta/graphify-out/graph.json"; do
+    [ -f "$_gj" ] || continue
+    _hubs="$(graphify god-nodes --top 8 --graph "$_gj" 2>/dev/null | grep -E '^[[:space:]]*[0-9]+\.' | sed 's/^[[:space:]]*/  /')"
+    [ -n "$_hubs" ] || continue
+    echo "## Code map (auto-orientation)"
+    echo "This repo has a knowledge graph — these are its architectural hubs. Consult the graph"
+    echo "BEFORE crawling files to find where something lives:"
+    echo "$_hubs"
+    echo "Query without reading files: \`graphify query \"<question>\"\` · \`graphify path A B\` · \`graphify affected X\`"
+    echo ""
+    break
+  done
+fi
+# --- end auto-orientation ---
+
 # Emit session start event
 "$AGENTDB" emit session "session:start" "" "{\"branch\":\"$(git branch --show-current 2>/dev/null || echo none)\",\"profile\":\"$PROFILE\",\"project\":\"$PROJECT_ROOT\"}" "" "$KERNEL_SESSION_ID" 2>/dev/null &
 _kernel_hook_end "session-start" 0

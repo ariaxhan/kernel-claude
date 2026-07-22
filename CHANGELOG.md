@@ -2,6 +2,21 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.6.1] - 2026-07-22 "auto-orientation"
+
+Makes 8.6.0's knowledge-graph actually pay off without anyone remembering to use it. A skill
+that tells the agent to reach for the graph is opt-in cognition — it mostly won't happen. The
+automatic half is ambient: inject the graph's architectural spine into session-start context so
+the agent boots ALREADY oriented instead of file-crawling to rebuild the map every session.
+
+### Added
+- **`session-start.sh` auto-orientation** — if the working repo has a `graphify-out/graph.json`
+  (root or `_meta/`), the session-start hook emits a compact "Code map" block: the top god-nodes
+  (architectural hubs) + the `graphify query`/`path`/`affected` commands to navigate without
+  reading files. **Self-gating**: silent when no graph exists, so users without graphs see no
+  change. This is the automatic layer; the MCP/CLI deep-query tools remain available for on-demand
+  traversal. Regression test added.
+
 ## [8.6.0] - 2026-07-22 "knowledge-graph"
 
 A new methodology skill and an opt-in freshness hook. Fully additive; no change to existing
