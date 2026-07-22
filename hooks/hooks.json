@@ -14,6 +14,11 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autopush.sh install",
           "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/knowledge-graph.sh install",
+            "timeout": 15
           }
         ]
       }

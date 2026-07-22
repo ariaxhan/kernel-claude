@@ -3467,6 +3467,58 @@ test_validate_structure_sources_common() {
   assert_contains "$content" "common.sh" "validate-structure.sh should source common.sh"
 }
 
+# === Knowledge-graph (8.6.0) ===
+
+test_knowledge_graph_skill_exists() {
+  assert_file_exists "$PLUGIN_ROOT/skills/knowledge-graph/SKILL.md"
+  local content; content=$(cat "$PLUGIN_ROOT/skills/knowledge-graph/SKILL.md")
+  assert_contains "$content" "orientation" "skill should explain orientation-token cost" || return 1
+  assert_contains "$content" "code-only" "skill should mandate --code-only for the code layer"
+}
+
+test_hooks_json_has_knowledge_graph() {
+  local content; content=$(cat "$PLUGIN_ROOT/hooks/hooks.json")
+  assert_contains "$content" "knowledge-graph.sh install" "hooks.json should wire the opt-in installer"
+}
+
+test_claude_md_references_knowledge_graph() {
+  local content; content=$(cat "$PLUGIN_ROOT/CLAUDE.md")
+  assert_contains "$content" "knowledge-graph" "generated governance should list the skill"
+}
+
+test_knowledge_graph_installer_is_optin() {
+  # WITHOUT KERNEL_GRAPH_ON the installer must stamp NOTHING (mirrors autopush safety)
+  git init -q "$TEST_PROJECT" 2>/dev/null
+  ( cd "$TEST_PROJECT" && CLAUDE_PROJECT_DIR="$TEST_PROJECT" KERNEL_GRAPH_ON=0 \
+      bash "$PLUGIN_ROOT/hooks/scripts/knowledge-graph.sh" install >/dev/null 2>&1 )
+  if [ -f "$TEST_PROJECT/.git/hooks/post-commit" ]; then
+    echo "  FAIL: installer stamped a hook without KERNEL_GRAPH_ON"; return 1
+  fi
+  return 0
+}
+
+test_knowledge_graph_installer_optin_installs() {
+  # WITH KERNEL_GRAPH_ON=1 it installs the marked post-commit
+  git init -q "$TEST_PROJECT" 2>/dev/null
+  ( cd "$TEST_PROJECT" && CLAUDE_PROJECT_DIR="$TEST_PROJECT" KERNEL_GRAPH_ON=1 \
+      bash "$PLUGIN_ROOT/hooks/scripts/knowledge-graph.sh" install >/dev/null 2>&1 )
+  assert_file_exists "$TEST_PROJECT/.git/hooks/post-commit" || return 1
+  local content; content=$(cat "$TEST_PROJECT/.git/hooks/post-commit")
+  assert_contains "$content" "kernel-knowledge-graph" "installed hook should carry the marker" || return 1
+  assert_contains "$content" "code-only" "hook must extract code-only (never graphify update)"
+}
+
+test_knowledge_graph_installer_preserves_foreign_hook() {
+  # must NEVER clobber a foreign post-commit
+  git init -q "$TEST_PROJECT" 2>/dev/null
+  echo '#!/bin/sh
+echo foreign' > "$TEST_PROJECT/.git/hooks/post-commit"; chmod +x "$TEST_PROJECT/.git/hooks/post-commit"
+  ( cd "$TEST_PROJECT" && CLAUDE_PROJECT_DIR="$TEST_PROJECT" KERNEL_GRAPH_ON=1 \
+      bash "$PLUGIN_ROOT/hooks/scripts/knowledge-graph.sh" install >/dev/null 2>&1 )
+  local content; content=$(cat "$TEST_PROJECT/.git/hooks/post-commit")
+  assert_contains "$content" "foreign" "foreign post-commit must be preserved, not clobbered"
+}
+
 # === Hooks v2 Tests ===
 
 test_validate_json_schema_exists() {
@@ -4697,6 +4749,14 @@ run_test_suite() {
     governance)
       run_test "generated governance adapters and operator" test_generated_governance
       ;;
+    knowledge_graph)
+      run_test "knowledge-graph SKILL.md exists + explains orientation cost" test_knowledge_graph_skill_exists
+      run_test "hooks.json wires knowledge-graph installer" test_hooks_json_has_knowledge_graph
+      run_test "generated governance lists knowledge-graph" test_claude_md_references_knowledge_graph
+      run_test "installer is opt-in (no stamp without KERNEL_GRAPH_ON)" test_knowledge_graph_installer_is_optin
+      run_test "installer stamps marked hook with KERNEL_GRAPH_ON=1" test_knowledge_graph_installer_optin_installs
+      run_test "installer preserves a foreign post-commit" test_knowledge_graph_installer_preserves_foreign_hook
+      ;;
     manifest)
       run_test "schemas parse as JSON" test_manifest_schemas_parse_as_json
       run_test "handoff example validates" test_manifest_validate_handoff_example
@@ -5275,6 +5335,7 @@ main() {
     run_test_suite "learn"
     run_test_suite "version_sync"
     run_test_suite "governance"
+    run_test_suite "knowledge_graph"
     run_test_suite "runtime_upgrade"
     run_test_suite "release_docs"
     run_test_suite "test_gate"

@@ -2,6 +2,29 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.6.0] - 2026-07-22 "knowledge-graph"
+
+A new methodology skill and an opt-in freshness hook. Fully additive; no change to existing
+skills, recall, or session behavior unless you opt in.
+
+### Added
+- **`knowledge-graph` skill** (`skills/knowledge-graph/SKILL.md`) — build, keep-fresh, and
+  query a deterministic code knowledge graph (via `graphify`: tree-sitter + NetworkX, MIT,
+  local + free) to cut an agent's **orientation-token** cost — the tokens spent finding where
+  code lives before any reasoning happens. Covers `extract --code-only`, `god-nodes`,
+  `affected` (blast radius), `query`/`path`, and `benchmark`. Frames the payoff honestly: the
+  savings are conditional on repo size × tangle (measured ~5.7x on a mid-size service, ~73x on
+  a large interconnected one, ~13% on a tiny lib), and the graph helps **navigation, not
+  reasoning**.
+- **Opt-in code-graph freshness** — `hooks/scripts/knowledge-graph.sh install` stamps a
+  post-commit hook that incrementally refreshes the code graph (`extract --code-only`, never
+  `graphify update`, which would balloon docs into the graph). **Opt-in only** via
+  `KERNEL_GRAPH_ON=1` (mirrors autopush; never stamps hooks by surprise), never clobbers a
+  foreign post-commit, and no-ops silently if graphify is absent. `graphify-out/` is derived —
+  gitignore it, never commit it.
+- Six regression tests (`knowledge_graph` suite): skill presence, hooks.json wiring, governance
+  listing, opt-in gating, marked-hook install, foreign-hook preservation.
+
 ## [8.5.2] - 2026-07-17 "harness-projects guard fix"
 
 ### Fixed

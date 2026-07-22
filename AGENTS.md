@@ -1,6 +1,6 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: 217e339d59806b5839c31d163a34b1dca2e8ad6e64888d2aaa1cd3705749c02f; adapter: codex -->
-<kernel version="8.5.2">
+     source-sha256: 4fbcc9b73bf3c2936a721491fe4c05eb2acf373cd190c710a2a69a1f61b61019; adapter: codex -->
+<kernel version="8.6.0">
 
 
 <!-- ============================================ -->
@@ -216,6 +216,7 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <skill id="architecture" triggers="system design, structure, modules">Modular design, interface stability, dependency management, coupling analysis.</skill>
   <skill id="orchestration" triggers="multi-agent, parallel, tier 2+">Multi-agent coordination. AgentDB contracts, 4 fault tolerance layers, context transfer.</skill>
   <skill id="context-mgmt" triggers="compaction, handoff, memory, tokens">Context engineering. Progressive disclosure, AgentDB offloading, compaction strategies. Use native /context for usage check.</skill>
+  <skill id="knowledge-graph" triggers="knowledge graph, graphify, code graph, god nodes, orientation cost, token bill, map codebase, what connects, callers of, blast radius">Deterministic code knowledge graph (graphify, tree-sitter, local+free) to cut orientation-token cost. Build/refresh/query, god-nodes, blast-radius; opt-in post-commit freshness (KERNEL_GRAPH_ON). Navigation not reasoning; savings scale with repo size×tangle, not a fixed multiplier.</skill>
 
   <skill id="frontend" triggers="UI, frontend, styling, visual">Context-led interface design. Derive art direction from product, audience, brand, content, and the existing design system; mood variants are optional lenses.</skill>
   <skill id="marketing-site" triggers="marketing site, landing page, company website, client website, conversion, positioning, CTA">Honest marketing-site strategy: audience, offer, proof, objections, action, privacy, art direction, and client handoff.</skill>
