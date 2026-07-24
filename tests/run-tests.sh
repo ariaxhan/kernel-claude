@@ -268,6 +268,23 @@ test_agentdb_error() {
   assert_contains "$output" "file not found"
 }
 
+test_agentdb_recall_defaults_to_pure_fts() {
+  # 8.6.2: recall is pure FTS by default (eval-proven best arm); the semantic-embed
+  # hybrid is opt-in via AGENTDB_EMBED=1. Guards against a silent re-flip of the default.
+  # 1) Source-level: the fusion gate must default OFF (opt-in), not ON.
+  assert_contains "$(cat "$PLUGIN_ROOT/orchestration/agentdb/agentdb")" \
+    '[ "${AGENTDB_EMBED:-0}" = "1" ] || { printf '"'"'%s'"'"' "$raw"; return 0; }'
+  # 2) Behavioral: recall works with NO backend and NO opt-in (pure FTS standalone),
+  #    and setting AGENTDB_EMBED=1 without a backend still returns results (graceful).
+  agentdb init >/dev/null
+  agentdb learn pattern "rate limiter uses a token bucket" "src/limit.ts" >/dev/null
+  local def opt
+  def=$(agentdb recall "token bucket rate limiter")
+  assert_contains "$def" "token bucket"
+  opt=$(AGENTDB_EMBED=1 agentdb recall "token bucket rate limiter")
+  assert_contains "$opt" "token bucket"
+}
+
 # === Edge Case Tests ===
 
 test_agentdb_special_chars_in_insight() {
@@ -4870,6 +4887,7 @@ run_test_suite() {
       run_test "query works" test_agentdb_query
       run_test "recent shows checkpoints" test_agentdb_recent
       run_test "error records tool errors" test_agentdb_error
+      run_test "recall defaults to pure FTS (embed opt-in)" test_agentdb_recall_defaults_to_pure_fts
       ;;
     edge)
       run_test "special chars (SQL injection)" test_agentdb_special_chars_in_insight
