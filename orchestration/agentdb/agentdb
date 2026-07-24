@@ -1891,6 +1891,9 @@ _recall_emit() {
                   THEN '  ↳ ' || substr(l.evidence,1,90) ELSE '' END,
              '@@US@@', '@@us@@')
              || '@@US@@' || l.id || '@@US@@' || '$origin'
+             || '@@US@@' || replace(replace(replace(
+                  lower(l.insight || ' ' || COALESCE(l.evidence,'')),
+                  char(10),' '), char(13),' '), char(9),' ')
       FROM learnings l JOIN learnings_fts f ON f.rowid = l.rowid
       WHERE learnings_fts MATCH '$fts_query'
         AND (l.visibility = 'agent' OR l.visibility IS NULL)
@@ -2109,9 +2112,11 @@ cmd_recall() {
   local -a qargs=()
   local a
   local ids_only=0
+  local scores_only=0
   for a in "$@"; do
     if [ "$a" = "--global" ]; then use_global=1
     elif [ "$a" = "--ids" ]; then ids_only=1      # eval mode: print surfaced ids, no side effects
+    elif [ "$a" = "--scores" ]; then scores_only=1; ids_only=1  # measurement mode: id<TAB>bm25, no side effects
     else qargs+=("$a"); fi
   done
   local query="${qargs[*]:-}"  # :- guards empty array under set -u on bash 3.2 (macOS)
@@ -2150,13 +2155,19 @@ cmd_recall() {
 
   # Build the FTS query (phrase-quoted OR — injection-safe, no quotes survive) and a
   # LIKE clause (for DBs without an FTS index). Terms are [a-z0-9] only → quote-safe.
-  local fts_query like_clause
+  local fts_query like_clause term_count terms_space
   fts_query=$(printf '%s\n' "$terms" | awk 'NF{printf (n++?" OR ":"")"\""$1"\""}')
   like_clause=""
+  term_count=0
   while IFS= read -r t; do
     [ -z "$t" ] && continue
     like_clause="${like_clause:+$like_clause OR }insight LIKE '%$t%' OR evidence LIKE '%$t%' OR domain LIKE '%$t%'"
+    term_count=$((term_count + 1))
   done <<< "$terms"
+  # Space-joined term list for the whole-word matched-term count used by the relevance
+  # floor below (word-boundary, in awk — SQL LIKE can't reject infix matches like
+  # "state" in "statement" or "re" in "render", which is exactly the OR-noise to kill).
+  terms_space=$(printf '%s' "$terms" | tr '\n' ' ')
 
   # Self-heal local FTS (build it if this DB predates migration 012 / hasn't run
   # preflight this session) so the local path uses bm25 ranking, not LIKE.
@@ -2198,8 +2209,62 @@ cmd_recall() {
   raw_local=$(_maybe_hybrid "$DB" "$query" "$raw_local" "$limit")
   raw_global=""
   [ -n "$global_db" ] && raw_global=$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0 "global")
-  dedup=$(printf '%s\n%s\n' "$raw_local" "$raw_global" | grep -v '^[[:space:]]*$' \
+
+  # RELEVANCE FLOOR (2026-07-24, EXP-REC-016). FTS ORs every query term, so any query
+  # that shares even ONE common word with the corpus returns SOMETHING — the OR-noise
+  # problem (an off-domain query surfacing an incidental single-word match). _recall_emit
+  # emits $5 = the row's lowercased searchable text (insight+evidence); we stamp $5 with
+  # the WHOLE-WORD matched-term COUNT (how many distinct query terms actually appear as
+  # words in the row), then drop candidates matching FEWER than the minimum. A real
+  # multi-term hit survives; a lone-common-word hit goes silent.
+  #   Why matched-term count, not bm25: it is SCALE-INVARIANT. bm25 magnitude grows with
+  #   corpus size, so a bm25 floor calibrated on a large corpus silently kills real hits
+  #   on a small/new DB — reintroducing the very recall-death this harness exists to
+  #   catch. Word-boundary (awk, not SQL LIKE) is required: LIKE can't reject infix
+  #   matches ("state" in "statement", "re" in "render") that are exactly the OR-noise.
+  #   Calibrated on _meta/evals/recall (29 positives / 16 negatives): default min=2 keeps
+  #   29/29 positives (weakest real hit, C21, matches exactly 2 terms) and silences ~12/16
+  #   OR-noise negatives; residual leaks share 2 genuine words (real overlap, not noise).
+  # GUARD: applies only when the query itself has >= min terms — a legitimately short
+  # query can only ever match its few terms, so the floor is disabled for it (never
+  # silences a 1-term query). Rows with NO $5 (LIKE fallback / embed semantic-only rows)
+  # keep the count they had, or pass when non-numeric — the floor never degrades a
+  # non-FTS mode. Kill-switch AGENTDB_NO_FLOOR=1; tune via AGENTDB_RECALL_MIN_TERMS=<n>.
+  local scored
+  scored=$(printf '%s\n%s\n' "$raw_local" "$raw_global" \
+    | awk -F'@@US@@' -v OFS='@@US@@' -v terms="$terms_space" '
+        BEGIN { nt = split(terms, T, " ") }
+        NF < 5 { print; next }                          # fragment / no-text row: unchanged
+        {
+          txt = " " $5 " "; gsub(/[^a-z0-9]+/, " ", txt)
+          c = 0
+          for (i = 1; i <= nt; i++)
+            if (T[i] != "" && index(txt, " " T[i] " ") > 0) c++
+          $5 = c; print                                 # $5 now = matched-term count
+        }')
+
+  local min_terms="${AGENTDB_RECALL_MIN_TERMS:-2}"
+  local floored
+  if [ "${AGENTDB_NO_FLOOR:-0}" = "1" ] || [ "$term_count" -lt "$min_terms" ]; then
+    floored="$scored"
+  else
+    floored=$(printf '%s\n' "$scored" \
+      | awk -F'@@US@@' -v m="$min_terms" '
+          NF < 5 { print; next }                        # fragment row: keep
+          $5 !~ /^[0-9]+$/ { print; next }              # no count: keep (non-FTS mode)
+          ($5 + 0) >= m { print }                       # enough terms matched: keep
+        ')
+  fi
+  dedup=$(printf '%s\n' "$floored" | grep -v '^[[:space:]]*$' \
         | awk -F'@@US@@' '!seen[$1]++' | awk -v n="$limit" 'NR<=n')
+
+  # Measurement mode: dump id<TAB>matched-term-count for every surfaced candidate
+  # (ZERO side effects). Used by the relevance-floor calibration harness. $5 is the
+  # count of distinct query terms present in the row (FTS path only; blank on LIKE).
+  if [ "$scores_only" = "1" ]; then
+    printf '%s\n' "$dedup" | awk -F'@@US@@' 'NF>=4{print $3"\t"$5}'
+    return 0
+  fi
 
   # Eval mode: emit the surfaced ids only, in ranked order, with ZERO side effects
   # (no events, no hit_count bumps) so repeated eval runs never mutate the corpus.
@@ -2642,6 +2707,10 @@ case "${1:-help}" in
     echo "                          Retrieval is pure FTS (keyword/bm25) by default — the"
     echo "                          eval-proven best arm. Opt into the semantic-embed hybrid"
     echo "                          with AGENTDB_EMBED=1 (needs a backend: see embed-init)."
+    echo "                          A relevance floor drops incidental single-common-word"
+    echo "                          (OR-noise) hits: a candidate must match >=2 query terms."
+    echo "                          On by default; disable with AGENTDB_NO_FLOOR=1 or tune"
+    echo "                          AGENTDB_RECALL_MIN_TERMS=<n>."
     echo "  alias add|list|rm       Curated recall synonym mappings (query-term -> corpus-term)."
     echo "                          Recovers zero-lexical-overlap paraphrase queries; expansion"
     echo "                          is on by default, disable per-call with AGENTDB_NO_ALIAS=1."

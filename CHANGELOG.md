@@ -2,6 +2,27 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.7.2] - 2026-07-24 "relevance floor"
+
+### Added
+- **Recall relevance floor (min-matched-terms), ON by default** — FTS ORs every query
+  term, so any query sharing even ONE common word with the corpus returned SOMETHING
+  (the OR-noise / relevance-floor problem: off-domain queries surfacing an incidental
+  single-word match). A candidate must now match at least **2 distinct query terms**
+  (whole-word) to survive; a lone-common-word hit goes silent while a real multi-term
+  match is untouched. Chosen over an absolute bm25 floor because matched-term count is
+  **scale-invariant** — bm25 magnitude grows with corpus size, so a bm25 floor tuned on
+  a large corpus would silently kill real hits on a small/new DB (the very recall-death
+  this system guards against). Word-boundary matching (not SQL `LIKE`, which can't reject
+  infix matches like "state" in "statement" or "re" in "render") is what makes the
+  separation clean. GUARD: queries with fewer than the minimum terms are exempt (a short
+  query is never silenced). Kill-switch `AGENTDB_NO_FLOOR=1`; tune `AGENTDB_RECALL_MIN_TERMS`.
+  Eval-proven on `_meta/evals/recall` (extended to 29 positives / 16 negatives): recall@5
+  stays **1.000** (29/29 positives kept, weakest real hit matches exactly 2 terms) while
+  the negative false-hit rate drops **81% → 25%** (12/16 OR-noise negatives now silent;
+  the 4 residual leaks share 2 genuine words — real overlap, not noise). Regression test
+  `recall relevance floor (bm25, default on)`; suite 440/440.
+
 ## [8.7.1] - 2026-07-24 "sentinel in content"
 
 ### Fixed
