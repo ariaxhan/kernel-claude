@@ -1983,8 +1983,13 @@ _hybrid_rerank() {
 # failure echoes $raw unchanged (pure FTS — the exact pre-015 behavior).
 _maybe_hybrid() {
   local db="$1" query="$2" raw="$3" limit="$4"
-  # Escape hatch: force pure FTS (used by the eval's baseline arm, and any user who
-  # wants to pin keyword-only behavior even with a backend installed).
+  # DEFAULT: pure FTS (keyword/bm25). Eval-proven on _meta/evals/recall to beat the embed
+  # hybrid on every metric — recall@5 0.857 vs 0.809, MRR 0.786 vs 0.746, precision@5 0.190
+  # vs 0.171, and 0 vs 2 off-domain false hits (the hybrid drags in semantically-adjacent
+  # but wrong learnings). See CHANGELOG 8.6.2. The semantic-embed hybrid is OPT-IN via
+  # AGENTDB_EMBED=1 (kept available; a backend must still be installed via `embed-init`).
+  [ "${AGENTDB_EMBED:-0}" = "1" ] || { printf '%s' "$raw"; return 0; }
+  # Legacy hard override, still honored: pin pure FTS even if AGENTDB_EMBED=1 is also set.
   [ "${AGENTDB_NO_EMBED:-0}" = "1" ] && { printf '%s' "$raw"; return 0; }
   local sem_pairs
   sem_pairs=$(_embed_run query "$db" "$query") || { printf '%s' "$raw"; return 0; }
@@ -1993,7 +1998,7 @@ _maybe_hybrid() {
   semf=$(mktemp); ftsf=$(mktemp)
   # sem-rank: id<TAB>rank (cosine order). Cap the semantic pool at limit*3.
   printf '%s\n' "$sem_pairs" | awk -F'\t' 'NF>=1 && $1!=""{print $1"\t"NR}' \
-    | head -n $((limit * 3)) > "$semf"
+    | awk -v n=$((limit * 3)) 'NR<=n' > "$semf"
   # fts-rank: id<TAB>rank from the raw FTS candidate order (field 3 = id).
   printf '%s\n' "$raw" | awk -F'@@US@@' 'NF>=4 && $3!=""{print $3"\t"(++n)}' > "$ftsf"
   # Pull display rows for semantic ids that FTS missed, so semantic can surface them.
@@ -2029,6 +2034,8 @@ cmd_embed_init() {
   _ensure_embedding_cols
   AGENTDB_EMBED_PYTHON="$py" _embed_run sync "$DB"
   echo "Done. Add AGENTDB_EMBED_PYTHON to your shell profile to make it permanent."
+  echo "Note: recall defaults to pure FTS (the eval-proven best arm). To actually route"
+  echo "recall through this semantic-embed hybrid, also export AGENTDB_EMBED=1."
 }
 
 cmd_recall() {
@@ -2108,7 +2115,7 @@ cmd_recall() {
   raw_global=""
   [ -n "$global_db" ] && raw_global=$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0 "global")
   dedup=$(printf '%s\n%s\n' "$raw_local" "$raw_global" | grep -v '^[[:space:]]*$' \
-        | awk -F'@@US@@' '!seen[$1]++' | head -n "$limit")
+        | awk -F'@@US@@' '!seen[$1]++' | awk -v n="$limit" 'NR<=n')
 
   # Eval mode: emit the surfaced ids only, in ranked order, with ZERO side effects
   # (no events, no hit_count bumps) so repeated eval runs never mutate the corpus.
@@ -2547,6 +2554,9 @@ case "${1:-help}" in
     echo "  init                    Initialize DB + apply migrations"
     echo "  preflight               Validate schema + environment health"
     echo "  recall <keywords> [--global]  Task context; rerun as files/scope/failure change"
+    echo "                          Retrieval is pure FTS (keyword/bm25) by default — the"
+    echo "                          eval-proven best arm. Opt into the semantic-embed hybrid"
+    echo "                          with AGENTDB_EMBED=1 (needs a backend: see embed-init)."
     echo "  read-start              Full generic context for audit/resume"
     echo "  write-end <json>        Checkpoint before stopping"
     echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"

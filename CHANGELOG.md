@@ -2,6 +2,34 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.6.2] - 2026-07-24 "recall reliability"
+
+Two recall fixes that together take `agentdb recall` from silently-broken-and-slower to
+deterministic-and-better. Fully backward compatible: every prior behavior path is preserved,
+the semantic-embed hybrid is still available (now opt-in).
+
+### Fixed
+- **Recall SIGPIPE under `pipefail`** — the migration-015 hybrid re-rank and the main dedup
+  step piped into `head -n N`. Under `set -euo pipefail`, when `head` closed the pipe early
+  while upstream was still writing, upstream took SIGPIPE, `pipefail` propagated exit 141, and
+  `set -e` aborted recall after printing only the `## Recall:` header. This silently truncated
+  live recall to a **76% zero-result rate** (recall@5 0.238) undetected, and made results flaky
+  run-to-run. Replaced the two early-closing `| head -n N` with `| awk -v n=N 'NR<=n'` (a
+  full-read limiter that never closes the pipe early; identical output). Verified on
+  `_meta/evals/recall`: zero-result rate **76% -> 0%**, now deterministic.
+
+### Changed
+- **Recall defaults to pure FTS; the semantic-embed hybrid is now opt-in** — a controlled
+  re-run of the recall eval (both arms, live DB) showed the pure keyword/bm25 arm beats the
+  embed hybrid on **every** metric: recall@5 **0.857 vs 0.809**, MRR **0.786 vs 0.746**,
+  precision@5 **0.190 vs 0.171**, and negative correctness **2/2 vs 0/2** (the hybrid dragged
+  in two semantically-adjacent but off-domain false hits). So `recall` now runs pure FTS by
+  default. Opt into the hybrid with **`AGENTDB_EMBED=1`** (a backend must still be installed via
+  `agentdb embed-init`). `AGENTDB_NO_EMBED=1` still forces pure FTS (now redundant-but-honored).
+  No change to `embed-sync`, `graph build`, or `promote`, which use embeddings directly.
+  Documented in CLI help + `embed-init` output. Regression test added
+  (`recall defaults to pure FTS`); full suite 437/437.
+
 ## [8.6.1] - 2026-07-22 "auto-orientation"
 
 Makes 8.6.0's knowledge-graph actually pay off without anyone remembering to use it. A skill
