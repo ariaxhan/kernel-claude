@@ -1878,11 +1878,18 @@ _recall_emit() {
   has_fts=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
   if [ -n "$has_fts" ]; then
     [ "$writable" = "1" ] && sqlite3 "$db" "INSERT INTO learnings_fts(learnings_fts) VALUES('rebuild');" 2>/dev/null || true
+    # The display segment is content and may itself CONTAIN the @@US@@ sentinel
+    # (the canon delimiter-bug learning literally documents it) — that shifted
+    # awk fields so \$3 stopped being the id: --ids emitted a text fragment and
+    # reinforcement bumped junk ids. replace() folds any in-content sentinel to
+    # lowercase (display-harmless, never split on). The dedup key is lower()ed
+    # so it can never contain the uppercase sentinel.
     sqlite3 "$db" "
       SELECT lower(substr(l.insight,1,200)) || '@@US@@' ||
-             '- [' || l.type || '] ' || l.insight || '$tag' ||
+             replace('- [' || l.type || '] ' || l.insight || '$tag' ||
              CASE WHEN l.evidence IS NOT NULL AND l.evidence != ''
-                  THEN '  ↳ ' || substr(l.evidence,1,90) ELSE '' END
+                  THEN '  ↳ ' || substr(l.evidence,1,90) ELSE '' END,
+             '@@US@@', '@@us@@')
              || '@@US@@' || l.id || '@@US@@' || '$origin'
       FROM learnings l JOIN learnings_fts f ON f.rowid = l.rowid
       WHERE learnings_fts MATCH '$fts_query'
@@ -1898,9 +1905,10 @@ _recall_emit() {
   elif [ -n "$like_clause" ]; then
     sqlite3 "$db" "
       SELECT lower(substr(insight,1,200)) || '@@US@@' ||
-             '- [' || type || '] ' || insight || '$tag' ||
+             replace('- [' || type || '] ' || insight || '$tag' ||
              CASE WHEN evidence IS NOT NULL AND evidence != ''
-                  THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END
+                  THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END,
+             '@@US@@', '@@us@@')
              || '@@US@@' || id || '@@US@@' || '$origin'
       FROM learnings
       WHERE ($like_clause)
@@ -1957,9 +1965,10 @@ _emit_rows_by_ids() {
   fi
   sqlite3 "$db" "
     SELECT lower(substr(insight,1,200)) || '@@US@@' ||
-           '- [' || type || '] ' || insight || '$tag' ||
+           replace('- [' || type || '] ' || insight || '$tag' ||
            CASE WHEN evidence IS NOT NULL AND evidence != ''
-                THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END
+                THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END,
+           '@@US@@', '@@us@@')
            || '@@US@@' || id || '@@US@@' || '$origin'
     FROM learnings
     WHERE id IN ($in_list)
