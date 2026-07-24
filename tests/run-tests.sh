@@ -329,6 +329,43 @@ test_agentdb_recall_sentinel_in_content() {
   assert_contains "$(agentdb recall "printable sentinel marker delimiter")" "sentinel marker"
 }
 
+test_agentdb_recall_relevance_floor() {
+  # 8.7.2: min-matched-terms relevance floor. FTS ORs every query term, so an off-domain
+  # query sharing even ONE common word with the corpus returns SOMETHING (the OR-noise
+  # problem). Rows matching FEWER than min distinct query terms are dropped. Default ON
+  # at min=2 (calibrated on _meta/evals/recall: 29 positives / 16 negatives — keeps
+  # 29/29 positives, silences 12/16 OR-noise negatives). Matched-term count is
+  # SCALE-INVARIANT (unlike an absolute bm25 floor, whose magnitude grows with corpus
+  # size and would silently kill real hits on a small/new DB). Kill-switch
+  # AGENTDB_NO_FLOOR=1; tunable AGENTDB_RECALL_MIN_TERMS. A query with < min terms is
+  # exempt (never silences a legitimately short query).
+  # 1) Source-level: default value present and kill-switch gated (no silent re-flip).
+  local src; src=$(cat "$PLUGIN_ROOT/orchestration/agentdb/agentdb")
+  assert_contains "$src" 'AGENTDB_RECALL_MIN_TERMS:-2'
+  assert_contains "$src" 'AGENTDB_NO_FLOOR:-0'
+  # 2) Behavioral: a real multi-term match survives the DEFAULT floor. --ids avoids the
+  #    echoed query header, so we test surfaced rows, never the header line.
+  agentdb init >/dev/null
+  agentdb learn pattern "quokka zephyr nimbus obsidian lattice" "src/floor.ts" >/dev/null
+  assert_contains "$(agentdb recall "quokka zephyr nimbus obsidian lattice" --ids)" "LRN-" \
+    "default floor must keep a genuine multi-term match"
+  # 3) OR-noise: a multi-word query that shares only ONE incidental word with the corpus
+  #    (count 1 < min 2) is silenced by default -> proves the floor is wired.
+  local noise
+  noise=$(agentdb recall "quokka salamander tornado helicopter" --ids 2>/dev/null || true)
+  if printf '%s\n' "$noise" | grep -q '^LRN-'; then
+    echo "  FAIL: single-common-word OR-noise query was NOT silenced (floor not wired)"
+    printf '%s\n' "$noise"
+    return 1
+  fi
+  # 4) Kill-switch restores the OR-noise hit (proves AGENTDB_NO_FLOOR=1 bypasses).
+  assert_contains "$(AGENTDB_NO_FLOOR=1 agentdb recall "quokka salamander tornado helicopter" --ids)" "LRN-" \
+    "AGENTDB_NO_FLOOR=1 must bypass the floor"
+  # 5) A legitimately SHORT (single-term) query is exempt — the floor never silences it.
+  assert_contains "$(agentdb recall "quokka" --ids)" "LRN-" \
+    "a 1-term query must be exempt from the min-2-terms floor"
+}
+
 # === Edge Case Tests ===
 
 test_agentdb_special_chars_in_insight() {
@@ -4933,6 +4970,7 @@ run_test_suite() {
       run_test "error records tool errors" test_agentdb_error
       run_test "recall defaults to pure FTS (embed opt-in)" test_agentdb_recall_defaults_to_pure_fts
       run_test "recall alias expansion (migration 017)" test_agentdb_recall_alias_expansion
+      run_test "recall relevance floor (bm25, default on)" test_agentdb_recall_relevance_floor
       run_test "recall ids survive sentinel-in-content" test_agentdb_recall_sentinel_in_content
       ;;
     edge)
