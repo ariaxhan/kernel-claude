@@ -2,6 +2,27 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.7.0] - 2026-07-24 "recall reach"
+
+Attacks the one recall class 8.6.2 could not: **zero-lexical-overlap paraphrases** ("switched
+laptops" vs "machine move"; "memory lookup comes back empty" vs "recall returned no matching
+learnings"). Keyword FTS cannot reach these by construction, and the semantic-embed hybrid
+already lost to FTS on every metric (8.6.2). The eval-proven winner is the cheapest mechanism:
+a curated synonym table applied to recall terms at query time.
+
+### Added
+- **`agentdb alias add|list|rm`** — curated recall alias mappings (`recall_aliases`, migration
+  017; also self-heals via code on any pre-017 DB). Directed `query-term -> corpus-term` rows;
+  `recall` expands its normalized terms through the table before building the FTS query.
+  Kill-switch per call: **`AGENTDB_NO_ALIAS=1`**. Alias rows are curated source data and ARE
+  included in the `agent.db.json` mirror (unlike derived tables).
+- Eval evidence (extended 32-case golden set, `_meta/evals/recall`, 10 hard paraphrase cases):
+  recall@5 **0.724 -> 1.000**, recall@1 0.621 -> 0.828, MRR 0.664 -> 0.899, negatives unchanged.
+  Alternatives measured and rejected: porter-stemming FTS tokenizer (recovered 0 hard cases,
+  broke a negative via "topping"->"top" stem collision), entity-co-occurrence graph 1-hop
+  expansion (made only 3/8 unreachable cases *reachable*, unranked — strictly dominated).
+- Regression test `recall alias expansion (migration 017)`; suite 438/438.
+
 ## [8.6.2] - 2026-07-24 "recall reliability"
 
 Two recall fixes that together take `agentdb recall` from silently-broken-and-slower to
