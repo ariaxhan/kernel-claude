@@ -311,6 +311,24 @@ test_agentdb_recall_alias_expansion() {
   assert_contains "$(agentdb alias list)" "laptops -> machine"
 }
 
+test_agentdb_recall_sentinel_in_content() {
+  # 8.7.1: a learning whose TEXT contains the literal @@US@@ row delimiter (the
+  # canon delimiter-bug learning documents it) must not corrupt field splitting:
+  # --ids must emit the real id, never a text fragment of the insight.
+  agentdb init >/dev/null
+  agentdb learn gotcha "delimiter arrived as literal; fixed with printable @@US@@ sentinel marker" "commit abc123" >/dev/null
+  local ids
+  ids=$(agentdb recall "printable sentinel marker delimiter" --ids)
+  assert_contains "$ids" "LRN-" "--ids must return a learning id"
+  if printf '%s\n' "$ids" | grep -qv '^LRN-'; then
+    echo "  FAIL: --ids emitted a non-id line (sentinel-in-content field corruption)"
+    printf '%s\n' "$ids"
+    return 1
+  fi
+  # display path still shows the insight (sentinel folded to lowercase is OK)
+  assert_contains "$(agentdb recall "printable sentinel marker delimiter")" "sentinel marker"
+}
+
 # === Edge Case Tests ===
 
 test_agentdb_special_chars_in_insight() {
@@ -4915,6 +4933,7 @@ run_test_suite() {
       run_test "error records tool errors" test_agentdb_error
       run_test "recall defaults to pure FTS (embed opt-in)" test_agentdb_recall_defaults_to_pure_fts
       run_test "recall alias expansion (migration 017)" test_agentdb_recall_alias_expansion
+      run_test "recall ids survive sentinel-in-content" test_agentdb_recall_sentinel_in_content
       ;;
     edge)
       run_test "special chars (SQL injection)" test_agentdb_special_chars_in_insight

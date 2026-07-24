@@ -2,6 +2,18 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [8.7.1] - 2026-07-24 "sentinel in content"
+
+### Fixed
+- **Recall row-splitting corrupted by content containing the `@@US@@` sentinel** — the canon
+  delimiter-bug learning literally documents the sentinel, so its own text shifted the awk
+  fields: `recall --ids` emitted an insight fragment instead of the id, and the reinforcement
+  path bumped hit_count / emitted memory_events against junk ids for ANY learning whose
+  insight or evidence contains `@@US@@`. Fix: `replace()` folds an in-content sentinel to
+  lowercase (`@@us@@`) in the display segment at emit time (display-harmless, never split
+  on); the dedup key is `lower()`ed and could never carry the uppercase sentinel. Regression
+  test `recall ids survive sentinel-in-content`; suite 439/439.
+
 ## [8.7.0] - 2026-07-24 "recall reach"
 
 Attacks the one recall class 8.6.2 could not: **zero-lexical-overlap paraphrases** ("switched

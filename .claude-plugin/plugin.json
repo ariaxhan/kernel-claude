@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "8.7.0",
+  "version": "8.7.1",
   "description": "Durable project memory, bounded JSON handoffs, engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.7.0 adds recall alias expansion: a curated synonym table (agentdb alias add|list|rm, migration 017) applied at query time, taking the recall eval from 0.724 to 1.000 recall@5 on zero-lexical-overlap paraphrase queries. 8.6.2 hardened recall (SIGPIPE fix, pure-FTS default).",
   "author": {
     "name": "Aria Han",
