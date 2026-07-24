@@ -285,6 +285,32 @@ test_agentdb_recall_defaults_to_pure_fts() {
   assert_contains "$opt" "token bucket"
 }
 
+test_agentdb_recall_alias_expansion() {
+  # 8.7.0: curated recall alias expansion (migration 017). A paraphrase query whose
+  # words never appear in a learning must surface it once aliases map query-side
+  # terms to corpus vocabulary; AGENTDB_NO_ALIAS=1 must restore pure-term recall.
+  agentdb init >/dev/null
+  agentdb learn gotcha "launchd plists rot on machine move" "render from HOME" >/dev/null
+  local before after off
+  # zero-lexical-overlap paraphrase: no shared term with the insight
+  before=$(agentdb recall "swapped laptops broke scheduler" 2>/dev/null || true)
+  if [[ "$before" == *"machine move"* ]]; then
+    echo "  FAIL: paraphrase matched WITHOUT aliases (test premise broken)"
+    return 1
+  fi
+  agentdb alias add laptops machine >/dev/null
+  agentdb alias add swapped move >/dev/null
+  agentdb alias add scheduler launchd >/dev/null
+  after=$(agentdb recall "swapped laptops broke scheduler")
+  assert_contains "$after" "machine move" "alias expansion should reach the learning"
+  off=$(AGENTDB_NO_ALIAS=1 agentdb recall "swapped laptops broke scheduler" 2>/dev/null || true)
+  if [[ "$off" == *"machine move"* ]]; then
+    echo "  FAIL: AGENTDB_NO_ALIAS=1 did not disable alias expansion"
+    return 1
+  fi
+  assert_contains "$(agentdb alias list)" "laptops -> machine"
+}
+
 # === Edge Case Tests ===
 
 test_agentdb_special_chars_in_insight() {
@@ -4888,6 +4914,7 @@ run_test_suite() {
       run_test "recent shows checkpoints" test_agentdb_recent
       run_test "error records tool errors" test_agentdb_error
       run_test "recall defaults to pure FTS (embed opt-in)" test_agentdb_recall_defaults_to_pure_fts
+      run_test "recall alias expansion (migration 017)" test_agentdb_recall_alias_expansion
       ;;
     edge)
       run_test "special chars (SQL injection)" test_agentdb_special_chars_in_insight

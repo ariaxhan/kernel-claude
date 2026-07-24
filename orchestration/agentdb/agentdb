@@ -139,6 +139,21 @@ _ensure_embedding_cols() {
   return 0
 }
 
+# Migration 017: recall alias table, delegated to code (idempotent, self-heals
+# any DB that predates the migration). Curated query-side term -> corpus-side
+# alias mappings; inert until rows exist. See migrations/017_recall_aliases.sql.
+_ensure_alias_table() {
+  [ -f "$DB" ] || return 0
+  local has
+  has=$(db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='recall_aliases' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has" ]; then
+    db_exec "CREATE TABLE IF NOT EXISTS recall_aliases (term TEXT NOT NULL, alias TEXT NOT NULL, note TEXT, ts TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), PRIMARY KEY (term, alias));" 2>/dev/null || true
+    db_exec "CREATE INDEX IF NOT EXISTS idx_recall_aliases_term ON recall_aliases(term);" 2>/dev/null || true
+    db_exec "INSERT OR IGNORE INTO _migrations (name) VALUES ('017_recall_aliases');" 2>/dev/null || true
+  fi
+  return 0
+}
+
 # Return a SQL literal for a text value: '<escaped>' for a non-empty string, or
 # bare NULL for an empty one (absence = UNKNOWN, never an empty-string fact; the
 # null-semantics contract, design 5.2).
@@ -2038,6 +2053,47 @@ cmd_embed_init() {
   echo "recall through this semantic-embed hybrid, also export AGENTDB_EMBED=1."
 }
 
+# Manage recall alias expansion mappings (migration 017). Directed mappings:
+# <term> is the query-side word an agent might type, <alias> the corpus-side word
+# that actually appears in learnings. Curate BOTH directions explicitly if needed.
+cmd_alias() {
+  local sub="${1:-list}"
+  [ $# -gt 0 ] && shift
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  _ensure_alias_table
+  _norm_tok() { printf '%s' "$1" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9'; }
+  case "$sub" in
+    add)
+      local term="${1:-}"
+      [ $# -gt 0 ] && shift
+      term=$(_norm_tok "$term")
+      [ -z "$term" ] || [ $# -eq 0 ] && { echo "Usage: agentdb alias add <term> <alias...>"; exit 1; }
+      local a n added=0
+      for a in "$@"; do
+        n=$(_norm_tok "$a")
+        [ -z "$n" ] || [ "$n" = "$term" ] && continue
+        db_exec "INSERT OR IGNORE INTO recall_aliases (term, alias) VALUES ('$term','$n');"
+        added=$((added+1))
+      done
+      echo "alias: $term -> $added mapping(s) stored"
+      ;;
+    rm)
+      local term="${1:-}" al="${2:-}"
+      term=$(_norm_tok "$term")
+      [ -z "$term" ] && { echo "Usage: agentdb alias rm <term> [alias]"; exit 1; }
+      if [ -n "$al" ]; then
+        db_exec "DELETE FROM recall_aliases WHERE term='$term' AND alias='$(_norm_tok "$al")';"
+      else
+        db_exec "DELETE FROM recall_aliases WHERE term='$term';"
+      fi
+      echo "alias: removed"
+      ;;
+    list|*)
+      db_exec "SELECT term || ' -> ' || group_concat(alias, ', ') FROM recall_aliases GROUP BY term ORDER BY term;" 2>/dev/null
+      ;;
+  esac
+}
+
 cmd_recall() {
   # Parse --global (cross-project) out of the args; the rest is the query.
   local use_global=0
@@ -2063,6 +2119,25 @@ cmd_recall() {
   # Fallback: if hygiene stripped everything (all stopwords), keep raw alnum terms.
   [ -z "$terms" ] && terms=$(printf '%s' "$query" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' ' ' | tr ' ' '\n' | awk 'NF')
   [ -z "$terms" ] && { echo "No searchable terms in: $query"; exit 1; }
+
+  # Migration 017: curated alias expansion. Each normalized query term pulls its
+  # corpus-side aliases (recall_aliases) into the term set, so paraphrase queries
+  # with ZERO lexical overlap can still reach the right learning ("switched
+  # laptops" -> machine/move -> the launchd-plist-rot lesson). Table-gated (a DB
+  # without migration 017 skips cleanly); kill-switch AGENTDB_NO_ALIAS=1.
+  # Eval-gated in _meta/evals/recall (hard-paraphrase cases C17/C18 class).
+  if [ "${AGENTDB_NO_ALIAS:-0}" != "1" ] && \
+     db_exec "SELECT 1 FROM sqlite_master WHERE type='table' AND name='recall_aliases' LIMIT 1;" 2>/dev/null | grep -q 1; then
+    local _t _in_list="" alias_terms
+    while IFS= read -r _t; do
+      [ -z "$_t" ] && continue
+      _in_list="${_in_list:+$_in_list,}'$_t'"   # terms are [a-z0-9]-only -> quote-safe
+    done <<< "$terms"
+    alias_terms=""
+    [ -n "$_in_list" ] && alias_terms=$(db_exec "SELECT DISTINCT alias FROM recall_aliases WHERE term IN ($_in_list);" 2>/dev/null \
+      | tr 'A-Z' 'a-z' | tr -c 'a-z0-9\n' ' ' | tr ' ' '\n' | awk 'length($0)>=2' || true)
+    [ -n "$alias_terms" ] && terms=$(printf '%s\n%s\n' "$terms" "$alias_terms" | awk 'NF && !seen[$0]++')
+  fi
 
   # Build the FTS query (phrase-quoted OR — injection-safe, no quotes survive) and a
   # LIKE clause (for DBs without an FTS index). Terms are [a-z0-9] only → quote-safe.
@@ -2535,6 +2610,7 @@ case "${1:-help}" in
   resurrect)   shift; cmd_resurrect "$@" ;;
   antibody)    shift; cmd_antibody "$@" ;;
   recall)      shift; cmd_recall "$@" ;;
+  alias)       shift; cmd_alias "$@" ;;
   embed-sync)  shift; _ensure_embedding_cols; _embed_run sync "$DB" ;;
   embed-status) shift; _embed_run backend || { echo "no embedding backend installed — recall is FTS-only (see: agentdb embed-init)"; exit 0; } ;;
   embed-init)  shift; cmd_embed_init "$@" ;;
@@ -2557,6 +2633,9 @@ case "${1:-help}" in
     echo "                          Retrieval is pure FTS (keyword/bm25) by default — the"
     echo "                          eval-proven best arm. Opt into the semantic-embed hybrid"
     echo "                          with AGENTDB_EMBED=1 (needs a backend: see embed-init)."
+    echo "  alias add|list|rm       Curated recall synonym mappings (query-term -> corpus-term)."
+    echo "                          Recovers zero-lexical-overlap paraphrase queries; expansion"
+    echo "                          is on by default, disable per-call with AGENTDB_NO_ALIAS=1."
     echo "  read-start              Full generic context for audit/resume"
     echo "  write-end <json>        Checkpoint before stopping"
     echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"
