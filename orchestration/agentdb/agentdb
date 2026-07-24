@@ -1993,7 +1993,7 @@ _maybe_hybrid() {
   semf=$(mktemp); ftsf=$(mktemp)
   # sem-rank: id<TAB>rank (cosine order). Cap the semantic pool at limit*3.
   printf '%s\n' "$sem_pairs" | awk -F'\t' 'NF>=1 && $1!=""{print $1"\t"NR}' \
-    | head -n $((limit * 3)) > "$semf"
+    | awk -v n=$((limit * 3)) 'NR<=n' > "$semf"
   # fts-rank: id<TAB>rank from the raw FTS candidate order (field 3 = id).
   printf '%s\n' "$raw" | awk -F'@@US@@' 'NF>=4 && $3!=""{print $3"\t"(++n)}' > "$ftsf"
   # Pull display rows for semantic ids that FTS missed, so semantic can surface them.
@@ -2108,7 +2108,7 @@ cmd_recall() {
   raw_global=""
   [ -n "$global_db" ] && raw_global=$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0 "global")
   dedup=$(printf '%s\n%s\n' "$raw_local" "$raw_global" | grep -v '^[[:space:]]*$' \
-        | awk -F'@@US@@' '!seen[$1]++' | head -n "$limit")
+        | awk -F'@@US@@' '!seen[$1]++' | awk -v n="$limit" 'NR<=n')
 
   # Eval mode: emit the surfaced ids only, in ranked order, with ZERO side effects
   # (no events, no hit_count bumps) so repeated eval runs never mutate the corpus.
