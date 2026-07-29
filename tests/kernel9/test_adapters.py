@@ -134,6 +134,18 @@ class ClaudeAdapter(unittest.TestCase):
                             f"{event} binds missing script {rel}",
                         )
 
+    def test_normal_requests_reach_the_adaptive_router(self):
+        doc = load(self.host["hooks_file"])
+        commands = [
+            hook["command"]
+            for group in doc["hooks"]["UserPromptSubmit"]
+            for hook in group["hooks"]
+        ]
+        self.assertTrue(
+            any(command.endswith("/hooks/scripts/route-request.sh") for command in commands),
+            "Claude UserPromptSubmit does not reach the Kernel 9 router",
+        )
+
 
 class CodexAdapter(unittest.TestCase):
     """Requirement 13."""
@@ -192,6 +204,18 @@ class CodexAdapter(unittest.TestCase):
             for group in groups:
                 for hook in group["hooks"]:
                     self.assertIn("${CODEX_PLUGIN_ROOT}", hook["command"], event)
+
+    def test_normal_requests_reach_the_adaptive_router(self):
+        doc = load(self.host["hooks_file"])
+        commands = [
+            hook["command"]
+            for group in doc["hooks"]["UserPromptSubmit"]
+            for hook in group["hooks"]
+        ]
+        self.assertTrue(
+            any(command.endswith("/hooks/scripts/route-request.sh") for command in commands),
+            "Codex UserPromptSubmit does not reach the Kernel 9 router",
+        )
 
 
 class TruthfulCapabilityReporting(unittest.TestCase):

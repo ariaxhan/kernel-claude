@@ -80,6 +80,10 @@
       "description": "Whether this classification was surfaced to the user. True only when the mode materially changed behavior.",
       "type": "boolean"
     },
+    "transient": {
+      "description": "True when this request is a lightweight subrequest that must not replace the active live-run route.",
+      "type": "boolean"
+    },
     "transitions": {
       "description": "Append-only record of mode changes during the task, with the evidence that triggered each.",
       "type": "array",

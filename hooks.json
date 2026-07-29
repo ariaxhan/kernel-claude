@@ -115,6 +115,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/route-request.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/post-compact-restore.sh",
             "timeout": 5
           }

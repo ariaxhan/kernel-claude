@@ -76,6 +76,7 @@ DOMAIN_SIGNALS = {
         _sig(r"\b(visual|aesthetic|art direction|mood|palette|typograph\w+)\b", 3, "names a visual property"),
         _sig(r"\b(layout|spacing|hierarchy|composition|contrast)\b", 2, "names a design property"),
         _sig(r"\b(ui|ux|interface|screen|mockup|wireframe|prototype)\b", 2, "names an interface artifact"),
+        _sig(r"\b(previews?|screenshots?|rendered artifact|visual comparison)\b", 3, "names a rendered comparison surface"),
         _sig(r"\b(look|feel|style|theme|brand)\b", 2, "names an appearance concern"),
         _sig(r"\b(iterate|tweak|refine|polish) (on )?(the )?(design|visual|look|style|ui)\b", 3, "asks for visual iteration"),
         _sig(r"\b(worldbuild\w*|concept art|illustration|render)\b", 3, "names a visual-worldbuilding artifact"),
@@ -110,6 +111,7 @@ WORK_SHAPE_SIGNALS = {
         _sig(r"\b(fix the|update the|change the|add a|remove the|delete the) \w+\b", 2, "names a single bounded edit"),
         _sig(r"\b(bump|increment|set)\s+(the\s+)?\w+\s+to\b", 3, "names a single value change"),
         _sig(r"\b(what is|where is|show me|list|read|print)\b", 2, "asks for information, not change"),
+        _sig(r"\b(status|progress|where (are|did) we|what happened)\b", 4, "asks for lightweight status"),
         _sig(r"\b(copy ?edit|proofread|reword)\b", 2, "single revision pass"),
     ],
     "gated": [
@@ -119,6 +121,9 @@ WORK_SHAPE_SIGNALS = {
         _sig(r"\b(unfamiliar|new to|never used|first time|not sure how)\b", 3, "unfamiliar territory needing a verification step"),
         _sig(r"\b(make sure|verify|ensure|must not break)\b", 2, "explicit verification requested"),
         _sig(r"\b(synthesi[sz]e|write up|produce) (a |the )?(report|summary|analysis)\b", 2, "bounded deliverable with a review step"),
+        _sig(r"\b(review|audit|compare|comparison)\b", 3, "asks for a bounded artifact or assessment"),
+        _sig(r"\b(clean ?up|tidy|straighten out)\b", 3, "names an ambiguous repair surface needing a scope gate"),
+        _sig(r"\b(bounded|local) .{0,24}\b(artifact|comparison|assessment)\b", 3, "bounds an artifact and its evaluation surface"),
     ],
     "trajectory": [
         _sig(r"\b(iterat\w*|keep (going|trying|adjusting|iterat\w+)|until it (looks|feels|works|is right))\b", 4, "asks for repeated adjustment toward a target"),
@@ -148,17 +153,49 @@ PROTECTED_SIGNALS = [
     _sig(r"\b(expensive|cost|budget|spend|bill)\b", 2, "has a cost consequence"),
     _sig(r"\b(silent\w*|quietly|hard to (notice|detect)|no error)\b", 3, "fails quietly when wrong"),
     _sig(r"\b(account|subscription|tenant|org(ani[sz]ation)?)\b", 2, "operates on an account boundary"),
+    _sig(r"\b(read.only|don.t change|no changes|do not (edit|write|modify)|strictly read)\b", 3, "imposes a no-write boundary"),
 ]
 
 # Explicit de-risking phrases. These do not cancel a protected signal (fail
 # closed), they only lower confidence in a *normal* verdict being wrong.
 NORMAL_SIGNALS = [
     _sig(r"\b(local|localhost|sandbox|scratch|test (env|environment)|dry.?run)\b", 3, "confined to a local or sandbox surface"),
-    _sig(r"\b(read.only|just (look|read|check)|don.t change|no changes)\b", 3, "read-only by request"),
+    _sig(r"\b(just (look|read|check))\b", 2, "asks only for observation"),
     _sig(r"\b(draft|prototype|throwaway|experiment(al)?)\b", 2, "explicitly disposable output"),
 ]
 
 PROTECTED_THRESHOLD = 3
+
+# Request-state signals. Text starts the classification, but normal host
+# activation must not pretend the current request is the whole world. These
+# signals are used only with observable live-run state supplied by the hook:
+# the previous route, elapsed session time, and working-tree change count.
+LOW_INFORMATION_CONTINUATION = re.compile(
+    r"^\s*(continue|keep going|go on|resume|carry on|same thing|finish it)"
+    r"[\s.!?]*$",
+    re.IGNORECASE,
+)
+LIGHTWEIGHT_STATUS = re.compile(
+    r"\b(status|progress|where (are|did) we|what happened)\b",
+    re.IGNORECASE,
+)
+MEANINGFUL_REVISION = re.compile(
+    r"\b(actually|instead|new evidence|we found|turns out|was wrong|stale|"
+    r"scope (expanded|changed)|back out|revert that|stop the|only produce|"
+    r"fresh process|regression)\b",
+    re.IGNORECASE,
+)
+SAFETY_BOUNDARY_RELEASE = re.compile(
+    r"\b(you may (edit|write|modify)|writes? (are|is) allowed|"
+    r"lift (the )?read.only|new (task|request)|unrelated task)\b",
+    re.IGNORECASE,
+)
+STATE_PRESSURE_SIGNALS = [
+    _sig(r"\b(scope (expanded|changed)|expanded into|turned into)\b", 1, "scope changed after execution began"),
+    _sig(r"\b(new evidence|we found|turns out|was wrong|stale|false)\b", 1, "new evidence invalidated an assumption"),
+    _sig(r"\b(long.?running|still (active|running)|[3-9][0-9]-minute|[1-9][0-9]{2,}-minute)\b", 1, "a live execution remains active"),
+    _sig(r"\b(fresh process|save/load|allocation regression|performance regression)\b", 1, "a fresh runtime observation changed the state"),
+]
 
 # Domain-appropriate verification. Never hardcoded to "tests": the brief forbids
 # tests language for non-code domains.
@@ -234,9 +271,25 @@ def classify_domain(text: str, hint: str | None = None) -> tuple[str, float, lis
     return top_domain, _confidence(top_score, runner_up), reasons_by_domain[top_domain]
 
 
-def classify_work_shape(text: str, hint: str | None = None) -> tuple[str, float, list[str]]:
+def classify_work_shape(
+    text: str,
+    hint: str | None = None,
+    state: dict | None = None,
+) -> tuple[str, float, list[str]]:
     if hint:
         return hint, 0.99, [f"work shape pinned to {hint} by caller"]
+
+    state = state or {}
+    previous_shape = state.get("previous_work_shape")
+    if (
+        previous_shape in SHAPE_ORDER
+        and LOW_INFORMATION_CONTINUATION.fullmatch(text)
+    ):
+        return (
+            previous_shape,
+            0.85,
+            ["low-information continuation retained the current live-run shape"],
+        )
 
     scored = {}
     reasons_by_shape = {}
@@ -244,6 +297,24 @@ def classify_work_shape(text: str, hint: str | None = None) -> tuple[str, float,
         total, reasons = _score(text, signals)
         scored[shape] = total
         reasons_by_shape[shape] = reasons
+
+    # A meaningful revision is decision-relevant only in the context of an
+    # active run. Escalate to trajectory when at least two independent pressure
+    # observations say the inherited gated boundary no longer describes
+    # reality. No project name or provider identity participates.
+    if previous_shape in ("gated", "trajectory") and MEANINGFUL_REVISION.search(text):
+        pressure_score, pressure_reasons = _score(text, STATE_PRESSURE_SIGNALS)
+        age = max(0, int(state.get("session_age_minutes", 0) or 0))
+        changes = max(0, int(state.get("working_tree_changes", 0) or 0))
+        if age >= 30:
+            pressure_score += 1
+            pressure_reasons.append(f"active run is {age} minutes old")
+        if changes >= 5:
+            pressure_score += 1
+            pressure_reasons.append(f"working tree has {changes} changed paths")
+        if pressure_score >= 2:
+            scored["trajectory"] += 6
+            reasons_by_shape["trajectory"].extend(pressure_reasons)
 
     # Trajectory must genuinely earn selection: repeated feedback has to be
     # useful, not merely possible. It wins only by strictly beating the best
@@ -329,12 +400,13 @@ def build_classification(
     domain_hint=None,
     shape_hint=None,
     safety_hint=None,
+    state=None,
     boundary=None,
     role="writer",
     holder=None,
 ):
     domain, d_conf, d_reasons = classify_domain(text, domain_hint)
-    shape, s_conf, s_reasons = classify_work_shape(text, shape_hint)
+    shape, s_conf, s_reasons = classify_work_shape(text, shape_hint, state)
     safety, f_conf, f_reasons = classify_safety(text, safety_hint)
 
     # Overall confidence is the weakest link, not the average: a classification
@@ -398,6 +470,94 @@ def build_classification(
         or min(s_conf, f_conf) < LOW_CONFIDENCE_FLOOR
     )
 
+    return out
+
+
+def classify_request(
+    text: str,
+    previous: dict | None = None,
+    session_age_minutes: int = 0,
+    working_tree_changes: int = 0,
+) -> dict:
+    """Classify the current request against observable live-run state.
+
+    Previous state is evidence, not authority. A low-information continuation
+    retains it because the request supplies no contrary fact. Every substantive
+    request is classified afresh, and a changed shape records the reassessment.
+    """
+    previous = previous or None
+    state = {
+        "previous_work_shape": previous.get("work_shape") if previous else None,
+        "session_age_minutes": max(0, int(session_age_minutes)),
+        "working_tree_changes": max(0, int(working_tree_changes)),
+    }
+    continuing = bool(previous and LOW_INFORMATION_CONTINUATION.fullmatch(text))
+    out = build_classification(
+        text,
+        state=state,
+        safety_hint=previous.get("safety") if continuing else None,
+    )
+
+    if not previous:
+        return out
+
+    transient_status = bool(LIGHTWEIGHT_STATUS.search(text))
+
+    # A hard safety boundary is active-run state. Do not clear it merely
+    # because the next revision omits the original hazard words. An explicit
+    # release or a named new objective is required.
+    if (
+        previous.get("safety") == "protected"
+        and out["safety"] == "normal"
+        and not SAFETY_BOUNDARY_RELEASE.search(text)
+    ):
+        out["safety"] = "protected"
+        out["verification"] = json.loads(
+            json.dumps(
+                previous.get(
+                    "verification",
+                    {
+                        "method": VERIFICATION_BY_DOMAIN.get(
+                            out["domain"],
+                            "confirm the outcome against the running system",
+                        ),
+                        "seeded_failure_verified": False,
+                    },
+                )
+            )
+        )
+        out["reasons"] = (
+            ["existing safety boundary remains active"] + out["reasons"]
+        )[:6]
+        out["announced"] = True
+
+    # A status lookup is a transient subrequest, not a revision of the active
+    # objective. It gets the cheapest work shape but retains any active safety
+    # boundary and must not replace the route that "continue" resumes.
+    if transient_status:
+        out["transient"] = True
+        return out
+
+    prior_transitions = json.loads(json.dumps(previous.get("transitions", [])))
+    old_shape = previous.get("work_shape")
+    new_shape = out["work_shape"]
+    if old_shape != new_shape:
+        prior_transitions.append(
+            {
+                "from": old_shape,
+                "to": new_shape,
+                "trigger": "current request materially revised the active run",
+                "direction": (
+                    "escalate"
+                    if SHAPE_ORDER.index(new_shape) > SHAPE_ORDER.index(old_shape)
+                    else "deescalate"
+                ),
+                "user_initiated": True,
+            }
+        )
+        out["announced"] = True
+    if prior_transitions:
+        out["transitions"] = prior_transitions
     return out
 
 
@@ -476,6 +636,9 @@ def main(argv=None):
     c.add_argument("--boundary", help="ownership boundary this task will write to")
     c.add_argument("--role", choices=["writer", "reader"], default="writer")
     c.add_argument("--holder", help="session id claiming the boundary")
+    c.add_argument("--previous", help="previous classification JSON file")
+    c.add_argument("--session-age-minutes", type=int, default=0)
+    c.add_argument("--working-tree-changes", type=int, default=0)
     c.add_argument("--compact", action="store_true", help="single-line JSON")
 
     a = sub.add_parser("adjust", help="move one step lighter or heavier")
@@ -492,15 +655,29 @@ def main(argv=None):
         if not text:
             print("kernel-router: empty task description", file=sys.stderr)
             return 2
-        result = build_classification(
-            text,
-            domain_hint=args.domain,
-            shape_hint=args.work_shape,
-            safety_hint=args.safety,
-            boundary=args.boundary,
-            role=args.role,
-            holder=args.holder,
-        )
+        if args.previous:
+            with open(args.previous) as fh:
+                previous = json.load(fh)
+            result = classify_request(
+                text,
+                previous=previous,
+                session_age_minutes=args.session_age_minutes,
+                working_tree_changes=args.working_tree_changes,
+            )
+        else:
+            result = build_classification(
+                text,
+                domain_hint=args.domain,
+                shape_hint=args.work_shape,
+                safety_hint=args.safety,
+                state={
+                    "session_age_minutes": args.session_age_minutes,
+                    "working_tree_changes": args.working_tree_changes,
+                },
+                boundary=args.boundary,
+                role=args.role,
+                holder=args.holder,
+            )
     else:
         raw = open(args.input).read() if args.input else sys.stdin.read()
         result = adjust(json.loads(raw), args.direction, args.trigger, args.user)
