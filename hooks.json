@@ -6,18 +6,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
             "timeout": 30,
             "statusMessage": "Loading KERNEL context..."
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autopush.sh install",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/autopush.sh install",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/knowledge-graph.sh install",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/knowledge-graph.sh install",
             "timeout": 15
           }
         ]
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-bash.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/guard-bash.sh",
             "timeout": 5
           }
         ]
@@ -39,22 +39,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-config.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/guard-config.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/detect-secrets.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/detect-secrets.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-structure.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/validate-structure.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/warn-hardcoded.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/warn-hardcoded.sh",
             "timeout": 5
           }
         ]
@@ -64,7 +64,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-context.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/guard-context.sh",
             "timeout": 5
           }
         ]
@@ -76,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/auto-approve-safe.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/auto-approve-safe.sh",
             "timeout": 5
           }
         ]
@@ -88,7 +88,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/scan-output.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/scan-output.sh",
             "timeout": 10
           }
         ]
@@ -98,24 +98,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-write.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/log-write.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-json-schema.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": "Edit|Write|Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/capture-error.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/validate-json-schema.sh",
             "timeout": 5
           }
         ]
@@ -127,7 +115,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-compact-restore.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/post-compact-restore.sh",
             "timeout": 5
           }
         ]
@@ -139,7 +127,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/pre-compact-commit.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/pre-compact-commit.sh",
             "timeout": 30,
             "statusMessage": "Saving context snapshot..."
           }
@@ -152,7 +140,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-end.sh",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/session-end.sh",
             "timeout": 210,
             "statusMessage": "Closing session..."
           }

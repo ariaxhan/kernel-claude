@@ -1,5 +1,6 @@
 {
   "name": "kernel-marketplace",
+  "description": "Adaptive execution: the smallest process that can safely do the job",
   "owner": {
     "name": "Aria Han"
   },
@@ -7,7 +8,7 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Durable project memory, bounded JSON handoffs, engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.7.2 adds a recall relevance floor (min-matched-terms, on by default): a candidate must match >=2 distinct query terms, cutting OR-noise false hits 81% to 25% while keeping recall@5 at 1.000. 8.7.0 added curated recall alias expansion (0.724 to 1.000 recall@5 on paraphrase queries).",
+      "description": "Adaptive execution: the smallest process that can safely do the job",
       "version": "8.7.2"
     }
   ]

@@ -4820,6 +4820,11 @@ test_landing_page_composes_marketing_and_frontend() {
   grep -q 'project.*configured.*deploy' "$skill"
 }
 
+test_kernel9_python_suite() {
+  cd "$PLUGIN_ROOT" || return 1
+  python3 -m unittest discover -s tests/kernel9 -p 'test_*.py'
+}
+
 test_migration_kernel_taxonomy_blocks_parse() {
   # every SKILL.md frontmatter parses and carries kernel.kind
   python3 - "$PLUGIN_ROOT" <<'PYINNER'
@@ -5303,6 +5308,9 @@ run_test_suite() {
       run_test "frontend is context-led, not a house style" test_frontend_is_context_led_not_house_style
       run_test "landing-page composes marketing + frontend" test_landing_page_composes_marketing_and_frontend
       ;;
+    kernel9)
+      run_test "Kernel 9 router, packs, and host adapters" test_kernel9_python_suite
+      ;;
     recall)
       run_test "recall dedups identical insights" test_recall_dedups_identical_insights
       run_test "recall hides human_only learnings" test_recall_hides_human_only
@@ -5448,6 +5456,7 @@ main() {
     run_test_suite "entropy_adaptive"
     run_test_suite "read_start"
     run_test_suite "marketing"
+    run_test_suite "kernel9"
     run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"
