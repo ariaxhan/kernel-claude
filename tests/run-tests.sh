@@ -241,6 +241,35 @@ test_agentdb_prune() {
   assert_contains "$output" "Kept 5"
 }
 
+test_agentdb_prune_all_compacts_free_pages() {
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  agentdb init >/dev/null
+  sqlite3 "$db" "CREATE TABLE prune_probe(payload BLOB); INSERT INTO prune_probe VALUES(zeroblob(6291456)); DROP TABLE prune_probe;"
+  local before
+  before=$(sqlite3 "$db" "PRAGMA freelist_count;")
+  [ "$before" -gt 0 ] || { echo "test setup failed to create free pages"; return 1; }
+
+  local output
+  output=$(agentdb prune all 5)
+  assert_contains "$output" "Compacted database." || return 1
+  assert_equals "0" "$(sqlite3 "$db" "PRAGMA freelist_count;")" "prune all must VACUUM reclaimable pages"
+}
+
+test_preflight_accepts_append_only_history_growth() {
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  agentdb init >/dev/null
+  sqlite3 "$db" "INSERT INTO memory_events(event_id, kind, payload) VALUES('large-history-probe', 'retrieved', hex(zeroblob(3145728)));"
+
+  local output
+  output=$(agentdb preflight 2>&1)
+  if [[ "$output" == *"preflight:bloat"* ]]; then
+    echo "append-only memory history must not be reported as reclaimable bloat"
+    echo "$output"
+    return 1
+  fi
+  assert_contains "$output" "preflight:ok" "healthy append-only growth should pass preflight"
+}
+
 test_agentdb_query() {
   agentdb init >/dev/null
   agentdb learn pattern "test query" >/dev/null
@@ -4970,6 +4999,8 @@ run_test_suite() {
       run_test "read-start with data" test_agentdb_read_start_with_data
       run_test "status shows counts" test_agentdb_status
       run_test "prune keeps N" test_agentdb_prune
+      run_test "prune all compacts free pages" test_agentdb_prune_all_compacts_free_pages
+      run_test "preflight accepts append-only history growth" test_preflight_accepts_append_only_history_growth
       run_test "query works" test_agentdb_query
       run_test "recent shows checkpoints" test_agentdb_recent
       run_test "error records tool errors" test_agentdb_error

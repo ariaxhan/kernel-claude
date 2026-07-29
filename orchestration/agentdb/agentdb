@@ -390,12 +390,16 @@ cmd_preflight() {
     warnings=$((warnings + 1))
   fi
 
-  # Check 7: DB bloat (>5MB is suspicious for a metadata store)
-  local db_bytes
-  db_bytes=$(stat -f%z "$DB" 2>/dev/null || stat -c%s "$DB" 2>/dev/null || echo "0")
-  if [ "$db_bytes" -gt 5242880 ]; then
-    local db_mb=$(( db_bytes / 1048576 ))
-    echo "preflight:bloat — agent.db is ${db_mb}MB (consider: agentdb prune all)"
+  # Check 7: reclaimable DB bloat. Total file size is not a useful signal:
+  # memory_events is intentionally append-only, so a healthy DB grows over time.
+  # Warn only when SQLite itself reports >5MB of free pages that VACUUM can reclaim.
+  local page_size free_pages reclaimable_bytes
+  page_size=$(db_exec "PRAGMA page_size;" 2>/dev/null || echo "0")
+  free_pages=$(db_exec "PRAGMA freelist_count;" 2>/dev/null || echo "0")
+  reclaimable_bytes=$(( page_size * free_pages ))
+  if [ "$reclaimable_bytes" -gt 5242880 ]; then
+    local reclaimable_mb=$(( reclaimable_bytes / 1048576 ))
+    echo "preflight:bloat — ${reclaimable_mb}MB is reclaimable (run: agentdb prune all)"
     warnings=$((warnings + 1))
   fi
 
@@ -1057,6 +1061,8 @@ cmd_prune() {
       cmd_prune errors "$keep"
       cmd_prune contracts 1
       cmd_prune learnings
+      db_exec "VACUUM;"
+      echo "Compacted database."
       ;;
     *)
       echo "Usage: agentdb prune <checkpoints|errors|contracts|learnings|all> [keep_count]" >&2
