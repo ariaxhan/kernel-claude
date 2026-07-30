@@ -5,8 +5,9 @@ scope: KERNEL plugin .md corpus (skills/, commands/, agents/, root CLAUDE.md)
 files_reviewed: 50 (20 skills + 14 commands + 16 agents)
 regression_guard: "bash tests/run-tests.sh stays at 242 passed, 0 failed"
 tenets_enforced: [1 NO-DEFER, 4 DRY, 6 MEASURE-IMPACT, 9 STEP-BY-STEP, 10 AGENT-READER]
+type: note
+created: 2026-05-28
 ---
-
 ## STATUS (2026-05-28)
 
 **Shipped — Waves A + B (commit cb3e14c, branch chore/kernel-md-consistency, suite 242/0):**

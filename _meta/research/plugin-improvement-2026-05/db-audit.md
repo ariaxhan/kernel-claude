@@ -3,8 +3,9 @@ name: agentdb-correctness-audit
 description: Full audit of AgentDB migration application gap, idempotency, schema drift, and other DB error classes in kernel-claude v7.13.0.
 type: reference
 date: 2026-05-28
+status: active
+created: 2026-05-28
 ---
-
 # AgentDB Correctness Audit
 
 **Audited:** `orchestration/agentdb/agentdb`, `schema.sql`, `init.sh`, all 9 migrations.

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-14
+---
+
 # Research-Failures-First Protocol
 
 Status: **enforced**

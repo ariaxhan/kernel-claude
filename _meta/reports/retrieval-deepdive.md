@@ -5,8 +5,9 @@ scope: orchestration/agentdb (recall, read-start, FTS5 index)
 status: analysis — no code written yet
 constraints: NO FTS sync triggers · additive only · bash + sqlite3 only
 db_state: 501 learnings in kernel-claude/_meta/agentdb/agent.db, 7 tagged global
+type: note
+created: 2026-06-06
 ---
-
 # AgentDB Retrieval Deep-Dive
 
 ## 0. System as it stands (ground truth from the source)

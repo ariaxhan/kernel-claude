@@ -3,8 +3,9 @@ query: Codex compatibility mapping SessionEnd autopush into Stop timeout
 date: 2026-07-15
 ttl: 30
 status: reproduced
+type: note
+created: 2026-07-15
 ---
-
 # Failure-mode map: SessionEnd autopush under Codex
 
 ## Evidence priority

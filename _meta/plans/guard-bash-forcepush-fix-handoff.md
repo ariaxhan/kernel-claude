@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-06-27
+---
+
 # Handoff: guard-bash force-push false-positive fix (uncommitted)
 
 **Status:** fix WRITTEN to disk, NOT committed. Blocked by the session wall-clock

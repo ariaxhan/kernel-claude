@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-07-10
+---
+
 # Tear Down: PR 145 — yaml-skill-unification manifest runtime
 reviewed: 2026-07-10
 tier: 3

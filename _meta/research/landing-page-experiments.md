@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-12
+---
+
 # Landing Page Command — Experiment Design
 
 **Status:** Ready to run against a real WordPress site via /kernel:experiment

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-08
+---
+
 # Plugin Instruction Loading Research
 
 **Date**: 2026-03-08  

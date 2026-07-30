@@ -4,8 +4,9 @@ description: Plugin features and fixes derived from daily email automation signa
 type: reference
 date: 2026-05-28
 source: orchestrator-recon
+status: active
+created: 2026-05-28
 ---
-
 # Plugin Improvements: Email Automation Intelligence
 
 ## Context

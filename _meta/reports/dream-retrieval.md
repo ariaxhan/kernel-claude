@@ -16,8 +16,10 @@ hard_constraints:
   - NO FTS sync triggers (SQLite 3.43 aborts learn insert) — rebuild-on-recall is locked
   - additive, no regression — 5+ live DBs, multi-agent orchestration is core
   - bash + sqlite3 only — no heavy deps unless flagged a bigger bet
+type: note
+status: active
+created: 2026-06-06
 ---
-
 # Dream — Retrieval Fix
 
 The fault isn't one bug. It's two layers failing together:

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-13
+---
+
 # CONTEXT HANDOFF
 Generated: 2026-03-13
 

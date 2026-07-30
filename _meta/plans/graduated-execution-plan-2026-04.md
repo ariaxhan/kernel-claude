@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Execution Plan: 5 Graduated Hypotheses
 
 **Date:** 2026-04-08

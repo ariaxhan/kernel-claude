@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-28
+---
+
 # Hook System Review -- kernel-claude
 
 **Reviewed:** 2026-05-28

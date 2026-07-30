@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-07-15
+---
+
 # KERNEL 8.1.4: remove lifecycle autopush
 
 ## Goal

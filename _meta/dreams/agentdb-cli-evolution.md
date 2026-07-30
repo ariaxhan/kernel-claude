@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-25
+---
+
 # Dream: AgentDB CLI -- What should it become?
 
 Generated: 2026-03-25

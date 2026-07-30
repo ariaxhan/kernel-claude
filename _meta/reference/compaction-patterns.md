@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-08
+---
+
 # Compaction Patterns
 
 **Type:** reference | **Load:** on-demand via skills/context/SKILL.md

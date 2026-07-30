@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Comprehensive Experiment Benchmark — April 2026
 
 **Date:** 2026-04-08 (FINAL)

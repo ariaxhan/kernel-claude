@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-07-10
+---
+
 # Tear Down: KERNEL 8.0.0 public release
 
 reviewed: 2026-07-10T23:24:00-07:00

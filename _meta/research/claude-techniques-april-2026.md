@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-19
+---
+
 # Claude Code & Prompt Engineering: New Actionable Techniques (April 2026)
 
 **Research Date:** 2026-04-19  

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-28
+---
+
 # Skill-Flow Rewrite Audit — chore/kernel-md-consistency
 
 Date: 2026-05-28

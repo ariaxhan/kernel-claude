@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-14
+---
+
 # Cross-project mining for kernel-claude updates — 2026-05-14
 
 Sourced from 14 CodingVault projects (excluding funjoin entirely). Strongest signals from `distillations/` threads, `dreams/` graduated docs, and recently-modified project `_meta/` directories.

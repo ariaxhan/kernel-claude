@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Context Management & Memory Systems for AI Agents — Repository Survey
 **Date:** 2026-04-07
 **Scope:** GitHub, npm, and open-source repositories solving context persistence, compression, handoff, and memory for AI coding agents (especially Claude Code)

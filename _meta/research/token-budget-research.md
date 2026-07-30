@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-25
+---
+
 # Token Budget Constraints for Claude Code Plugin (1M Context)
 
 **Status:** Research complete  

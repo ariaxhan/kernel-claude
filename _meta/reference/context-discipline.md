@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-04
+---
+
 # Context Discipline
 
 **Type:** invariant | **Load:** on-demand

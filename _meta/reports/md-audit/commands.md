@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-28
+---
+
 # Commands Audit — /commands/*.md
 Generated: 2026-05-28
 

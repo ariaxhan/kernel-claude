@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-04
+---
+
 # Ingest Analysis: Why I Failed
 
 ## What I Should Have Done (per ingest)

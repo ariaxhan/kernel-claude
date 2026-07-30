@@ -4,8 +4,10 @@ date: "2026-04-07"
 ttl: 14
 domain: "OSS discovery — new projects not in prior surveys"
 sources: 12
+type: note
+status: active
+created: 2026-04-07
 ---
-
 # Fresh OSS Discovery — April 2026
 
 **Scope:** Projects NOT covered in existing kernel-claude research (community-plugins, plugin-landscape, context-repos surveys). Focus on novel approaches to problems kernel-claude faces.

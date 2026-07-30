@@ -4,8 +4,10 @@ date: "2026-04-07"
 ttl: 14
 domain: "claude-code plugins ecosystem"
 sources: 11
+type: note
+status: active
+created: 2026-04-07
 ---
-
 # Community Claude Code Plugins & Extensions Research
 
 **Scope:** Unique capabilities built by the community that go beyond kernel-claude's current feature set.

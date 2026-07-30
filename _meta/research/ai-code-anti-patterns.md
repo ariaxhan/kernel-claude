@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-12
+---
+
 # AI Code Anti-Patterns Research
 
 **Research Date:** 2026-03-12

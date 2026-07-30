@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-28
+---
+
 # Adversary findings — AgentDB migration-drift fix
 
 Branch: `fix/agentdb-migration-drift` (uncommitted working tree)

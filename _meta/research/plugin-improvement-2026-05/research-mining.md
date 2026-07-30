@@ -11,8 +11,9 @@ sources:
   - _meta/research/claude-techniques-april-2026.md
   - _meta/research/plugin-gap-verdicts-2026-04.md
   - agentdb learnings (top 40 by hit_count)
+status: active
+created: 2026-05-28
 ---
-
 # Plugin Improvement — Research Mining 2026-05
 
 Synthesized from 6 research documents + top-40 agentdb learnings. Each item: what, why (cited), tier, disruption risk.

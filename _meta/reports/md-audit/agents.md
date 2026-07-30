@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-28
+---
+
 # Agent Files Audit — agents/*.md
 
 **Date:** 2026-05-28

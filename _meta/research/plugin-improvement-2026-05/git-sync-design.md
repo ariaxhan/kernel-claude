@@ -3,8 +3,9 @@ name: git-sync-design
 description: "OPT-IN /kernel:save and /kernel:pull feature design — modeled on our4cuts save.sh/pull.sh, reconciled with kernel invariants."
 type: reference
 date: 2026-05-28
+status: active
+created: 2026-05-28
 ---
-
 # /kernel:save — Git Sync Feature Design
 
 ## Why this exists

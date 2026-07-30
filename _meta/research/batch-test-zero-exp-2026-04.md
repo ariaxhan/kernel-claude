@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Batch Experiment Results: Zero-Experiment Hypotheses
 
 **Date:** 2026-04-07

@@ -3,8 +3,9 @@ name: budget-validation
 description: Token budget analysis — are the line caps still correct? Three-source reconciliation + verdict.
 type: reference
 date: 2026-05-28
+status: active
+created: 2026-05-28
 ---
-
 # Token Budget Validation — 2026-05-28
 
 ## The Contradiction Being Resolved

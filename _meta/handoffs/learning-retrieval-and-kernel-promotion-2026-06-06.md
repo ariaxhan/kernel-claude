@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-06-06
+---
+
 # CONTEXT HANDOFF — kernel-claude retrieval pass + cascade (COMPLETE)
 Generated: 2026-06-06 · Updated: 2026-06-06 (session 2 — shipped)
 

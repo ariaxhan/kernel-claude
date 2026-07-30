@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Dream: Instrumentation + Compression Resilience
 
 **Date:** 2026-04-07
