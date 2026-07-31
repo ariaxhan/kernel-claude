@@ -56,9 +56,11 @@ lowest setting proven adequate. Ambiguous judgment or a measured miss justifies 
 effort; protected work requires a fresh independent verifier. The lane contract records
 the requested model and effort, whether inheritance is intentional, and the escalation
 condition. A prompt that says "use your judgment" is evidence of ambiguity, not a license
-to choose a prestige model by role. Receipts keep requested model and effort separate from
-observed model and effort. Unsupported or unexposed values are `unavailable`, never inferred. The builder
-never grades its own protected work, and the coordinator reproduces acceptance evidence.
+to choose a prestige model by role. Receipts keep `requested_model` and `requested_effort`
+separate from `observed_model` and `observed_effort`. Unsupported or unexposed values are
+`unavailable`, never inferred. Protected receipts require distinct `builder_identity` and
+`verifier_identity`; the builder never grades its own protected work. The coordinator
+reproduces acceptance evidence.
 </worker_model_doctrine>
 
 <fault_tolerance>

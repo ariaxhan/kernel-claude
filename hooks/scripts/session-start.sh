@@ -135,8 +135,8 @@ Recall with concrete nouns, not prose. Recall again after discovery, when scope/
 
 Optimize for the fastest correct, robust path. Tier by reversibility x blast radius, NOT file count. Gate hard only where an op is irreversible. T1 execute, T2 plan+verify, T3 confirm.
 Default is inline. Spawn a subagent only to protect context, to buy real wall-clock on heavy file-disjoint work, when explicitly asked, or for independent verification, never for independence alone. When work is genuinely high-blast-radius or delegated, contract it, then verify with an adversary.
-Route model and effort by task shape and measured evidence, never prestige. Preserve the exact requested model and effort; never silently substitute. Receipts keep requested model and effort separate from observed model and effort, and mark fields unavailable when the runtime does not expose them.
-Protected work gets a fresh independent verifier; the builder never grades its own protected work.
+Route model and effort by task shape and measured evidence, never prestige. Preserve the exact request; never silently substitute. Receipts keep `requested_model` and `requested_effort` separate from `observed_model` and `observed_effort`, and use `unavailable` when the runtime does not expose a value.
+Protected receipts require distinct `builder_identity` and `verifier_identity`; the builder never grades its own protected work.
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
 KERNEL_CONTEXT
 # END GENERATED KERNEL AMBIENT

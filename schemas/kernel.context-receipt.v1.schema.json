@@ -8,6 +8,14 @@
     "manifest",
     "manifest_sha256",
     "bundle_sha256",
+    "requested_model",
+    "observed_model",
+    "requested_effort",
+    "observed_effort",
+    "fallback_authorized",
+    "safety",
+    "builder_identity",
+    "verifier_identity",
     "total_estimated_tokens",
     "status",
     "estimation_method"
@@ -31,6 +39,54 @@
     },
     "bundle_sha256": {
       "type": "string",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "requested_model": {
+      "type": "string",
+      "description": "Exact requested model id, or unavailable when selection was inherited or not exposed",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "observed_model": {
+      "type": "string",
+      "description": "Runtime-observed model id, or unavailable when the runtime does not expose it; never copied from requested_model",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "requested_effort": {
+      "type": "string",
+      "description": "Exact requested effort, or unavailable when selection was inherited or not exposed",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "observed_effort": {
+      "type": "string",
+      "description": "Runtime-observed effort, or unavailable when the runtime does not expose it; never copied from requested_effort",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "fallback_authorized": {
+      "type": "boolean",
+      "description": "True only when the contract pre-authorized a model or effort mismatch",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "fallback_reason": {
+      "type": "string",
+      "description": "Required non-empty reason when fallback_authorized is true",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "safety": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "protected"
+      ],
+      "x-kernel-enforced-by": "compiler"
+    },
+    "builder_identity": {
+      "type": "string",
+      "description": "Builder session or agent identity, or unavailable for normal work without a delegated builder",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "verifier_identity": {
+      "type": "string",
+      "description": "Fresh verifier session or agent identity, or unavailable for normal work without independent verification",
       "x-kernel-enforced-by": "compiler"
     },
     "created": {
