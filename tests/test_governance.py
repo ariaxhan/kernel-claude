@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -70,6 +71,34 @@ class GeneratorTests(unittest.TestCase):
     def test_checked_in_outputs_are_current(self):
         result = run(sys.executable, str(GEN), "--check")
         self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_routing_policy_is_truthful_and_not_prestige_pinned(self):
+        source = (ROOT / "governance/kernel.md.tmpl").read_text()
+        orchestration = (ROOT / "skills/orchestration/SKILL.md").read_text()
+
+        for phrase in (
+            "requested model and effort",
+            "observed model and effort",
+            "Never silently substitute",
+            "builder never grades its own protected work",
+        ):
+            self.assertIn(phrase, source)
+
+        self.assertIn("pre-authorized fallback", orchestration)
+        self.assertNotIn(
+            "FALLBACK to an alternative\nmodel/provider",
+            orchestration,
+            "provider recovery must not silently change the requested route",
+        )
+
+        pinned = []
+        for path in sorted((ROOT / "agents").glob("*.md")):
+            if re.search(r"^model:\s*", path.read_text(), re.MULTILINE):
+                pinned.append(path.relative_to(ROOT).as_posix())
+        self.assertEqual(
+            [], pinned,
+            "generic agent roles must inherit or be routed explicitly, not pin prestige models",
+        )
 
     def test_unknown_missing_and_unused_tokens_fail(self):
         with tempfile.TemporaryDirectory() as td:

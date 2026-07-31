@@ -2,7 +2,6 @@
 name: surgeon
 description: Minimal diff implementation, commit every working state
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: opus
 ---
 
 <agent id="surgeon">

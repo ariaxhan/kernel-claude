@@ -2,7 +2,6 @@
 name: reviewer
 description: Code review agent. Reviews PRs and code changes for quality.
 tools: Read, Bash, Grep, Glob
-model: opus
 ---
 
 <agent id="reviewer">

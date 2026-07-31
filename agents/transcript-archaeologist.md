@@ -6,7 +6,6 @@ description: >
   and returns the conclusion, not the raw pile. Read-only. Spawned to protect the main context
   from megabytes of logs when only the findings are needed.
 tools: Read, Bash, Grep, Glob
-model: sonnet
 ---
 
 <agent id="transcript-archaeologist">

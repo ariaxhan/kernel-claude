@@ -2,7 +2,6 @@
 name: deep-diver
 description: "Pre-implementation failure-mode research. Runs Research-Failures-First protocol: spawns Channel-A (GitHub issues) + Channel-D (production case studies) in parallel, merges into canonical failure-mode map at _meta/research/<topic>.md. Gates non-trivial native/infra/schema work."
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
-model: sonnet
 ---
 
 <agent id="deep-diver">

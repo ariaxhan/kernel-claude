@@ -2,7 +2,6 @@
 name: blind-evaluator
 description: "Structurally separate eval agent. Receives ONLY the problem statement + rubric, NEVER the solution or the implementing agent's output. Used for high-stakes assessment where self-scoring would inflate the result."
 tools: Read, Bash, Grep, Glob
-model: sonnet
 ---
 
 <agent id="blind-evaluator">
