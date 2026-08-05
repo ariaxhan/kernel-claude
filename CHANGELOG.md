@@ -57,11 +57,42 @@ loads one domain pack for the announced route instead of a single always-on conf
   contributor 11000), including a test pinning the population split itself so the old conflation
   cannot silently return.
 
+### Migration and upgrade
+- **Pre-9.0.0 context receipts now validate instead of failing.** `kernel.context-receipt/v1`
+  gained eight required routing fields while keeping the `v1` identifier, so every receipt
+  written before that change failed validation. Because `deactivate` validates a receipt before
+  merging the context ledger, those receipts could not be retired at all and runtime state
+  stayed active after the error. They are now migrated on read: absent fields are filled with
+  the documented "unrecorded" values, the fill is announced on stderr, and the affected fields
+  are listed in `migrated_fields` so they can never be mistaken for real routing evidence. A
+  `safety` of `unknown` is accepted only alongside that marker; a compiler emitting it is
+  rejected.
+- **`scripts/kernel-setup.sh` no longer silently prefers a stale cache.** It compares the
+  checkout's version against the newest cached runtime, picks the higher, and prints which and
+  why. Previously, running a 9.0.0 checkout's own setup script could configure an 8.x runtime
+  with no indication.
+- `docs/upgrading.md` now covers 8.x to 9.0.0 and rollback, including the one-way caveat that
+  9.0.0 receipts carry keys 8.x will reject.
+
+### Also fixed
+- **Routing no longer disables itself silently on payload drift.** `route-request.sh` exited 0
+  without a receipt or warning whenever no known prompt field was present, so a host payload
+  change would turn adaptive routing off for every request, permanently and invisibly. It now
+  distinguishes "this event carries no prompt" (quiet, correct) from "no recognised prompt field
+  exists" (emits the gated/protected fallback naming the observed keys).
+- **`LIGHTWEIGHT_STATUS` is anchored.** Unanchored, it matched any prompt merely containing
+  "status" or "progress", so "fix the status endpoint and deploy it" was treated as a transient
+  status lookup: classified for that turn but never stored, leaving a later "continue" to resume
+  a stale route.
+
 ### Known limitations
-- Model-routing and builder-versus-verifier rules are not enforced per request. A request with no
-  receipt proceeds normally.
-- `kernel.context-receipt/v1` gained required fields without a migration path for existing v1
-  receipts.
+- **Model-routing and builder-versus-verifier rules are not enforced per request.** They are
+  checked when receipt validation runs; a request with no receipt at all proceeds normally. The
+  README says so plainly rather than claiming external enforcement. This is the largest remaining
+  gap in 9.0.0 and it is a build, not a fix.
+- The seeded-failure audit covers the router, classification schema, and route hook only. It
+  cannot catch adapter, ambient-budget, receipt-enforcement, migration, versioning, or install
+  defects, so "N/N mutations caught" is a statement about the router, not about the release.
 
 ## [8.7.2] - 2026-07-24 "relevance floor"
 

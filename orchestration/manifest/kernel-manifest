@@ -248,6 +248,14 @@ def validate_invariants(manifest, errors):
 
 def validate_context_receipt_invariants(receipt, errors):
     unavailable = "unavailable"
+    # safety="unknown" exists solely so a pre-Kernel-9 receipt can be validated and retired.
+    # A freshly compiled receipt claiming it would be asserting that the safety pass did not
+    # run, which is never legitimate, so it is only accepted alongside the migration marker.
+    if receipt.get("safety") == "unknown" and "safety" not in (receipt.get("migrated_fields") or []):
+        errors.append(
+            "safety: 'unknown' is only valid on a migrated pre-Kernel-9 receipt "
+            "(migrated_fields must list safety); a compiler must never emit it"
+        )
     routed_strings = (
         "requested_model", "observed_model", "requested_effort", "observed_effort",
         "builder_identity", "verifier_identity",
@@ -294,9 +302,64 @@ def schema_for(manifest):
     return json.load(open(path))
 
 
+# Fields promoted to required on kernel.context-receipt/v1 by the Kernel 9 routing work,
+# mapped to the value that means "this was never recorded".
+#
+# The schema id stayed v1 while `required` grew by eight fields, so every receipt written
+# before that change fails validation. That is not a cosmetic problem: `deactivate` validates
+# an existing receipt before merging the context ledger, so a pre-Kernel-9 receipt could not be
+# deactivated at all and runtime state stayed active after the error.
+#
+# Backfilling is the honest migration rather than a workaround, because the schema itself
+# documents "unavailable" as the value for "selection was inherited or not exposed", which is
+# exactly the situation of a receipt written before the field existed. The alternative, bumping
+# to v2, would strand the same receipts behind a different error.
+RECEIPT_V1_BACKFILL = {
+    "requested_model": "unavailable",
+    "observed_model": "unavailable",
+    "requested_effort": "unavailable",
+    "observed_effort": "unavailable",
+    "fallback_authorized": False,
+    "safety": "unknown",  # only legal with the migrated_fields marker set below
+    "builder_identity": "unavailable",
+    "verifier_identity": "unavailable",
+}
+
+
+def migrate_context_receipt(manifest):
+    """Fill routing fields absent from pre-Kernel-9 receipts. Returns the field names filled.
+
+    Only ever ADDS absent keys. A present value, including a falsy one, is never overwritten,
+    so this cannot mask a receipt that genuinely recorded a bad substitution.
+    """
+    if manifest.get("schema") != "kernel.context-receipt/v1":
+        return []
+    filled = [k for k in RECEIPT_V1_BACKFILL if k not in manifest]
+    # ALL-OR-NOTHING. A receipt missing every routing field predates Kernel 9 and is migrated.
+    # A receipt missing only some of them is a modern receipt the compiler built wrong, and must
+    # still fail loudly: partial absence is corruption, not history. Without this distinction the
+    # migration would paper over exactly the defect the required-fields change exists to catch.
+    if len(filled) != len(RECEIPT_V1_BACKFILL):
+        return []
+    for key in filled:
+        manifest[key] = RECEIPT_V1_BACKFILL[key]
+    if filled:
+        # Leave a trace so a migrated receipt is never mistaken for one that recorded real
+        # routing evidence. Anything reading these fields as proof must check this first.
+        manifest.setdefault("migrated_fields", sorted(filled))
+    return filled
+
+
 def validate_manifest(manifest, path):
     if not isinstance(manifest, dict):
         die(1, f"{path}: manifest root must be a mapping")
+    migrated = migrate_context_receipt(manifest)
+    if migrated:
+        print(
+            f"MIGRATED {path}: pre-Kernel-9 receipt, filled {len(migrated)} absent routing "
+            f"field(s) as unrecorded: {', '.join(migrated)}",
+            file=sys.stderr,
+        )
     schema = schema_for(manifest)
     errors = []
     validate_node(manifest, schema, "$", errors)

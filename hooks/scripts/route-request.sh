@@ -30,7 +30,27 @@ command -v jq >/dev/null 2>&1 || { emit_fallback "jq unavailable"; exit 0; }
 PROMPT=$(printf '%s' "$INPUT" | jq -r '
   .prompt // .user_prompt // .message // .input // empty
 ' 2>/dev/null || true)
-[ -n "$PROMPT" ] || exit 0
+
+# Distinguish "this event legitimately carries no prompt" from "the host changed its payload
+# shape and we no longer recognise it". Both used to `exit 0` silently, which meant a host
+# update could turn adaptive routing off for every request, permanently, with no signal
+# anywhere. jq/router unavailability two lines above already fails loudly; schema drift is the
+# same class of problem and gets the same treatment.
+if [ -z "$PROMPT" ]; then
+  PAYLOAD_KEYS=$(printf '%s' "$INPUT" | jq -r 'if type=="object" then (keys_unsorted | join(",")) else "" end' 2>/dev/null || true)
+  if [ -z "$PAYLOAD_KEYS" ]; then
+    # Unparseable or non-object input. Not a prompt event; stay quiet.
+    exit 0
+  fi
+  case ",$PAYLOAD_KEYS," in
+    *,prompt,*|*,user_prompt,*|*,message,*|*,input,*)
+      # A known prompt field is present but empty. Genuinely nothing to classify.
+      exit 0 ;;
+    *)
+      emit_fallback "unrecognised payload shape (keys: $PAYLOAD_KEYS); routing disabled, host schema may have drifted"
+      exit 0 ;;
+  esac
+fi
 
 SESSION_ID=$(printf '%s' "$INPUT" | jq -r '
   .session_id // .conversation_id // .thread_id // .threadId // empty

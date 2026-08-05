@@ -1,5 +1,58 @@
 # Upgrading and rolling back
 
+## Upgrading from 8.x to 9.0.0
+
+KERNEL 9 changes how guidance is loaded: instead of one always-on configuration, each request
+is classified (domain x work shape x safety) and one domain pack is loaded for the route.
+
+Claude Code:
+
+```text
+/plugin marketplace update kernel-marketplace
+/plugin update kernel@kernel-marketplace
+/reload-plugins
+```
+
+Codex: reinstall from the marketplace, then restart Codex.
+
+Then run `/kernel:init` (Claude) or `$kernel:init` (Codex) once. If you are running from a
+checkout rather than an installed release, `scripts/kernel-setup.sh` now prefers the checkout
+when it is newer than anything in your cache and prints which runtime it chose. Earlier
+versions silently preferred the cache, so a 9.0.0 checkout could configure an 8.x runtime
+without saying so.
+
+### What changes for you
+
+- Ambient context is delivered by the SessionStart hook and the packs you actually load. This
+  repository's `CLAUDE.md` is not loaded into your sessions and never was; your host loads your
+  own instruction file.
+- Existing context receipts keep working. `kernel.context-receipt/v1` gained eight routing
+  fields in 9.0.0; a receipt written before that is migrated on read, its absent fields marked
+  as unrecorded rather than invented, and it prints `MIGRATED ...` when that happens. Those
+  fields are listed in `migrated_fields` so they are never mistaken for real routing evidence.
+- Model-routing and separate-builder-from-verifier rules are checked at receipt validation.
+  They are not enforced on every request in 9.0.0, and a request with no receipt proceeds
+  normally. Treat them as a convention, not a sandbox.
+
+### Rolling back to 8.x
+
+Nothing in 9.0.0 rewrites 8.x state, so rollback is reinstalling the older release:
+
+```text
+/plugin install kernel@kernel-marketplace --version 8.7.2
+/reload-plugins
+```
+
+Or point at a specific cached runtime without reinstalling:
+
+```bash
+KERNEL_RUNTIME_ROOT=~/.kernel/8.7.2 scripts/kernel-setup.sh
+```
+
+One caveat in that direction: a receipt written by 9.0.0 carries the eight new routing fields,
+and 8.x will reject the unknown keys. Receipts are per-session artefacts, so delete or archive
+any 9.0.0 receipts before rolling back rather than trying to convert them.
+
 ## Upgrading from 7.23.0
 
 KERNEL 8 is a major release. Update explicitly:

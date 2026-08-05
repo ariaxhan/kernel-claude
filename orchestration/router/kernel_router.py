@@ -186,8 +186,20 @@ LOW_INFORMATION_CONTINUATION = re.compile(
     r"[\s.!?]*$",
     re.IGNORECASE,
 )
+# Anchored, like LOW_INFORMATION_CONTINUATION above, and for the same reason. Unanchored
+# this matched any prompt merely CONTAINING "status" or "progress", so "fix the status
+# endpoint and deploy it" and "update the progress dashboard" were treated as transient
+# status lookups: classified for the current turn but never stored, so a later "continue"
+# resumed a stale route. A status request is a whole short utterance, not a word in passing.
 LIGHTWEIGHT_STATUS = re.compile(
-    r"\b(status|progress|where (are|did) we|what happened)\b",
+    r"^\s*(?:"
+    r"(?:what(?:'s|s| is| was)?\s+)?(?:the\s+|our\s+)?(?:current\s+|latest\s+)?status"
+    r"|(?:any\s+|what\s+|the\s+)?progress(?: so far)?"
+    r"|where (?:are|did) we(?: (?:at|now|leave off|get to))?"
+    r"|what happened"
+    r"|how(?:'s|s| is)? it going"
+    r"|update\??"
+    r")[\s.!?]*$",
     re.IGNORECASE,
 )
 MEANINGFUL_REVISION = re.compile(

@@ -75,9 +75,11 @@
       "type": "string",
       "enum": [
         "normal",
-        "protected"
+        "protected",
+        "unknown"
       ],
-      "x-kernel-enforced-by": "compiler"
+      "x-kernel-enforced-by": "compiler",
+      "description": "Safety classification of the work. 'unknown' is reserved for receipts written before Kernel 9 recorded this field and is only valid when migrated_fields lists safety; a compiler must never emit it."
     },
     "builder_identity": {
       "type": "string",
@@ -226,6 +228,14 @@
         }
       },
       "x-kernel-enforced-by": "compiler"
+    },
+    "migrated_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Routing fields that were absent from a pre-Kernel-9 receipt and backfilled on read as unrecorded. Their presence here means they are NOT evidence.",
+      "x-kernel-enforced-by": "manifest-runtime"
     }
   }
 }

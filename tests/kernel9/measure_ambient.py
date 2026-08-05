@@ -127,7 +127,8 @@ def skill_frontmatter_cost() -> dict:
             continue
         count += 1
         try:
-            text = open(path, encoding="utf-8").read()
+            with open(path, encoding="utf-8") as fh:
+                text = fh.read()
         except OSError:
             unparsed.append(entry)
             continue

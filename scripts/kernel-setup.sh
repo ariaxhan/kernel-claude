@@ -53,6 +53,17 @@ CACHE="${KERNEL_CACHE_DIR:-$HOME/.claude/plugins/cache/kernel-marketplace/kernel
 # Resolve to a REAL directory, never the `current` symlink itself:
 # kernel_validate_runtime_root rejects a symlink at its first check, so a runtime
 # root given as `.../kernel/current` makes the plugin refuse its own selector.
+# Version declared by a runtime root, or empty if it is not a readable KERNEL tree.
+runtime_version() {
+  local manifest="$1/.claude-plugin/plugin.json"
+  [ -f "$manifest" ] || return 0
+  python3 -c 'import json,sys
+try:
+    print(json.load(open(sys.argv[1])).get("version",""))
+except Exception:
+    pass' "$manifest" 2>/dev/null
+}
+
 pick_runtime() {
   if [ -n "${KERNEL_RUNTIME_ROOT:-}" ]; then
     realpath_of "$KERNEL_RUNTIME_ROOT"; return 0
@@ -72,6 +83,24 @@ pick_runtime() {
       best="$d"
     fi
   done
+  # Prefer the checkout this script was invoked from when it is NEWER than anything cached.
+  #
+  # Without this, running a 9.0.0 checkout's own setup script silently configured whatever
+  # older release happened to be in the cache, because the cache was consulted first. The
+  # user's intent when they run THIS repo's script is this repo, so a stale cache winning
+  # silently is a upgrade-path trap rather than a safe default.
+  local repo_v="" best_v=""
+  repo_v=$(runtime_version "$REPO_ROOT")
+  [ -n "$best" ] && best_v=$(basename "$best")
+  if [ -n "$repo_v" ] && [ -f "$REPO_ROOT/hooks/scripts/common.sh" ]; then
+    if [ -z "$best_v" ] || [ "$(printf '%s\n%s\n' "$best_v" "$repo_v" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)" = "$repo_v" ]; then
+      if [ -n "$best_v" ] && [ "$best_v" != "$repo_v" ]; then
+        printf 'kernel-setup: using this checkout (%s), newer than cached %s\n' "$repo_v" "$best_v" >&2
+      fi
+      realpath_of "$REPO_ROOT"; return 0
+    fi
+    printf 'kernel-setup: using cached runtime %s, newer than this checkout (%s)\n' "$best_v" "$repo_v" >&2
+  fi
   if [ -n "$best" ]; then realpath_of "$best"; return 0; fi
   # Contributor path: run straight out of a checkout, nothing installed yet.
   realpath_of "$REPO_ROOT"
