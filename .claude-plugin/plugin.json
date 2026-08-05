@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "8.7.3",
+  "version": "9.0.0",
   "description": "KERNEL classifies each task by domain, work shape, and safety level, then loads only the guidance that classification requires. Ordinary work runs with no ceremony; protected work gets externally enforced safety checks; genuinely iterative work gets a feedback loop. Durable memory, bounded resume manifests, and destructive-operation guards are included and work without any external directory tree.",
   "author": {
     "name": "Aria Han",

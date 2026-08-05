@@ -89,29 +89,47 @@ while IFS= read -r FILE_PATH; do
       exit 2
     fi
 
-    # Every absolute path in the plist must be a plain interpreter or live in the project.
+    # Every absolute path in the plist must be a system interpreter the agent cannot
+    # rewrite, or live in the project.
+    #
+    # This list is deliberately EXACT PATHS, never directory wildcards. A previous
+    # version allowed /usr/local/bin/* and /opt/homebrew/bin/*, which defeated the whole
+    # guard on any normal Mac: /opt/homebrew/bin is owned by the login user, so the agent
+    # could write its own payload there and then schedule it, gaining persistent arbitrary
+    # execution while this script printed "all executed paths resolve inside <project>".
+    # The risk being controlled is scheduling code the agent authored, so an allowed path
+    # must be one the agent cannot author.
     OUTSIDE=""
     while IFS= read -r P; do
       [ -z "$P" ] && continue
       case "$P" in
-        /bin/sh|/bin/bash|/bin/zsh|/usr/bin/env|/usr/bin/python3|/usr/bin/open|/usr/local/bin/*|/opt/homebrew/bin/*) continue ;;
+        /bin/sh|/bin/bash|/bin/zsh|/usr/bin/env|/usr/bin/python3|/usr/bin/open) continue ;;
       esac
       case "$P" in
         "$PROJECT_ROOT"/*) continue ;;
-        *) OUTSIDE="$OUTSIDE $P" ;;
       esac
+      # Defence in depth for interpreters installed outside the system prefix (Homebrew
+      # python3, node): permitted only when the binary exists, is NOT writable by this
+      # user, AND its directory is not writable either. The directory check matters as
+      # much as the file check: a read-only binary inside a writable directory can simply
+      # be deleted and replaced, which is the same bypass one level up. A path that does
+      # not exist is refused rather than assumed safe.
+      if [ -f "$P" ] && [ ! -w "$P" ] && [ ! -w "$(dirname "$P")" ]; then
+        continue
+      fi
+      OUTSIDE="$OUTSIDE $P"
     done <<EOF
 $(echo "$CONTENT" | grep -oE '<string>[^<]*</string>' | sed -e 's|</\{0,1\}string>||g' | grep -E '^/')
 EOF
 
     if [ -n "$OUTSIDE" ]; then
-      echo "BLOCKED: launchd plist would run code outside the project ($FILE_PATH)." >&2
-      echo "  Outside $PROJECT_ROOT:$OUTSIDE" >&2
+      echo "BLOCKED: launchd plist would run code the agent can author ($FILE_PATH)." >&2
+      echo "  Not a system interpreter, not inside $PROJECT_ROOT, and agent-writable:$OUTSIDE" >&2
       echo "  Move the script into the project, or have the human install this one." >&2
       exit 2
     fi
 
-    echo "guard-config: allowing LaunchAgent write -- all executed paths resolve inside $PROJECT_ROOT." >&2
+    echo "guard-config: allowing LaunchAgent write -- every executed path is a system interpreter or inside $PROJECT_ROOT." >&2
     continue
   fi
 

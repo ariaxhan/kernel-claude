@@ -153,6 +153,17 @@ PROTECTED_SIGNALS = [
     _sig(r"\b(expensive|cost|budget|spend|bill)\b", 2, "has a cost consequence"),
     _sig(r"\b(silent\w*|quietly|hard to (notice|detect)|no error)\b", 3, "fails quietly when wrong"),
     _sig(r"\b(account|subscription|tenant|org(ani[sz]ation)?)\b", 2, "operates on an account boundary"),
+    # Infrastructure whose failure mode is an outage or a loss of trust, not a bad diff.
+    # Added 2026-08-05 after an adversarial review found "change the DNS record for
+    # example.com", "rotate the TLS certificate for example.com", and "suspend the customer
+    # account" all classifying as normal + silent, while packs/operations/PACK.md states that
+    # most operations work should be protected. Weighted at threshold so a single unambiguous
+    # mention is sufficient; these are not operations to discover you got wrong.
+    _sig(r"\b(dns|nameserver|name server|cname|mx record|a record|zone file|registrar)\b", 3, "changes name resolution, which fails as an outage"),
+    _sig(r"\b(tls|ssl|certificate|cert(ificate)? (rotation|renewal)|acme|let.?s encrypt)\b", 3, "changes transport trust material"),
+    _sig(r"\b(suspend|deactivate|disable|revoke|ban|lock out|terminate)\b", 3, "removes access from someone"),
+    _sig(r"\b(firewall|security group|ingress|egress|acl|port forward|vpn|tunnel)\b", 3, "changes a network boundary"),
+    _sig(r"\b(backup|restore|snapshot|failover|disaster recovery)\b", 3, "touches the recovery path"),
     _sig(r"\b(read.only|don.t change|no changes|do not (edit|write|modify)|strictly read)\b", 3, "imposes a no-write boundary"),
 ]
 

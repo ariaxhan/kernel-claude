@@ -70,9 +70,15 @@ cannot forge. These are a tripwire, not a sandbox, and [docs/safety.md](docs/saf
 explicit about where they stop working.
 
 Underneath, KERNEL classifies each task by domain, work shape, and safety level, then loads
-only the guidance that classification requires. Ordinary work runs with no ceremony.
-Protected work gets externally enforced checks and a builder that does not grade its own
-homework.
+one domain pack for the announced route. Ordinary work runs with no ceremony.
+
+Two honest limits on that, current as of 9.0.0. The model-routing and
+separate-builder-from-verifier rules are checked when receipt validation is run; they are not
+yet enforced on every request, and a request with no receipt at all proceeds normally. And the
+compact governance template is not yet wired into the generator, so ambient context has not
+dropped the way the Kernel 9 design intends. Both are tracked in
+[docs/kernel-9/INVENTORY.md](docs/kernel-9/INVENTORY.md). Treat the routing rules as a
+convention the tooling helps you keep, not as a sandbox.
 
 ## Surfaces, and how Codex differs
 
@@ -89,8 +95,12 @@ codex plugin add kernel@kernel-marketplace
 
 Restart Codex afterwards, then invoke `$kernel:init`. Skills are namespaced on both hosts:
 Claude Code invokes `/kernel:help`, Codex invokes `$kernel:help`. Two real differences.
-Codex runs supported synchronous hook events but has no plugin SessionEnd event, so
-end-of-session recording must be invoked explicitly with `$kernel:handoff`. And Codex does
+Codex runs the supported synchronous hook events, including `SessionEnd`, but does not
+implement `PostToolUseFailure`. KERNEL's `capture-error.sh` is therefore not bound on that
+host, and tool-error recording degrades to what `PostToolUse` can observe. That degradation is
+silent at runtime, so the per-host matrix is worth reading before you rely on error history:
+[docs/kernel-9/HOST-CAPABILITIES.md](docs/kernel-9/HOST-CAPABILITIES.md), generated from
+`governance/hosts.json`. And Codex does
 not register KERNEL's Claude Code agent definitions as native subagents; it maps the same
 roles onto its own during orchestration. Reasoning and detail:
 [docs/install.md](docs/install.md).

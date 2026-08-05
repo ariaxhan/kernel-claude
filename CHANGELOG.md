@@ -2,6 +2,51 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.0.0] - 2026-08-05
+
+Adaptive execution. KERNEL now classifies each task by domain, work shape, and safety, and
+loads one domain pack for the announced route instead of a single always-on configuration.
+
+### Added
+- Classification contract (`schemas/kernel.classification.v1.json`): domain x work_shape x safety.
+- Deterministic stdlib-only router (`orchestration/router/kernel_router.py`). Safety is scored in
+  a pass that cannot read work_shape, so de-risking language cannot clear a real hazard.
+- Six on-demand domain packs: software, research, writing, design, operations, strategy.
+- Per-host adapter generation from `governance/hosts.json`, plus a generated capability report.
+- Receipted model selection: `requested_` and `observed_` model and effort are recorded separately.
+- 80 Kernel 9 router, pack, and adapter tests wired into the repository gate.
+
+### Fixed
+- **Security: LaunchAgent provenance bypass.** The guard allowed `/usr/local/bin/*` and
+  `/opt/homebrew/bin/*` by wildcard as "plain interpreters". `/opt/homebrew/bin` is owned by the
+  login user on a normal Mac, so an agent could write its own payload there, schedule it, and gain
+  persistent execution while the guard printed "all executed paths resolve inside <project>". The
+  allowlist is now exact system-interpreter paths; anything else must be inside the project, or
+  exist with neither the file nor its directory writable by the current user. Regression test
+  asserts both halves and was verified to fail when the wildcard is restored.
+- **Router: infrastructure work classified as normal.** DNS, TLS and certificate, access
+  revocation, network boundary, and backup or restore operations now score protected. Previously
+  "change the DNS record", "rotate the TLS certificate", and "suspend the customer account" all
+  routed normal and silent, contradicting `packs/operations/PACK.md`.
+- Re-pinned the `guard-config.sh` integrity hash, stale since the provenance change landed.
+- `skills/help/SKILL.md` version declaration was out of sync.
+
+### Changed
+- Version is 9.0.0 across `plugin.json`, `marketplace.json`, `.codex-plugin/plugin.json`,
+  `CLAUDE.md`, `AGENTS.md`, and `skills/help/SKILL.md`. 8.7.0 through 8.7.3 were never released.
+- README corrected on two counts it had wrong: it claimed Codex lacks `SessionEnd` (it does not;
+  the real gap is `PostToolUseFailure`), and it described routing and independent verification as
+  externally enforced when they are checked only at receipt validation.
+- README rewritten around a 60-second install; prior content relocated to `docs/`, nothing deleted.
+
+### Known limitations
+- The compact governance template is not yet wired into the generator, so ambient context has not
+  dropped to the Kernel 9 target. Do not cite the sub-500-token figure yet.
+- Model-routing and builder-versus-verifier rules are not enforced per request. A request with no
+  receipt proceeds normally.
+- `kernel.context-receipt/v1` gained required fields without a migration path for existing v1
+  receipts.
+
 ## [8.7.2] - 2026-07-24 "relevance floor"
 
 ### Added

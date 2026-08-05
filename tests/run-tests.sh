@@ -1437,7 +1437,36 @@ test_guard_config_blocks_ssh_write()      { _gc '/Users/u/.ssh/authorized_keys';
 test_guard_config_blocks_shell_rc_write() { _gc '/Users/u/.zshrc';                                assert_exit_code 2 "$?" "write to shell rc must be blocked"; }
 test_guard_config_blocks_git_hook_write() { _gc '/repo/.git/hooks/pre-commit';                    assert_exit_code 2 "$?" "write into .git/hooks must be blocked"; }
 test_guard_config_blocks_mcp_json_write() { _gc '/proj/.mcp.json';                                assert_exit_code 2 "$?" "write to .mcp.json must be blocked (CurXecute class)"; }
-test_guard_config_blocks_launchagent()    { _gc '/Users/u/Library/LaunchAgents/com.evil.plist';   assert_exit_code 2 "$?" "LaunchAgents write must be blocked"; }
+# LaunchAgent policy is provenance-based since the 2026-08 guard change: scheduling is not
+# the risk, scheduling code the AGENT AUTHORED is. So this asserts both halves. It replaces
+# an older test that expected unconditional blocking and had been failing on main ever since
+# the policy changed.
+# CLAUDE_PROJECT_DIR is pinned to PLUGIN_ROOT so "inside the project" is well defined here.
+# Without it the guard falls back to git-toplevel or pwd, which under the test harness is not
+# the tree the fixture paths live in, and the allowed-half assertions fail for the wrong reason.
+_gc_plist() {
+  printf '{"tool_input":{"file_path":"/Users/u/Library/LaunchAgents/com.x.plist","content":"<plist><array><string>%s</string></array></plist>"}}' "$1" \
+    | CLAUDE_PROJECT_DIR="$PLUGIN_ROOT" "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1
+}
+test_guard_config_blocks_launchagent() {
+  # A LaunchDaemon is root scope and stays unconditionally blocked.
+  _gc '/Library/LaunchDaemons/com.evil.plist'
+  assert_exit_code 2 "$?" "LaunchDaemon write must be blocked (root scope)" || return 1
+  # Agent-writable Homebrew prefix. This was a live bypass: /opt/homebrew/bin is owned by the
+  # login user, so allowing it by wildcard let an agent write its own payload there and then
+  # schedule it for persistent execution.
+  _gc_plist '/opt/homebrew/bin/not-a-real-interpreter'
+  assert_exit_code 2 "$?" "LaunchAgent running an agent-writable Homebrew path must be blocked" || return 1
+  _gc_plist '/usr/local/bin/evil'
+  assert_exit_code 2 "$?" "LaunchAgent running /usr/local/bin/* must not be wildcard-allowed" || return 1
+  _gc_plist '/tmp/payload.sh'
+  assert_exit_code 2 "$?" "LaunchAgent running an arbitrary outside path must be blocked" || return 1
+  # The permitted half: real system interpreters, and anything inside the project.
+  _gc_plist '/bin/bash'
+  assert_exit_code 0 "$?" "LaunchAgent running a system interpreter must be allowed" || return 1
+  _gc_plist "$PLUGIN_ROOT/scripts/kernel-setup.sh"
+  assert_exit_code 0 "$?" "LaunchAgent running a script inside the project must be allowed" || return 1
+}
 test_guard_config_blocks_approvals_write(){ _gc '/Users/u/.kernel/approvals/x.token';             assert_exit_code 2 "$?" "write into approval store must be blocked"; }
 test_guard_config_allows_normal_source()  { _gc '/proj/src/main.py';                              assert_exit_code 0 "$?" "normal source write must pass"; }
 test_guard_config_allows_named_lookalike(){ _gc '/proj/src/zshrc_parser.py';                      assert_exit_code 0 "$?" "file merely NAMED like an rc file must pass"; }
@@ -1863,7 +1892,7 @@ test_critical_guard_scripts_unchanged_for_820() {
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
 16e5c6d2e357ed225f31c319c4af2a797afd4bcdb85b8cdd01fc874a14b0af18 guard-bash.sh
-115785e567cecaa9292565c88e963911ff62e8802b4e2e99d676e71084aced6a guard-config.sh
+6a885672ad9f643bc0ac60cc3cfe3f2366a890faaa3a4bee132afb2d99cde731 guard-config.sh
 d3611267b4f135c5b96e8a4a8af60f296b196efc135e3dfbef63d7683065608c detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
 EOF
