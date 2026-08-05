@@ -2369,23 +2369,47 @@ test_release_docs_explain_vaults_continuity_boundary() {
 }
 
 test_release_metadata_and_inventory_are_truthful() {
-  local skills agents
+  # This test previously pinned "35 skills / 15 agents / version 8.5.0" as literals and
+  # discarded the exit status of every check except the last grep, so it reported PASS
+  # while the real inventory was 26 and 10 and the version was 8.7.2. A test named
+  # "truthful" was the thing hiding the untruth. Two changes prevent a repeat:
+  #   1. Every assertion now gates (|| fail=1) and the function returns the accumulated
+  #      status, so a failure cannot be masked by a later passing command.
+  #   2. Nothing is pinned. The documented counts are PARSED OUT of the docs and compared
+  #      against the filesystem, so the test cannot go stale at release time and cannot be
+  #      satisfied by a number that is merely self-consistent and wrong.
+  local fail=0 skills agents doc_skills doc_agents qs_skills
   skills=$(find "$PLUGIN_ROOT/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
   agents=$(find "$PLUGIN_ROOT/agents" -maxdepth 1 -name '*.md' ! -name README.md | wc -l | tr -d ' ')
-  assert_equals 35 "$skills" "skill inventory"
-  assert_equals 15 "$agents" "agent inventory"
-  python3 - "$PLUGIN_ROOT" <<'PY'
+
+  doc_skills=$(grep -ohE 'There are [0-9]+ skills' "$PLUGIN_ROOT/docs/daily-use.md" | grep -oE '[0-9]+' | head -1)
+  doc_agents=$(grep -ohE '[0-9]+ specialized Claude Code agent definitions' "$PLUGIN_ROOT/docs/daily-use.md" | grep -oE '[0-9]+' | head -1)
+  qs_skills=$(grep -ohE 'Codex loads all [0-9]+ KERNEL skills' "$PLUGIN_ROOT/docs/QUICKSTART.md" | grep -oE '[0-9]+' | head -1)
+
+  [ -n "$doc_skills" ] || { echo "  FAIL: docs/daily-use.md states no skill count"; fail=1; }
+  [ -n "$doc_agents" ] || { echo "  FAIL: docs/daily-use.md states no agent count"; fail=1; }
+  [ -n "$qs_skills" ]  || { echo "  FAIL: docs/QUICKSTART.md states no skill count"; fail=1; }
+
+  assert_equals "$skills" "$doc_skills" "documented skill count vs skills/*/SKILL.md on disk" || fail=1
+  assert_equals "$agents" "$doc_agents" "documented agent count vs agents/*.md on disk" || fail=1
+  assert_equals "$skills" "$qs_skills"  "QUICKSTART skill count vs skills/*/SKILL.md on disk" || fail=1
+
+  # Version is checked for internal consistency, not pinned to a literal, so a release bump
+  # does not require editing this test.
+  python3 - "$PLUGIN_ROOT" <<'PY' || fail=1
 import json, pathlib, sys
-r=pathlib.Path(sys.argv[1])
-p=json.loads((r/'.claude-plugin/plugin.json').read_text())
-m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
-assert p['version']==m['version']=='8.5.0'
-for x in (p,m):
-    assert '35 engineering skills' in x['description'] and '8.5.0' in x['description']
+r = pathlib.Path(sys.argv[1])
+p = json.loads((r / '.claude-plugin/plugin.json').read_text())
+m = json.loads((r / '.claude-plugin/marketplace.json').read_text())['plugins'][0]
+if p['version'] != m['version']:
+    print(f"  FAIL: plugin.json {p['version']} != marketplace.json {m['version']}")
+    sys.exit(1)
 PY
-  grep -q 'There are 35 skills and 15 specialized Claude Code agent definitions' "$PLUGIN_ROOT/README.md" || return 1
-  grep -q 'Codex loads all 35 KERNEL skills' "$PLUGIN_ROOT/docs/QUICKSTART.md" || return 1
-  grep -q 'validate | latest | divergence | preflight | compile | resume | activate | deactivate' "$PLUGIN_ROOT/README.md"
+
+  grep -q 'validate | latest | divergence | preflight | compile | resume | activate | deactivate' \
+    "$PLUGIN_ROOT/README.md" || { echo "  FAIL: README.md is missing the state-command list"; fail=1; }
+
+  return $fail
 }
 
 test_dreamer_agent_exists_with_frontmatter() {

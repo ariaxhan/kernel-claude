@@ -1,70 +1,101 @@
-# KERNEL 8
+# KERNEL
 
-KERNEL is a Claude Code plugin that gives coding sessions durable project memory, bounded handoffs, repeatable engineering workflows, and independent checks before risky changes ship. Codex can load the same package through its Claude-marketplace compatibility path.
+A Claude Code plugin that gives your coding sessions a memory that survives them, resumable
+state, and guards that stop irreversible commands before they run.
 
-It is for people who use Claude Code on real repositories and want work to survive session boundaries without turning the agent loose. It does not replace source control, tests, human review, or project-specific instructions. KERNEL records evidence and enforces process; it cannot prove a product is correct by itself.
-
-## Supported surfaces
-
-- Claude Code in a terminal.
-- Claude Code Desktop local and SSH sessions. Remote sessions do not support plugins.
-- Claude Code in VS Code, which uses the same plugin configuration and may ask for a restart after changes.
-- Codex CLI and the Codex app through Codex's legacy Claude-plugin compatibility loader.
-
-KERNEL skills are namespaced. Claude Code invokes `/kernel:ingest`; Codex invokes
-`$kernel:ingest`. Cursor and Claude chat Personal plugins are not supported
-installation targets here.
-
-KERNEL 8 intentionally does not ship a native `.codex-plugin` manifest yet. Claude's
-explicit-only skill marker and Codex's native plugin validator currently disagree;
-keeping the compatibility loader preserves the safety rule instead of quietly making
-side-effecting skills start on their own. The shared `hooks/hooks.json` is regression-
-tested against both loaders.
+For people running Claude Code on real repositories who want yesterday's context back
+tomorrow. Not for you if you want an autonomous agent, or a replacement for tests, review,
+and reading the diff.
 
 ## Install
 
-### Claude Code
+```bash
+claude plugin marketplace add ariaxhan/kernel-claude
+claude plugin install kernel@kernel-marketplace
+~/.claude/plugins/marketplaces/kernel-marketplace/scripts/kernel-setup.sh
+```
 
-In Claude Code:
+Needs `git`, `sqlite3`, `jq`, `python3`, `bash`. Takes about ten seconds. Setup asks once
+before it writes, and never touches your shell config.
+
+## What you should see
+
+Setup finishes by writing a real memory and reading it back by keyword:
 
 ```text
-/plugin marketplace add ariaxhan/kernel-claude
-/plugin install kernel@kernel-marketplace
-/reload-plugins
-/kernel:init
+## Recall: KERNEL installed machine
+
+- [pattern] KERNEL 8.7.2 installed on this machine  ↳ kernel-setup.sh completed at 2026-08-04T23:51:39Z
+
+KERNEL is set up.
+  memory:  /Users/you/Documents/Vaults/_meta/agentdb/agent.db
+  agentdb: /Users/you/Documents/Vaults/.local/bin/agentdb
 ```
 
-`/kernel:init` is an explicit setup operation. It shows the detected Vaults path and asks before creating directories or links. Requirements: Git, SQLite 3, `jq`, Python 3, and Bash.
+That round trip is the proof, not a status message. There is now a SQLite database on your
+machine that every Claude Code session reads on start and writes on end. If setup could not
+write to it or could not read it back, it exits non-zero and tells you which half failed.
 
-Verify:
+Now run `claude` and type `/kernel:help`.
 
-```bash
-agentdb status
-readlink "$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current"
-```
+---
 
-Then run `/kernel:help` in a new Claude Code session.
+## Where things are
 
-### Codex CLI or app
+**[Full documentation](docs/)** covers install paths and verification, the daily loop, what
+KERNEL writes to disk, the safety model, troubleshooting, upgrading, and contributing.
 
-In a terminal:
+Go to [docs/install.md](docs/install.md) if the three commands above did not work, and
+[docs/daily-use.md](docs/daily-use.md) once they did.
+
+## What it actually does
+
+Three things, in the order you notice them.
+
+**Memory.** `agentdb` is a SQLite database in your Vaults directory. Sessions recall from it
+before acting and write learnings at the end, so a failure you hit last week does not cost
+you the same afternoon twice. Recall is FTS5 keyword search by default; local semantic search
+is opt-in and adds nothing to your network. See
+[docs/data-and-memory.md](docs/data-and-memory.md).
+
+**Bounded resume.** Handoffs, checkpoints, and retrospectives are validated JSON manifests,
+not prose summaries. A new session reconstructs exactly the state the manifest pins rather
+than inheriting a whole conversation. The manifest CLI is
+`validate | latest | divergence | preflight | compile | resume | activate | deactivate`.
+
+**Reversibility guards.** Hooks classify commands and writes by how hard they are to undo.
+Recoverable mistakes get a warning the model can correct; genuinely destructive ones
+hard-block and surface to you, with a one-time approval token that a prompt-injected command
+cannot forge. These are a tripwire, not a sandbox, and [docs/safety.md](docs/safety.md) is
+explicit about where they stop working.
+
+Underneath, KERNEL classifies each task by domain, work shape, and safety level, then loads
+only the guidance that classification requires. Ordinary work runs with no ceremony.
+Protected work gets externally enforced checks and a builder that does not grade its own
+homework.
+
+## Surfaces, and how Codex differs
+
+Claude Code terminal, Desktop (local and SSH), and VS Code. Remote Claude Code sessions do
+not support plugins.
+
+Codex CLI and the Codex app load the same package through their Claude-marketplace
+compatibility loader:
 
 ```bash
 codex plugin marketplace add ariaxhan/kernel-claude
 codex plugin add kernel@kernel-marketplace
 ```
 
-Restart the Codex session or app after installation. Verify with:
+Restart Codex afterwards, then invoke `$kernel:init`. Skills are namespaced on both hosts:
+Claude Code invokes `/kernel:help`, Codex invokes `$kernel:help`. Two real differences.
+Codex runs supported synchronous hook events but has no plugin SessionEnd event, so
+end-of-session recording must be invoked explicitly with `$kernel:handoff`. And Codex does
+not register KERNEL's Claude Code agent definitions as native subagents; it maps the same
+roles onto its own during orchestration. Reasoning and detail:
+[docs/install.md](docs/install.md).
 
-```bash
-codex plugin list
-```
-
-Then explicitly invoke `$kernel:init`; use `$kernel:help` for the Codex skill index.
-
-## Upgrading from 7.23.0
-
-KERNEL 8 is a major release. Update explicitly:
+## Updating
 
 Claude Code:
 
@@ -74,37 +105,24 @@ Claude Code:
 /reload-plugins
 ```
 
-Codex:
+Codex, where the marketplace upgrade also refreshes the installed cache:
 
 ```bash
 codex plugin marketplace upgrade kernel-marketplace
 ```
 
-Restart Codex after the upgrade. Current Codex refreshes the installed plugin cache
-as part of the marketplace upgrade; there is no `codex plugin update` command.
+Upgrading from 7.23, the breaking changes, and rolling back without losing data:
+[docs/upgrading.md](docs/upgrading.md).
 
-Start a new session if Claude Code says a component or monitor could not reload. VS Code may show a restart banner.
+If update and reload both fail, reinstall. Claude Code takes
+`/plugin uninstall kernel@kernel-marketplace --keep-data` followed by a fresh install; Codex
+takes `codex plugin remove kernel@kernel-marketplace` then
+`codex plugin add kernel@kernel-marketplace`. Removing the marketplace or clearing the plugin
+cache is not routine maintenance.
 
-On startup, KERNEL validates the plugin Claude Code actually loaded and advances its `current` runtime selector only forward. It repairs exactly three old KERNEL links when their link text proves they point to a numbered `kernel-marketplace/kernel/<version>` runtime:
+## Rolling back
 
-- `$KERNEL_VAULTS/.local/bin/agentdb`
-- `$KERNEL_VAULTS/.claude/kernel/orchestration`
-- `$KERNEL_VAULTS/.claude/kernel/hooks`
-
-Missing paths stay missing. Regular files, directories, malformed links, and unrelated links are never replaced; KERNEL prints a recovery warning instead. Updating does not replace project files, existing manifests, receipts, or AgentDB. Hooks and explicit init still write session records and setup files in the selected Vaults.
-
-Breaking changes:
-
-- Live handoffs, checkpoints, retrospectives, and context receipts use canonical JSON. Historical YAML remains history, but KERNEL 8 does not resume it as live state.
-- The old command-file implementation layer is gone. Workflows are skills and keep their namespaced invocations.
-- `/kernel:design` became `/kernel:frontend` to avoid a native-name collision.
-- A KERNEL 7 session may keep using its loaded 7.23 code until reloaded or restarted. Old cache directories may remain temporarily; their presence does not make them active.
-- KERNEL 7 may not resume state created by KERNEL 8 even though that state is preserved.
-
-### Roll back without deleting data
-
-From any directory, clone the repository and check out the verified 7.23 release
-commit. Use the installed KERNEL 8 selector before starting the older plugin:
+Check out the verified 7.23 release commit and point the installed selector at it:
 
 ```bash
 git clone https://github.com/ariaxhan/kernel-claude.git "$HOME/kernel-claude-7.23"
@@ -114,205 +132,33 @@ V8_SELECTOR="$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current/scrip
 claude --plugin-dir "$HOME/kernel-claude-7.23"
 ```
 
-To deliberately select a validated local or cached runtime for the helper links:
+To select a validated runtime explicitly, call a numbered selector directly, for example
+`"$HOME/.claude/plugins/cache/kernel-marketplace/kernel/8.0.2/scripts/select-runtime.sh" /path/to/runtime`.
+That moves `current` backward on purpose; ordinary old sessions cannot. It selects code only
+and does not convert state formats.
 
-```bash
-"$HOME/.claude/plugins/cache/kernel-marketplace/kernel/8.0.2/scripts/select-runtime.sh" /path/to/kernel-claude-7.23
-```
+## Where your data lives
 
-That explicit selection may move `current` backward; normal old sessions cannot. It does not convert KERNEL 8 JSON state to KERNEL 7 YAML. Do not delete the plugin cache or remove the marketplace as a normal rollback step.
+Everything durable goes in the selected Vaults directory: `_meta/agentdb/agent.db` for
+memory, `_meta/handoffs/` and `_meta/checkpoints/` for JSON state, `_meta/logs/` for runtime
+records. Detection order and the full list: [docs/data-and-memory.md](docs/data-and-memory.md).
 
-Runtime link changes clean temporary siblings on normal errors and catchable signals.
-An uncatchable process kill can leave a `.kernel-tmp.*` symlink; the next matching
-operation removes only KERNEL-shaped symlink residue and never a regular lookalike.
-
-## Daily use
-
-1. Start or resume with `/kernel:ingest`. KERNEL reads AgentDB and the live repository, then defines observable success.
-2. Let risk choose the workflow. Easy-to-undo work runs directly; durable or quiet changes use a contract and separate implementation/checking roles.
-3. Run `/kernel:validate`, then `/kernel:handoff` when another session needs an exact resume point.
-
-Useful skill groups:
-
-- Workflows: `ingest`, `diagnose`, `dream`, `metrics`, `forge`, `experiment`
-- State: `handoff`, `checkpoint`, `retrospective`
-- Validation: `validate`, `review`, `tearitapart`
-- Methods: `build`, `testing`, `debug`, `security`, `architecture`, `git`, `frontend`, `marketing-site`, and more
-- Setup/reference: `init`, `help`, `landing-page`
-
-There are 35 skills and 15 specialized Claude Code agent definitions in this release.
-
-`governance-sync` is explicit-only. It audits Git repositories for `CLAUDE.md` /
-`AGENTS.md` gaps and can generate a missing native adapter after showing conflicts,
-provenance hashes, and a backup destination. It never rewrites a conflict.
-Codex loads the skills and SessionStart rules, but it does not register those 10
-Claude agent files as native Codex agents; KERNEL maps the same roles onto Codex's
-available subagents during orchestration. Use `/kernel:help` in Claude Code or
-`$kernel:help` in Codex.
-
-## What KERNEL writes
-
-KERNEL keeps durable data in the selected Vaults, found in this order: valid `KERNEL_VAULTS`, `~/Documents/Vaults`, `~/Vaults`, then `~/Downloads/Vaults`.
-
-- `_meta/agentdb/agent.db`: project memory, contracts, checkpoints, verdicts, and telemetry.
-- `_meta/handoffs/`, `_meta/checkpoints/`, `_meta/retrospectives/`, and receipts: JSON state artifacts.
-- `_meta/agents/`, `_meta/logs/`, and small session-status files: runtime records.
-- `.claude/kernel/` and `.local/bin/agentdb`: links created only by explicit init; startup only repairs recognized old numbered KERNEL links.
-
-### Semantic recall (8.3.0, optional)
-
-By default `agentdb recall` is FTS5 keyword search. Run `agentdb embed-init` once to
-add local semantic search: it creates a venv beside the DB, installs `fastembed`
-(ONNX all-MiniLM-L6-v2, ~50MB, no torch, fully on-machine — nothing leaves your
-computer), embeds your learnings, and prints an `AGENTDB_EMBED_PYTHON` export to make
-it permanent. Recall then fuses keyword bm25 with cosine similarity (reciprocal-rank
-fusion) and surfaces learnings whose wording differs from your query. On a real
-47-learning corpus this lifted recall@5 from 0.75 to 0.85 with no regressions. Install
-nothing and recall stays exactly as before — semantic search is strictly additive and
-opt-in. The embedding vectors are derived data: they are excluded from the tracked
-JSON mirror and rebuilt with `agentdb embed-sync` on a fresh clone. Measure retrieval
-quality yourself with `orchestration/agentdb/eval/run_eval.py` against a gold set.
-
-### Lean session start (8.4.0)
-
-Because recall is now task-driven, the SessionStart context is lean: a learning count, a
-`agentdb recall` pointer, and the top few highest-hit failures — about 950 tokens, down
-from ~3,700 when startup dumped ~50 task-blind learnings every session. The agent recalls
-what its task needs instead of receiving everything up front. Recall with concrete nouns:
-feature + subsystem/library + discovered files/symbols + exact error or desired outcome.
-Run it again after discovery, when scope or hypothesis changes, or when a new failure appears.
-Run `agentdb read-start` explicitly (no flag) only when you want the full weighted memory dump.
-
-### Learning graph + promotion (8.5.1)
-
-With embeddings present, `agentdb graph build` connects related learnings (semantic
-cosine + `[[links]]`) into a `learning_edges` table; `agentdb graph neighbors <id>` shows
-a learning's related lessons. `agentdb promote` clusters recurring failures and surfaces
-candidate doctrine themes for review (it never auto-writes doctrine). The edges are derived
-data — excluded from the JSON mirror and rebuilt by `graph build`, like the embeddings.
-
-KERNEL hooks can inspect repository state, run configured checks, and write these records.
-Claude Code runs the full declared lifecycle. Codex runs supported synchronous hook
-events, including the write guards and SessionStart context; it skips asynchronous
-command hooks and has no plugin SessionEnd event, so end-of-session recording in Codex
-must be invoked explicitly with `$kernel:handoff`. Some workflows can use GitHub when
-the project profile enables it. KERNEL does not promise that all processing stays
-local when you invoke a workflow that uses external tools. Review host permissions
-and the repository's own instructions before granting access.
-
-KERNEL 8.0.2 declares its six advisory hooks as synchronous so Codex executes them
-instead of skipping them. They remain non-blocking in outcome: an internal logging or
-validation failure returns success and cannot reject the tool operation. The critical
-secret, configuration, command, and context guards remain separate blocking gates.
-
-When the active project root exactly matches the Vaults root and the shared continuity
-engine plus an executable Claude or Codex adapter are present, that Vaults service owns
-compaction checkpoints and restore injection. KERNEL's PreCompact and PostCompact paths
-cleanly no-op there; SessionStart still supplies AgentDB and governance without adding a
-second restore. Nested repositories retain KERNEL's deterministic generic fallback.
-Merely finding continuity files above the active project does not disable KERNEL.
-
-## Safety model
-
-- Risk is based on how hard a change is to undo, how quietly it can fail, and how much it can affect.
-- Tier 2 and 3 work uses bounded contracts, separate agents, and a required budget cap.
-- Context manifests can be `sealed`, `bounded`, or `advisory`; hooks enforce active restrictions.
-- Runtime roots, JSON state, selectors, and helper-link ownership are validated before mutation.
-- KERNEL refuses unsafe filesystem objects instead of overwriting them.
-- “Done” requires a real verification command. A commit, push, deploy, and working product are different states.
-
-### Security guard (8.2.0)
-
-The command, write, and tool-output guards enforce one line: **reversibility**. An
-operation that cannot be undone — or is hard to undo — hard-blocks and *surfaces* the
-block so a human decides; a recoverable one warns and lets the model self-correct. The
-guard is grounded in real 2025-26 incidents (Replit's production-DB wipe, the Nx
-s1ngularity supply-chain attack, EchoLeak/CamoLeak exfiltration, CurXecute/MCPoison MCP
-attacks), not a hand-made list. It covers six threat classes:
-
-- **Self-destruct** — `rm -rf` of root/home, `dd`/`mkfs`, disk overwrite, `DROP`/`TRUNCATE`,
-  infra teardown, cloud deletes, git history destruction, recursive `chmod`/`chown`.
-- **Exfiltration** — a literal secret, a credential file (`~/.ssh`, `~/.aws`, `.env`), or a
-  keychain read in the same command as a network egress tool. Env-var references and
-  localhost targets pass.
-- **Scope escape** — `--dangerously-skip-permissions` spawns (the Nx signature), `crontab`
-  writes, redirects into shell startup files, and any tampering with the guard itself.
-- **Supply chain** — `curl|sh`, `base64 -d | sh`, `eval $(curl …)`.
-- **Sensitive config writes** — credential roots, `.git/hooks/`, MCP config
-  (`.mcp.json`/`.cursor/mcp.json`), launchd/cron persistence.
-- **Indirect prompt injection** — a warn-only tripwire on `WebFetch`/`WebSearch`/MCP output
-  that flags invisible-character smuggling (Unicode Tags, zero-width, bidi) and
-  instruction-override phrasing, then tells the model to treat that output as untrusted
-  data. Nothing is blocked; false positives are being tuned on real traffic first.
-
-**Human approval, unforgeable by injection.** When a hard block is genuinely intended, the
-guard mints a one-time `KERNEL_APPROVE=<code>` bound to a hash of the exact command and
-stores it in `~/.kernel/approvals/` (15-minute TTL, single use). The human reads the token
-file out-of-band and re-runs the command with the code. Because the code never enters the
-model-visible stream, a prompt-injected command cannot forge it — this replaces the old
-`DANGER_OK=1` substring, which any injected command could set on itself. The token store is
-unreadable to the agent.
-
-**Honest scope.** These hooks are a tripwire, not a sandbox. Heuristic injection detection
-is ~40-84% effective in the literature, and a determined multi-step evasion can route
-around a text guard. Real containment is the OS sandbox (Claude Code `/sandbox`, Codex
-network-off default) and egress control that these hooks sit inside. The guard stops the
-accidental catastrophe and raises the cost of the injected one.
-
-## Troubleshooting and recovery
-
-Skills missing after update: run `/reload-plugins`; start a new session if prompted.
-
-Codex reports `unknown field version` for `hooks/hooks.json`: the session is still
-loading an older cached KERNEL release. Upgrade the marketplace, then restart Codex so
-it reads KERNEL 8. Do not hand-edit the numbered cache.
-
-Helper-link warning: inspect the exact path printed by KERNEL, then run `/kernel:init`. Init will not overwrite a regular file, directory, or unrelated link without a separate manual decision.
-
-Wrong Vaults: set `KERNEL_VAULTS` to the existing Vaults root before init or startup.
-
-Normal reinstall, only after update/reload fails:
-
-Claude Code:
-
-```text
-/plugin uninstall kernel@kernel-marketplace --keep-data
-/plugin install kernel@kernel-marketplace
-/reload-plugins
-```
-
-Codex:
-
-```bash
-codex plugin marketplace upgrade kernel-marketplace
-codex plugin remove kernel@kernel-marketplace
-codex plugin add kernel@kernel-marketplace
-```
-
-Restart Codex after reinstalling. `remove` deletes KERNEL's installed cache entry;
-it does not remove the marketplace or project data.
-
-Do not remove the marketplace or clear `~/.claude/plugins/cache` as routine maintenance. Those are destructive recovery steps with wider effects.
-
-Manifest runtime:
-
-```text
-kernel-manifest validate | latest | divergence | preflight | compile | resume | activate | deactivate
-```
+When the active project root exactly matches the Vaults root and a shared continuity engine
+with an executable host adapter is present, that service owns compaction checkpoints and
+restore injection, and KERNEL's compaction paths cleanly no-op rather than adding a second
+restore. Nested repositories retain KERNEL's deterministic generic fallback.
 
 ## Contributing
-
-Use the checkout directly instead of modifying a numbered cache directory:
 
 ```bash
 git clone https://github.com/ariaxhan/kernel-claude.git
 cd kernel-claude
+./scripts/kernel-setup.sh
 claude --plugin-dir ./
 ./tests/run-tests.sh
 ```
 
-Reload or start a new development session after plugin-structure changes. Do not replace installed cache directories with development symlinks.
-
-Architecture references: [KERNEL instructions](CLAUDE.md), [setup guide](docs/QUICKSTART.md), [8.0 migration](docs/MIGRATION-8.md), [manifest schema](schemas/), [workflows](workflows/), and [changelog](CHANGELOG.md).
+See [docs/contributing.md](docs/contributing.md). Fix defects here and release; do not edit
+an installed cache directory.
 
 MIT licensed.
