@@ -63,10 +63,56 @@ while IFS= read -r FILE_PATH; do
     echo "  The human reviews and applies MCP config changes." >&2
     exit 2
   fi
-  if echo "$FILE_PATH" | grep -qE '/Library/(LaunchAgents|LaunchDaemons)/|^/etc/(cron|crontab)'; then
-    echo "BLOCKED: write to launchd/cron persistence config ($FILE_PATH) -- installs code that runs on schedule/login, quietly." >&2
-    echo "  Persistence changes go through the human: show them the plist/crontab content to apply." >&2
+  # System-wide persistence (root scope) and cron are never agent-writable.
+  if echo "$FILE_PATH" | grep -qE '/Library/LaunchDaemons/|^/etc/(cron|crontab)'; then
+    echo "BLOCKED: write to system-wide persistence ($FILE_PATH) -- runs as root, on schedule, quietly." >&2
+    echo "  Show the human the exact plist/crontab content; they apply it." >&2
     exit 2
+  fi
+  # User LaunchAgents: the risk is scheduling ARBITRARY code, not scheduling at all.
+  # A project's own automation is the normal, legitimate case and blocking it outright
+  # just taught agents to hand humans copy-paste chores. So the test is provenance:
+  # every path the job executes must live inside the project being worked on.
+  if echo "$FILE_PATH" | grep -q '/Library/LaunchAgents/'; then
+    PROJECT_ROOT="${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+    CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // .tool_input.new_string // ""')
+
+    if [ -z "$CONTENT" ]; then
+      echo "BLOCKED: launchd plist write with no readable content ($FILE_PATH)." >&2
+      echo "  Cannot verify what it would execute. Write the plist inside the project first, then install it." >&2
+      exit 2
+    fi
+
+    # Fetch-and-execute in a scheduled job is the payload shape worth refusing outright.
+    if echo "$CONTENT" | grep -qE 'curl[^|]*\||wget[^|]*\||base64[[:space:]]+(-d|--decode)|\|[[:space:]]*(sh|bash)([[:space:]]|$)|osascript -e'; then
+      echo "BLOCKED: launchd plist contains a fetch-or-decode-then-execute pattern ($FILE_PATH)." >&2
+      exit 2
+    fi
+
+    # Every absolute path in the plist must be a plain interpreter or live in the project.
+    OUTSIDE=""
+    while IFS= read -r P; do
+      [ -z "$P" ] && continue
+      case "$P" in
+        /bin/sh|/bin/bash|/bin/zsh|/usr/bin/env|/usr/bin/python3|/usr/bin/open|/usr/local/bin/*|/opt/homebrew/bin/*) continue ;;
+      esac
+      case "$P" in
+        "$PROJECT_ROOT"/*) continue ;;
+        *) OUTSIDE="$OUTSIDE $P" ;;
+      esac
+    done <<EOF
+$(echo "$CONTENT" | grep -oE '<string>[^<]*</string>' | sed -e 's|</\{0,1\}string>||g' | grep -E '^/')
+EOF
+
+    if [ -n "$OUTSIDE" ]; then
+      echo "BLOCKED: launchd plist would run code outside the project ($FILE_PATH)." >&2
+      echo "  Outside $PROJECT_ROOT:$OUTSIDE" >&2
+      echo "  Move the script into the project, or have the human install this one." >&2
+      exit 2
+    fi
+
+    echo "guard-config: allowing LaunchAgent write -- all executed paths resolve inside $PROJECT_ROOT." >&2
+    continue
   fi
 
   # Only care about .claude/ paths beyond this point.
