@@ -18,19 +18,68 @@ Evidence for the "always-loaded cost" column: measured 2026-07-29 on
 
 ## 0. Measured baseline
 
+> **CORRECTED 2026-08-05. The original baseline in this section was wrong, and the
+> sub-500-token target it produced is withdrawn.** Both are preserved below the corrected
+> table, because the error is more instructive than the number.
+
+Measured by `tests/kernel9/measure_ambient.py`, which now separates two populations that
+pay different amounts.
+
+| Metric | plugin user | contributor in this repo |
+|---|---|---|
+| SessionStart hook stdout | **1864 tok** | 1864 tok |
+| Skill frontmatter, 26 skills, host-visible for routing | **2732 tok** | 2732 tok |
+| Instruction file, per host | **not loaded** | 5784 tok |
+| **Ambient total** | **≈ 4596 tok** | ≈ 10380 tok |
+
+Ratchets enforced by `tests/kernel9/test_ambient_budget.py`: plugin 4800, contributor 11000.
+
+### What the original baseline got wrong
+
+It charged this repo's `CLAUDE.md` to every session. **Plugin users never load it.** Claude
+Code loads the *user's own* instruction file, and `.claude-plugin/plugin.json` does not
+reference ours; `tests/run-tests.sh` has said exactly this in a comment for a long time, and
+the instrument disagreed with it. That inflated the baseline about 4x.
+
+The consequence was not cosmetic. It made "reduce ambient context" look like it required
+deleting the I0 invariants and anti-patterns from `CLAUDE.md`, which would have saved plugin
+users **zero tokens** while removing safety rules from the contributors who do load them.
+
+### Why <500 is withdrawn rather than deferred
+
+Plugin ambient is dominated by **skill frontmatter**, not by any template: ~2732 tok across 26
+skills, mean ~105, range 66 to 174. There is no dominant offender to trim, and the host must
+keep that frontmatter visible or routing cannot happen at all. Reaching 500 would mean
+shipping roughly four skills.
+
+The governance template was never the binding constraint, so wiring the compact
+`kernel9.md.tmpl` does not deliver the claimed reduction. **Do not restate the sub-500 figure.**
+The honest claim is that the instruction file is no longer the delivery mechanism, and that
+ambient is one hook plus the packs actually loaded.
+
+The real lever, if this is revisited, is `session-start.sh` at 1864 tok, paid by every session
+on every host.
+
+<details>
+<summary>Original (incorrect) baseline, kept for the record</summary>
+
 | Metric | Kernel 8 (measured) | Kernel 9 target |
 |---|---|---|
 | SessionStart hook stdout | 6808 B ≈ **1702 tok** | part of <500 |
 | `CLAUDE.md` (always loaded) | 22531 B ≈ **5632 tok** | part of <500 |
 | **Total ambient** | **≈ 7334 tok** | **< 500 tok** |
+
+Required reduction in ambient context: ~93%.
+</details>
+
+| Metric | Kernel 8 | Kernel 9 target |
+|---|---|---|
 | Always-visible skills | 26 | as few as route correctly |
 | Canonical governance template | 301 lines | — |
 | Lifecycle bindings | 12 | — |
 | Hook scripts | 24 | safety subset preserved |
 | Agents | 10 | — |
 | AgentDB migrations | 17 | all must remain readable |
-
-Required reduction in ambient context: **~93%**.
 
 ---
 
@@ -105,7 +154,7 @@ These five are the safety overlay. They are independent of work shape, per the b
 
 | Script | Class | Note |
 |---|---|---|
-| `session-start.sh` | core | **Must shrink from 1702 → part of <500 tok.** Also has a latent hang when run without hook JSON on stdin (see §5). |
+| `session-start.sh` | core | **1864 tok, paid by every session on every host. The real ambient lever now that the <500 target is withdrawn (see §0).** Also has a latent hang when run without hook JSON on stdin (see §5). |
 | `session-end.sh` | core | Documented `--no-verify` carve-out stays. |
 | `pre-compact-commit.sh` | core | Same carve-out. |
 | `post-compact-restore.sh` | core | |
@@ -184,7 +233,7 @@ violation. Kernel 9 must emit a truthful capability declaration per host.
 | D1 | `PostToolUseFailure` binding is a silent no-op on Codex | 0 symbol occurrences in Codex 0.145.0 binary; hook is bound unconditionally in `hooks/hooks.json` | truthfulness |
 | D2 | `session-start.sh` hangs indefinitely without hook JSON on stdin | killed at 120 s; exits 0 in seconds when fed `{"hook_event_name":"SessionStart",...}` | robustness |
 | D3 | No `.codex-plugin/plugin.json` | `find` over repo root | portability |
-| D4 | Ambient context is 14.7× the target | 7334 tok measured vs <500 target | the headline |
+| D4 | ~~Ambient context is 14.7x the target~~ WITHDRAWN 2026-08-05 | Baseline was wrong: it charged CLAUDE.md to plugin users, who never load it. Real plugin ambient 4596 tok, dominated by skill frontmatter, not by any template. Target retired, ratchets in test_ambient_budget.py instead. | see §0 |
 
 ---
 

@@ -72,13 +72,18 @@ explicit about where they stop working.
 Underneath, KERNEL classifies each task by domain, work shape, and safety level, then loads
 one domain pack for the announced route. Ordinary work runs with no ceremony.
 
-Two honest limits on that, current as of 9.0.0. The model-routing and
-separate-builder-from-verifier rules are checked when receipt validation is run; they are not
-yet enforced on every request, and a request with no receipt at all proceeds normally. And the
-compact governance template is not yet wired into the generator, so ambient context has not
-dropped the way the Kernel 9 design intends. Both are tracked in
-[docs/kernel-9/INVENTORY.md](docs/kernel-9/INVENTORY.md). Treat the routing rules as a
-convention the tooling helps you keep, not as a sandbox.
+One honest limit on that, current as of 9.0.0: the model-routing and
+separate-builder-from-verifier rules are checked when receipt validation is run. They are not
+yet enforced on every request, and a request with no receipt at all proceeds normally. Treat
+them as a convention the tooling helps you keep, not as a sandbox.
+
+On context cost, the number you will see quoted elsewhere is wrong and this is the corrected
+one. KERNEL's ambient cost to a plugin user is roughly **4,600 tokens**: about 1,900 from the
+SessionStart hook and about 2,700 from skill frontmatter the host keeps visible so routing can
+happen. This repo's `CLAUDE.md` is **not** part of that; your host loads your own instruction
+file, not ours. An earlier target of "under 500 tokens" came from a measurement that charged our
+`CLAUDE.md` to everyone, and it is withdrawn. Detail and the ratchets that now enforce it:
+[docs/kernel-9/INVENTORY.md](docs/kernel-9/INVENTORY.md).
 
 ## Surfaces, and how Codex differs
 

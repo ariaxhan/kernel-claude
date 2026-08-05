@@ -39,9 +39,25 @@ loads one domain pack for the announced route instead of a single always-on conf
   externally enforced when they are checked only at receipt validation.
 - README rewritten around a 60-second install; prior content relocated to `docs/`, nothing deleted.
 
+### Corrected measurement
+- **The sub-500-token ambient target is withdrawn, and the baseline that produced it was wrong.**
+  `measure_ambient.py` charged this repo's `CLAUDE.md` (~5.8k tok) to every session. Plugin users
+  never load it: the host loads the *user's* instruction file, and `.claude-plugin/plugin.json`
+  does not reference ours. That inflated the baseline about 4x and made reducing ambient context
+  look like it required deleting the I0 invariants, which would have saved plugin users zero
+  tokens.
+- Real figures, now measured separately per population: **plugin ambient ~4596 tok** (1864
+  session-start + 2732 skill frontmatter), **contributor ambient ~10380 tok**.
+- Skill frontmatter was previously counted as zero. It is host-visible so routing can happen, so
+  it is ambient, and at ~2732 tok it is the largest single component of what users pay.
+- <500 is not reachable: skill frontmatter is flat across 26 skills (mean ~105, range 66 to 174)
+  with no dominant offender, so hitting it would mean shipping about four skills. The governance
+  template was never the binding constraint. **Do not restate the sub-500 figure.**
+- Ratchets now enforced in CI by `tests/kernel9/test_ambient_budget.py` (plugin 4800,
+  contributor 11000), including a test pinning the population split itself so the old conflation
+  cannot silently return.
+
 ### Known limitations
-- The compact governance template is not yet wired into the generator, so ambient context has not
-  dropped to the Kernel 9 target. Do not cite the sub-500-token figure yet.
 - Model-routing and builder-versus-verifier rules are not enforced per request. A request with no
   receipt proceeds normally.
 - `kernel.context-receipt/v1` gained required fields without a migration path for existing v1
