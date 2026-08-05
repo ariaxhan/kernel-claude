@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-31
+---
+
 # Lightweight Frontend Research: Developer Dashboard for kernel-claude
 
 **Status:** Complete  

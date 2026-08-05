@@ -1,5 +1,5 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: 4fbcc9b73bf3c2936a721491fe4c05eb2acf373cd190c710a2a69a1f61b61019; adapter: codex -->
+     source-sha256: a8737a0695f15b626b1dbbffa4e82f78a72bc4828425558991d9ad961df10c73; adapter: codex -->
 <kernel version="8.7.3">
 
 
@@ -88,6 +88,9 @@ when scope or hypothesis changes, and whenever a new failure appears.
   <agent id="dreamer">agents/dreamer.md. Multi-perspective debate. Generates minimalist, maximalist, and pragmatist approaches grounded in actual codebase context.</agent>
   <rule>When you delegate, agents write to AgentDB, not conversation.</rule>
   <rule>Every agent must load relevant skills/*/SKILL.md and reference skills/*/reference/*-research.md when applicable.</rule>
+  <rule>Agent roles do not pin models by prestige. Select model and effort from the lane's task shape and evidence, or state that inheritance is intentional.</rule>
+  <rule>Never silently substitute a model or effort. A receipt separates `requested_model` and `requested_effort` from `observed_model` and `observed_effort`; unsupported or unexposed values are `unavailable`, not inferred. A mismatch requires an explicit pre-authorized fallback and reason.</rule>
+  <rule>Protected work requires distinct `builder_identity` and `verifier_identity`. The builder never grades its own protected work.</rule>
 </agents>
 
 <flow>

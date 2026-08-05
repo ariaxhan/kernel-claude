@@ -3,8 +3,9 @@ query: "Claude Code plugin marketplace update behavior for KERNEL 7.23.0 to 8.0.
 date: 2026-07-10
 ttl: 30
 status: verified
+type: note
+created: 2026-07-10
 ---
-
 # KERNEL 8.0.0 user-upgrade audit
 
 ## Release decision

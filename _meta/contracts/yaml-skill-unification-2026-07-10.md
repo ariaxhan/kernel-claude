@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-07-10
+---
+
 # CONTRACT: yaml-skill-unification | 2026-07-10
 
 **GOAL:** Remove the kernel commands layer; every kernel operation is a first-class skill.

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Graduation Push — April 2026
 
 Experiments EXP-190 through EXP-194. Five RISING hypotheses tested for graduation readiness.

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-25
+---
+
 # Token Budget Quick Reference
 
 ## Current State

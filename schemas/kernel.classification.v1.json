@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kernel.classification/v1",
+  "title": "KERNEL adaptive execution classification",
+  "description": "The compact, inspectable representation of how KERNEL chose to execute a task. Three independent dimensions: domain, work_shape, safety. Surfaced to the user only via /kernel:status or /kernel:why.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "domain", "work_shape", "safety", "confidence", "reasons"],
+  "properties": {
+    "schema": {
+      "const": "kernel.classification/v1"
+    },
+    "domain": {
+      "description": "What kind of work this is. Selects which domain pack loads. Extensible: a domain pack may register additional values.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "work_shape": {
+      "description": "How much process the work needs. Independent of domain and safety.",
+      "enum": ["direct", "gated", "trajectory"]
+    },
+    "safety": {
+      "description": "How much protection the work needs. Independent of domain and work_shape.",
+      "enum": ["normal", "protected"]
+    },
+    "confidence": {
+      "description": "Classifier confidence in this routing. Below low_confidence_floor the router must state its uncertainty rather than proceed silently.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "reasons": {
+      "description": "The evidence that drove classification. Each entry must be a checkable observation about the task, not a restatement of the verdict.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "escalate_when": {
+      "description": "Named conditions that move work to a heavier shape or higher safety. Required for direct and gated shapes: a mode with no exit condition cannot adapt.",
+      "type": "array",
+      "maxItems": 6,
+      "items": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "deescalate_when": {
+      "description": "Named conditions that move work to a lighter shape. Required for gated and trajectory: a mode with no exit is a permanent operating system, which the brief rejects.",
+      "type": "array",
+      "maxItems": 6,
+      "items": { "type": "string", "minLength": 3, "maxLength": 200 }
+    },
+    "packs": {
+      "description": "Domain packs actually loaded for this task. Empty means universal core only.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }
+    },
+    "verification": {
+      "description": "Domain-appropriate verification method chosen. Never hardcoded to 'tests'.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method"],
+      "properties": {
+        "method": { "type": "string", "minLength": 3 },
+        "instrument": { "type": "string" },
+        "seeded_failure_verified": { "type": "boolean" }
+      }
+    },
+    "ownership": {
+      "description": "Writer/resource ownership claim for collision prevention.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundary"],
+      "properties": {
+        "boundary": { "type": "string", "minLength": 1 },
+        "role": { "enum": ["writer", "reader"] },
+        "holder": { "type": "string" }
+      }
+    },
+    "announced": {
+      "description": "Whether this classification was surfaced to the user. True only when the mode materially changed behavior.",
+      "type": "boolean"
+    },
+    "transient": {
+      "description": "True when this request is a lightweight subrequest that must not replace the active live-run route.",
+      "type": "boolean"
+    },
+    "transitions": {
+      "description": "Append-only record of mode changes during the task, with the evidence that triggered each.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "trigger"],
+        "properties": {
+          "from": { "type": "string" },
+          "to": { "type": "string" },
+          "trigger": { "type": "string", "minLength": 3 },
+          "direction": { "enum": ["escalate", "deescalate"] },
+          "user_initiated": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "R1: any shape that is not the heaviest must name how it escalates. Without an exit condition a mode cannot adapt to reality.",
+      "if": { "properties": { "work_shape": { "enum": ["direct", "gated"] } } },
+      "then": { "required": ["escalate_when"], "properties": { "escalate_when": { "minItems": 1 } } }
+    },
+    {
+      "$comment": "R2: any shape heavier than direct must name how it de-escalates. Trajectory is a gear, not the permanent operating system.",
+      "if": { "properties": { "work_shape": { "enum": ["gated", "trajectory"] } } },
+      "then": { "required": ["deescalate_when"], "properties": { "deescalate_when": { "minItems": 1 } } }
+    },
+    {
+      "$comment": "R3: protected work must name the verification that distinguishes the safe outcome from the unsafe one.",
+      "if": { "properties": { "safety": { "const": "protected" } } },
+      "then": { "required": ["verification"] }
+    }
+  ]
+}

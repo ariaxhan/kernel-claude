@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -18,6 +19,35 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 GEN = ROOT / "scripts" / "generate-governance.py"
 SYNC = ROOT / "scripts" / "governance-sync.py"
+KM = ROOT / "orchestration" / "manifest" / "kernel-manifest"
+RECEIPT_FIXTURE = ROOT / "tests" / "fixtures" / "manifests" / "receipt-example.json"
+
+
+def routing_policy_errors(source, orchestration):
+    combined = source + "\n" + orchestration
+    errors = []
+    required = (
+        "requested_model",
+        "observed_model",
+        "requested_effort",
+        "observed_effort",
+        "builder_identity",
+        "verifier_identity",
+        "Never silently substitute",
+        "builder never grades its own protected work",
+    )
+    for phrase in required:
+        if phrase not in combined:
+            errors.append(f"missing routing invariant: {phrase}")
+    contradictions = (
+        r"silent substitution is allowed",
+        r"builder may grade (?:its|their) own protected work",
+        r"FALLBACK to an alternative\s+model/provider",
+    )
+    for pattern in contradictions:
+        if re.search(pattern, combined, re.IGNORECASE):
+            errors.append(f"contradictory routing policy: {pattern}")
+    return errors
 
 
 def load_sync_module():
@@ -70,6 +100,32 @@ class GeneratorTests(unittest.TestCase):
     def test_checked_in_outputs_are_current(self):
         result = run(sys.executable, str(GEN), "--check")
         self.assertEqual(0, result.returncode, result.stderr)
+
+    def test_routing_policy_is_truthful_and_not_prestige_pinned(self):
+        source = (ROOT / "governance/kernel.md.tmpl").read_text()
+        orchestration = (ROOT / "skills/orchestration/SKILL.md").read_text()
+        self.assertEqual([], routing_policy_errors(source, orchestration))
+        self.assertIn("pre-authorized fallback", orchestration)
+
+        pinned = []
+        for path in sorted((ROOT / "agents").glob("*.md")):
+            if re.search(r"^model:\s*", path.read_text(), re.MULTILINE):
+                pinned.append(path.relative_to(ROOT).as_posix())
+        self.assertEqual(
+            [], pinned,
+            "generic agent roles must inherit or be routed explicitly, not pin prestige models",
+        )
+
+    def test_contradictory_policy_seeds_are_rejected(self):
+        source = (ROOT / "governance/kernel.md.tmpl").read_text()
+        orchestration = (ROOT / "skills/orchestration/SKILL.md").read_text()
+        for contradiction in (
+            "Silent substitution is allowed when a provider is unavailable.",
+            "The builder may grade its own protected work.",
+            "FALLBACK to an alternative\nmodel/provider on provider failure.",
+        ):
+            with self.subTest(contradiction=contradiction):
+                self.assertTrue(routing_policy_errors(source, orchestration + contradiction))
 
     def test_unknown_missing_and_unused_tokens_fail(self):
         with tempfile.TemporaryDirectory() as td:
@@ -262,6 +318,135 @@ class GeneratorTests(unittest.TestCase):
             self.assertEqual(0, run(sys.executable, str(GEN), "--root", str(root)).returncode)
             shell = (root / "hooks/scripts/session-start.sh").read_text()
             self.assertIn(r"literal \\1 \\g<1>", shell)
+
+
+class RoutingReceiptTests(unittest.TestCase):
+    ROUTING_FIELDS = (
+        "requested_model",
+        "observed_model",
+        "requested_effort",
+        "observed_effort",
+        "fallback_authorized",
+        "safety",
+        "builder_identity",
+        "verifier_identity",
+    )
+
+    def receipt(self):
+        return json.loads(RECEIPT_FIXTURE.read_text())
+
+    def validate_receipt(self, receipt):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "receipt.json"
+            path.write_text(json.dumps(receipt))
+            return run(str(KM), "validate", str(path), cwd=Path(td))
+
+    def checkpoint(self, root):
+        path = root / "checkpoint.json"
+        path.write_text(json.dumps({
+            "schema": "kernel.checkpoint/v1",
+            "identity": {"name": "routing-test", "created": "2026-07-31T12:00:00Z"},
+            "provenance": {"branch": "main", "commit": "abc", "dirty": False},
+            "task": {"goal": "compile a receipted route"},
+            "steps_completed": [],
+            "pending_steps": [],
+            "resume": {"position": "p", "next_operation": "n"},
+            "context": {"policy": {"mode": "advisory"}},
+        }))
+        return path
+
+    def test_receipt_requires_every_routing_and_actor_field(self):
+        baseline = self.receipt()
+        for field in self.ROUTING_FIELDS:
+            with self.subTest(field=field):
+                receipt = dict(baseline)
+                receipt.pop(field)
+                result = self.validate_receipt(receipt)
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn(f"missing required key '{field}'", result.stdout)
+
+    def test_silent_substitution_seed_is_rejected(self):
+        receipt = self.receipt()
+        receipt.update({
+            "requested_model": "gpt-5.6-sol",
+            "observed_model": "gpt-5.6-terra",
+            "requested_effort": "low",
+            "observed_effort": "low",
+            "fallback_authorized": False,
+        })
+        result = self.validate_receipt(receipt)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("model/effort mismatch requires a pre-authorized fallback", result.stdout)
+
+    def test_protected_self_grade_seed_is_rejected(self):
+        receipt = self.receipt()
+        receipt.update({
+            "safety": "protected",
+            "builder_identity": "agent-1",
+            "verifier_identity": "agent-1",
+        })
+        result = self.validate_receipt(receipt)
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("protected receipt requires distinct builder and verifier identities", result.stdout)
+
+    def test_compile_emits_unavailable_defaults_and_enforces_protected_identity(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            checkpoint = self.checkpoint(root)
+            default = run(str(KM), "compile", str(checkpoint), cwd=root)
+            self.assertEqual(0, default.returncode, default.stderr)
+            receipt = json.loads(default.stdout)
+            for field in ("requested_model", "observed_model", "requested_effort",
+                          "observed_effort", "builder_identity", "verifier_identity"):
+                self.assertEqual("unavailable", receipt[field])
+            self.assertFalse(receipt["fallback_authorized"])
+            self.assertEqual("normal", receipt["safety"])
+
+            requested_only = run(
+                str(KM), "compile", str(checkpoint),
+                "--requested-model", "gpt-5.6-sol",
+                "--requested-effort", "low",
+                cwd=root,
+            )
+            self.assertEqual(0, requested_only.returncode, requested_only.stderr)
+            requested_receipt = json.loads(requested_only.stdout)
+            self.assertEqual("gpt-5.6-sol", requested_receipt["requested_model"])
+            self.assertEqual("unavailable", requested_receipt["observed_model"])
+            self.assertEqual("low", requested_receipt["requested_effort"])
+            self.assertEqual("unavailable", requested_receipt["observed_effort"])
+
+            silent = run(
+                str(KM), "compile", str(checkpoint),
+                "--requested-model", "gpt-5.6-sol",
+                "--observed-model", "gpt-5.6-terra",
+                cwd=root,
+            )
+            self.assertNotEqual(0, silent.returncode)
+            self.assertIn(
+                "model/effort mismatch requires a pre-authorized fallback",
+                silent.stdout,
+            )
+
+            protected = run(
+                str(KM), "compile", str(checkpoint),
+                "--requested-model", "gpt-5.6-sol",
+                "--observed-model", "gpt-5.6-terra",
+                "--requested-effort", "high",
+                "--observed-effort", "high",
+                "--fallback-authorized", "true",
+                "--fallback-reason", "pre-authorized provider fallback",
+                "--safety", "protected",
+                "--builder-identity", "builder-1",
+                "--verifier-identity", "verifier-2",
+                cwd=root,
+            )
+            self.assertEqual(0, protected.returncode, protected.stderr)
+            protected_receipt = json.loads(protected.stdout)
+            self.assertEqual("gpt-5.6-sol", protected_receipt["requested_model"])
+            self.assertEqual("gpt-5.6-terra", protected_receipt["observed_model"])
+            self.assertTrue(protected_receipt["fallback_authorized"])
+            self.assertEqual("builder-1", protected_receipt["builder_identity"])
+            self.assertEqual("verifier-2", protected_receipt["verifier_identity"])
 
 
 class SyncTests(unittest.TestCase):

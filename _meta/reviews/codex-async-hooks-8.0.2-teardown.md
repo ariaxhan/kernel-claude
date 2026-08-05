@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-07-11
+---
+
 # Tear Down: Codex async hooks compatibility for 8.0.2
 
 reviewed: 2026-07-11T10:02:00-07:00

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-07-17
+---
+
 # Code review: Kernel 8.5.0 marketing + recall
 
 Verdict: APPROVE

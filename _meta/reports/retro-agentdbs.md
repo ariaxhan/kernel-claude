@@ -5,8 +5,10 @@ scope: our4cuts, modelmind, kernel-claude, augur, ariacam
 mode: read-only investigation
 author: retrospective agent
 purpose: feed kernel retrieval-system redesign
+type: note
+status: active
+created: 2026-06-06
 ---
-
 # AgentDB Retrospective — Retrieval Gaps Across 5 Project DBs
 
 Read-only analysis of the five `_meta/agentdb/agent.db` learning stores. Goal: find

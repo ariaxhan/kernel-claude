@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-04
+---
+
 # Claude Code & Prompt Engineering Best Practices 2026
 
 **Research Date:** 2026-04-04  

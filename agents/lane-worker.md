@@ -6,7 +6,6 @@ description: >
   progress to AgentDB, and never commits. Spawned only when an orchestrator has genuinely
   independent, file-disjoint work to run concurrently.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
 ---
 
 <agent id="lane-worker">

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Retrieval Strategy Tournament — H078
 
 **Date:** 2026-04-07

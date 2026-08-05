@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Plugin Gap Experiment — Design Document
 
 **Date**: 2026-04-07

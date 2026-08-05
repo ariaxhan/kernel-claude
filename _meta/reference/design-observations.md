@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-03
+---
+
 # Design Observations
 
 Comprehensive analysis of frontend design patterns distilled into reusable aesthetics.

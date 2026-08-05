@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-04
+---
+
 # Decision Heuristics
 
 **Type:** reference | **Load:** on-demand

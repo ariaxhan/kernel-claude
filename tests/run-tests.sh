@@ -241,6 +241,35 @@ test_agentdb_prune() {
   assert_contains "$output" "Kept 5"
 }
 
+test_agentdb_prune_all_compacts_free_pages() {
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  agentdb init >/dev/null
+  sqlite3 "$db" "CREATE TABLE prune_probe(payload BLOB); INSERT INTO prune_probe VALUES(zeroblob(6291456)); DROP TABLE prune_probe;"
+  local before
+  before=$(sqlite3 "$db" "PRAGMA freelist_count;")
+  [ "$before" -gt 0 ] || { echo "test setup failed to create free pages"; return 1; }
+
+  local output
+  output=$(agentdb prune all 5)
+  assert_contains "$output" "Compacted database." || return 1
+  assert_equals "0" "$(sqlite3 "$db" "PRAGMA freelist_count;")" "prune all must VACUUM reclaimable pages"
+}
+
+test_preflight_accepts_append_only_history_growth() {
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  agentdb init >/dev/null
+  sqlite3 "$db" "INSERT INTO memory_events(event_id, kind, payload) VALUES('large-history-probe', 'retrieved', hex(zeroblob(3145728)));"
+
+  local output
+  output=$(agentdb preflight 2>&1)
+  if [[ "$output" == *"preflight:bloat"* ]]; then
+    echo "append-only memory history must not be reported as reclaimable bloat"
+    echo "$output"
+    return 1
+  fi
+  assert_contains "$output" "preflight:ok" "healthy append-only growth should pass preflight"
+}
+
 test_agentdb_query() {
   agentdb init >/dev/null
   agentdb learn pattern "test query" >/dev/null
@@ -2340,23 +2369,47 @@ test_release_docs_explain_vaults_continuity_boundary() {
 }
 
 test_release_metadata_and_inventory_are_truthful() {
-  local skills agents
+  # This test previously pinned "35 skills / 15 agents / version 8.5.0" as literals and
+  # discarded the exit status of every check except the last grep, so it reported PASS
+  # while the real inventory was 26 and 10 and the version was 8.7.2. A test named
+  # "truthful" was the thing hiding the untruth. Two changes prevent a repeat:
+  #   1. Every assertion now gates (|| fail=1) and the function returns the accumulated
+  #      status, so a failure cannot be masked by a later passing command.
+  #   2. Nothing is pinned. The documented counts are PARSED OUT of the docs and compared
+  #      against the filesystem, so the test cannot go stale at release time and cannot be
+  #      satisfied by a number that is merely self-consistent and wrong.
+  local fail=0 skills agents doc_skills doc_agents qs_skills
   skills=$(find "$PLUGIN_ROOT/skills" -mindepth 2 -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
   agents=$(find "$PLUGIN_ROOT/agents" -maxdepth 1 -name '*.md' ! -name README.md | wc -l | tr -d ' ')
-  assert_equals 35 "$skills" "skill inventory"
-  assert_equals 15 "$agents" "agent inventory"
-  python3 - "$PLUGIN_ROOT" <<'PY'
+
+  doc_skills=$(grep -ohE 'There are [0-9]+ skills' "$PLUGIN_ROOT/docs/daily-use.md" | grep -oE '[0-9]+' | head -1)
+  doc_agents=$(grep -ohE '[0-9]+ specialized Claude Code agent definitions' "$PLUGIN_ROOT/docs/daily-use.md" | grep -oE '[0-9]+' | head -1)
+  qs_skills=$(grep -ohE 'Codex loads all [0-9]+ KERNEL skills' "$PLUGIN_ROOT/docs/QUICKSTART.md" | grep -oE '[0-9]+' | head -1)
+
+  [ -n "$doc_skills" ] || { echo "  FAIL: docs/daily-use.md states no skill count"; fail=1; }
+  [ -n "$doc_agents" ] || { echo "  FAIL: docs/daily-use.md states no agent count"; fail=1; }
+  [ -n "$qs_skills" ]  || { echo "  FAIL: docs/QUICKSTART.md states no skill count"; fail=1; }
+
+  assert_equals "$skills" "$doc_skills" "documented skill count vs skills/*/SKILL.md on disk" || fail=1
+  assert_equals "$agents" "$doc_agents" "documented agent count vs agents/*.md on disk" || fail=1
+  assert_equals "$skills" "$qs_skills"  "QUICKSTART skill count vs skills/*/SKILL.md on disk" || fail=1
+
+  # Version is checked for internal consistency, not pinned to a literal, so a release bump
+  # does not require editing this test.
+  python3 - "$PLUGIN_ROOT" <<'PY' || fail=1
 import json, pathlib, sys
-r=pathlib.Path(sys.argv[1])
-p=json.loads((r/'.claude-plugin/plugin.json').read_text())
-m=json.loads((r/'.claude-plugin/marketplace.json').read_text())['plugins'][0]
-assert p['version']==m['version']=='8.5.0'
-for x in (p,m):
-    assert '35 engineering skills' in x['description'] and '8.5.0' in x['description']
+r = pathlib.Path(sys.argv[1])
+p = json.loads((r / '.claude-plugin/plugin.json').read_text())
+m = json.loads((r / '.claude-plugin/marketplace.json').read_text())['plugins'][0]
+if p['version'] != m['version']:
+    print(f"  FAIL: plugin.json {p['version']} != marketplace.json {m['version']}")
+    sys.exit(1)
 PY
-  grep -q 'There are 35 skills and 15 specialized Claude Code agent definitions' "$PLUGIN_ROOT/README.md" || return 1
-  grep -q 'Codex loads all 35 KERNEL skills' "$PLUGIN_ROOT/docs/QUICKSTART.md" || return 1
-  grep -q 'validate | latest | divergence | preflight | compile | resume | activate | deactivate' "$PLUGIN_ROOT/README.md"
+
+  grep -q 'validate | latest | divergence | preflight | compile | resume | activate | deactivate' \
+    "$PLUGIN_ROOT/README.md" || { echo "  FAIL: README.md is missing the state-command list"; fail=1; }
+
+  return $fail
 }
 
 test_dreamer_agent_exists_with_frontmatter() {
@@ -4820,6 +4873,11 @@ test_landing_page_composes_marketing_and_frontend() {
   grep -q 'project.*configured.*deploy' "$skill"
 }
 
+test_kernel9_python_suite() {
+  cd "$PLUGIN_ROOT" || return 1
+  python3 -m unittest discover -s tests/kernel9 -p 'test_*.py'
+}
+
 test_migration_kernel_taxonomy_blocks_parse() {
   # every SKILL.md frontmatter parses and carries kernel.kind
   python3 - "$PLUGIN_ROOT" <<'PYINNER'
@@ -4965,6 +5023,8 @@ run_test_suite() {
       run_test "read-start with data" test_agentdb_read_start_with_data
       run_test "status shows counts" test_agentdb_status
       run_test "prune keeps N" test_agentdb_prune
+      run_test "prune all compacts free pages" test_agentdb_prune_all_compacts_free_pages
+      run_test "preflight accepts append-only history growth" test_preflight_accepts_append_only_history_growth
       run_test "query works" test_agentdb_query
       run_test "recent shows checkpoints" test_agentdb_recent
       run_test "error records tool errors" test_agentdb_error
@@ -5303,6 +5363,9 @@ run_test_suite() {
       run_test "frontend is context-led, not a house style" test_frontend_is_context_led_not_house_style
       run_test "landing-page composes marketing + frontend" test_landing_page_composes_marketing_and_frontend
       ;;
+    kernel9)
+      run_test "Kernel 9 router, packs, and host adapters" test_kernel9_python_suite
+      ;;
     recall)
       run_test "recall dedups identical insights" test_recall_dedups_identical_insights
       run_test "recall hides human_only learnings" test_recall_hides_human_only
@@ -5448,6 +5511,7 @@ main() {
     run_test_suite "entropy_adaptive"
     run_test_suite "read_start"
     run_test_suite "marketing"
+    run_test_suite "kernel9"
     run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"

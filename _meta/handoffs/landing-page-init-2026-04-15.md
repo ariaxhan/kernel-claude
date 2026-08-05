@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-15
+---
+
 # CONTEXT HANDOFF — Landing Page Init Setup
 
 Generated: 2026-04-15

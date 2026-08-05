@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-24
+---
+
 # Tear Down: Issue Plan #19-#34
 reviewed: 2026-03-24T00:35:00Z
 tier: 3

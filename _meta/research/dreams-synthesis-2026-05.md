@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-14
+---
+
 # Dreams folder synthesis for kernel-claude updates — 2026-05-14
 
 Sourced from /Users/ariaxhan/Vaults/CodingVault/dreams/. 18 of 25 graduated docs post-date the last plugin update (Apr 7, 2026).

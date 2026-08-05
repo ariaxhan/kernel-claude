@@ -6,6 +6,11 @@ Subcommands:
   latest     [--dir D ...]                newest manifest path across dirs (default: _meta/checkpoints _meta/handoffs)
   divergence <file>                       live git state vs manifest provenance (exit 1 on hard divergence)
   compile    <file> [--bundle-out P] [--receipt-out P] [--agentdb-tokens N]
+                    [--requested-model ID] [--observed-model ID]
+                    [--requested-effort E] [--observed-effort E]
+                    [--fallback-authorized true|false] [--fallback-reason TEXT]
+                    [--safety normal|protected]
+                    [--builder-identity ID] [--verifier-identity ID]
                                           resolve context selectors, emit kernel.context-receipt/v1 JSON
   activate   <file>                       write _meta/.active-manifest.json (arms guard-context hook)
   deactivate [--receipt P]                merge _meta/.context-ledger into receipt, remove state files
@@ -241,6 +246,45 @@ def validate_invariants(manifest, errors):
                 errors.append(f"workflow.invalidation_rules[{i}].invalidates: unknown phase '{target}'")
 
 
+def validate_context_receipt_invariants(receipt, errors):
+    unavailable = "unavailable"
+    routed_strings = (
+        "requested_model", "observed_model", "requested_effort", "observed_effort",
+        "builder_identity", "verifier_identity",
+    )
+    for field in routed_strings:
+        value = receipt.get(field)
+        if isinstance(value, str) and not value.strip():
+            errors.append(f"{field}: must be a non-empty value or '{unavailable}'")
+
+    mismatches = []
+    for requested, observed in (
+        ("requested_model", "observed_model"),
+        ("requested_effort", "observed_effort"),
+    ):
+        want, got = receipt.get(requested), receipt.get(observed)
+        if (isinstance(want, str) and isinstance(got, str)
+                and unavailable not in (want, got) and want != got):
+            mismatches.append((requested, observed))
+
+    authorized = receipt.get("fallback_authorized")
+    reason = receipt.get("fallback_reason")
+    if mismatches and authorized is not True:
+        errors.append("routing: model/effort mismatch requires a pre-authorized fallback")
+    if authorized is True:
+        if not mismatches:
+            errors.append("routing: fallback_authorized requires an observed model or effort mismatch")
+        if not isinstance(reason, str) or not reason.strip() or reason == unavailable:
+            errors.append("routing: fallback_authorized requires a non-empty fallback_reason")
+
+    if receipt.get("safety") == "protected":
+        builder = receipt.get("builder_identity")
+        verifier = receipt.get("verifier_identity")
+        if (not isinstance(builder, str) or not isinstance(verifier, str)
+                or unavailable in (builder, verifier) or builder == verifier):
+            errors.append("protected receipt requires distinct builder and verifier identities")
+
+
 def schema_for(manifest):
     sid = manifest.get("schema", "")
     fname = sid.replace("/", ".") + ".schema.json"  # kernel.handoff/v1 -> kernel.handoff.v1.schema.json
@@ -259,6 +303,8 @@ def validate_manifest(manifest, path):
     if manifest.get("schema") in ("kernel.handoff/v1", "kernel.checkpoint/v1"):
         validate_selectors(manifest, errors)
         validate_invariants(manifest, errors)
+    elif manifest.get("schema") == "kernel.context-receipt/v1":
+        validate_context_receipt_invariants(manifest, errors)
     if errors:
         for e in errors:
             print(f"INVALID {e}")
@@ -533,11 +579,33 @@ def cmd_compile(args):
     path = args[0]
     bundle_out = receipt_out = None
     agentdb_tokens = 0
+    routing = {
+        "requested_model": "unavailable",
+        "observed_model": "unavailable",
+        "requested_effort": "unavailable",
+        "observed_effort": "unavailable",
+        "fallback_authorized": False,
+        "safety": "normal",
+        "builder_identity": "unavailable",
+        "verifier_identity": "unavailable",
+    }
+    routing_options = {
+        "--requested-model": "requested_model",
+        "--observed-model": "observed_model",
+        "--requested-effort": "requested_effort",
+        "--observed-effort": "observed_effort",
+        "--fallback-reason": "fallback_reason",
+        "--safety": "safety",
+        "--builder-identity": "builder_identity",
+        "--verifier-identity": "verifier_identity",
+    }
     i = 1
     seen = set()
     while i < len(args):
         a = args[i]
-        if a not in ("--bundle-out", "--receipt-out", "--agentdb-tokens"):
+        allowed = {"--bundle-out", "--receipt-out", "--agentdb-tokens",
+                   "--fallback-authorized", *routing_options}
+        if a not in allowed:
             die(1, f"compile: unknown option or argument '{a}'")
         if a in seen:
             die(1, f"compile: duplicate option '{a}'")
@@ -556,6 +624,12 @@ def cmd_compile(args):
                 die(1, f"compile: --agentdb-tokens requires an integer, got '{value}'")
             if agentdb_tokens < 0:
                 die(1, "compile: --agentdb-tokens must be >= 0")
+        elif a == "--fallback-authorized":
+            if value not in ("true", "false"):
+                die(1, "compile: --fallback-authorized requires true or false")
+            routing["fallback_authorized"] = value == "true"
+        else:
+            routing[routing_options[a]] = value
         i += 2
 
     manifest = load_and_validate(path)
@@ -612,6 +686,7 @@ def cmd_compile(args):
         "manifest": path,
         "manifest_sha256": hashlib.sha256(open(cli_path(path), "rb").read()).hexdigest(),
         "bundle_sha256": hashlib.sha256(bundle.encode()).hexdigest(),
+        **routing,
         "created": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "manifest_tokens": manifest_tokens,
         "project_instructions_tokens": project_instr,
@@ -628,6 +703,7 @@ def cmd_compile(args):
         "selections": selections,
         "loads_beyond_manifest": [],
     }
+    validate_manifest(receipt, "generated context receipt")
     out = dump_json(receipt)
     if bundle_out:
         with open(cli_path(bundle_out), "w", encoding="utf-8") as f:

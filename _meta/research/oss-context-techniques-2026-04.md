@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # OSS Context Management Techniques — Source Code Analysis
 
 **Date:** 2026-04-07

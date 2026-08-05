@@ -1,0 +1,41 @@
+{
+  "name": "kernel",
+  "version": "8.7.3",
+  "description": "KERNEL classifies each task by domain, work shape, and safety level, then loads only the guidance that classification requires. Ordinary work runs with no ceremony; protected work gets externally enforced safety checks; genuinely iterative work gets a feedback loop. Durable memory, bounded resume manifests, and destructive-operation guards are included and work without any external directory tree.",
+  "author": {
+    "name": "Aria Han",
+    "url": "https://github.com/ariaxhan"
+  },
+  "homepage": "https://github.com/ariaxhan/kernel-claude",
+  "repository": "https://github.com/ariaxhan/kernel-claude",
+  "license": "MIT",
+  "keywords": [
+    "adaptive-execution",
+    "agentdb",
+    "memory",
+    "safety",
+    "orchestration",
+    "handoff",
+    "methodology"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "KERNEL",
+    "shortDescription": "Adaptive execution: the smallest process that can safely do the job",
+    "longDescription": "KERNEL classifies each task by domain, work shape, and safety level, then loads only the guidance that classification requires. Ordinary work runs with no ceremony; protected work gets externally enforced safety checks; genuinely iterative work gets a feedback loop. Durable memory, bounded resume manifests, and destructive-operation guards are included and work without any external directory tree.",
+    "developerName": "Aria Han",
+    "category": "Engineering",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
+    "websiteURL": "https://github.com/ariaxhan/kernel-claude",
+    "brandColor": "#111111",
+    "defaultPrompt": [
+      "Fix the failing test in this repo.",
+      "Why did you pick that mode?",
+      "Use less process for this one."
+    ]
+  }
+}

@@ -8,12 +8,12 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
             "timeout": 30,
-            "statusMessage": "Loading AgentDB context..."
+            "statusMessage": "Loading KERNEL context..."
           },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autopush.sh install",
-          "timeout": 15
+            "timeout": 15
           },
           {
             "type": "command",
@@ -50,12 +50,12 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-structure.sh",
-          "timeout": 5
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/warn-hardcoded.sh",
-          "timeout": 5
+            "timeout": 5
           }
         ]
       },
@@ -99,12 +99,12 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/log-write.sh",
-          "timeout": 5
+            "timeout": 5
           },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/validate-json-schema.sh",
-          "timeout": 5
+            "timeout": 5
           }
         ]
       }
@@ -116,7 +116,7 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/capture-error.sh",
-          "timeout": 5
+            "timeout": 5
           }
         ]
       }
@@ -125,6 +125,11 @@
       {
         "matcher": "",
         "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/route-request.sh",
+            "timeout": 5
+          },
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-compact-restore.sh",
@@ -154,7 +159,7 @@
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-end.sh",
             "timeout": 210,
-            "statusMessage": "Running tests + cleaning up session..."
+            "statusMessage": "Closing session..."
           }
         ]
       }

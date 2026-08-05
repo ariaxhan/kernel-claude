@@ -5,7 +5,6 @@ description: >
   conventions, identifies risk zones. Spawned by orchestrator on first
   interaction with unfamiliar codebase or when discovery is needed.
 tools: Read, Bash, Grep, Glob
-model: haiku
 ---
 
 <agent id="scout">

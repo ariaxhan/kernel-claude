@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-10
+---
+
 # AI Landing Page Failure Modes: Research & Prevention
 
 **Research Date:** 2026-04-10  

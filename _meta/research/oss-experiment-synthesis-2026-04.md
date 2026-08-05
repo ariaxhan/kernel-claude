@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # OSS Experiment Synthesis — Consolidated Hypotheses
 
 **Date:** 2026-04-07

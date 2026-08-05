@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-12
+---
+
 # Reply Draft v4: Stanley Context Vault Discussion
 
 ---

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-07-15
+---
+
 # Tear Down: KERNEL 8.1.4 Stop hook
 
 reviewed: 2026-07-15T21:45:00Z

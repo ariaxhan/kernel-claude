@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Coordination Failure in Multi-Agent Systems: External Validation
 
 **Date:** 2026-04-07

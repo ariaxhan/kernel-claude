@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Domain Coupling & Emergent Pattern Analysis
 
 **Date:** 2026-04-07  

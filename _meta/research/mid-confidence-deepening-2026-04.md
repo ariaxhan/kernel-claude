@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Mid-Confidence Hypothesis Deepening (2026-04-07)
 
 7 hypotheses at 0.25-0.5 confidence, each with 1 prior experiment. Added EXP-200 through EXP-206.

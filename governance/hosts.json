@@ -1,0 +1,91 @@
+{
+  "_comment": [
+    "Canonical host capability source for KERNEL 9. Every generated adapter,",
+    "manifest, hook binding, and capability claim derives from this file, so a",
+    "host's real support surface is stated exactly once.",
+    "",
+    "supported_lifecycle_events is a claim about the HOST, not about Kernel.",
+    "It must be backed by the evidence named in verified_by. Adding an event",
+    "here without evidence is how a false parity claim gets shipped."
+  ],
+
+  "kernel_lifecycle_bindings": [
+    "SessionStart",
+    "SessionEnd",
+    "PreToolUse",
+    "PostToolUse",
+    "PostToolUseFailure",
+    "UserPromptSubmit",
+    "PreCompact",
+    "PermissionRequest"
+  ],
+
+  "hosts": {
+    "claude": {
+      "display_name": "Claude Code",
+      "instruction_file": "CLAUDE.md",
+      "invoke_prefix": "/kernel:",
+      "plugin_manifest": ".claude-plugin/plugin.json",
+      "marketplace_manifest": ".claude-plugin/marketplace.json",
+      "hooks_file": "hooks/hooks.json",
+      "skills_declaration": "implicit",
+      "supported_lifecycle_events": [
+        "SessionStart",
+        "SessionEnd",
+        "PreToolUse",
+        "PostToolUse",
+        "PostToolUseFailure",
+        "UserPromptSubmit",
+        "PreCompact",
+        "PermissionRequest",
+        "Stop",
+        "SubagentStop",
+        "Notification"
+      ],
+      "verified_by": "Claude Code 2.1.220 plugin runtime; bindings exercised by tests/run-tests.sh lifecycle suite",
+      "verified_on": "2026-07-29"
+    },
+
+    "codex": {
+      "display_name": "Codex",
+      "instruction_file": "AGENTS.md",
+      "invoke_prefix": "$kernel:",
+      "plugin_manifest": ".codex-plugin/plugin.json",
+      "marketplace_manifest": ".agents/plugins/marketplace.json",
+      "hooks_file": "hooks.json",
+      "skills_declaration": "explicit",
+      "supported_lifecycle_events": [
+        "SessionStart",
+        "SessionEnd",
+        "PreToolUse",
+        "PostToolUse",
+        "UserPromptSubmit",
+        "PreCompact",
+        "PermissionRequest",
+        "Stop",
+        "SubagentStop"
+      ],
+      "unsupported_lifecycle_events": {
+        "PostToolUseFailure": "Not implemented by Codex 0.146.0. Exact symbol search over the shipped binary returns zero occurrences, while every lifecycle event Kernel binds on this host returns 17 or more. Kernel's capture-error.sh is therefore not bound on this host, and error capture degrades to what PostToolUse can observe."
+      },
+      "verified_by": "codex-cli 0.146.0; symbol extraction from the shipped binary; native manifest shape read from installed OpenAI plugins (visualize, codex-security); plugin-level hooks.json shape read from installed figma and replayio plugins",
+      "verified_on": "2026-07-29"
+    }
+  },
+
+  "interface": {
+    "displayName": "KERNEL",
+    "shortDescription": "Adaptive execution: the smallest process that can safely do the job",
+    "longDescription": "KERNEL classifies each task by domain, work shape, and safety level, then loads only the guidance that classification requires. Ordinary work runs with no ceremony; protected work gets externally enforced safety checks; genuinely iterative work gets a feedback loop. Durable memory, bounded resume manifests, and destructive-operation guards are included and work without any external directory tree.",
+    "developerName": "Aria Han",
+    "category": "Engineering",
+    "capabilities": ["Read", "Write", "Interactive"],
+    "websiteURL": "https://github.com/ariaxhan/kernel-claude",
+    "brandColor": "#111111",
+    "defaultPrompt": [
+      "Fix the failing test in this repo.",
+      "Why did you pick that mode?",
+      "Use less process for this one."
+    ]
+  }
+}

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-07-17
+---
+
 # Kernel marketing + recall contract
 
 Goal: make frontend work context-led, add reusable marketing/client judgment, keep explicit landing-page shipping simple, and make AgentDB recall easier to use well.

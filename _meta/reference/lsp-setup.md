@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-08
+---
+
 # LSP Tool Setup
 
 **Purpose:** 600x faster code navigation. LSP understands your code structure; grep just searches text.

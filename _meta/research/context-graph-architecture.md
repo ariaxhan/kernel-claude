@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-12
+---
+
 # Context Graph Architecture Research
 
 **Date:** 2026-03-12

@@ -10,8 +10,9 @@ sources:
   - _meta/research/plugin-improvement-2026-05/email-intel.md
   - _meta/research/plugin-improvement-2026-05/git-sync-design.md
   - _meta/research/plugin-improvement-2026-05/cross-repo-patterns.md
+status: active
+created: 2026-05-28
 ---
-
 # kernel-claude Plugin Improvement Roadmap — 2026-05-28
 
 ## Executive Summary

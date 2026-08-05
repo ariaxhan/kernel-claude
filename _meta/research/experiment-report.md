@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # Experiment Report: Hypothesis Validation
 
 **Date:** 2026-04-07

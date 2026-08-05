@@ -50,18 +50,25 @@ When killing a stuck session, kill its whole process pool, not just the visible 
 </single_coordinator>
 
 <worker_model_doctrine>
-Cheap models (haiku/codex-tier) are safe ONLY for total-spec execution and mechanical
-evidence-only verification: zero delegated decisions, a pre-verified guide, every step
-spelled out. If you are tempted to write "use your judgment" in a cheap-model prompt,
-it is a strong-model task. The coordinator re-runs gates itself; lane reports are
-claims, not facts, and are wrong roughly 1 in 5. Adjudicate on evidence you reproduce.
+Select model and effort from the lane's task shape and measured evidence, never from
+role prestige. Mechanical total-spec execution with deterministic checks can use the
+lowest setting proven adequate. Ambiguous judgment or a measured miss justifies more
+effort; protected work requires a fresh independent verifier. The lane contract records
+the requested model and effort, whether inheritance is intentional, and the escalation
+condition. A prompt that says "use your judgment" is evidence of ambiguity, not a license
+to choose a prestige model by role. Receipts keep `requested_model` and `requested_effort`
+separate from `observed_model` and `observed_effort`. Unsupported or unexposed values are
+`unavailable`, never inferred. Protected receipts require distinct `builder_identity` and
+`verifier_identity`; the builder never grades its own protected work. The coordinator
+reproduces acceptance evidence.
 </worker_model_doctrine>
 
 <fault_tolerance>
-1. RETRY transient failures with backoff, max 3. 2. FALLBACK to an alternative
-model/provider on provider failure. 3. CLASSIFY the failure type before choosing
-recovery. 4. CHECKPOINT state to AgentDB at every boundary so a respawn resumes
-instead of restarting.
+1. RETRY transient failures with backoff, max 3. 2. CLASSIFY the failure before choosing
+recovery. 3. Never silently substitute model, effort, or provider. Use an alternative only
+when the contract names a pre-authorized fallback; record the original request, the failure,
+and the observed fallback identity separately. Otherwise stop and re-contract. 4. CHECKPOINT
+state to AgentDB at every boundary so a respawn resumes instead of restarting.
 </fault_tolerance>
 
 <worktree_safety>

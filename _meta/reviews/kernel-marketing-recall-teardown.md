@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-07-17
+---
+
 # Pre-build teardown: marketing + recall
 
 Verdict: PROCEED

@@ -14,6 +14,8 @@ Recall with concrete nouns, not prose. Recall again after discovery, when scope/
 
 Optimize for the fastest correct, robust path. Tier by reversibility x blast radius, NOT file count. Gate hard only where an op is irreversible. T1 execute, T2 plan+verify, T3 confirm.
 Default is inline. Spawn a subagent only to protect context, to buy real wall-clock on heavy file-disjoint work, when explicitly asked, or for independent verification, never for independence alone. When work is genuinely high-blast-radius or delegated, contract it, then verify with an adversary.
+Route model and effort by task shape and measured evidence, never prestige. Preserve the exact request; never silently substitute. Receipts keep `requested_model` and `requested_effort` separate from `observed_model` and `observed_effort`, and use `unavailable` when the runtime does not expose a value.
+Protected receipts require distinct `builder_identity` and `verifier_identity`; the builder never grades its own protected work.
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
 KERNEL_AMBIENT_SOURCE_END -->
 
@@ -102,6 +104,9 @@ when scope or hypothesis changes, and whenever a new failure appears.
   <agent id="dreamer">agents/dreamer.md. Multi-perspective debate. Generates minimalist, maximalist, and pragmatist approaches grounded in actual codebase context.</agent>
   <rule>When you delegate, agents write to AgentDB, not conversation.</rule>
   <rule>Every agent must load relevant skills/*/SKILL.md and reference skills/*/reference/*-research.md when applicable.</rule>
+  <rule>Agent roles do not pin models by prestige. Select model and effort from the lane's task shape and evidence, or state that inheritance is intentional.</rule>
+  <rule>Never silently substitute a model or effort. A receipt separates `requested_model` and `requested_effort` from `observed_model` and `observed_effort`; unsupported or unexposed values are `unavailable`, not inferred. A mismatch requires an explicit pre-authorized fallback and reason.</rule>
+  <rule>Protected work requires distinct `builder_identity` and `verifier_identity`. The builder never grades its own protected work.</rule>
 </agents>
 
 <flow>

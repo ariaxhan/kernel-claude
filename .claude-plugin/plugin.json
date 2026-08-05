@@ -1,7 +1,7 @@
 {
   "name": "kernel",
   "version": "8.7.3",
-  "description": "Durable project memory, bounded JSON handoffs, engineering skills, and independent verification for Claude Code and Codex. KERNEL 8.7.2 adds a recall relevance floor (min-matched-terms, on by default): a candidate must match >=2 distinct query terms, cutting OR-noise false hits 81% to 25% while keeping recall@5 at 1.000. 8.7.0 added curated recall alias expansion (0.724 to 1.000 recall@5 on paraphrase queries).",
+  "description": "KERNEL classifies each task by domain, work shape, and safety level, then loads only the guidance that classification requires. Ordinary work runs with no ceremony; protected work gets externally enforced safety checks; genuinely iterative work gets a feedback loop. Durable memory, bounded resume manifests, and destructive-operation guards are included and work without any external directory tree.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"
@@ -10,14 +10,12 @@
   "repository": "https://github.com/ariaxhan/kernel-claude",
   "license": "MIT",
   "keywords": [
+    "adaptive-execution",
     "agentdb",
-    "orchestration",
-    "multi-agent",
-    "tdd",
-    "security",
-    "code-review",
-    "validation",
     "memory",
+    "safety",
+    "orchestration",
+    "handoff",
     "methodology"
   ]
 }

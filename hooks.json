@@ -1,0 +1,156 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/session-start.sh",
+            "timeout": 30,
+            "statusMessage": "Loading KERNEL context..."
+          },
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/autopush.sh install",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/knowledge-graph.sh install",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/guard-bash.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/guard-config.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/detect-secrets.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/validate-structure.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/warn-hardcoded.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Read|Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/guard-context.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/auto-approve-safe.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "WebFetch|WebSearch|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/scan-output.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/log-write.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/validate-json-schema.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/route-request.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/post-compact-restore.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/pre-compact-commit.sh",
+            "timeout": 30,
+            "statusMessage": "Saving context snapshot..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CODEX_PLUGIN_ROOT}/hooks/scripts/session-end.sh",
+            "timeout": 210,
+            "statusMessage": "Closing session..."
+          }
+        ]
+      }
+    ]
+  }
+}

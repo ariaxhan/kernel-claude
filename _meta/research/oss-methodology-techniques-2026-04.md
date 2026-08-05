@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-04-07
+---
+
 # OSS Methodology Techniques — GSD-2 & Headroom
 
 **Date:** 2026-04-07

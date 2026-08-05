@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-14
+---
+
 # kernel-claude state audit — 2026-05-14
 
 ## TL;DR

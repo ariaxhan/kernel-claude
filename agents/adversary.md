@@ -2,7 +2,6 @@
 name: adversary
 description: QA - assume broken, find edge cases, prove with evidence
 tools: Read, Bash, Grep, Glob
-model: opus
 ---
 
 <agent id="adversary">

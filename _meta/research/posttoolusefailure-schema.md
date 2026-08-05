@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-31
+---
+
 # PostToolUseFailure Hook JSON Schema
 
 **Date:** 2026-03-30  

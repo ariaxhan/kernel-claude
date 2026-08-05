@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-05-28
+---
+
 # Skills SKILL.md Audit — 2026-05-28
 
 **Files reviewed:** 20  

@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-01-17
+---
+
 # KERNEL Plugin Learnings
 
 tokens: ~200 | type: log | append-only

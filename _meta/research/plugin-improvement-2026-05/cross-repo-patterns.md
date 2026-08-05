@@ -10,8 +10,9 @@ surveyed_repos:
   - our4cuts
   - kernel_systems
   - kernel-cursor
+status: active
+created: 2026-05-28
 ---
-
 # Cross-Repo Pattern Survey — kernel-claude plugin
 
 Surveyed 2026-05-28. Focus: `.claude/` configs, hooks, scripts, git automation, db patterns, design enforcement, worktree usage. Each finding is classified as **PROMOTE** (bring into kernel-claude) or **RECONCILE** (drift kernel must address).

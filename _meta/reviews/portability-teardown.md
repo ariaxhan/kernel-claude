@@ -1,3 +1,9 @@
+---
+type: note
+status: active
+created: 2026-03-13
+---
+
 # Tear Down: Cross-Machine Portability
 
 reviewed: 2026-03-13
