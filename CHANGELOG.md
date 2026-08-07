@@ -2,6 +2,18 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [Unreleased]
+
+### Added
+- frontend: motion-language shelf (`skills/frontend/motion/`) — 8 orthogonal motion lenses
+  (kinetic-type, haunted-machine, cursor-field, real-weight, one-surface, liquid-material,
+  held-breath, grand-tour) composable with the 9 mood variants; each carries a dominant
+  idea, signature move families, a binding prohibition ledger, and a reduced-motion degrade.
+- frontend: vetted component-sources registry
+  (`skills/frontend/reference/component-sources.md`) with per-library licenses, a
+  do-not-use ledger, and the never-ship-stock rule.
+- frontend: tournament exploration guidance and motion-language routing in SKILL.md.
+
 ## [9.0.0] - 2026-08-05
 
 Adaptive execution. KERNEL now classifies each task by domain, work shape, and safety, and

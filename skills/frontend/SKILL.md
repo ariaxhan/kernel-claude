@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: "Context-led frontend design and UI implementation. Derives art direction from the product, audience, brand, content, and existing design system; prevents generic AI defaults without imposing a Kernel house style. Triggers: frontend, ui, styling, css, visual, theme, component, layout, responsive, accessibility, design system, aesthetic, abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal."
+description: "Context-led frontend design and UI implementation. Derives art direction from the product, audience, brand, content, and existing design system; prevents generic AI defaults without imposing a Kernel house style. Triggers: frontend, ui, styling, css, visual, theme, component, layout, responsive, accessibility, design system, aesthetic, animation, motion, abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal, kinetic-type, haunted-machine, cursor-field, real-weight, one-surface, liquid-material, held-breath, grand-tour."
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 kernel:
   kind: methodology
@@ -51,6 +51,28 @@ Load `variants/{name}.md` when the user names one or when exploration genuinely 
 Variants describe mood, never mandatory components, fonts, palettes, effects, or layouts.
 </variants>
 
+<motion-languages>
+Optional motion lenses, orthogonal to mood variants: kinetic-type, haunted-machine,
+cursor-field, real-weight, one-surface, liquid-material, held-breath, grand-tour.
+Load `motion/{name}.md` when the user names one, when animation is central to the ask, or
+when exploration genuinely benefits. A motion language defines how the page moves — its
+dominant idea, signature move families, prohibitions, and reduced-motion degrade — never
+specific components, libraries, durations, or easing values.
+
+Compose freely: any mood x any motion language, either alone, or neither. Context-fit
+always wins over any lens; a lens bends to the content, never the reverse. Each language's
+prohibition list is binding while that language is active — bans differentiate more than
+moves do. All languages inherit the reduced-motion hard bar: every design must survive
+with its motion stripped.
+</motion-languages>
+
+<exploration>
+When the brief is open and distinctiveness matters, run a small tournament: generate 2-3
+divergent interpretations of the same mood x motion pick (or different picks), compare
+rendered results, fork the winner. A lens is a direction vector, not a template — two runs
+of the same pick on different products should rhyme, never match.
+</exploration>
+
 <hard-bars>
 - Hierarchy: the primary action and reading order are obvious without explanation.
 - Responsive: content fits and remains usable at the project breakpoints; touch targets are
@@ -98,6 +120,10 @@ problem first and re-check. Never claim visual completion without seeing the ren
 
 <reference>
 Read `skills/frontend/reference/design-research.md` when deeper rationale is useful.
+Read `skills/frontend/reference/component-sources.md` before pulling any third-party
+animated component or effect: it lists vetted open-source libraries, per-library licenses,
+a do-not-use ledger, and the binding rule — pull the primitive, restyle it to the active
+direction, never ship it stock.
 </reference>
 
 <on_complete>
