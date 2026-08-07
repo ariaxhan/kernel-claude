@@ -1,6 +1,6 @@
 {
   "name": "kernel-marketplace",
-  "description": "Adaptive execution: the smallest process that can safely do the job",
+  "description": "Fences, not leashes: enforced boundaries for Claude Code in auto mode",
   "owner": {
     "name": "Aria Han"
   },
@@ -8,8 +8,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Adaptive execution: the smallest process that can safely do the job",
-      "version": "9.1.0"
+      "description": "Fences, not leashes: enforced boundaries for Claude Code in auto mode",
+      "version": "9.1.1"
     }
   ]
 }

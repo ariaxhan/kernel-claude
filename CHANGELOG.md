@@ -2,6 +2,18 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.1.1] - 2026-08-07
+
+### Changed
+- Repositioned all public copy around fences-not-leashes: README hero, plugin and
+  marketplace descriptions. Headline: enforced boundaries over per-action approval, with
+  cited evidence (Anthropic auto-mode data; arXiv:2606.05647). Memory recast as "fences
+  that learn." Copy only; no mechanism changes. Rationale and gap map:
+  docs/positioning-fences-not-leashes.md.
+
+### Fixed
+- CI: shellcheck SC2209 in tests/test-guard-config-launchagents.sh.
+
 ## [9.1.0] - 2026-08-07
 
 ### Added

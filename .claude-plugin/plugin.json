@@ -1,7 +1,7 @@
 {
   "name": "kernel",
-  "version": "9.1.0",
-  "description": "KERNEL classifies each task by domain, work shape, and safety level, then loads only the guidance that classification requires. Ordinary work runs with no ceremony; protected work gets externally enforced safety checks; genuinely iterative work gets a feedback loop. Durable memory, bounded resume manifests, and destructive-operation guards are included and work without any external directory tree.",
+  "version": "9.1.1",
+  "description": "KERNEL fences your Claude Code agent instead of leashing it. Destructive commands are blocked by hooks, not approved by tired humans; irreversible operations require a one-time token only a human can open; independent verifiers check finished work without seeing the builder's reasoning; every claim carries a receipt. And the fences learn: mistakes a session survives become durable memory that blocks them next time. Review outcomes, not keystrokes.",
   "author": {
     "name": "Aria Han",
     "url": "https://github.com/ariaxhan"

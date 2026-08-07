@@ -1,11 +1,27 @@
 # KERNEL
 
-A Claude Code plugin that gives your coding sessions a memory that survives them, resumable
-state, and guards that stop irreversible commands before they run.
+**Stop approving everything your AI does. It's making you less safe.**
 
-For people running Claude Code on real repositories who want yesterday's context back
-tomorrow. Not for you if you want an autonomous agent, or a replacement for tests, review,
-and reading the diff.
+Auto mode is the default now, and the data behind that decision is brutal: humans reviewing
+per-action permission prompts caught dangerous commands 13.6% of the time; automated checks
+caught 89%. People approve 97% of prompts. Attention decays to ~5% blocking after fifty
+prompts. Per-action approval is a leash held by someone who stopped looking.
+([Anthropic's numbers](https://claude.com/blog/auto-mode-default-in-claude-code); the
+[academic result](https://arxiv.org/abs/2606.05647) is worse — 94% of developers miss
+deliberate agent sabotage, and 56% accept it even after a warning.)
+
+KERNEL is the other model: fences. The agent runs free inside enforced boundaries — hooks
+that block destructive commands outright rather than warning about them, irreversible
+operations gated behind a one-time token only a human can open, independent verifier agents
+that never saw the builder's reasoning, and receipts for every claim. You review outcomes,
+not keystrokes.
+
+And the fences learn: every mistake a session survives is written to a memory that outlives
+it, so yesterday's near-miss is tomorrow's blocked command.
+
+For people running Claude Code in auto mode on real repositories. Not for you if you want
+an autonomous agent with no boundaries, or a replacement for tests, review, and reading
+the diff.
 
 ## Install
 
