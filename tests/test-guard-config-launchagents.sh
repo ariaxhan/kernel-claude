@@ -27,7 +27,7 @@ mkdir -p "$PROJ"
 trap 'rm -rf "$(dirname "$PROJ")"' EXIT
 
 # Assembled from parts so this file does not itself trip the curl-pipe-shell bash guard.
-C=curl; PIPE='|'; SH=sh; B=base64; DASHD='-d'
+C='curl'; PIPE='|'; SH='sh'; B='base64'; DASHD='-d'
 
 check() { # expected(ALLOW|BLOCK) content path label
   local out rc got
