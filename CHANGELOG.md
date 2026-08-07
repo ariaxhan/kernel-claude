@@ -2,7 +2,7 @@
 
 All notable changes to KERNEL are documented in this file.
 
-## [Unreleased]
+## [9.1.0] - 2026-08-07
 
 ### Added
 - frontend: motion-language shelf (`skills/frontend/motion/`) — 8 orthogonal motion lenses
