@@ -198,6 +198,13 @@ ambiguous: assume higher. File count is only a weak hint, never the trigger.
   Use AskUserQuestion when: tier classification is borderline (e.g., 2-3 files but complex coupling)
   Ask: "Scoped to {N} files — tier {X}. Confirm tier, or should I treat as tier {X+1}?"
   Options: confirm tier {X}, bump to tier {X+1}
+
+  When the request itself is underspecified (any GOAL/CONSTRAINTS/INPUTS/OUTPUTS/DONE-WHEN
+  field unknowable), run the structured interview from skills/build/SKILL.md "The
+  interview" BEFORE scoping: batched AskUserQuestion rounds over intent, implementation
+  forks, veto-risk UX, edge behavior, and tradeoffs. Bounded choices only; open-ended
+  direction stays prose. Answers are quoted into the spec/commission so each decision
+  carries its authority.
 </ask_user>
 </step>
 

@@ -26,6 +26,12 @@ Load `skills/marketing-site/SKILL.md` and `skills/frontend/SKILL.md` before writ
 Use answers already present in the request/repository. Resolve only what materially changes
 the build: audience, desired action, offer/proof, brand/assets, required content/legal pages,
 real CTA destination, domain, and deploy target. Never invent brand facts or proof.
+
+For the unresolved inputs, run a structured interview with the AskUserQuestion tool
+(batched, up to 4 questions per round, recommended option first where evidence supports
+one) instead of guessing or asking loose prose questions. Bounded choices only; positioning
+and voice discussions stay prose. The interview method: skills/build/SKILL.md "The
+interview".
 </inputs>
 
 <scaffold>
