@@ -18,9 +18,34 @@ paths/symbols or the scope changes. Reference on demand: skills/build/reference/
 ## Goal first
 
 Before touching code, state: GOAL, CONSTRAINTS, INPUTS, OUTPUTS, DONE-WHEN. If any
-field is genuinely unknowable, the feature is underspecified; interview the user and
-write the spec to `_meta/plans/` before implementing. State the DONE-WHEN criteria at
-the start of the session, not the end.
+field is genuinely unknowable, the feature is underspecified; run the interview below
+and write the spec to `_meta/plans/` before implementing. State the DONE-WHEN criteria
+at the start of the session, not the end.
+
+## The interview
+
+When a feature is underspecified, interview the user with the AskUserQuestion tool
+rather than guessing or asking one vague open question. Cover, in order of leverage:
+
+1. Intent: which of 2-3 plausible readings of the request is meant.
+2. Implementation shape: the genuine forks (storage, framework, integration boundary)
+   where the user's answer changes the build.
+3. UI/UX: only the decisions the user would veto if guessed wrong.
+4. Edge cases and failure behavior: what should happen when input is empty, huge,
+   concurrent, or malicious.
+5. Tradeoffs: name the axis (speed vs completeness, flexibility vs simplicity) and let
+   the user place the slider.
+
+Rules, enforced by taste:
+- Interviews are for bounded choices with real options. Open-ended strategy and design
+  direction stay prose conversation, never option polls.
+- Every question must change what gets built; if all answers lead to the same code,
+  don't ask.
+- Offer a recommended option first when the evidence supports one.
+- Batch related questions (the tool takes up to 4); one interview beats five
+  interruptions.
+- The answers land in the spec at `_meta/plans/<feature>.md` (or the active commission),
+  quoted, so the authority behind each decision is traceable.
 
 ## Research cache
 
