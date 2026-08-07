@@ -347,8 +347,16 @@ _kernel_hook_end() {
 # Handles: HTTPS, SSH (git@), SSH (ssh://), with/without .git suffix
 parse_github_remote() {
   local url="$1"
-  echo "$url" | grep -qi "github\.com" || return 0
-  echo "$url" | sed -E 's#^(https?://|git@|ssh://git@)github\.com[:/]##; s/\.git$//'
+  if ! echo "$url" | grep -qi "github\.com"; then
+    # ssh-config host aliases (e.g. git@github-blink:owner/repo.git in multi-account
+    # setups) hide github.com behind the alias; resolve via ssh -G before rejecting.
+    local host resolved
+    host=$(echo "$url" | sed -nE 's#^(ssh://)?(git@)?([^@:/]+)[:/].+#\3#p')
+    [[ -n "$host" ]] || return 0
+    resolved=$(ssh -G "$host" 2>/dev/null | awk '/^hostname /{print $2; exit}')
+    [[ "$resolved" == "github.com" ]] || return 0
+  fi
+  echo "$url" | sed -E 's#^(https?://|ssh://)?(git@)?[^@:/]+[:/]##; s/\.git$//'
 }
 
 # Pure classification, no side effects, fully testable
