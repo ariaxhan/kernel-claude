@@ -2,6 +2,30 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Violation corpus** (`tests/corpus/`): a standing harness proving KERNEL's gates can
+  still refuse things. Three checks, all failing-loud: bidirectional divergence between
+  `hooks/gates.json`, the scripts on disk, and the bindings in `hooks/hooks.json`;
+  must-block/must-allow coverage for every gate; and liveness, which reruns each gate with
+  its declared dependencies stripped from PATH and asserts it matches its declared degraded
+  mode. Runs in CI ahead of the suite. (#173)
+- **Gate registry** (`hooks/gates.json`): every hook script declared with its class, events,
+  external dependencies, and degraded mode. Coverage derives from this file, so a gate added
+  without a row fails the harness rather than being silently skipped.
+- Degraded modes are now declared per gate, not implied: `fail-closed`, `fail-open-loud`,
+  `fail-closed-when-armed`, `fail-abstain`. Detecting that a check could not run is not
+  enough - the direction has to be a decision.
+
+### Fixed
+- **`guard-bash` failed dark.** The destructive-command guard warned and exited 0 when `jq`
+  was missing, so the most important fence in KERNEL allowed every command whenever one
+  binary was absent. It now fails closed, with an explicit `KERNEL_GUARD_BASH_DEGRADED_OK=1`
+  escape hatch. Found by the corpus harness on its first run and confirmed by hand.
+- `scan-output` switched its injection tripwire off silently when `python3` was missing; it
+  now warns. Post-hoc scanning cannot refuse, but it must never be quiet about being off.
+
 ## [9.1.2] - 2026-08-08
 
 ### Added

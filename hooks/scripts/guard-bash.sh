@@ -42,8 +42,14 @@
 INPUT=$(cat)
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo "guard-bash: warning -- jq not found, destructive-command guard is degraded (install jq)." >&2
-  exit 0
+  # Fail CLOSED. Without a parser this guard cannot tell `ls` from a recursive
+  # delete, and kernel's own rule is "when the scanner fails: block". Warning and
+  # allowing turned the single most important fence into decor whenever jq went
+  # missing -- caught by tests/corpus/run-corpus.py on its first run.
+  echo "BLOCKED: destructive-command guard cannot run (jq not found), so no Bash command can be checked." >&2
+  echo "  Install jq (brew install jq), then retry. Set KERNEL_GUARD_BASH_DEGRADED_OK=1 to accept an unguarded session." >&2
+  [ "${KERNEL_GUARD_BASH_DEGRADED_OK:-0}" = "1" ] && exit 0
+  exit 2
 fi
 
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')

@@ -1886,12 +1886,17 @@ test_log_write_multifile_and_json_roundtrip() {
 }
 
 test_critical_guard_scripts_unchanged_for_820() {
+  # Pins detect silent tampering with the four gates that can refuse an action.
+  # A pin changes only alongside a reviewed change to the guard itself; the
+  # guard-bash pin moved once, when it was changed to fail CLOSED on a missing
+  # jq (it warned and allowed, so the destructive-command fence opened whenever
+  # its parser went missing -- found by tests/corpus/run-corpus.py).
   local expected actual file
   while read -r expected file; do
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-16e5c6d2e357ed225f31c319c4af2a797afd4bcdb85b8cdd01fc874a14b0af18 guard-bash.sh
+79ba520623565a2c5c2daece27eb8a935105ea08ea7e351d63a90947d20e41aa guard-bash.sh
 6a885672ad9f643bc0ac60cc3cfe3f2366a890faaa3a4bee132afb2d99cde731 guard-config.sh
 d3611267b4f135c5b96e8a4a8af60f296b196efc135e3dfbef63d7683065608c detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
@@ -4907,6 +4912,11 @@ test_kernel9_python_suite() {
   python3 -m unittest discover -s tests/kernel9 -p 'test_*.py'
 }
 
+test_violation_corpus() {
+  cd "$PLUGIN_ROOT" || return 1
+  python3 tests/corpus/run-corpus.py
+}
+
 test_migration_kernel_taxonomy_blocks_parse() {
   # every SKILL.md frontmatter parses and carries kernel.kind
   python3 - "$PLUGIN_ROOT" <<'PYINNER'
@@ -5395,6 +5405,9 @@ run_test_suite() {
     kernel9)
       run_test "Kernel 9 router, packs, and host adapters" test_kernel9_python_suite
       ;;
+    corpus)
+      run_test "violation corpus: gates still refuse, and fail as declared" test_violation_corpus
+      ;;
     recall)
       run_test "recall dedups identical insights" test_recall_dedups_identical_insights
       run_test "recall hides human_only learnings" test_recall_hides_human_only
@@ -5541,6 +5554,7 @@ main() {
     run_test_suite "read_start"
     run_test_suite "marketing"
     run_test_suite "kernel9"
+    run_test_suite "corpus"
     run_test_suite "recall"
     run_test_suite "learn"
     run_test_suite "version_sync"
