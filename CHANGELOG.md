@@ -18,6 +18,18 @@ All notable changes to KERNEL are documented in this file.
   `fail-closed-when-armed`, `fail-abstain`. Detecting that a check could not run is not
   enough - the direction has to be a decision.
 
+- **Retirement ledger** (`governance/retirements.jsonl` + `governance/RETIREMENT.md`):
+  removing a mechanism now requires an append-only verdict naming what died, why, what
+  replaced it, and the evidence. Backfilled with the five real retirements the v7-v9
+  archaeology could substantiate, including one recorded in reverse: the spec-interview
+  recipe, lost to erosion and revived in 9.1.2. (#174)
+- **Erosion check** (`scripts/check-orphans.py`): fails when a library function loses its
+  last call site in code without a verdict, and fails again when a baselined orphan heals
+  but its entry is left behind. Tests and docs are deliberately not counted as callers -
+  a suite that greps for a name is asserting wiring, not using it, which is how five
+  stranded functions stayed hidden. Functions named only in agent/skill markdown are
+  reported as prose-wired rather than counted.
+
 ### Fixed
 - **`guard-bash` failed dark.** The destructive-command guard warned and exited 0 when `jq`
   was missing, so the most important fence in KERNEL allowed every command whenever one
