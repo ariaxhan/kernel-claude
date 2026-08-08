@@ -2,6 +2,19 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.1.2] - 2026-08-08
+
+### Added
+- Revived spec-interview recipe in skills/build (lost in the v8 prose rewrite), wired into
+  ingest scoping and landing-page inputs: leverage-ordered AskUserQuestion rounds, bounded
+  choices only, answers quoted into the spec (#168, #172).
+- Three-session execution synthesis (docs/execution-synthesis-2026-08-07.md) grounding the
+  9.2 issue set (#169-#176).
+
+### Fixed
+- Nothing net: #177 (hook root fallback) was merged and fully reverted (#178) after it
+  proved to break harness token substitution; hooks are byte-identical to 9.1.1.
+
 ## [9.1.1] - 2026-08-07
 
 ### Changed
