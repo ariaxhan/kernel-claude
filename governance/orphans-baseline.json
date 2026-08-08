@@ -1,0 +1,83 @@
+{
+  "$note": "Library functions with no CALL SITE IN CODE when scripts/check-orphans.py landed. This is DEBT, not an allowlist: every entry names the issue that will re-wire it or retire it with a verdict in governance/retirements.jsonl. The check fails when the list grows without a decision AND when an entry heals but is left here, so the baseline cannot outlive the debt it records. Mentions in tests and docs are deliberately not counted as callers: a suite that greps for a name is asserting wiring, not using it, and that is precisely how a stranded function hides.",
+  "taken": "2026-08-08",
+  "orphans": [
+    {
+      "function": "kernel_hook_content",
+      "script": "hooks/scripts/common.sh",
+      "state": "candidate-for-retirement",
+      "tracked_by": "#174",
+      "note": "Hook-payload accessor superseded by per-hook jq extraction. Retire with a verdict once confirmed no host adapter needs it."
+    },
+    {
+      "function": "kernel_hook_file_path",
+      "script": "hooks/scripts/common.sh",
+      "state": "candidate-for-retirement",
+      "tracked_by": "#174",
+      "note": "Same family as kernel_hook_content."
+    },
+    {
+      "function": "kernel_semver",
+      "script": "hooks/scripts/common.sh",
+      "state": "candidate-for-retirement",
+      "tracked_by": "#174",
+      "note": "Version comparison helper; the runtime selector does its own comparison. Retire together with kernel_version_lt if that one also loses its caller."
+    },
+    {
+      "function": "update_current_symlink",
+      "script": "hooks/scripts/common.sh",
+      "state": "candidate-for-retirement",
+      "tracked_by": "#174",
+      "note": "Runtime-selection helper superseded by select-runtime.sh. Named only in the changelog and an old review, i.e. history, not wiring."
+    },
+    {
+      "function": "_gh_comment_issue",
+      "script": "hooks/scripts/github-integration.sh",
+      "state": "prose-wired",
+      "tracked_by": "#169",
+      "note": "Named in agents/surgeon.md for checkpoint comments. Same prose-reachability caveat; the signed commission's state-change receipts would give it a real caller."
+    },
+    {
+      "function": "_gh_create_issue",
+      "script": "hooks/scripts/github-integration.sh",
+      "state": "prose-wired",
+      "tracked_by": "#169",
+      "note": "Named in skills/ingest/SKILL.md (tier-2 contract as Issue), so it runs only when an agent follows that prose. #169 decides whether issue-per-commission becomes a real call site."
+    },
+    {
+      "function": "_gh_close_issue",
+      "script": "hooks/scripts/github-integration.sh",
+      "state": "stranded",
+      "tracked_by": "#169",
+      "note": "No code caller and no instruction reference. Closes the issue a contract opened; dead since the commands layer went."
+    },
+    {
+      "function": "_gh_ensure_labels",
+      "script": "hooks/scripts/github-integration.sh",
+      "state": "stranded",
+      "tracked_by": "#169",
+      "note": "Creates the agent/tier labels the issue-per-contract flow needs. Orphaned with that flow; required again if #169 restores issue-per-commission."
+    },
+    {
+      "function": "_gh_post_decision",
+      "script": "hooks/scripts/github-integration.sh",
+      "state": "stranded",
+      "tracked_by": "#169",
+      "note": "Posts decisions to Discussions. Its call sites lived in the commands layer and died with it (c23e6cb). The library still works; nothing calls it."
+    },
+    {
+      "function": "_gh_post_handoff",
+      "script": "hooks/scripts/github-integration.sh",
+      "state": "stranded",
+      "tracked_by": "#169",
+      "note": "Same erosion as _gh_post_decision. #169 decides re-wire vs retire; matra's evidence argues cadence posting stays dead and only state-change receipts return."
+    },
+    {
+      "function": "_gh_post_learning",
+      "script": "hooks/scripts/github-integration.sh",
+      "state": "stranded",
+      "tracked_by": "#169",
+      "note": "Posts learnings to Discussions. matra's evidence argues cadence posting should stay retired and only state-change receipts return; #169 records that verdict either way."
+    }
+  ]
+}

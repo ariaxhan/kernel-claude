@@ -35,6 +35,8 @@ jobs:
         run: jq --version
       - name: Violation corpus (gates must still refuse)
         run: python3 tests/corpus/run-corpus.py
+      - name: Orphaned callers (erosion check)
+        run: python3 scripts/check-orphans.py
       - name: Run test suite
         run: ./tests/run-tests.sh
       - name: Verify generated governance adapters

@@ -4917,6 +4917,27 @@ test_violation_corpus() {
   python3 tests/corpus/run-corpus.py
 }
 
+test_orphan_check() {
+  cd "$PLUGIN_ROOT" || return 1
+  python3 scripts/check-orphans.py
+}
+
+test_retirement_ledger_wellformed() {
+  cd "$PLUGIN_ROOT" || return 1
+  python3 - <<'PYINNER'
+import json, pathlib, sys
+required = {"date", "mechanism", "kind", "why", "replaced_by", "evidence"}
+for i, line in enumerate(pathlib.Path("governance/retirements.jsonl").read_text().splitlines(), 1):
+    if not line.strip():
+        continue
+    entry = json.loads(line)
+    missing = required - set(entry)
+    if missing:
+        sys.exit(f"retirements.jsonl line {i}: missing {sorted(missing)}")
+print("retirement ledger: every verdict names what died, why, and what replaced it")
+PYINNER
+}
+
 test_migration_kernel_taxonomy_blocks_parse() {
   # every SKILL.md frontmatter parses and carries kernel.kind
   python3 - "$PLUGIN_ROOT" <<'PYINNER'
@@ -5407,6 +5428,8 @@ run_test_suite() {
       ;;
     corpus)
       run_test "violation corpus: gates still refuse, and fail as declared" test_violation_corpus
+      run_test "no function lost its last caller without a verdict" test_orphan_check
+      run_test "retirement ledger is well-formed" test_retirement_ledger_wellformed
       ;;
     recall)
       run_test "recall dedups identical insights" test_recall_dedups_identical_insights
