@@ -1,0 +1,309 @@
+{
+  "$schema_note": "Authoritative registry of every hook script KERNEL ships. The violation corpus derives its coverage from this file, and tests/corpus/run-corpus.sh FAILS when this registry and the scripts on disk (or the bindings in hooks/hooks.json) diverge in EITHER direction. A coverage check computed from whatever the harness happens to know about would itself fail open, which is the defect class this whole mechanism exists to kill.",
+  "classes": {
+    "gate": "Can refuse an action (exit 2 / deny / block). Requires corpus coverage: at least one case it must block and one it must allow.",
+    "advisory": "Adds context or records state. Cannot refuse. No corpus coverage required, but its degraded mode is still declared.",
+    "library": "Sourced by other scripts; never bound to an event directly."
+  },
+  "degraded_modes": {
+    "fail-closed": "If the check cannot run (missing dependency, unreadable input), REFUSE the action. Correct for safety gates: a scanner that cannot scan must not wave things through.",
+    "fail-open-loud": "If the check cannot run, allow the action but emit a visible warning to stderr. Correct for narrow or advisory checks where refusing everything would be worse than the risk. Silent fail-open is never a valid declaration.",
+    "not-applicable": "No external dependency whose absence changes the verdict.",
+    "fail-closed-when-armed": "Inert when its trigger state is absent (allow, quietly), and fail-closed once armed. Correct for gates that only govern an opted-in mode; requires a corpus case that arms the gate, or the armed path is never proven.",
+    "fail-abstain": "If the check cannot run, emit NO decision, falling through to normal handling. Correct where the gate's dangerous direction is YES (auto-approval): uncertainty must never become consent."
+  },
+  "hooks": [
+    {
+      "id": "guard-bash",
+      "script": "hooks/scripts/guard-bash.sh",
+      "class": "gate",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Bash",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-closed",
+      "rationale": "Destructive-command guard. Fails closed: without a parser it cannot tell a listing from a recursive delete. Escape hatch KERNEL_GUARD_BASH_DEGRADED_OK=1 is explicit and logged."
+    },
+    {
+      "id": "detect-secrets",
+      "script": "hooks/scripts/detect-secrets.sh",
+      "class": "gate",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-closed",
+      "rationale": "Secret scanner. Deliberately does not source circuit-breaker.sh: a security gate must never auto-disable itself."
+    },
+    {
+      "id": "guard-config",
+      "script": "hooks/scripts/guard-config.sh",
+      "class": "gate",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud",
+      "rationale": "Narrow guard over .claude/ config writes. Refusing every write when jq is absent would halt all work for a narrow risk, so it warns loudly and allows."
+    },
+    {
+      "id": "guard-context",
+      "script": "hooks/scripts/guard-context.sh",
+      "class": "gate",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Read|Grep|Glob",
+      "external_deps": [
+        "jq",
+        "python3"
+      ],
+      "degraded_mode": "fail-closed-when-armed",
+      "rationale": "Enforces an activated manifest's context policy. With no manifest active it is inert by design; once a manifest is active and the pointer cannot be read, it blocks -- a sealed experiment must never silently degrade to unsealed."
+    },
+    {
+      "id": "scan-output",
+      "script": "hooks/scripts/scan-output.sh",
+      "class": "gate",
+      "events": [
+        "PostToolUse"
+      ],
+      "matcher": "WebFetch|WebSearch|mcp__.*",
+      "external_deps": [
+        "python3"
+      ],
+      "degraded_mode": "fail-open-loud",
+      "rationale": "Prompt-injection tripwire over fetched content. Post-hoc, so refusing protects nothing; it must degrade loudly instead of silently."
+    },
+    {
+      "id": "auto-approve-safe",
+      "script": "hooks/scripts/auto-approve-safe.sh",
+      "class": "gate",
+      "events": [
+        "PermissionRequest"
+      ],
+      "matcher": "Bash",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-abstain",
+      "rationale": "Auto-approves demonstrably safe commands. Its dangerous direction is YES, so when it cannot evaluate it emits no decision and the human is asked."
+    },
+    {
+      "id": "validate-structure",
+      "script": "hooks/scripts/validate-structure.sh",
+      "class": "advisory",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "warn-hardcoded",
+      "script": "hooks/scripts/warn-hardcoded.sh",
+      "class": "advisory",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "log-write",
+      "script": "hooks/scripts/log-write.sh",
+      "class": "advisory",
+      "events": [
+        "PostToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "validate-json-schema",
+      "script": "hooks/scripts/validate-json-schema.sh",
+      "class": "advisory",
+      "events": [
+        "PostToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "capture-error",
+      "script": "hooks/scripts/capture-error.sh",
+      "class": "advisory",
+      "events": [
+        "PostToolUseFailure"
+      ],
+      "matcher": "Edit|Write|Bash",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "route-request",
+      "script": "hooks/scripts/route-request.sh",
+      "class": "advisory",
+      "events": [
+        "UserPromptSubmit"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "python3"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "post-compact-restore",
+      "script": "hooks/scripts/post-compact-restore.sh",
+      "class": "advisory",
+      "events": [
+        "UserPromptSubmit"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "sqlite3"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "pre-compact-commit",
+      "script": "hooks/scripts/pre-compact-commit.sh",
+      "class": "advisory",
+      "events": [
+        "PreCompact"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git",
+        "sqlite3"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "session-start",
+      "script": "hooks/scripts/session-start.sh",
+      "class": "advisory",
+      "events": [
+        "SessionStart"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git",
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "session-end",
+      "script": "hooks/scripts/session-end.sh",
+      "class": "advisory",
+      "events": [
+        "SessionEnd"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git",
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "autopush",
+      "script": "hooks/scripts/autopush.sh",
+      "class": "advisory",
+      "events": [
+        "SessionStart"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "knowledge-graph",
+      "script": "hooks/scripts/knowledge-graph.sh",
+      "class": "advisory",
+      "events": [
+        "SessionStart"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "common",
+      "script": "hooks/scripts/common.sh",
+      "class": "library",
+      "events": [],
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "circuit-breaker",
+      "script": "hooks/scripts/circuit-breaker.sh",
+      "class": "library",
+      "events": [],
+      "external_deps": [
+        "python3"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "github-integration",
+      "script": "hooks/scripts/github-integration.sh",
+      "class": "library",
+      "events": [],
+      "external_deps": [
+        "gh"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "test-gate",
+      "script": "hooks/scripts/test-gate.sh",
+      "class": "library",
+      "events": [],
+      "external_deps": [
+        "git"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "scan-output-impl",
+      "script": "hooks/scripts/scan-output.py",
+      "class": "library",
+      "events": [],
+      "external_deps": [],
+      "degraded_mode": "not-applicable"
+    }
+  ]
+}

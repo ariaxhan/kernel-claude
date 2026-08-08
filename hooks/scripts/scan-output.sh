@@ -16,5 +16,10 @@
 # itself (I0.15). Degrades silently if python3 is missing (never breaks the tool
 # loop -- this hook only ever warns).
 
-command -v python3 >/dev/null 2>&1 || exit 0
+if ! command -v python3 >/dev/null 2>&1; then
+  # Allow (post-hoc: the content already arrived, refusing protects nothing) but
+  # never SILENTLY -- a quiet tripwire is indistinguishable from a clean scan.
+  echo "scan-output: warning -- python3 not found, injection tripwire is OFF for this call." >&2
+  exit 0
+fi
 exec python3 "$(dirname "$0")/scan-output.py"

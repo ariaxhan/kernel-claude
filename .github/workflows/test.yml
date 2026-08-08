@@ -33,6 +33,8 @@ jobs:
         run: sqlite3 --version
       - name: Verify jq
         run: jq --version
+      - name: Violation corpus (gates must still refuse)
+        run: python3 tests/corpus/run-corpus.py
       - name: Run test suite
         run: ./tests/run-tests.sh
       - name: Verify generated governance adapters
