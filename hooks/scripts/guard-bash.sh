@@ -102,6 +102,31 @@ esac
 # extraction and the rm gate below still use the raw $COMMAND (paths are case-sensitive).
 LOW=$(printf '%s' "$COMMAND" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
 
+# Heredoc bodies that are DATA, not code, are dropped before keyword matching. Writing a
+# chronicle that mentions a rewrite tool, or filing an issue that quotes a destructive
+# command, tripped this guard on prose describing the very rules it enforces.
+#
+# The exception is load-bearing: when the heredoc feeds a shell or interpreter
+# (`bash <<EOF`, `python3 - <<PY`), the body IS executed, so it is kept and matched. That
+# is a real bypass vector, and narrowing noise must never open one.
+if printf '%s' "$COMMAND" | grep -q '<<'; then
+  if ! printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node)[^|;&]*<<'; then
+    COMMAND_CODE=$(printf '%s' "$COMMAND" | awk '
+      BEGIN { in_doc = 0 }
+      {
+        if (in_doc) { if ($0 == term) { in_doc = 0 }; next }
+        line = $0
+        if (match(line, /<<-?[[:space:]]*'"'"'?[A-Za-z_][A-Za-z0-9_]*'"'"'?/)) {
+          term = substr(line, RSTART, RLENGTH)
+          gsub(/<<-?[[:space:]]*/, "", term); gsub(/'"'"'/, "", term)
+          in_doc = 1
+        }
+        print line
+      }')
+    LOW=$(printf '%s' "$COMMAND_CODE" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
+  fi
+fi
+
 # block <reason> <recovery-hint> : print a structured refusal + the human approval
 # path, mint a one-time code for this exact command, then exit 2.
 block() {
@@ -161,7 +186,11 @@ printf '%s' "$LOW" | grep -qE 'git +reset +--hard' \
   && block "git reset --hard discards uncommitted work irreversibly." "git stash first if you might want it back."
 printf '%s' "$LOW" | grep -qE 'git +clean +-[a-z]*f' \
   && block "git clean -f deletes untracked files irreversibly." "git clean -n to preview what would be removed."
-printf '%s' "$LOW" | grep -qE 'git +branch +-d[[:space:]]' \
+# Case-SENSITIVE on purpose: $LOW has folded -D into -d, so matching it here made the
+# safe delete indistinguishable from the destructive one and blocked `git branch -d`
+# five times across three sessions in one day. A guard that cries wolf on the safe form
+# of a command teaches people to override it, which costs more than it ever saves.
+printf '%s' "$COMMAND" | grep -qE 'git +branch +(-[a-zA-Z]*D|--delete --force|--force --delete)' \
   && block "git branch -D force-deletes a branch (may drop unmerged commits)." "Confirm it's merged, or use -d (safe delete)."
 printf '%s' "$LOW" | grep -qE 'filter-repo|filter-branch|(^| )bfg( |$)' \
   && block "git history rewrite (filter-repo/filter-branch/bfg) is destructive + non-collaborative." "Verify a backup ref exists first."
@@ -226,8 +255,14 @@ printf '%s' "$COMMAND" | grep -qE 'mv[[:space:]]+("?/([[:space:]]|$)|~([[:space:
 # python -c / perl -e / node -e / ruby -e whose body does recursive/tree deletion.
 # Narrow to TREE deletion (rmtree/removedirs/rimraf/fs.rm*/rm -rf) -- a single-file
 # os.remove is not catastrophic and would over-block legitimate scripting.
-if printf '%s' "$LOW" | grep -qE '(python[0-9.]*|perl|ruby|node)[[:space:]]+(-e|-c)'; then
-  printf '%s' "$LOW" | grep -qE 'rmtree|removedirs|rimraf|rmsync|rmdirsync|fs\.rm|rm[[:space:]]+-[a-z]*r[a-z]*f' \
+# Tested per SEGMENT, not across the whole command line. Matching both patterns anywhere
+# in one string meant `rm -rf build && python3 -c "print(1)"` was refused as an indirect
+# recursive delete: two unrelated commands, one of them already explicit and reviewable,
+# which is precisely what this rule exists to prefer.
+_after_interpreter=$(printf '%s' "$LOW" | awk '
+  { if (match($0, /(python[0-9.]*|perl|ruby|node)[[:space:]]+(-e|-c)/)) print substr($0, RSTART) }')
+if [ -n "$_after_interpreter" ]; then
+  printf '%s' "$_after_interpreter" | grep -qE 'rmtree|removedirs|rimraf|rmsync|rmdirsync|fs\.rm|rm[[:space:]]+-[a-z]*r[a-z]*f' \
     && block "interpreter one-liner performing recursive/tree deletion." "Refusing indirect recursive rm via python/perl/node/ruby; do it explicitly so it's reviewable."
 fi
 

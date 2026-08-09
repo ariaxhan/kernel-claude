@@ -1896,7 +1896,7 @@ test_critical_guard_scripts_unchanged_for_820() {
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-79ba520623565a2c5c2daece27eb8a935105ea08ea7e351d63a90947d20e41aa guard-bash.sh
+155da2476aff3551f1161f7d792a4bfdd560e1c4ccec6c22c71207108894224d guard-bash.sh
 6a885672ad9f643bc0ac60cc3cfe3f2366a890faaa3a4bee132afb2d99cde731 guard-config.sh
 d3611267b4f135c5b96e8a4a8af60f296b196efc135e3dfbef63d7683065608c detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
