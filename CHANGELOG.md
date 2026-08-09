@@ -54,6 +54,16 @@ All notable changes to KERNEL are documented in this file.
   does it, after a human reviewed the claim. (#169)
 
 ### Fixed
+- **guard-bash matched guarded commands inside text ARGUMENTS** (#188): a commit message,
+  a lesson recorded with `agentdb learn`, or an issue body that NAMED a destructive command
+  was refused as if it had run one. Reported by a peer session that hit it twice and
+  reworded rather than requesting an override, which is the good outcome and the bad habit.
+  The guard now keeps one "code view" of the command with data removed, and every rule reads
+  it, so the case-sensitive rules and the rest can no longer disagree about what counts as
+  code. The distinguishing signal is the RECEIVING command, never the quoting: an argument
+  to `git commit -m` or `agentdb learn` is data, while an argument to `bash -c` is code and
+  is still matched in full. Known gap, in the safe direction: single-quoted text arguments
+  stay matched.
 - **Three guard-bash false positives** (#175). A fence that refuses ordinary work teaches
   people to override it, so noise is a safety defect, not a cosmetic one. The safe
   merge-checked branch delete was refused because the command was folded to lowercase
