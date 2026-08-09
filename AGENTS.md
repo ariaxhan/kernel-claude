@@ -1,5 +1,5 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: 098a02b0b0709d9b813d5791d9b2ca79ccb3af642182e06e4fc5d6badbdee936; adapter: codex -->
+     source-sha256: b72f6ff7d3e7a9e1f62840c1a1b9edfc0deb1ac3d65e92ebf701f188ec287ee4; adapter: codex -->
 <kernel version="9.1.2">
 
 
@@ -271,6 +271,7 @@ reviewed the claim.</rule>
 
   <skill id="frontend" triggers="UI, frontend, styling, visual">Context-led interface design. Derive art direction from product, audience, brand, content, and the existing design system; mood variants are optional lenses.</skill>
   <skill id="marketing-site" triggers="marketing site, landing page, company website, client website, conversion, positioning, CTA">Honest marketing-site strategy: audience, offer, proof, objections, action, privacy, art direction, and client handoff.</skill>
+  <skill id="human-pass" triggers="testflight, human pass, acceptance test, device test, before we ship, what should I test">Guided acceptance passes for the only verifier that cannot be automated: literal controls, paste-ready inputs, expected outcome per step, worst case first, bundled to one sitting. The recorded verdict is part of done.</skill>
   <skill id="app-dev" triggers="app, mobile, store submission, build, deploy, fastlane">Mobile/web build pipeline: fastlane-first local builds, store submission, pre-submission checklists. EAS only as a stated exception.</skill>
 
   <!-- EXPERIMENTATION -->

@@ -60,9 +60,30 @@ kernel:
      manifest until both schemas can be satisfied.
    - Tag (only if user requested a tagged release): `git tag -l` to avoid clobber → `git tag -a v{X.Y.Z} -m "{summary}"` → `git push origin v{X.Y.Z}`.
 
-6. **Checkpoint**
+6. **Human pass** *(any user-facing release: app build, deploy, anything a person will touch)*
+   - Load `skills/human-pass/SKILL.md` and write the guide for THIS build: literal
+     controls, paste-ready inputs, expected outcome per step, worst case first,
+     bundled to one sitting with the time cost stated.
+   - Hand it over and wait. The build is not shipped, it is awaiting verdict.
+   - (gate: no guide, or no recorded verdict → the release is NOT done. Say
+     "awaiting your pass on <build>", never "shipped". A green pipeline is not a
+     person having used the thing.)
+   - Findings come back as prose; YOU convert them into issues, not the human.
+   - Record the verdict as a state-change receipt on the release issue, naming
+     what it unlocks (next build, submission, deploy promotion).
+
+7. **Checkpoint**
    - `agentdb learn pattern "ship: {branch} {commit_range} {sha_pushed}" "validate=pass review=pass push=ok"`
    - Profile-gated: github-oss/github-production → post PR or release note via gh CLI.
+
+## The verdict is part of done
+
+For anything a person will use, the completion states are ordered: validated,
+merged, deployed, **accepted**. CI proves the first three. Only a human who used
+the build proves the fourth, and only that one predicts whether the release was
+any good: a 15-minute guided pass found five defects that 500+ green tests had
+not, because some properties only exist on the far side of a real screen with
+real data. Report the state you actually reached, by name.
 
 ## Ask-user gates (mandatory pause points)
 
