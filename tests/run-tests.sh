@@ -1668,7 +1668,11 @@ test_hooks_json_schema_valid() {
   [ -f "$hooks_file" ] || { echo "FAIL: hooks.json not found"; return 1; }
 
   # Valid Claude Code hook event names
-  local valid_events="SessionStart PreToolUse PostToolUse PermissionRequest PreCompact SessionEnd PostToolUseFailure Notification UserPromptSubmit"
+  # Stop and SubagentStop were missing here until the chronicle gate needed Stop: the
+  # allowlist had drifted from the events both hosts actually dispatch, so a valid
+  # binding read as invalid. A gate that only covers some of what it claims to cover
+  # is a gap, not a guard.
+  local valid_events="SessionStart PreToolUse PostToolUse PermissionRequest PreCompact SessionEnd PostToolUseFailure Notification UserPromptSubmit Stop SubagentStop"
 
   # Extract all event names from hooks.json
   local events
