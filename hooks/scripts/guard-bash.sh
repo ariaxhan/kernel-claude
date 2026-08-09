@@ -102,6 +102,11 @@ esac
 # extraction and the rm gate below still use the raw $COMMAND (paths are case-sensitive).
 LOW=$(printf '%s' "$COMMAND" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
 
+# The code view: $COMMAND with the parts that are DATA removed. Every rule matches
+# against this or its lowercased twin, never against the raw command, so a rule that
+# needs case sensitivity and a rule that does not cannot disagree about what is code.
+COMMAND_CODE="$COMMAND"
+
 # Heredoc bodies that are DATA, not code, are dropped before keyword matching. Writing a
 # chronicle that mentions a rewrite tool, or filing an issue that quotes a destructive
 # command, tripped this guard on prose describing the very rules it enforces.
@@ -109,9 +114,35 @@ LOW=$(printf '%s' "$COMMAND" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' 
 # The exception is load-bearing: when the heredoc feeds a shell or interpreter
 # (`bash <<EOF`, `python3 - <<PY`), the body IS executed, so it is kept and matched. That
 # is a real bypass vector, and narrowing noise must never open one.
+# Same class, different syntax: a guarded keyword inside a quoted ARGUMENT to a command
+# that consumes text. Recording a lesson, writing a commit message, or filing an issue
+# ABOUT a destructive operation is not performing one, and refusing the description
+# teaches people to reword until the guard shuts up -- a habit that costs more than the
+# noise it removes.
+#
+# The distinguishing signal is the RECEIVING command, never the quoting. An argument to
+# `git commit -m`, `gh issue comment -b`, or `agentdb learn` is data. An argument to
+# `bash -c` or `python3 -c` is code, and those are matched in full, above and below.
+_strip_text_arguments() {
+  printf '%s' "$1" | awk '
+    {
+      line = $0
+      # Drop the quoted payload that follows a text-consuming flag, keeping the command
+      # itself visible so the guard still sees what is being RUN.
+      gsub(/(git[[:space:]]+(commit|tag)[^|;&]*-[a-zA-Z]*m|gh[[:space:]]+[a-z-]+[^|;&]*-[a-zA-Z]*(b|body)|agentdb[[:space:]]+(learn|contract|verdict|write-end)([[:space:]]+[a-z-]+)*)[[:space:]]+"[^"]*"([[:space:]]+"[^"]*")*/, " <text> ", line)
+      print line
+    }'
+}
+if printf '%s' "$COMMAND" | grep -qE '(git[[:space:]]+(commit|tag)|gh[[:space:]]+[a-z-]+|agentdb[[:space:]]+(learn|contract|verdict|write-end))'; then
+  if ! printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node)[[:space:]]+-[ce]'; then
+    COMMAND_CODE=$(_strip_text_arguments "$COMMAND_CODE")
+    LOW=$(printf '%s' "$COMMAND_CODE" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
+  fi
+fi
+
 if printf '%s' "$COMMAND" | grep -q '<<'; then
   if ! printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node)[^|;&]*<<'; then
-    COMMAND_CODE=$(printf '%s' "$COMMAND" | awk '
+    COMMAND_CODE=$(printf '%s' "$COMMAND_CODE" | awk '
       BEGIN { in_doc = 0 }
       {
         if (in_doc) { if ($0 == term) { in_doc = 0 }; next }
@@ -179,7 +210,7 @@ while IFS= read -r _seg; do
       block "Force push to main/master not allowed." \
             "Push to a feature branch and open a PR, or force-push a non-default branch."
   fi
-done < <(echo "$COMMAND" | tr ';|&' '\n')
+done < <(echo "$COMMAND_CODE" | tr ';|&' '\n')
 
 # --- Other git history/state destruction (reset --hard, clean -f, branch -D, rewrite) ---
 printf '%s' "$LOW" | grep -qE 'git +reset +--hard' \
@@ -190,7 +221,7 @@ printf '%s' "$LOW" | grep -qE 'git +clean +-[a-z]*f' \
 # safe delete indistinguishable from the destructive one and blocked `git branch -d`
 # five times across three sessions in one day. A guard that cries wolf on the safe form
 # of a command teaches people to override it, which costs more than it ever saves.
-printf '%s' "$COMMAND" | grep -qE 'git +branch +(-[a-zA-Z]*D|--delete --force|--force --delete)' \
+printf '%s' "$COMMAND_CODE" | grep -qE 'git +branch +(-[a-zA-Z]*D|--delete --force|--force --delete)' \
   && block "git branch -D force-deletes a branch (may drop unmerged commits)." "Confirm it's merged, or use -d (safe delete)."
 printf '%s' "$LOW" | grep -qE 'filter-repo|filter-branch|(^| )bfg( |$)' \
   && block "git history rewrite (filter-repo/filter-branch/bfg) is destructive + non-collaborative." "Verify a backup ref exists first."

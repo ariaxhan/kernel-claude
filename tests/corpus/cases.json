@@ -42,6 +42,18 @@
     "INTERPRETER_TREE_DELETE": [
       "python3 -c \"import shutil; shutil.rm",
       "tree('/data')\""
+    ],
+    "COMMIT_MSG_NAMING_GUARDED_OP": [
+      "git commit -m \"fix: stop the drop table users path from running\""
+    ],
+    "LEARN_NAMING_GUARDED_OP": [
+      "agentdb learn gotcha \"drop table users wipes data with no rollback\" \"evidence\""
+    ],
+    "SHELL_C_REAL_COMMAND": [
+      "bash -c \"git reset --hard origin/main\""
+    ],
+    "COMMIT_THEN_REAL_COMMAND": [
+      "git commit -m \"wip\" && git reset --hard HEAD~3"
     ]
   },
   "cases": [
@@ -323,6 +335,54 @@
       },
       "input": {
         "hook_event_name": "Stop"
+      }
+    },
+    {
+      "id": "guard-bash/allows-commit-message-naming-a-guarded-op",
+      "gate": "guard-bash",
+      "expect": "allow",
+      "why": "Describing a destructive operation is not performing one. Refusing the description teaches people to reword until the guard shuts up, which is a worse habit than the noise it removes.",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "{{COMMIT_MSG_NAMING_GUARDED_OP}}"
+        }
+      }
+    },
+    {
+      "id": "guard-bash/allows-learn-string-naming-a-guarded-op",
+      "gate": "guard-bash",
+      "expect": "allow",
+      "why": "Recording a lesson about a destructive command is the behaviour the memory protocol asks for; the guard blocked it twice in one day on a peer session.",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "{{LEARN_NAMING_GUARDED_OP}}"
+        }
+      }
+    },
+    {
+      "id": "guard-bash/blocks-real-command-inside-shell-c",
+      "gate": "guard-bash",
+      "expect": "block",
+      "why": "The bypass the text-argument fix must not open: an argument to a shell is CODE, and the distinguishing signal is the receiving command, never the quoting.",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "{{SHELL_C_REAL_COMMAND}}"
+        }
+      }
+    },
+    {
+      "id": "guard-bash/blocks-real-command-alongside-a-commit-message",
+      "gate": "guard-bash",
+      "expect": "block",
+      "why": "Stripping the message must not blind the guard to a real destructive command in the same line.",
+      "input": {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "{{COMMIT_THEN_REAL_COMMAND}}"
+        }
       }
     }
   ]
