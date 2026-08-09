@@ -46,6 +46,13 @@ All notable changes to KERNEL are documented in this file.
   stranded functions stayed hidden. Functions named only in agent/skill markdown are
   reported as prose-wired rather than counted.
 
+### Removed
+- Discussions cadence posting (`_gh_post_learning`, `_gh_post_decision`, `_gh_post_handoff`)
+  and `_gh_close_issue`, each with a verdict in `governance/retirements.jsonl`. Their call
+  sites died with the commands layer months ago and nobody noticed, which is the measurement:
+  nobody was reading them. Nothing auto-closes an issue now; a merged PR's Closes reference
+  does it, after a human reviewed the claim. (#169)
+
 ### Fixed
 - **Three guard-bash false positives** (#175). A fence that refuses ordinary work teaches
   people to override it, so noise is a safety defect, not a cosmetic one. The safe

@@ -2777,15 +2777,25 @@ test_github_integration_has_profile_gate() {
 }
 
 test_github_integration_has_issue_functions() {
-  grep -q "_gh_create_issue" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" &&
-  grep -q "_gh_comment_issue" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" &&
-  grep -q "_gh_close_issue" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+  local lib="$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+  grep -q "_gh_create_issue" "$lib" &&
+  grep -q "_gh_comment_issue" "$lib" &&
+  # Retired in #169 with a verdict: nothing auto-closes an issue, a merged PR's
+  # Closes reference does it after a human reviewed the claim. Asserted ABSENT so
+  # the retirement cannot quietly reverse.
+  ! grep -q "^_gh_close_issue()" "$lib"
 }
 
 test_github_integration_has_discussion_functions() {
-  grep -q "_gh_post_discussion" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" &&
-  grep -q "_gh_post_session_summary" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" &&
-  grep -q "_gh_post_learning" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+  local lib="$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
+  grep -q "_gh_post_discussion" "$lib" &&
+  grep -q "_gh_post_session_summary" "$lib" &&
+  # State-change receipts replaced cadence posting (#169). The landing receipt must
+  # exist; the three cadence posters must not. Their call sites had been dead for
+  # months while these very greps kept passing, which is why presence alone was
+  # never proof of anything.
+  grep -q "^_gh_post_landing_receipts()" "$lib" &&
+  ! grep -qE "^_gh_post_(learning|decision|handoff)\(\)" "$lib"
 }
 
 test_github_integration_fire_and_forget() {
