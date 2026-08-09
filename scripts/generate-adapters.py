@@ -59,6 +59,7 @@ HOOK_BINDINGS = [
     {"event": "PostToolUseFailure", "matcher": "Edit|Write|Bash", "script": "capture-error.sh", "timeout": 5},
     {"event": "UserPromptSubmit", "matcher": "", "script": "route-request.sh", "timeout": 5},
     {"event": "UserPromptSubmit", "matcher": "", "script": "post-compact-restore.sh", "timeout": 5},
+    {"event": "Stop", "matcher": "", "script": "chronicle-gate.sh", "timeout": 15},
     {"event": "PreCompact", "matcher": "", "script": "pre-compact-commit.sh", "timeout": 30,
      "statusMessage": "Saving context snapshot..."},
     {"event": "SessionEnd", "matcher": "", "script": "session-end.sh", "timeout": 210,

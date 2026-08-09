@@ -300,6 +300,30 @@
           "command": "{{HEREDOC_TO_SHELL}}"
         }
       }
+    },
+    {
+      "id": "chronicle-gate/blocks-source-change-with-no-chronicle",
+      "gate": "chronicle-gate",
+      "expect": "block",
+      "why": "The founding case: a session that changed source and wrote no account of it. Prose asking for a chronicle does not produce chronicles.",
+      "arms": {
+        "src/feature.ts": "export const shipped = true;\n"
+      },
+      "input": {
+        "hook_event_name": "Stop"
+      }
+    },
+    {
+      "id": "chronicle-gate/allows-records-only-session",
+      "gate": "chronicle-gate",
+      "expect": "allow",
+      "why": "A session that only touched records and scaffolding has no source story to tell, and must not be held hostage for one.",
+      "arms": {
+        "docs/notes.md": "# notes\n"
+      },
+      "input": {
+        "hook_event_name": "Stop"
+      }
     }
   ]
 }
