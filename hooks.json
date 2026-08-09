@@ -115,6 +115,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "${PLUGIN_ROOT}/hooks/scripts/context-usage.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "${PLUGIN_ROOT}/hooks/scripts/route-request.sh",
             "timeout": 5
           },
