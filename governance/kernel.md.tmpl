@@ -155,6 +155,49 @@ Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-
   <rule>Never commit broken code to main. Never auto-resolve merge conflicts silently.</rule>
   <rule>Stash before risky ops. Tag milestones.</rule>
   <rule>Agent-authored and user-authored commits NEVER use --no-verify. If a gate fails, fix the gate or the change.</rule>
+  <cycle>
+    One issue, one PR, one cycle. A cycle ends SHIPPED (merged, verified live) or REVERTED
+    (tree clean, one line saying why). Never an ambiguous middle: a rejected cycle that left
+    43 files dirty poisoned the next cycle's measurements. This is a process rule, not a
+    harness -- any loop harness built later needs its own selftest and one watched run
+    before it is trusted, because three same-species harness bugs once burned 3.5 hours
+    inside correct-looking unverified control flow.
+    Accumulating requests split into separate issues, never one train of unrelated commits.
+    Stacked PRs merge parent-first, each only when green.
+  </cycle>
+  <wip>
+    One write cycle in flight on a shared tree. A second issue may exist only in verify or
+    PR-open state. Parallel work means file-disjoint BRANCHES with a single merge authority
+    and a landing pass, never worktrees: the record is 60 worktree branches and 949 commits
+    with zero merges, against ~50 lanes landed without them.
+  </wip>
+  <verification_budget>
+    Verifier recursion caps at 2 DISAGREEMENT rounds. Rounds where the verifier and builder
+    agree a defect is real -- repair, then a confirm-only delta -- do not count; capping
+    those forces pointless escalations, and one pilot ran three such rounds with zero
+    disagreements. Blind review is ONE adjudicated round per milestone, cadenced per
+    milestone or merge and never by calendar, because calendar triggers fire into empty
+    context and get snoozed. Loops churn while known defects sit: 7 defects on a real device
+    outlived 506 green tests.
+    Two consecutive cycles producing only tooling, receipts, or plans and zero landed
+    outcome: halt and re-bound. Apparatus outrunning outcomes is the churn signal.
+  </verification_budget>
+  <done>
+    Done means merged and verified live. Committed, pushed, deployed, and working are four
+    different states; name the one you checked. "Pushed" is a fresh remote read, never local
+    belief -- a remote once sat 51 commits behind for days while receipts tracked SHAs to
+    five decimals. CI green is the conclusion read at the cycle's head SHA: a watch command's
+    exit status is not a verdict, and trusting one merged a PR with a failing required check.
+    The ABSENCE of a CI run is a red state, not a pending one: a stacked PR whose base moved
+    can go CONFLICTING and silently produce no runs at all, where pushes and reruns do
+    nothing.
+  </done>
+  <receipts>
+    Receipts fire on state changes -- cycle verdict, QA verdict, merge, live proof -- and
+    land as comments on the cycle's issue. Never on cadence: 29 checkpoints a day rebinding
+    one frozen SHA recorded a stall without preventing it, and comments nobody reads are
+    rows in a table nobody queries.
+  </receipts>
   <hook_carve_outs>
     Two automated hooks call `git commit --no-verify` intentionally:
     - hooks/scripts/session-end.sh (SessionEnd batch commit)
