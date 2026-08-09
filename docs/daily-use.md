@@ -18,7 +18,7 @@ In Codex, replace the leading `/` with `$`, for example `$kernel:validate`.
   `marketing-site`, and more
 - Setup/reference: `init`, `help`, `landing-page`
 
-There are 26 skills and 10 specialized Claude Code agent definitions in this release. Use
+There are 27 skills and 10 specialized Claude Code agent definitions in this release. Use
 `/kernel:help` in Claude Code or `$kernel:help` in Codex for the live index and plugin
 status.
 
