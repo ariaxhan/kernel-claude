@@ -7,13 +7,21 @@ What each host actually supports. Kernel does not claim parity it does not have.
 | Lifecycle event Kernel binds | Claude Code | Codex |
 |---|---|---|
 | SessionStart | yes | yes |
-| SessionEnd | yes | yes |
+| SessionEnd | yes | yes, capped at 3s |
 | PreToolUse | yes | yes |
 | PostToolUse | yes | yes |
 | PostToolUseFailure | yes | **no** |
 | UserPromptSubmit | yes | yes |
 | PreCompact | yes | yes |
 | PermissionRequest | yes | yes |
+
+## Host-enforced timeout ceilings
+
+### Codex
+
+- **SessionEnd** — capped at 3s. Kernel's binding wants 210s.
+
+codex-cli 0.147.0 hard-clamps SessionEnd hook timeouts and says so on every session start: `clamping SessionEnd hook timeout to 3s in <plugin>/hooks.json`. The clamp string is extracted from the shipped binary and is SessionEnd-specific; no other lifecycle event carries one. A declared timeout above this ceiling is not honoured, it is overruled.
 
 ## Unsupported features, and what degrades
 
