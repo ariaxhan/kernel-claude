@@ -38,6 +38,18 @@ All notable changes to KERNEL are documented in this file.
   reported as prose-wired rather than counted.
 
 ### Fixed
+- **Three guard-bash false positives** (#175). A fence that refuses ordinary work teaches
+  people to override it, so noise is a safety defect, not a cosmetic one. The safe
+  merge-checked branch delete was refused because the command was folded to lowercase
+  before matching, making it indistinguishable from the force delete: five refusals across
+  three sessions in one day. An explicit recursive delete alongside an unrelated
+  interpreter call in the same line was refused as an indirect deletion, which is exactly
+  the explicit form that rule prefers. And prose naming a guarded command inside a heredoc
+  was matched as if it were code, so writing a chronicle or filing an issue about the
+  guards tripped them. Heredoc bodies are now dropped only when they are data; a heredoc
+  feeding a shell or interpreter is still matched, because narrowing noise must never open
+  a bypass. All three fixes ship with corpus cases, including one asserting that bypass
+  stays closed.
 - **`guard-bash` failed dark.** The destructive-command guard warned and exited 0 when `jq`
   was missing, so the most important fence in KERNEL allowed every command whenever one
   binary was absent. It now fails closed, with an explicit `KERNEL_GUARD_BASH_DEGRADED_OK=1`
