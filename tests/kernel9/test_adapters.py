@@ -120,20 +120,6 @@ class ClaudeAdapter(unittest.TestCase):
         for key in ("interface", "skills", "apps", "mcpServers"):
             self.assertNotIn(key, m, f"Claude manifest carries Codex-only key {key!r}")
 
-    def test_hook_bindings_reference_real_scripts(self):
-        doc = load(self.host["hooks_file"])
-        for event, groups in doc["hooks"].items():
-            for group in groups:
-                for hook in group["hooks"]:
-                    cmd = hook["command"]
-                    self.assertIn("${CLAUDE_PLUGIN_ROOT}", cmd, f"{event}: wrong root var")
-                    rel = cmd.split("${CLAUDE_PLUGIN_ROOT}/")[1].split()[0]
-                    with self.subTest(event=event, script=rel):
-                        self.assertTrue(
-                            os.path.isfile(os.path.join(REPO, rel)),
-                            f"{event} binds missing script {rel}",
-                        )
-
     def test_normal_requests_reach_the_adaptive_router(self):
         doc = load(self.host["hooks_file"])
         commands = [
@@ -198,24 +184,6 @@ class CodexAdapter(unittest.TestCase):
         self.assertEqual(self.host["hooks_file"], "hooks.json")
         self.assertTrue(os.path.isfile(os.path.join(REPO, "hooks.json")))
 
-    def test_hook_bindings_use_a_root_var_codex_actually_substitutes(self):
-        """Codex substitutes PLUGIN_ROOT / CLAUDE_PLUGIN_ROOT and nothing else.
-
-        A name Codex does not know expands to the empty string, so the hook
-        runs `/hooks/scripts/<name>` and exits 127 on every single event. The
-        old assertion pinned the invented name and stayed green while every
-        Codex hook in the plugin was dead.
-        """
-        substituted = ("${PLUGIN_ROOT}", "${CLAUDE_PLUGIN_ROOT}")
-        doc = load(self.host["hooks_file"])
-        for event, groups in doc["hooks"].items():
-            for group in groups:
-                for hook in group["hooks"]:
-                    self.assertTrue(
-                        hook["command"].startswith(substituted),
-                        f"{event}: {hook['command']} uses a root var Codex never sets",
-                    )
-
     def test_normal_requests_reach_the_adaptive_router(self):
         doc = load(self.host["hooks_file"])
         commands = [
@@ -228,6 +196,67 @@ class CodexAdapter(unittest.TestCase):
             "Codex UserPromptSubmit does not reach the Kernel 9 router",
         )
 
+
+
+class EveryHostBindsRealScripts(unittest.TestCase):
+    """Both hosts, one check. Not one host's bindings and a promise about the other.
+
+    Two separate defects shipped through the gap this class closes.
+
+    The Claude adapter had a binding-resolves-on-disk test; the Codex adapter
+    never did. So when the generator emitted ${CODEX_PLUGIN_ROOT} -- a variable
+    Codex does not substitute -- every Codex command expanded to the empty
+    string, ran `/hooks/scripts/<name>`, and exited 127 on every lifecycle
+    event of every session. The Codex test that existed asserted the invented
+    name was present, which is the generator agreeing with itself, so it was
+    green for the defect's whole life (#191, #194).
+
+    Parameterizing over governance/hosts.json means a third host cannot opt out
+    of this by simply never having a test written for it.
+    """
+
+    # The names Codex's hook command runner actually substitutes, read out of
+    # the shipped binary's codex_hooks::engine::command_runner string block,
+    # plus Claude's own. Anything else expands to empty and exits 127.
+    SUBSTITUTED = {"CLAUDE_PLUGIN_ROOT", "PLUGIN_ROOT"}
+
+    def _bindings(self, host):
+        doc = load(host["hooks_file"])
+        for event, groups in doc["hooks"].items():
+            for group in groups:
+                for hook in group["hooks"]:
+                    yield event, hook["command"]
+
+    def test_every_binding_uses_the_root_var_the_host_declares(self):
+        for key, host in spec()["hosts"].items():
+            declared = "${%s}" % host["plugin_root_var"]
+            for event, cmd in self._bindings(host):
+                with self.subTest(host=key, event=event):
+                    self.assertTrue(
+                        cmd.startswith(declared + "/"),
+                        f"{key} {event}: {cmd} does not use declared {declared}",
+                    )
+
+    def test_declared_root_var_is_one_the_host_substitutes(self):
+        """The declaration itself has to be a real name, not a plausible one."""
+        for key, host in spec()["hosts"].items():
+            with self.subTest(host=key):
+                self.assertIn(
+                    host["plugin_root_var"], self.SUBSTITUTED,
+                    f"{key} declares {host['plugin_root_var']!r}, which no host "
+                    "substitutes; every hook would expand to / and exit 127",
+                )
+
+    def test_every_binding_resolves_to_a_script_on_disk(self):
+        for key, host in spec()["hosts"].items():
+            for event, cmd in self._bindings(host):
+                # Strip whatever ${...}/ prefix this host uses, then drop args.
+                rel = cmd.split("}/", 1)[1].split()[0]
+                with self.subTest(host=key, event=event, script=rel):
+                    self.assertTrue(
+                        os.path.isfile(os.path.join(REPO, rel)),
+                        f"{key} {event} binds missing script {rel}",
+                    )
 
 class TruthfulCapabilityReporting(unittest.TestCase):
     """Requirement 14. The heart of the honesty guarantee."""

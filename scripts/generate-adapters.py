@@ -76,15 +76,16 @@ def version() -> str:
     return load_json(CLAUDE_PLUGIN)["version"]
 
 
-def plugin_root_var(host_key: str) -> str:
-    """Each host names the plugin root differently.
+def plugin_root_var(host: dict) -> str:
+    """The variable name this host substitutes in a hook command.
 
-    Codex's hook command runner substitutes exactly four names: PLUGIN_ROOT,
-    CLAUDE_PLUGIN_ROOT, PLUGIN_DATA, CLAUDE_PLUGIN_DATA. CODEX_PLUGIN_ROOT was
-    never one of them. It expanded to the empty string, so every Codex hook ran
-    `/hooks/scripts/<name>` and exited 127 on every lifecycle event.
+    Declared in governance/hosts.json, not chosen here. A name the host does
+    not know expands to the empty string, so every hook runs an absolute path
+    off / and exits 127. CODEX_PLUGIN_ROOT was invented in this function and
+    killed every Codex hook until #191; keeping the value in the canonical
+    source puts it under that file's evidence rule.
     """
-    return "${CLAUDE_PLUGIN_ROOT}" if host_key == "claude" else "${PLUGIN_ROOT}"
+    return "${%s}" % host["plugin_root_var"]
 
 
 # --------------------------------------------------------------------------
@@ -95,7 +96,7 @@ def plugin_root_var(host_key: str) -> str:
 def build_hooks(host_key: str, host: dict) -> tuple[dict, list[str]]:
     """Return (hooks document, list of dropped bindings)."""
     supported = set(host["supported_lifecycle_events"])
-    root = plugin_root_var(host_key)
+    root = plugin_root_var(host)
 
     grouped: dict[str, list] = {}
     dropped: list[str] = []

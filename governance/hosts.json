@@ -6,7 +6,14 @@
     "",
     "supported_lifecycle_events is a claim about the HOST, not about Kernel.",
     "It must be backed by the evidence named in verified_by. Adding an event",
-    "here without evidence is how a false parity claim gets shipped."
+    "here without evidence is how a false parity claim gets shipped.",
+    "",
+    "plugin_root_var is the same kind of claim: the variable name the HOST",
+    "substitutes in a hook command. A name the host does not know expands to",
+    "the empty string, so every hook runs an absolute path off / and exits",
+    "127. This was invented as CODEX_PLUGIN_ROOT once and killed every Codex",
+    "hook until #191. It lives here, not in the generator, so it cannot be",
+    "chosen without the evidence rule above applying to it."
   ],
 
   "kernel_lifecycle_bindings": [
@@ -29,6 +36,7 @@
       "marketplace_manifest": ".claude-plugin/marketplace.json",
       "hooks_file": "hooks/hooks.json",
       "skills_declaration": "implicit",
+      "plugin_root_var": "CLAUDE_PLUGIN_ROOT",
       "supported_lifecycle_events": [
         "SessionStart",
         "SessionEnd",
@@ -54,6 +62,7 @@
       "marketplace_manifest": ".agents/plugins/marketplace.json",
       "hooks_file": "hooks.json",
       "skills_declaration": "explicit",
+      "plugin_root_var": "PLUGIN_ROOT",
       "supported_lifecycle_events": [
         "SessionStart",
         "SessionEnd",
