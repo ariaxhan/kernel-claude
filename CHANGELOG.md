@@ -18,6 +18,13 @@ All notable changes to KERNEL are documented in this file.
   `fail-closed-when-armed`, `fail-abstain`. Detecting that a check could not run is not
   enough - the direction has to be a decision.
 
+- **Execution process rules** in the canonical governance template (#171): the cycle
+  primitive (shipped or reverted, never ambiguous), WIP 1 on a shared tree with
+  file-disjoint branches instead of worktrees, a verifier-recursion cap that counts
+  disagreement rounds only, one adjudicated blind round per milestone, the scaffolding
+  tripwire, done-means-merged-and-live with absence-of-a-CI-run as a red state, and
+  state-change receipts. Every rule carries the failure that paid for it. Validated by two
+  independent pilots before landing.
 - **Retirement ledger** (`governance/retirements.jsonl` + `governance/RETIREMENT.md`):
   removing a mechanism now requires an append-only verdict naming what died, why, what
   replaced it, and the evidence. Backfilled with the five real retirements the v7-v9
