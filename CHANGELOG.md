@@ -18,6 +18,15 @@ All notable changes to KERNEL are documented in this file.
   `fail-closed-when-armed`, `fail-abstain`. Detecting that a check could not run is not
   enough - the direction has to be a decision.
 
+- **Chronicle Stop-gate** (`hooks/scripts/chronicle-gate.sh`, #170): a session that changed
+  source is asked once for an honest account before it ends, naming what was attempted,
+  what was verified live, and what failed. One small file per session, not an accumulating
+  apparatus. It refuses exactly once and always names an escape hatch
+  (`KERNEL_CHRONICLE_OK=1`), because a gate you cannot satisfy gets the whole hook chain
+  disabled. Records-only sessions pass untouched.
+- **Scaffolding tripwire**, in the same hook: two consecutive sessions producing only
+  tooling, docs, or tests and no landed outcome print a halt-and-re-bound warning.
+  Apparatus outrunning outcomes once cost a whole phase.
 - **Execution process rules** in the canonical governance template (#171): the cycle
   primitive (shipped or reverted, never ambiguous), WIP 1 on a shared tree with
   file-disjoint branches instead of worktrees, a verifier-recursion cap that counts

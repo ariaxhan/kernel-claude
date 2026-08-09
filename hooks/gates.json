@@ -14,18 +14,191 @@
   },
   "hooks": [
     {
-      "id": "guard-bash",
-      "script": "hooks/scripts/guard-bash.sh",
-      "class": "gate",
+      "id": "autopush",
+      "script": "hooks/scripts/autopush.sh",
+      "class": "advisory",
+      "events": [
+        "SessionStart"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "capture-error",
+      "script": "hooks/scripts/capture-error.sh",
+      "class": "advisory",
+      "events": [
+        "PostToolUseFailure"
+      ],
+      "matcher": "Edit|Write|Bash",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "knowledge-graph",
+      "script": "hooks/scripts/knowledge-graph.sh",
+      "class": "advisory",
+      "events": [
+        "SessionStart"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "log-write",
+      "script": "hooks/scripts/log-write.sh",
+      "class": "advisory",
+      "events": [
+        "PostToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "post-compact-restore",
+      "script": "hooks/scripts/post-compact-restore.sh",
+      "class": "advisory",
+      "events": [
+        "UserPromptSubmit"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "sqlite3"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "pre-compact-commit",
+      "script": "hooks/scripts/pre-compact-commit.sh",
+      "class": "advisory",
+      "events": [
+        "PreCompact"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git",
+        "sqlite3"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "route-request",
+      "script": "hooks/scripts/route-request.sh",
+      "class": "advisory",
+      "events": [
+        "UserPromptSubmit"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "python3"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "session-end",
+      "script": "hooks/scripts/session-end.sh",
+      "class": "advisory",
+      "events": [
+        "SessionEnd"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git",
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "session-start",
+      "script": "hooks/scripts/session-start.sh",
+      "class": "advisory",
+      "events": [
+        "SessionStart"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git",
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "validate-json-schema",
+      "script": "hooks/scripts/validate-json-schema.sh",
+      "class": "advisory",
+      "events": [
+        "PostToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "validate-structure",
+      "script": "hooks/scripts/validate-structure.sh",
+      "class": "advisory",
       "events": [
         "PreToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "warn-hardcoded",
+      "script": "hooks/scripts/warn-hardcoded.sh",
+      "class": "advisory",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "auto-approve-safe",
+      "script": "hooks/scripts/auto-approve-safe.sh",
+      "class": "gate",
+      "events": [
+        "PermissionRequest"
       ],
       "matcher": "Bash",
       "external_deps": [
         "jq"
       ],
-      "degraded_mode": "fail-closed",
-      "rationale": "Destructive-command guard. Fails closed: without a parser it cannot tell a listing from a recursive delete. Escape hatch KERNEL_GUARD_BASH_DEGRADED_OK=1 is explicit and logged."
+      "degraded_mode": "fail-abstain",
+      "rationale": "Auto-approves demonstrably safe commands. Its dangerous direction is YES, so when it cannot evaluate it emits no decision and the human is asked."
+    },
+    {
+      "id": "chronicle-gate",
+      "script": "hooks/scripts/chronicle-gate.sh",
+      "class": "gate",
+      "events": [
+        "Stop"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "git"
+      ],
+      "degraded_mode": "fail-open-loud",
+      "rationale": "Requires an honest account from a session that changed source. Refuses once and names an escape hatch, because a gate you cannot satisfy is worse than none: people disable the whole chain. Without git it cannot tell whether source changed, and blocking the end of a session on that would trap it."
     },
     {
       "id": "detect-secrets",
@@ -40,6 +213,20 @@
       ],
       "degraded_mode": "fail-closed",
       "rationale": "Secret scanner. Deliberately does not source circuit-breaker.sh: a security gate must never auto-disable itself."
+    },
+    {
+      "id": "guard-bash",
+      "script": "hooks/scripts/guard-bash.sh",
+      "class": "gate",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Bash",
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-closed",
+      "rationale": "Destructive-command guard. Fails closed: without a parser it cannot tell a listing from a recursive delete. Escape hatch KERNEL_GUARD_BASH_DEGRADED_OK=1 is explicit and logged."
     },
     {
       "id": "guard-config",
@@ -85,175 +272,12 @@
       "rationale": "Prompt-injection tripwire over fetched content. Post-hoc, so refusing protects nothing; it must degrade loudly instead of silently."
     },
     {
-      "id": "auto-approve-safe",
-      "script": "hooks/scripts/auto-approve-safe.sh",
-      "class": "gate",
-      "events": [
-        "PermissionRequest"
-      ],
-      "matcher": "Bash",
-      "external_deps": [
-        "jq"
-      ],
-      "degraded_mode": "fail-abstain",
-      "rationale": "Auto-approves demonstrably safe commands. Its dangerous direction is YES, so when it cannot evaluate it emits no decision and the human is asked."
-    },
-    {
-      "id": "validate-structure",
-      "script": "hooks/scripts/validate-structure.sh",
-      "class": "advisory",
-      "events": [
-        "PreToolUse"
-      ],
-      "matcher": "Write|Edit",
-      "external_deps": [
-        "jq"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "warn-hardcoded",
-      "script": "hooks/scripts/warn-hardcoded.sh",
-      "class": "advisory",
-      "events": [
-        "PreToolUse"
-      ],
-      "matcher": "Write|Edit",
-      "external_deps": [
-        "jq"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "log-write",
-      "script": "hooks/scripts/log-write.sh",
-      "class": "advisory",
-      "events": [
-        "PostToolUse"
-      ],
-      "matcher": "Write|Edit",
-      "external_deps": [
-        "jq"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "validate-json-schema",
-      "script": "hooks/scripts/validate-json-schema.sh",
-      "class": "advisory",
-      "events": [
-        "PostToolUse"
-      ],
-      "matcher": "Write|Edit",
-      "external_deps": [
-        "jq"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "capture-error",
-      "script": "hooks/scripts/capture-error.sh",
-      "class": "advisory",
-      "events": [
-        "PostToolUseFailure"
-      ],
-      "matcher": "Edit|Write|Bash",
-      "external_deps": [
-        "jq"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "route-request",
-      "script": "hooks/scripts/route-request.sh",
-      "class": "advisory",
-      "events": [
-        "UserPromptSubmit"
-      ],
-      "matcher": "",
+      "id": "circuit-breaker",
+      "script": "hooks/scripts/circuit-breaker.sh",
+      "class": "library",
+      "events": [],
       "external_deps": [
         "python3"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "post-compact-restore",
-      "script": "hooks/scripts/post-compact-restore.sh",
-      "class": "advisory",
-      "events": [
-        "UserPromptSubmit"
-      ],
-      "matcher": "",
-      "external_deps": [
-        "sqlite3"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "pre-compact-commit",
-      "script": "hooks/scripts/pre-compact-commit.sh",
-      "class": "advisory",
-      "events": [
-        "PreCompact"
-      ],
-      "matcher": "",
-      "external_deps": [
-        "git",
-        "sqlite3"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "session-start",
-      "script": "hooks/scripts/session-start.sh",
-      "class": "advisory",
-      "events": [
-        "SessionStart"
-      ],
-      "matcher": "",
-      "external_deps": [
-        "git",
-        "jq"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "session-end",
-      "script": "hooks/scripts/session-end.sh",
-      "class": "advisory",
-      "events": [
-        "SessionEnd"
-      ],
-      "matcher": "",
-      "external_deps": [
-        "git",
-        "jq"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "autopush",
-      "script": "hooks/scripts/autopush.sh",
-      "class": "advisory",
-      "events": [
-        "SessionStart"
-      ],
-      "matcher": "",
-      "external_deps": [
-        "git"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "knowledge-graph",
-      "script": "hooks/scripts/knowledge-graph.sh",
-      "class": "advisory",
-      "events": [
-        "SessionStart"
-      ],
-      "matcher": "",
-      "external_deps": [
-        "git"
       ],
       "degraded_mode": "fail-open-loud"
     },
@@ -268,16 +292,6 @@
       "degraded_mode": "fail-open-loud"
     },
     {
-      "id": "circuit-breaker",
-      "script": "hooks/scripts/circuit-breaker.sh",
-      "class": "library",
-      "events": [],
-      "external_deps": [
-        "python3"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
       "id": "github-integration",
       "script": "hooks/scripts/github-integration.sh",
       "class": "library",
@@ -288,6 +302,14 @@
       "degraded_mode": "fail-open-loud"
     },
     {
+      "id": "scan-output-impl",
+      "script": "hooks/scripts/scan-output.py",
+      "class": "library",
+      "events": [],
+      "external_deps": [],
+      "degraded_mode": "not-applicable"
+    },
+    {
       "id": "test-gate",
       "script": "hooks/scripts/test-gate.sh",
       "class": "library",
@@ -296,14 +318,6 @@
         "git"
       ],
       "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "scan-output-impl",
-      "script": "hooks/scripts/scan-output.py",
-      "class": "library",
-      "events": [],
-      "external_deps": [],
-      "degraded_mode": "not-applicable"
     }
   ]
 }
