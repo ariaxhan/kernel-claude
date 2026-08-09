@@ -2,6 +2,58 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.2.1] - 2026-08-09
+
+Every Codex hook in KERNEL was dead, and the test suite said it was fine. This release
+fixes that, the two other host-truth defects the investigation turned up, and lands a
+finished feature that had never been committed.
+
+### Fixed
+- **Every Codex hook exited 127, on every event, since the Kernel 9 adapter shipped**
+  (#191). `hooks.json` bound each script as `${CODEX_PLUGIN_ROOT}/...`, but Codex's hook
+  command runner substitutes exactly four names: `PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`,
+  `PLUGIN_DATA`, `CLAUDE_PLUGIN_DATA`. `CODEX_PLUGIN_ROOT` was invented here, so it expanded
+  to the empty string and every hook ran `/hooks/scripts/<name>` off the filesystem root.
+  Guards, recall injection, routing, receipts: all of it, silently, because a failed hook is
+  a warning line and not a stop.
+- **The test that should have caught it asserted the invented name as the expected value**
+  (#194), so it was green for the defect's whole life while proving only that the generator
+  agreed with itself. The root variable now lives in `governance/hosts.json` under that
+  file's evidence rule, the generator reads it instead of choosing it, and the binding tests
+  are parameterized over every host: each binding uses its host's declared variable, that
+  variable is one a host actually substitutes, and every binding resolves to a file on disk.
+  A third host cannot opt out of coverage by never having a test written for it.
+- **Lifecycle hooks died with git-fatal 128 in a repo with no commits** (#192).
+  `session-start.sh` (twice) and `pre-compact-commit.sh` ran unguarded `git rev-parse HEAD`,
+  `git log`, and `git diff HEAD~3` under `set -eo pipefail`. A fresh repo's first session got
+  no context injection at all, and the PreCompact checkpoint died exactly when context was
+  about to be discarded. The `HEAD~3` case also fired on any repo with fewer than four
+  commits. The regression test exercises every hook against both repo shapes, not the three
+  known call sites.
+- **KERNEL declared a SessionEnd timeout Codex overrules** (#193). Codex hard-clamps
+  SessionEnd hooks to 3s and says so on every session start; `session-end.sh` was bound at
+  210 because it runs the project's test suite. `governance/hosts.json` now declares the
+  ceiling as a host fact with named evidence, the generator emits the real number, and the
+  capability report says `yes, capped at 3s` instead of a flat `yes`. Three tests enforce it.
+  Claude is deliberately untouched: it has no such ceiling and genuinely needs the 210s.
+
+### Added
+- **Context usage meter** (`hooks/scripts/context-usage.py`, #196): exact last-known Codex
+  context occupancy on every UserPromptSubmit, without reading or emitting conversation
+  content. Finished and independently verified some time ago, and never committed; work that
+  ends uncommitted has shipped nothing. Landed with its generator binding restored, its row
+  added to `hooks/gates.json`, and one defect the fixtures could not see: Codex 0.147.0 added
+  an `ordinal` field between `timestamp` and `type`, which the line matcher did not span, so
+  the meter read `unknown` on every live session while the suite stayed green on fixtures
+  that serialized `type` first. The matcher now skips any run of leading scalar envelope
+  fields, and cannot cross a nested object, so the envelope stays walkable while prompts,
+  messages, tool results and reasoning stay unreachable.
+
+### Known gaps, stated rather than implied
+- Codex still has no red-suite detection: the session-end test gate cannot complete inside
+  the 3s ceiling (#200). #193 stopped the manifest from claiming time it never had; it did
+  not give the mechanism back.
+
 ## [9.2.0] - 2026-08-09
 
 ### Added
