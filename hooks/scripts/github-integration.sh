@@ -156,20 +156,6 @@ _gh_comment_issue() {
   return 0
 }
 
-# Close issue with final comment.
-# Args: issue_number comment
-_gh_close_issue() {
-  _gh_available || return 0
-  local issue="${1:-}" comment="${2:-}"
-  [[ -z "$issue" ]] && return 0
-
-  local repo
-  repo=$(_gh_repo) || return 0
-
-  [[ -n "$comment" ]] && gh issue comment "$issue" -R "$repo" --body "$comment" 2>/dev/null || true
-  gh issue close "$issue" -R "$repo" 2>/dev/null || true
-  return 0
-}
 
 # === Discussion category resolution ===
 
@@ -282,61 +268,36 @@ EOF
   return 0
 }
 
-# Post high-hit learning to Learnings discussion category.
-# Args: insight evidence hit_count
-_gh_post_learning() {
+# --- State-change receipts -------------------------------------------------
+# A receipt fires when something CHANGED: work landed, a verdict was reached, a
+# deploy went live. Never on cadence. 29 checkpoints a day rebinding one frozen
+# SHA recorded a stall without preventing it, and a comment nobody reads is a row
+# in a table nobody queries.
+#
+# Args: <commit-range>  (defaults to this session's commits)
+# Scans the range for issue references and posts one landing receipt per issue.
+_gh_post_landing_receipts() {
   _gh_available || return 0
-  local insight="${1:-}" evidence="${2:-}" hit_count="${3:-1}"
-  [[ -z "$insight" ]] && return 0
+  local range="${1:-}"
+  [ -z "$range" ] && return 0
 
-  local body
-  body=$(cat <<EOF
-## Learning
+  local log
+  log=$(git log --oneline --no-merges "$range" 2>/dev/null) || return 0
+  [ -z "$log" ] && return 0
 
-**Insight:** ${insight}
-**Hit count:** ${hit_count}
+  local issues
+  issues=$(printf '%s' "$log" | grep -oE '#[0-9]+' | sort -u | tr -d '#')
+  [ -z "$issues" ] && return 0
 
-### Evidence
-${evidence:-No evidence provided.}
+  _gh_ensure_labels
 
----
-_Auto-posted by KERNEL when hit_count >= threshold._
-EOF
-)
-
-  _gh_post_discussion "$_GH_CAT_LEARNINGS" "Learning: ${insight%%. *}" "$body" &
+  local issue body
+  for issue in $issues; do
+    body=$(printf 'Landed on `%s`:\n\n```\n%s\n```\n' \
+      "$(git rev-parse --abbrev-ref HEAD 2>/dev/null)" \
+      "$(printf '%s' "$log" | grep -E "#${issue}([^0-9]|$)")")
+    _gh_comment_issue "$issue" "$body"
+  done
   return 0
 }
 
-# Post to Decisions discussion category.
-# Args: title body
-_gh_post_decision() {
-  _gh_available || return 0
-  local title="${1:-}" body="${2:-}"
-  [[ -z "$title" ]] && return 0
-
-  _gh_post_discussion "$_GH_CAT_DECISIONS" "$title" "$body" &
-  return 0
-}
-
-# Post handoff to Agent Logs discussion category.
-# Args: title body
-_gh_post_handoff() {
-  _gh_available || return 0
-  local title="${1:-}" body="${2:-}"
-  [[ -z "$title" ]] && return 0
-
-  local body_with_meta
-  body_with_meta=$(cat <<EOF
-## Handoff
-
-${body:-No details provided.}
-
----
-_Posted: $(date -u +"%Y-%m-%dT%H:%M:%SZ")_
-EOF
-)
-
-  _gh_post_discussion "$_GH_CAT_AGENT_LOGS" "Handoff: ${title}" "$body_with_meta" &
-  return 0
-}

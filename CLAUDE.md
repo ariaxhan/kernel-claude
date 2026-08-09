@@ -1,5 +1,5 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: 798915ed6a2971d02e6e12eb0639cdd3fca49cb686ed8a530f7bc45ec439d08c; adapter: claude -->
+     source-sha256: 098a02b0b0709d9b813d5791d9b2ca79ccb3af642182e06e4fc5d6badbdee936; adapter: claude -->
 <kernel version="9.1.2">
 
 
@@ -120,11 +120,16 @@ Setup: _meta/reference/lsp-setup.md
 <github_layer>
 GitHub is a supplementary visibility layer. AgentDB is ALWAYS the source of truth for ALL profiles.
 Non-local profiles (github, github-oss, github-production) get additive GitHub features:
-- Issues: tier 2+ contracts surface as GitHub Issues with agent/tier labels
-- Discussions: session summaries → Agent Logs, learnings → Learnings, decisions → Decisions
-- Agents post checkpoints and verdicts as issue comments
+- Issues carry work items: one issue, one PR, one cycle. Records (chronicles, docs) commit
+  straight to the default branch and never open an issue.
+- Receipts fire on STATE CHANGES: work landed, a verdict reached, a deploy proven live. They
+  land as comments on the cycle's issue. Never on cadence -- checkpoint chatter records a
+  stall without preventing it, and comments nobody reads are rows nobody queries.
+- Session summaries post to the Agent Logs discussion category.
 Library: hooks/scripts/github-integration.sh. All functions profile-gated, fire-and-forget.
 <rule>AgentDB first. GitHub after. Never block on GitHub API failures.</rule>
+<rule>Nothing auto-closes an issue. A merged PR's Closes reference does it, after a human
+reviewed the claim.</rule>
 </github_layer>
 
 <!-- ============================================ -->

@@ -53,6 +53,16 @@ if type _gh_available &>/dev/null && _gh_available; then
     [ -n "$SESSION_DURATION_MS" ] && DURATION_DISPLAY=" ($(( SESSION_DURATION_MS / 1000 ))s)"
     _gh_post_session_summary "$AGENT" "$BRANCH" \
         "${FILES_CHANGED} files changed${DURATION_DISPLAY}" "" "" &
+
+    # State-change receipt: work that landed against an issue says so, on the issue.
+    _KERNEL_START_SHA_FILE="${CLAUDE_PROJECT_DIR:-$(pwd)}/_meta/.runtime/session-start-sha"
+    if [ -r "$_KERNEL_START_SHA_FILE" ]; then
+        _KERNEL_START_SHA=$(cat "$_KERNEL_START_SHA_FILE" 2>/dev/null)
+        if [ -n "$_KERNEL_START_SHA" ] && [ "$_KERNEL_START_SHA" != "$(git rev-parse HEAD 2>/dev/null)" ]; then
+            _gh_post_landing_receipts "${_KERNEL_START_SHA}..HEAD" &
+        fi
+        rm -f "$_KERNEL_START_SHA_FILE" 2>/dev/null
+    fi
 fi
 
 _kernel_hook_end "session-end" 0
