@@ -258,6 +258,63 @@ class EveryHostBindsRealScripts(unittest.TestCase):
                         f"{key} {event} binds missing script {rel}",
                     )
 
+class HostEnforcedTimeoutCeilings(unittest.TestCase):
+    """A timeout the host overrules is a claim, not a budget.
+
+    Codex hard-clamps SessionEnd hooks to 3s and says so on every session start:
+    `clamping SessionEnd hook timeout to 3s`. Kernel bound session-end.sh at 210
+    because it runs the project's test suite there. The declared budget was 70x
+    the real one, the gate was killed every time, and both hosts.json and the
+    capability report said a flat "yes" for SessionEnd on Codex.
+
+    hosts.json's own header calls that shape of claim the thing it exists to
+    prevent, so the ceiling now lives there with named evidence, the generator
+    emits the real number, and the report says "yes, capped at 3s".
+    """
+
+    def test_no_binding_declares_a_timeout_above_its_host_ceiling(self):
+        for key, host in spec()["hosts"].items():
+            ceilings = host.get("hook_timeout_ceilings_seconds", {})
+            if not ceilings:
+                continue
+            doc = load(host["hooks_file"])
+            for event, groups in doc["hooks"].items():
+                limit = ceilings.get(event)
+                if limit is None:
+                    continue
+                for group in groups:
+                    for hook in group["hooks"]:
+                        with self.subTest(host=key, event=event):
+                            self.assertLessEqual(
+                                hook["timeout"], limit,
+                                f"{key} {event} declares {hook['timeout']}s over a "
+                                f"{limit}s ceiling; the host silently overrules it",
+                            )
+
+    def test_every_declared_ceiling_carries_evidence(self):
+        """Same rule the file already applies to supported_lifecycle_events."""
+        for key, host in spec()["hosts"].items():
+            if not host.get("hook_timeout_ceilings_seconds"):
+                continue
+            with self.subTest(host=key):
+                evidence = host.get("hook_timeout_ceiling_evidence", "")
+                self.assertGreater(
+                    len(evidence), 60,
+                    f"{key} declares a timeout ceiling with no substantive evidence",
+                )
+
+    def test_capability_report_does_not_call_a_capped_event_a_flat_yes(self):
+        doc = open(os.path.join(REPO, CAPABILITY_DOC)).read() if os.path.isabs(CAPABILITY_DOC) \
+            else open(CAPABILITY_DOC).read()
+        for key, host in spec()["hosts"].items():
+            for event, limit in host.get("hook_timeout_ceilings_seconds", {}).items():
+                with self.subTest(host=key, event=event):
+                    self.assertIn(
+                        f"capped at {limit}s", doc,
+                        f"{event} is capped at {limit}s on {key} but the report "
+                        "does not say so",
+                    )
+
 class TruthfulCapabilityReporting(unittest.TestCase):
     """Requirement 14. The heart of the honesty guarantee."""
 

@@ -94,13 +94,14 @@ def plugin_root_var(host: dict) -> str:
 # --------------------------------------------------------------------------
 
 
-def build_hooks(host_key: str, host: dict) -> tuple[dict, list[str]]:
-    """Return (hooks document, list of dropped bindings)."""
+def build_hooks(host_key: str, host: dict) -> tuple[dict, list[str], list[tuple]]:
+    """Return (hooks document, dropped bindings, bindings capped by a host ceiling)."""
     supported = set(host["supported_lifecycle_events"])
     root = plugin_root_var(host)
 
     grouped: dict[str, list] = {}
     dropped: list[str] = []
+    capped: list[tuple] = []
 
     for binding in HOOK_BINDINGS:
         event = binding["event"]
@@ -108,10 +109,20 @@ def build_hooks(host_key: str, host: dict) -> tuple[dict, list[str]]:
             dropped.append(f"{event}:{binding['script']}")
             continue
 
+        # Never declare a timeout the host will overrule. Codex hard-clamps
+        # SessionEnd to 3s and warns on every session start; asking for 210
+        # bought a truncated hook and a warning, not time. Emitting the real
+        # ceiling makes the manifest say what will actually happen.
+        ceiling = host.get("hook_timeout_ceilings_seconds", {}).get(event)
+        timeout = binding["timeout"]
+        if ceiling is not None and timeout > ceiling:
+            capped.append((event, binding["script"], timeout, ceiling))
+            timeout = ceiling
+
         entry = {
             "type": "command",
             "command": f"{root}/hooks/scripts/{binding['script']}",
-            "timeout": binding["timeout"],
+            "timeout": timeout,
         }
         if "statusMessage" in binding:
             entry["statusMessage"] = binding["statusMessage"]
@@ -125,7 +136,7 @@ def build_hooks(host_key: str, host: dict) -> tuple[dict, list[str]]:
         else:
             bucket.append({"matcher": binding["matcher"], "hooks": [entry]})
 
-    return {"hooks": grouped}, dropped
+    return {"hooks": grouped}, dropped, capped
 
 
 def build_plugin_manifest(host_key: str, host: dict, spec: dict) -> dict:
@@ -204,10 +215,34 @@ def build_capability_report(spec: dict) -> str:
     for event in wanted:
         row = [event]
         for host in spec["hosts"].values():
-            row.append("yes" if event in host["supported_lifecycle_events"] else "**no**")
+            if event not in host["supported_lifecycle_events"]:
+                row.append("**no**")
+                continue
+            # "Supported" and "supported with a ceiling that truncates our
+            # binding" are different claims. A flat yes hid the second one.
+            ceiling = host.get("hook_timeout_ceilings_seconds", {}).get(event)
+            row.append("yes" if ceiling is None else f"yes, capped at {ceiling}s")
         lines.append("| " + " | ".join(row) + " |")
 
-    lines += ["", "## Unsupported features, and what degrades", ""]
+    lines += ["", "## Host-enforced timeout ceilings", ""]
+    any_ceiling = False
+    for host in spec["hosts"].values():
+        ceilings = host.get("hook_timeout_ceilings_seconds", {})
+        if not ceilings:
+            continue
+        any_ceiling = True
+        lines += [f"### {host['display_name']}", ""]
+        for event, limit in sorted(ceilings.items()):
+            wanted_timeout = max(
+                (b["timeout"] for b in HOOK_BINDINGS if b["event"] == event), default=None
+            )
+            asked = f" Kernel's binding wants {wanted_timeout}s." if wanted_timeout else ""
+            lines.append(f"- **{event}** — capped at {limit}s.{asked}")
+        lines += ["", host.get("hook_timeout_ceiling_evidence", ""), ""]
+    if not any_ceiling:
+        lines += ["No host-enforced ceilings recorded.", ""]
+
+    lines += ["## Unsupported features, and what degrades", ""]
     any_gap = False
     for key, host in spec["hosts"].items():
         gaps = host.get("unsupported_lifecycle_events", {})
@@ -253,7 +288,7 @@ def targets(spec: dict) -> dict[str, str]:
     out: dict[str, str] = {}
 
     for host_key, host in spec["hosts"].items():
-        hooks_doc, _dropped = build_hooks(host_key, host)
+        hooks_doc, _dropped, _capped = build_hooks(host_key, host)
         out[host["hooks_file"]] = json.dumps(hooks_doc, indent=2) + "\n"
         out[host["plugin_manifest"]] = (
             json.dumps(build_plugin_manifest(host_key, host, spec), indent=2) + "\n"

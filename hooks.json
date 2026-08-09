@@ -163,7 +163,7 @@
           {
             "type": "command",
             "command": "${PLUGIN_ROOT}/hooks/scripts/session-end.sh",
-            "timeout": 210,
+            "timeout": 3,
             "statusMessage": "Closing session..."
           }
         ]
