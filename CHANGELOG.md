@@ -2,7 +2,7 @@
 
 All notable changes to KERNEL are documented in this file.
 
-## [Unreleased]
+## [9.2.0] - 2026-08-09
 
 ### Added
 - **Violation corpus** (`tests/corpus/`): a standing harness proving KERNEL's gates can

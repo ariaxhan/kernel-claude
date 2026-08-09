@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "9.1.2",
+  "version": "9.2.0",
   "description": "KERNEL fences your Claude Code agent instead of leashing it. Destructive commands are blocked by hooks, not approved by tired humans; irreversible operations require a one-time token only a human can open; independent verifiers check finished work without seeing the builder's reasoning; every claim carries a receipt. And the fences learn: mistakes a session survives become durable memory that blocks them next time. Review outcomes, not keystrokes.",
   "author": {
     "name": "Aria Han",
