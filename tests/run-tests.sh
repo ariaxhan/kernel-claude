@@ -433,6 +433,53 @@ test_agentdb_long_content() {
 
 # === Hook Tests ===
 
+test_lifecycle_hooks_survive_a_repo_with_no_commits() {
+  # A brand-new `git init`ed repo has no HEAD. Every lifecycle hook runs under
+  # `set -eo pipefail`, so ANY unguarded `git rev-parse HEAD`, `git log`, or
+  # `git diff HEAD~N` takes the whole hook down with exit 128 -- silently, since
+  # a failed hook is a warning line, not a stop.
+  #
+  # This bit session-start.sh (twice) and pre-compact-commit.sh. It is a class,
+  # not an instance, so this exercises EVERY hook rather than the three known
+  # call sites. Two repo shapes: no commits at all, and one commit (HEAD exists
+  # but HEAD~3 does not).
+  local fresh shallow rc failures=""
+  fresh=$(mktemp -d) || return 1
+  shallow=$(mktemp -d) || return 1
+
+  git -c init.defaultBranch=main init -q "$fresh"
+  echo scratch > "$fresh/a.txt"
+
+  git -c init.defaultBranch=main init -q "$shallow"
+  echo scratch > "$shallow/a.txt"
+  git -C "$shallow" -c user.email=t@example.invalid -c user.name=t add -A
+  git -C "$shallow" -c user.email=t@example.invalid -c user.name=t commit -qm "only commit"
+
+  local hook name repo
+  for repo in "$fresh" "$shallow"; do
+    for hook in "$PLUGIN_ROOT"/hooks/scripts/*.sh; do
+      name=$(basename "$hook")
+      # common.sh is sourced, never bound to an event.
+      [ "$name" = "common.sh" ] && continue
+      rc=0
+      echo "{\"session_id\":\"empty-repo-probe\",\"cwd\":\"$repo\"}" \
+        | ( cd "$repo" && CLAUDE_PROJECT_DIR="$repo" KERNEL_VAULTS="$repo" \
+            CLAUDE_PLUGIN_ROOT="$PLUGIN_ROOT" sh -c "$hook" ) >/dev/null 2>&1 || rc=$?
+      # 128 is git's fatal. Anything else (including a deliberate gate refusal)
+      # is this hook's own business; only a git-fatal crash is the defect.
+      if [ "$rc" = "128" ]; then
+        failures="$failures $name(repo=$(basename "$repo"))"
+      fi
+    done
+  done
+
+  rm -rf "$fresh" "$shallow"
+  if [ -n "$failures" ]; then
+    echo "FAIL: hook(s) died with git-fatal 128 on a repo with no/shallow history:$failures"
+    return 1
+  fi
+}
+
 test_session_start_outputs_kernel() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
@@ -5114,6 +5161,7 @@ run_test_suite() {
       run_test "long content" test_agentdb_long_content
       ;;
     hooks)
+      run_test "lifecycle hooks survive a repo with no commits" test_lifecycle_hooks_survive_a_repo_with_no_commits
       run_test "session-start outputs KERNEL" test_session_start_outputs_kernel
       run_test "session-start creates agent file" test_session_start_creates_agent_file
       run_test "detect-secrets clean file" test_detect_secrets_clean

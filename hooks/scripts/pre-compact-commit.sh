@@ -112,7 +112,10 @@ if [ -f "$AGENTDB_PATH" ]; then
     ACTIVE_GOAL=$(sqlite3 "$AGENTDB_PATH" "SELECT json_extract(content, '$.goal') FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "")
 
     # Get recent files changed
-    RECENT_FILES=$(cd "$PROJECT_ROOT" && git diff --name-only HEAD~3 2>/dev/null | head -10 | tr '\n' ',' | sed 's/,$//')
+    # A repo with fewer than four commits has no HEAD~3. Under `set -eo
+    # pipefail` that killed the whole PreCompact checkpoint with exit 128,
+    # losing the snapshot precisely when context was about to be discarded.
+    RECENT_FILES=$(cd "$PROJECT_ROOT" && git diff --name-only HEAD~3 2>/dev/null | head -10 | tr '\n' ',' | sed 's/,$//' || true)
 
     # Escape for safe embedding in the write-end JSON arg: a contract goal or
     # filename containing " or \ would otherwise produce malformed JSON and the
