@@ -77,8 +77,14 @@ def version() -> str:
 
 
 def plugin_root_var(host_key: str) -> str:
-    """Each host names the plugin root differently."""
-    return "${CLAUDE_PLUGIN_ROOT}" if host_key == "claude" else "${CODEX_PLUGIN_ROOT}"
+    """Each host names the plugin root differently.
+
+    Codex's hook command runner substitutes exactly four names: PLUGIN_ROOT,
+    CLAUDE_PLUGIN_ROOT, PLUGIN_DATA, CLAUDE_PLUGIN_DATA. CODEX_PLUGIN_ROOT was
+    never one of them. It expanded to the empty string, so every Codex hook ran
+    `/hooks/scripts/<name>` and exited 127 on every lifecycle event.
+    """
+    return "${CLAUDE_PLUGIN_ROOT}" if host_key == "claude" else "${PLUGIN_ROOT}"
 
 
 # --------------------------------------------------------------------------

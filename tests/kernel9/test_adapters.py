@@ -198,12 +198,23 @@ class CodexAdapter(unittest.TestCase):
         self.assertEqual(self.host["hooks_file"], "hooks.json")
         self.assertTrue(os.path.isfile(os.path.join(REPO, "hooks.json")))
 
-    def test_hook_bindings_use_the_codex_root_var(self):
+    def test_hook_bindings_use_a_root_var_codex_actually_substitutes(self):
+        """Codex substitutes PLUGIN_ROOT / CLAUDE_PLUGIN_ROOT and nothing else.
+
+        A name Codex does not know expands to the empty string, so the hook
+        runs `/hooks/scripts/<name>` and exits 127 on every single event. The
+        old assertion pinned the invented name and stayed green while every
+        Codex hook in the plugin was dead.
+        """
+        substituted = ("${PLUGIN_ROOT}", "${CLAUDE_PLUGIN_ROOT}")
         doc = load(self.host["hooks_file"])
         for event, groups in doc["hooks"].items():
             for group in groups:
                 for hook in group["hooks"]:
-                    self.assertIn("${CODEX_PLUGIN_ROOT}", hook["command"], event)
+                    self.assertTrue(
+                        hook["command"].startswith(substituted),
+                        f"{event}: {hook['command']} uses a root var Codex never sets",
+                    )
 
     def test_normal_requests_reach_the_adaptive_router(self):
         doc = load(self.host["hooks_file"])
