@@ -149,6 +149,8 @@ Default is inline. Spawn a subagent only to protect context, to buy real wall-cl
 Route model and effort by task shape and measured evidence, never prestige. Preserve the exact request; never silently substitute. Receipts keep `requested_model` and `requested_effort` separate from `observed_model` and `observed_effort`, and use `unavailable` when the runtime does not expose a value.
 Protected receipts require distinct `builder_identity` and `verifier_identity`; the builder never grades its own protected work.
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
+Structured questions are the default reply shape, not an escalation. End every unfinished turn with one; Claude uses the AskUserQuestion tool, Codex has no such tool and ends with a numbered QUESTION block instead. Skip only when the work is fully done, exactly one real option exists, or the session is non-interactive. The tool's absence from your tool list IS the non-interactive signal: never stall a headless run on an answer that cannot arrive.
+Subagents never ask the user. They escalate through their contract's ESCALATE IF line and stop; the orchestrator answers what its own context can answer and batches the rest into ONE round. Guessing is the top defect source: an unstated assumption you acted on is a defect you shipped.
 KERNEL_CONTEXT
 # END GENERATED KERNEL AMBIENT
 

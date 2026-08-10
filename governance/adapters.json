@@ -4,6 +4,10 @@
     "codex": "AGENTS.md"
   },
   "tokens": {
+    "ASK_MECHANISM": {
+      "claude": "an AskUserQuestion call",
+      "codex": "the numbered QUESTION block below"
+    },
     "CLIENT_NAME": {
       "claude": "Claude Code",
       "codex": "Codex"

@@ -1,5 +1,5 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: b72f6ff7d3e7a9e1f62840c1a1b9edfc0deb1ac3d65e92ebf701f188ec287ee4; adapter: codex -->
+     source-sha256: 4dc9ff3280df7c20087e7a5a9d837cc21df69ff85de0513a1fcacc8edfb44d26; adapter: codex -->
 <kernel version="9.2.1">
 
 
@@ -98,6 +98,41 @@ when scope or hypothesis changes, and whenever a new failure appears.
   tier the work → define success before coding → execute (inline by default; delegate heavy file-disjoint work → surgeon → verify) → learn (agentdb learn).
   Never implement the first idea: generate 2-3 approaches, choose simplest. Details live in the skills, not here.
 </flow>
+
+<interaction>
+Structured questions are the DEFAULT response shape, not an escalation. Every turn that is not
+finished ends with the numbered QUESTION block below. Never bury "should I...?" in prose and stop: a question the
+reader has to excavate from a wall of text is a question that gets answered wrong or not at all.
+
+  <rule>Ask unless one of three holds: the work is fully done, the answer is trivially unambiguous
+  (exactly one real option), or the interface makes it impossible.</rule>
+  <rule>Impossible means non-interactive: you are a subagent, or the session is headless
+  (`claude -p`, `codex exec`, codex-lane.sh, cron, CI). The tool's absence from your tool list IS
+  the signal. Never stall a headless run waiting on an answer that cannot arrive; state the
+  assumption in the deliverable instead.</rule>
+  <rule>Subagents never ask the user. They escalate through their contract's ESCALATE IF line and
+  stop. The orchestrator answers from its own context whatever it can, and forwards only the
+  genuinely user-only questions, batched into ONE round. Five lanes each raising a dialog rebuilds
+  the wall of text this rule exists to kill.</rule>
+  <rule>One round, at most 4 questions, ordered by leverage: the answer that invalidates the most
+  downstream work goes first. Every option carries its consequence; the recommended one is listed
+  first and labelled. Never ask what the repo, the diff, or an agentdb recall already answers.</rule>
+  <rule>Guessing is the top defect source. If you catch yourself writing "I'll assume", ask.</rule>
+
+  <codex_fallback>
+  Codex exposes no structured-question tool. Its final message ends with this block and nothing
+  after it, one block per open decision, max 4:
+
+    QUESTION: &lt;the decision, one line&gt;
+      1. &lt;option&gt; - &lt;consequence&gt;  [recommended]
+      2. &lt;option&gt; - &lt;consequence&gt;
+      3. something else - tell me what you want instead
+
+  No question in prose outside this shape.
+  </codex_fallback>
+
+  Full protocol: _meta/reference/interaction-protocol.md
+</interaction>
 
 <contract>
 CONTRACT: {id} | GOAL: {observable} | CONSTRAINTS: {files} | FAILURE: {conditions} | TIER: {2|3} | BRANCH: {name}

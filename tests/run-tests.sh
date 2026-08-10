@@ -2041,6 +2041,38 @@ test_claude_md_token_budget() {
   }
 }
 
+test_interaction_protocol_reaches_every_surface() {
+  # The <interaction> rule is worthless if it only lands in files plugin users never load.
+  # session-start.sh is the ONLY ambient delivery mechanism; assert all three surfaces carry it,
+  # each adapter resolved its own ASK_MECHANISM, and the reference doc it points at exists.
+  local failed=0
+
+  grep -qF "<interaction>" "$PLUGIN_ROOT/CLAUDE.md" || {
+    echo "FAIL: CLAUDE.md missing <interaction> block"; failed=1; }
+  grep -qF "<interaction>" "$PLUGIN_ROOT/AGENTS.md" || {
+    echo "FAIL: AGENTS.md missing <interaction> block"; failed=1; }
+
+  grep -qF "an AskUserQuestion call" "$PLUGIN_ROOT/CLAUDE.md" || {
+    echo "FAIL: CLAUDE.md should resolve ASK_MECHANISM to the AskUserQuestion tool"; failed=1; }
+  if grep -qF "AskUserQuestion call" "$PLUGIN_ROOT/AGENTS.md"; then
+    echo "FAIL: AGENTS.md must not tell Codex to call AskUserQuestion (no such tool)"; failed=1
+  fi
+  grep -qF "numbered QUESTION block" "$PLUGIN_ROOT/AGENTS.md" || {
+    echo "FAIL: AGENTS.md should resolve ASK_MECHANISM to the prose QUESTION block"; failed=1; }
+
+  # Ambient block is what plugin users actually see.
+  grep -qF "Structured questions are the default reply shape" \
+    "$PLUGIN_ROOT/hooks/scripts/session-start.sh" || {
+    echo "FAIL: session-start.sh ambient block missing the structured-question rule"; failed=1; }
+  grep -qF "Subagents never ask the user" \
+    "$PLUGIN_ROOT/hooks/scripts/session-start.sh" || {
+    echo "FAIL: session-start.sh ambient block missing the subagent escalation rule"; failed=1; }
+
+  assert_file_exists "$PLUGIN_ROOT/_meta/reference/interaction-protocol.md" || failed=1
+
+  return $failed
+}
+
 test_commands_token_budget() {
   # Skills should be focused. Guided generators (landing-page) and autonomous
   # engines (forge) legitimately run long; cap reflects real sizes.
@@ -5230,6 +5262,7 @@ run_test_suite() {
       ;;
     tokens)
       run_test "CLAUDE.md token budget" test_claude_md_token_budget
+      run_test "interaction protocol reaches every surface" test_interaction_protocol_reaches_every_surface
       run_test "commands token budget" test_commands_token_budget
       run_test "agents token budget" test_agents_token_budget
       run_test "critical content at edges" test_critical_content_at_edges
