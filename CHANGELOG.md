@@ -2,6 +2,48 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.3.0] - 2026-08-10
+
+Structured questions become the default reply shape instead of an escalation. The agent
+will visibly ask more, and ask in a form you can answer at a glance rather than excavate
+from a recap.
+
+### Added
+- **`<interaction>` governance block: every unfinished turn ends with a structured
+  question.** Two failures share one fix. The first is guessing: an agent with a real fork
+  in front of it picks one silently and builds forward on the wrong branch, which is a
+  defect committed before a line is written. The second is presentation: agents that do ask
+  bury the question in paragraph seven next to three other half-questions, the reader
+  answers the one they noticed, and the rest get guessed anyway. A question that must be
+  excavated is functionally an unasked question. Three exemptions only, and no others: the
+  work is fully done, exactly one real option exists, or the interface makes asking
+  impossible.
+- **Non-interactive detection reads the tool list, not the environment.** Absence of the
+  question tool IS the signal. Headless runs (`claude -p`, `codex exec`, codex-lane, cron,
+  CI) never stall waiting for an answer that cannot arrive; they state the assumption
+  explicitly in the deliverable and proceed, because an assumption written down is
+  recoverable and one acted on silently is not.
+- **Subagents never ask the user.** They escalate through their contract's existing
+  `ESCALATE IF` line and stop. The orchestrator then triages: answer from its own context,
+  the repo, the diff, or an `agentdb recall` whatever it can, merge duplicate escalations,
+  and forward only the genuinely user-only remainder batched into one round of at most four
+  questions ordered by leverage. Without this, five parallel lanes each raise a dialog and
+  rebuild exactly the wall of text the rule exists to remove.
+- **`ASK_MECHANISM` adapter token, so neither client is told to call a tool it does not
+  have.** Codex has no AskUserQuestion equivalent: its model-facing surface is `shell`,
+  `apply_patch`, `update_plan`, `web_search`, plus MCP, and none of them render a picker.
+  The token resolves to the tool for Claude and to a fixed numbered `QUESTION:` block,
+  pinned to the end of the final message, for Codex. A local MCP chooser was considered and
+  deferred: it dies in every headless lane and needs the prose fallback anyway, so the
+  fallback ships first.
+- **The rule lands in the ambient source block**, since `session-start.sh` is the only
+  context-delivery mechanism plugin users actually load. A governance rule that reaches only
+  `CLAUDE.md` reaches contributors and nobody else.
+- Full protocol at `_meta/reference/interaction-protocol.md`. New test asserts all three
+  delivery surfaces carry the rule and that each adapter resolved its own mechanism;
+  verified by breaking the ambient line and the Codex resolution on purpose and confirming
+  the test caught both, rather than trusting a green run.
+
 ## [9.2.1] - 2026-08-09
 
 Every Codex hook in KERNEL was dead, and the test suite said it was fine. This release
