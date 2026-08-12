@@ -436,6 +436,32 @@
           "content": "# just some notes\n"
         }
       }
+    },
+    {
+      "id": "verdict-gate/blocks-reopening-a-frozen-acceptance",
+      "gate": "verdict-gate",
+      "expect": "block",
+      "why": "A fresh reviewer with an architectural preference relitigating an already-accepted commit is the review tax in its purest form. Reopening takes new evidence, not a new opinion, and the refusal happens here rather than in an argument downstream.",
+      "input": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "/tmp/verdict.json",
+          "content": "{\"schema\": \"kernel.verdict/v1\", \"verdict\": \"FAIL\", \"commit\": \"abc123def456\", \"profile\": {\"schema\": \"kernel.acceptance-profile/v1\", \"id\": \"matra-production\", \"stage\": \"production\", \"blocks_at\": {\"correctness\": \"major\", \"privacy\": \"nit\", \"performance\": \"major\"}}, \"cannot_falsify\": [\"conformance only\"], \"acceptance\": {\"schema\": \"kernel.acceptance/v1\", \"commit\": \"abc123def456\", \"profile_id\": \"matra-production\", \"profile_hash\": \"0b785547474ccfd2\", \"accepted_at\": \"2026-08-11T00:00:00Z\", \"signer\": \"aria\", \"cannot_falsify\": [\"conformance only\"]}, \"findings\": [{\"summary\": \"I would have structured the module differently\", \"severity\": \"blocker\", \"distance\": 1, \"validated\": \"proven\", \"on_objective\": true, \"dimension\": \"correctness\", \"observable\": \"harder to extend later\", \"repro\": \"$ read the file\\nit is long\"}]}"
+        }
+      }
+    },
+    {
+      "id": "verdict-gate/allows-pass-when-the-profile-tolerates-the-dimension",
+      "gate": "verdict-gate",
+      "expect": "allow",
+      "why": "A demo profile setting performance:never must let a proven, distance-0, major performance finding quarantine rather than block. Same finding, different context, different correct answer.",
+      "input": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "/tmp/verdict.json",
+          "content": "{\"schema\": \"kernel.verdict/v1\", \"verdict\": \"PASS\", \"profile\": {\"schema\": \"kernel.acceptance-profile/v1\", \"id\": \"quantum-demo\", \"stage\": \"demo\", \"blocks_at\": {\"correctness\": \"blocker\", \"privacy\": \"minor\", \"performance\": \"never\"}}, \"cannot_falsify\": [\"no real device\"], \"findings\": [{\"summary\": \"first paint takes 4.2s\", \"severity\": \"major\", \"distance\": 0, \"validated\": \"proven\", \"on_objective\": true, \"dimension\": \"performance\", \"observable\": \"LCP 4.2s\", \"repro\": \"$ lighthouse\\nLCP 4200ms\"}]}"
+        }
+      }
     }
   ]
 }

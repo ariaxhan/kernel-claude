@@ -96,6 +96,90 @@
         "null"
       ],
       "x-kernel-enforced-by": "compiler"
+    },
+    "profile": {
+      "$ref": "kernel.acceptance-profile.v1",
+      "description": "The acceptance profile this run judged against. Its blocks_at map decides the blocking threshold per dimension, replacing the blocker-only fallback used when no profile exists. Absent means the evidence bar alone decides, which is the pre-profile behaviour.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "commit": {
+      "type": "string",
+      "description": "The exact commit under review. Required for finality: acceptance is never inherited by a descendant commit.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "acceptance": {
+      "$ref": "kernel.acceptance.v1",
+      "description": "A prior acceptance covering this commit. Present means the commit is frozen from ordinary re-review and findings cannot produce a FAIL without a recognised reopen event.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "reopen": {
+      "type": "object",
+      "required": [
+        "event",
+        "detail"
+      ],
+      "properties": {
+        "event": {
+          "enum": [
+            "new_failing_input",
+            "changed_dependency",
+            "missed_requirement",
+            "disproven_assumption",
+            "profile_changed",
+            "owner_promotion"
+          ],
+          "description": "The only events that reopen a frozen acceptance. A fresh reviewer, a rephrased concern, or a different architectural preference is deliberately absent: those are what an amnesiac critic generates for free.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "detail": {
+          "type": "string",
+          "description": "What is actually new. An event with no detail is refused and the commit stays frozen.",
+          "x-kernel-enforced-by": "compiler"
+        }
+      },
+      "description": "A claim that this run is entitled to reopen a frozen acceptance.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Evidence actually gathered this run, matched against the profile's required_evidence. Anything required and missing is reported on the verdict rather than silently passing.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "frozen": {
+      "type": "boolean",
+      "description": "Set by adjudication, never by the author.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "finality": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "x-kernel-enforced-by": "compiler"
+    },
+    "missing_required_evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "x-kernel-enforced-by": "compiler"
+    },
+    "profile_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "x-kernel-enforced-by": "compiler"
+    },
+    "profile_hash": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "x-kernel-enforced-by": "compiler"
     }
   },
   "definitions": {
@@ -196,6 +280,16 @@
           "items": {
             "type": "string"
           },
+          "x-kernel-enforced-by": "compiler"
+        },
+        "dimension": {
+          "type": "string",
+          "description": "Which acceptance dimension this finding lives on (correctness, security, privacy, data_loss, availability, performance, accessibility, maintainability, ...). The profile's blocks_at map is keyed by this. Defaults to 'correctness' when absent, and an unlisted dimension defaults to the strictest setting rather than the most permissive.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "failure_mode": {
+          "type": "string",
+          "description": "The concrete way this fails. If it matches one of the profile's acceptable_failure_modes it is quarantined however severe, because someone already decided in writing.",
           "x-kernel-enforced-by": "compiler"
         }
       }

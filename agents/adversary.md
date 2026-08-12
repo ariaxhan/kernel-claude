@@ -30,8 +30,16 @@ Reference: skills/quality/reference/quality-research.md
   does not buy independence, it buys a reviewer with amnesia who relitigates settled questions for
   free. Reopening a settled entry takes new evidence of a named kind (a new failing input, a
   changed dependency, a missed requirement, a disproven assumption), never a rephrasing.
-- **The declared objective**: what this project is for, with its date and success condition. A
-  demo and a payments system do not get the same bar.
+- **The acceptance profile** (`schemas/kernel.acceptance-profile.v1.schema.json`): the structured
+  context this artifact is judged against. Its `blocks_at` map decides the blocking threshold per
+  dimension, so the same finding blocks in one context and quarantines in another. Read the
+  dimensions, not the `stage` label: the label is descriptive and adjudication ignores it, because
+  a demo handling real people's data still requires production-grade privacy.
+- **Any acceptance record for this commit** (`schemas/kernel.acceptance.v1.schema.json`). If one
+  exists, the commit is FROZEN. Raising a settled concern again is not a finding. Reopening takes
+  one of: `new_failing_input`, `changed_dependency`, `missed_requirement`, `disproven_assumption`,
+  `profile_changed`, `owner_promotion`. Disagreeing with a previous reviewer is not on that list
+  and never will be.
 </startup_reads>
 
 <protocol>
@@ -128,10 +136,13 @@ run still returns PASS.
      ecosystem, the 2026-08-03 genre pivot, was distance-3.)
 3. **Names an observable failure.** "Predict what breaks and how we would see it." No observable,
    no block. Scored WITH distance, never instead of it, since a far-fetched observable is cheap.
-4. **On-objective.** Off-objective never blocks however real it is. Production-hardening findings
-   on a demo are quarantine. Read the project's declared objective before assigning severity;
-   with none declared, a reviewer defaults to production rigor every time because that is the
-   safest-looking answer and it costs the reviewer nothing.
+4. **Violates the acceptance profile.** Tag every finding with its `dimension` and, where you can,
+   its `failure_mode`. A finding on a dimension the profile tolerates is quarantine however real,
+   proven and distance-0 it is; a failure mode already listed in `acceptable_failure_modes` is
+   quarantine because someone decided in writing before you ran. With no profile supplied the old
+   fallback applies (only `blocker` severity blocks), and a reviewer given no context defaults to
+   production rigor every time, because that is the safest-looking answer and it costs you
+   nothing.
 
 Coordination-phase and reachability failures are distance-0 by construction and keep their
 existing absolute FAIL.
@@ -215,6 +226,9 @@ agentdb write-end '{"agent":"adversary","result":"pass|fail","phases_completed":
 - [ ] Every FAIL clears the fail_bar (pasted output + distance threshold + observable + on-objective)
 - [ ] CANNOT FALSIFY printed on PASS
 - [ ] Quarantined findings filed as issues with distance labels
+- [ ] Every finding carries a dimension
+- [ ] Acceptance profile read; stage label NOT treated as the decision
+- [ ] Acceptance record checked; a frozen commit reopened only on a recognised event
 - [ ] Findings adjudicated by scripts/adjudicate.py (not by you)
 - [ ] Verdict written to AgentDB
 </checklist>

@@ -22,14 +22,46 @@ Three defect classes this exists to kill, each bought with a real incident:
    coverage. An unfinished instrument is red, never neutral: "we could not reproduce it" and
    "it is not a problem" are different sentences.
 
+Two later additions, same shape:
+
+4. Context-blind severity. A finding's weight depends on what the artifact IS. An acceptance
+   profile (kernel.acceptance-profile/v1) states that context in structured dimensions, and a
+   finding must clear the evidence bar AND violate the profile to block. The stage label is
+   deliberately NOT consulted: a demo handling real people's data still requires production-grade
+   privacy.
+5. No finality. Every fresh context was a reviewer with amnesia, free to relitigate settled
+   questions. An acceptance record (kernel.acceptance/v1) freezes one exact commit under one exact
+   profile; reopening takes a recognised event, not a new opinion.
+
 Refs: ariaxhan/kernel-claude#204.
 """
 
 import argparse
+import hashlib
 import json
 import sys
 
 SCHEMA = "kernel.verdict/v1"
+
+# Severity ladder. A profile names the minimum severity that blocks per dimension, so the same
+# finding is blocking in one context and quarantined in another without anyone editing the finding.
+SEVERITY_ORDER = ["nit", "minor", "major", "blocker"]
+
+# An omitted dimension defaults to the strictest real setting. Silence in a profile must never
+# quietly widen what ships, which is the failure mode of every "we'll decide later" severity.
+DEFAULT_BLOCKS_AT = "blocker"
+
+# The only events that may reopen a frozen acceptance. A fresh reviewer, a rephrased concern, or a
+# different architectural preference is deliberately not on this list: those are exactly what an
+# amnesiac critic produces for free, and letting them reopen settled work is the tax.
+REOPEN_EVENTS = {
+    "new_failing_input",
+    "changed_dependency",
+    "missed_requirement",
+    "disproven_assumption",
+    "profile_changed",
+    "owner_promotion",
+}
 
 # distance -> what that finding must carry before it may block.
 # Distance never decides WHETHER a finding may block, only how much proof it needs.
@@ -46,6 +78,48 @@ STRONG_EVIDENCE = {"executed_demonstration", "cited_prior_failure", "observed_ou
 BLOCKING_SEVERITY = {"blocker"}
 
 
+def profile_hash(profile):
+    """Stable hash of the judged-against context. A changed profile voids an old acceptance."""
+    if not profile:
+        return None
+    material = {k: v for k, v in profile.items() if k not in ("schema", "owner")}
+    return hashlib.sha256(
+        json.dumps(material, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()[:16]
+
+
+def violates_profile(finding, profile):
+    """Return (violates: bool, reason: str|None).
+
+    Without a profile this returns True unconditionally, preserving the pre-profile behaviour:
+    the bar alone decides. That is deliberate back-compat, not a default-open, because the
+    evidence/distance/observable bar still has to be cleared either way.
+    """
+    if not profile:
+        return True, None
+
+    dimension = finding.get("dimension") or "correctness"
+    mode = finding.get("failure_mode")
+    accepted = profile.get("acceptable_failure_modes") or []
+    if mode and mode in accepted:
+        # Someone already decided this one, in writing, before the review ran.
+        return False, f"failure mode {mode!r} is an accepted failure mode of this profile"
+
+    blocks_at = (profile.get("blocks_at") or {}).get(dimension, DEFAULT_BLOCKS_AT)
+    if blocks_at == "never":
+        return False, f"profile tolerates any {dimension} finding (blocks_at: never)"
+
+    severity = finding.get("severity")
+    if severity not in SEVERITY_ORDER or blocks_at not in SEVERITY_ORDER:
+        return False, f"profile requires {dimension} >= {blocks_at}, got severity {severity!r}"
+
+    if SEVERITY_ORDER.index(severity) < SEVERITY_ORDER.index(blocks_at):
+        return False, (
+            f"profile blocks {dimension} only at {blocks_at} or above; this is {severity}"
+        )
+    return True, None
+
+
 def _norm_distance(value):
     """Distance 4+ is treated as 3: the proof bar does not keep rising, it saturates."""
     try:
@@ -55,11 +129,21 @@ def _norm_distance(value):
     return 3 if d > 3 else (d if d >= 0 else None)
 
 
-def evaluate(finding):
-    """Return (blocks: bool, reasons: list[str]). Reasons explain a REFUSAL to block."""
+def evaluate(finding, profile=None):
+    """Return (blocks: bool, reasons: list[str]). Reasons explain a REFUSAL to block.
+
+    Two independent gates, both required. The evidence bar asks "is this finding real enough to
+    act on"; the profile asks "does it matter for THIS artifact". A proven distance-0 blocker that
+    the profile tolerates is still not a blocker, and a finding the profile cares about deeply is
+    still not a blocker without evidence.
+    """
     reasons = []
 
-    if finding.get("severity") not in BLOCKING_SEVERITY:
+    if not profile and finding.get("severity") not in BLOCKING_SEVERITY:
+        # With no profile, "only blocker blocks" is the fallback threshold. That constant was
+        # always a stand-in for a profile nobody had written: once one exists, the owner declares
+        # the blocking threshold per dimension and violates_profile() applies it. Still a
+        # threshold, still one level, just a declared one instead of a hardcoded one.
         reasons.append(f"severity {finding.get('severity')!r} is not blocking")
 
     if finding.get("on_objective") is not True:
@@ -87,12 +171,70 @@ def evaluate(finding):
             elif not str(value or "").strip():
                 reasons.append(f"distance {finding.get('distance')} requires {field}")
 
+    ok, why = violates_profile(finding, profile)
+    if not ok:
+        reasons.append(why)
+
     return (not reasons), reasons
+
+
+def check_finality(doc):
+    """Is this commit frozen by a prior acceptance, and if so may this run reopen it?
+
+    Returns (frozen: bool, notes: list[str]). Frozen means ordinary re-review is refused: the
+    findings still get adjudicated and reported, but they cannot produce a FAIL, because a fresh
+    reviewer with no new evidence is not a new fact about the world.
+    """
+    acceptance = doc.get("acceptance")
+    if not acceptance:
+        return False, []
+
+    notes = []
+    commit = doc.get("commit")
+    if commit and acceptance.get("commit") and commit != acceptance["commit"]:
+        # Acceptance is never inherited. A later commit is a different artifact.
+        return False, [
+            f"acceptance covers {acceptance['commit'][:12]}, this is {commit[:12]}: not frozen"
+        ]
+
+    current = profile_hash(doc.get("profile"))
+    recorded = acceptance.get("profile_hash")
+    if current and recorded and current != recorded:
+        # The profile it was judged against no longer exists, so the answer no longer applies.
+        return False, [
+            f"acceptance profile changed ({recorded} -> {current}): prior acceptance is void, "
+            "re-review is required rather than merely permitted"
+        ]
+
+    event = (doc.get("reopen") or {}).get("event")
+    if event:
+        if event in REOPEN_EVENTS:
+            detail = (doc.get("reopen") or {}).get("detail") or ""
+            if not str(detail).strip():
+                return True, [f"reopen event {event!r} carries no detail: refused, still frozen"]
+            return False, [f"reopened on {event}: {detail}"]
+        return True, [
+            f"{event!r} is not a reopen event. Recognised: {sorted(REOPEN_EVENTS)}. "
+            "A new reviewer, a rephrased concern, or a different architectural preference is not "
+            "new evidence."
+        ]
+
+    return True, [
+        f"commit {acceptance.get('commit', '?')[:12]} was accepted under profile "
+        f"{acceptance.get('profile_id', '?')!r} at {acceptance.get('accepted_at', '?')}. "
+        "Frozen from ordinary re-review; reopening requires new evidence, not a new opinion."
+    ]
 
 
 def adjudicate(doc):
     findings = doc.get("findings") or []
+    profile = doc.get("profile")
     cannot_falsify = [c for c in (doc.get("cannot_falsify") or []) if str(c).strip()]
+    frozen, finality_notes = check_finality(doc)
+    settled = {
+        str(f.get("summary", "")).strip().lower()
+        for f in ((doc.get("acceptance") or {}).get("known_non_blockers") or [])
+    }
 
     blocking, quarantined, escalate = [], [], []
     for finding in findings:
@@ -104,7 +246,13 @@ def adjudicate(doc):
             entry["routed"] = "escalate"
             escalate.append(entry)
             continue
-        blocks, reasons = evaluate(finding)
+        blocks, reasons = evaluate(finding, profile)
+        if blocks and str(finding.get("summary", "")).strip().lower() in settled:
+            blocks = False
+            reasons = ["already a known non-blocker in the acceptance record for this commit"]
+        if blocks and frozen:
+            blocks = False
+            reasons = ["commit is frozen by a recorded acceptance; no recognised reopen event"]
         if blocks:
             entry["routed"] = "blocking"
             blocking.append(entry)
@@ -122,6 +270,14 @@ def adjudicate(doc):
             "or the verdict is not a verdict."
         )
 
+    missing_evidence = []
+    if profile:
+        supplied = {str(e).strip().lower() for e in (doc.get("evidence") or [])}
+        missing_evidence = [
+            e for e in (profile.get("required_evidence") or [])
+            if str(e).strip().lower() not in supplied
+        ]
+
     verdict = "FAIL" if blocking else "PASS"
     if errors:
         verdict = "INVALID"
@@ -130,6 +286,11 @@ def adjudicate(doc):
         "schema": SCHEMA,
         "verdict": verdict,
         "objective": doc.get("objective"),
+        "profile_id": (profile or {}).get("id"),
+        "profile_hash": profile_hash(profile),
+        "frozen": frozen,
+        "finality": finality_notes,
+        "missing_required_evidence": missing_evidence,
         "blocking": blocking,
         "quarantined": quarantined,
         "escalate": escalate,
@@ -151,6 +312,14 @@ def adjudicate(doc):
 
 def render(result):
     lines = [f"ADVERSARY: {result['verdict']}"]
+    if result.get("profile_id"):
+        lines.append(f"  profile: {result['profile_id']} ({result.get('profile_hash')})")
+    if result.get("frozen"):
+        lines.append("  FROZEN: this commit was already accepted. Ordinary re-review refused.")
+    for note in result.get("finality") or []:
+        lines.append(f"    {note}")
+    for missing in result.get("missing_required_evidence") or []:
+        lines.append(f"  MISSING REQUIRED EVIDENCE: {missing}")
     for f in result["blocking"]:
         lines.append(f"  BLOCK  d{f.get('distance')} {f.get('summary','(no summary)')}")
     for f in result["escalate"]:

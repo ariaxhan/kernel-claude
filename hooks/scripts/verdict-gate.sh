@@ -15,6 +15,10 @@
 #   - a verdict whose stated outcome disagrees with adjudication, i.e. an agent
 #     writing PASS over findings that clear the block bar, or FAIL over findings
 #     that do not. The critic proposes; scripts/adjudicate.py decides.
+#   - a FAIL written over a commit already frozen by a recorded acceptance with
+#     no recognised reopen event. That is a fresh reviewer relitigating settled
+#     work, which is the tax itself, and it is refused here rather than argued
+#     about downstream.
 #
 # What it deliberately does NOT do: judge whether the findings are correct. That
 # is not a hook's job and pretending otherwise would make it a gate that cannot
@@ -86,6 +90,11 @@ CLAIMED=$(printf '%s' "$CONTENT" | jq -r '.verdict // empty' 2>/dev/null)
 if [ -n "$CLAIMED" ] && [ "$CLAIMED" != "$ADJUDICATED" ]; then
   echo "BLOCKED: verdict says $CLAIMED, adjudication of its own findings says $ADJUDICATED." >&2
   echo "The critic proposes findings; scripts/adjudicate.py decides the verdict. Never ask the critic whether criticism is complete." >&2
+  if [ "$(printf '%s' "$RESULT" | jq -r '.frozen')" = "true" ]; then
+    echo "This commit was already accepted. Reopening takes new evidence, not a new opinion: one of" >&2
+    echo "  new_failing_input · changed_dependency · missed_requirement · disproven_assumption · profile_changed · owner_promotion" >&2
+    printf '%s' "$RESULT" | jq -r '.finality[]? | "  \(.)"' >&2
+  fi
   printf '%s' "$RESULT" | jq -r '.blocking[]? | "  BLOCK d\(.distance) \(.summary)"' >&2
   exit 2
 fi

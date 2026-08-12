@@ -156,14 +156,19 @@ A finding blocks only with ALL of:
    executed demonstration or a cited prior failure. Never auto-close d3; taste never clears it,
    a real outcome does.
 3. a named observable failure: predict what breaks and how we would see it
-4. on-objective: a production-hardening finding on a demo is not a blocker however real it is
+4. violates the acceptance profile: tag the finding's `dimension`, and let the profile's
+   `blocks_at` map decide the threshold for that dimension. A production-hardening finding on a
+   demo is not a blocker however real it is, and a privacy finding on a demo IS one when the
+   profile says so. The `stage` label never decides; the dimensions do.
 
 Everything else is filed with its `distance:N` label under the `quarantine` milestone. Recurrence
 is signal, silence is a verdict.
 </block_bar>
 
 Read the acceptance record before reviewing: claims, declared invariants, and tradeoffs already
-accepted. Reopening a settled entry takes new evidence of a named kind, never a new opinion.
+accepted. If the commit carries one, it is FROZEN and adjudication will refuse a FAIL. Reopening
+takes `new_failing_input`, `changed_dependency`, `missed_requirement`, `disproven_assumption`,
+`profile_changed`, or `owner_promotion`. A new reviewer is not a reopen event.
 Never ask a reviewer whether criticism is complete; it cannot answer and will always say no.
 </verdict_rules>
 
