@@ -135,9 +135,36 @@ Summary: APPROVE | REQUEST CHANGES | COMMENT
 </ask_user>
 
 <verdict_rules>
-- **APPROVE**: No critical or high issues
-- **REQUEST CHANGES**: Any critical or high issue
-- **COMMENT**: Only medium/low issues
+Review is finite because its purpose is AUTHORIZATION, not exhaustion. Approve once the change
+improves the health of the codebase, not once nothing else can be found. Nothing else can ever
+be found. (#204)
+
+- **APPROVE**: no finding clears the block bar. **Open non-blocking comments do NOT prevent
+  APPROVE** — say the issue number out loud and approve. Forcing another round to re-check a nit
+  costs more than the nit.
+- **REQUEST CHANGES**: at least one finding clears the block bar below.
+- **COMMENT**: findings worth saying, none blocking, and the author asked for a read rather than
+  a decision.
+
+<block_bar>
+A finding blocks only with ALL of:
+1. pasted output, not a described procedure
+2. a distance proof threshold cleared — distance sets how much evidence is needed, never whether
+   a finding may block:
+   d0 changed code fails · d1 violates a declared invariant · d2 pre-existing defect this change
+   exposed, needs a user-visible consequence · d3+ needs outside assumptions, blocks only on an
+   executed demonstration or a cited prior failure. Never auto-close d3; taste never clears it,
+   a real outcome does.
+3. a named observable failure: predict what breaks and how we would see it
+4. on-objective: a production-hardening finding on a demo is not a blocker however real it is
+
+Everything else is filed with its `distance:N` label under the `quarantine` milestone. Recurrence
+is signal, silence is a verdict.
+</block_bar>
+
+Read the acceptance record before reviewing: claims, declared invariants, and tradeoffs already
+accepted. Reopening a settled entry takes new evidence of a named kind, never a new opinion.
+Never ask a reviewer whether criticism is complete; it cannot answer and will always say no.
 </verdict_rules>
 
 <on_complete>
