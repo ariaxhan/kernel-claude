@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kernel.acceptance-profile.v1",
+  "title": "KERNEL acceptance profile",
+  "description": "The context review judges against, stated as structured dimensions rather than prose. Severity is a function of the finding AND this profile, so the same finding is blocking in one context and quarantined in another. A reviewer handed no profile defaults to production rigor every time, because that is the safest-looking answer and it costs the reviewer nothing. Refs ariaxhan/kernel-claude#204.",
+  "type": "object",
+  "required": ["schema", "id", "blocks_at"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": { "const": "kernel.acceptance-profile/v1", "x-kernel-enforced-by": "hook" },
+    "id": {
+      "type": "string",
+      "description": "Stable name for this profile, e.g. 'quantum-demo-2026-08-13'. Recorded in the acceptance so a later profile change is detectable.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "stage": {
+      "enum": ["demo", "prototype", "mvp", "beta", "production"],
+      "description": "DESCRIPTIVE ONLY, never authoritative. It exists so humans can read the profile at a glance and MUST NOT be consulted by adjudication: a demo handling real people's health data still requires production-grade privacy, and a production internal tool may tolerate ugly performance. The dimensions below decide; this label does not.",
+      "x-kernel-enforced-by": "agent"
+    },
+    "users": {
+      "type": "object",
+      "description": "Who is exposed. Real people raise the bar regardless of stage.",
+      "properties": {
+        "who": { "type": "string", "x-kernel-enforced-by": "agent" },
+        "count": { "type": ["integer", "string"], "x-kernel-enforced-by": "agent" },
+        "real_people": { "type": "boolean", "x-kernel-enforced-by": "agent" }
+      },
+      "x-kernel-enforced-by": "agent"
+    },
+    "data_sensitivity": {
+      "enum": ["none", "internal", "personal", "regulated"],
+      "description": "none: synthetic or public. internal: ours only. personal: identifiable people. regulated: health, financial, biometric, or minors.",
+      "x-kernel-enforced-by": "agent"
+    },
+    "lifetime": {
+      "enum": ["throwaway", "days", "weeks", "months", "years"],
+      "description": "How long this must keep working. A maintainability finding means something different at 'throwaway' than at 'years'.",
+      "x-kernel-enforced-by": "agent"
+    },
+    "availability": {
+      "enum": ["none", "best_effort", "business_hours", "always"],
+      "x-kernel-enforced-by": "agent"
+    },
+    "blast_radius": {
+      "enum": ["self", "team", "customers", "public", "irreversible"],
+      "description": "Who is hurt when it goes wrong, and whether it can be undone. 'irreversible' is the one that disqualifies ship-and-watch as an alternative to another review pass.",
+      "x-kernel-enforced-by": "agent"
+    },
+    "scale_target": { "type": "string", "x-kernel-enforced-by": "agent" },
+    "acceptable_failure_modes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Failure modes CONSCIOUSLY accepted for this artifact, e.g. 'crashes on malformed CSV', 'loses unsaved state on refresh'. A finding whose failure_mode matches one of these is quarantined however severe, because someone already decided. Writing it here IS the decision; it is not a place to shrug things off after the fact.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "required_evidence": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Evidence this profile demands before acceptance, e.g. 'walk the demo script 3x', 'contract tests green', 'a real device'. Missing required evidence is reported on the verdict; it never silently passes.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "blocks_at": {
+      "type": "object",
+      "description": "THE AUTHORITATIVE PART. Per dimension, the minimum finding severity that blocks. 'never' means findings on that dimension are quarantined however severe. This is what lets a demo profile set performance:never while still setting privacy:minor, so privacy blocks a demo and a slow render does not. An omitted dimension defaults to 'blocker', the strictest real setting, because silence in a profile must never quietly widen what ships.",
+      "additionalProperties": { "enum": ["nit", "minor", "major", "blocker", "never"] },
+      "properties": {
+        "correctness": { "enum": ["nit", "minor", "major", "blocker", "never"], "x-kernel-enforced-by": "compiler" },
+        "security": { "enum": ["nit", "minor", "major", "blocker", "never"], "x-kernel-enforced-by": "compiler" },
+        "privacy": { "enum": ["nit", "minor", "major", "blocker", "never"], "x-kernel-enforced-by": "compiler" },
+        "data_loss": { "enum": ["nit", "minor", "major", "blocker", "never"], "x-kernel-enforced-by": "compiler" },
+        "availability": { "enum": ["nit", "minor", "major", "blocker", "never"], "x-kernel-enforced-by": "compiler" },
+        "performance": { "enum": ["nit", "minor", "major", "blocker", "never"], "x-kernel-enforced-by": "compiler" },
+        "accessibility": { "enum": ["nit", "minor", "major", "blocker", "never"], "x-kernel-enforced-by": "compiler" },
+        "maintainability": { "enum": ["nit", "minor", "major", "blocker", "never"], "x-kernel-enforced-by": "compiler" }
+      },
+      "x-kernel-enforced-by": "compiler"
+    },
+    "owner": {
+      "type": "string",
+      "description": "Who may promote a quarantined finding to blocking, and who signs an acceptance. Never 'the last agent to speak'.",
+      "x-kernel-enforced-by": "agent"
+    }
+  }
+}

@@ -135,15 +135,55 @@ Summary: APPROVE | REQUEST CHANGES | COMMENT
 </ask_user>
 
 <verdict_rules>
-- **APPROVE**: No critical or high issues
-- **REQUEST CHANGES**: Any critical or high issue
-- **COMMENT**: Only medium/low issues
+Review is finite because its purpose is AUTHORIZATION, not exhaustion. Approve once the change
+improves the health of the codebase, not once nothing else can be found. Nothing else can ever
+be found. (#204)
+
+- **APPROVE**: no finding clears the block bar. **Open non-blocking comments do NOT prevent
+  APPROVE** — say the issue number out loud and approve. Forcing another round to re-check a nit
+  costs more than the nit.
+- **REQUEST CHANGES**: at least one finding clears the block bar below.
+- **COMMENT**: findings worth saying, none blocking, and the author asked for a read rather than
+  a decision.
+
+<block_bar>
+A finding blocks only with ALL of:
+1. pasted output, not a described procedure
+2. a distance proof threshold cleared — distance sets how much evidence is needed, never whether
+   a finding may block:
+   d0 changed code fails · d1 violates a declared invariant · d2 pre-existing defect this change
+   exposed, needs a user-visible consequence · d3+ needs outside assumptions, blocks only on an
+   executed demonstration or a cited prior failure. Never auto-close d3; taste never clears it,
+   a real outcome does.
+3. a named observable failure: predict what breaks and how we would see it
+4. violates the acceptance profile: tag the finding's `dimension`, and let the profile's
+   `blocks_at` map decide the threshold for that dimension. A production-hardening finding on a
+   demo is not a blocker however real it is, and a privacy finding on a demo IS one when the
+   profile says so. The `stage` label never decides; the dimensions do.
+
+Everything else is filed with its `distance:N` label under the `quarantine` milestone. Recurrence
+is signal, silence is a verdict.
+</block_bar>
+
+Read the acceptance record before reviewing: claims, declared invariants, and tradeoffs already
+accepted. If the commit carries one, it is FROZEN and adjudication will refuse a FAIL. Reopening
+takes `new_failing_input`, `changed_dependency`, `missed_requirement`, `disproven_assumption`,
+`profile_changed`, or `owner_promotion`. A new reviewer is not a reopen event.
+Never ask a reviewer whether criticism is complete; it cannot answer and will always say no.
 </verdict_rules>
 
 <on_complete>
+Emit findings as a `kernel.verdict/v1` document and let the acceptance function decide. The
+reviewer never grades its own completeness.
+
 ```bash
-agentdb write-end '{"command":"review","verdict":"X","critical":N,"high":N,"big5_violations":N}'
+python3 scripts/adjudicate.py findings.json --text --strict   # 0 PASS · 1 FAIL · 2 INVALID
+agentdb write-end '{"command":"review","verdict":"X","critical":N,"high":N,"big5_violations":N,"quarantined":N}'
 ```
+
+`cannot_falsify` is mandatory and non-empty. State what this review structurally could not see
+(no real device, conformance only, no live data, a suite that did not finish). Silence about
+coverage reads as coverage.
 </on_complete>
 
 </skill>

@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kernel.acceptance.v1",
+  "title": "KERNEL acceptance record",
+  "description": "Res judicata for one exact commit. Records that commit X was accepted under profile Y, with the blind spots declared, the non-blockers known at the time, and the tradeoffs consciously taken. Once recorded, that commit is frozen from ordinary re-review: a fresh reviewer with a new opinion cannot reopen it, only genuinely new evidence can. Without this, every fresh context is a reviewer with amnesia and no cost for relitigating settled questions, which is the single biggest generator of the review tax once severity is fixed. Refs ariaxhan/kernel-claude#204.",
+  "type": "object",
+  "required": ["schema", "commit", "profile_id", "profile_hash", "cannot_falsify", "accepted_at"],
+  "additionalProperties": true,
+  "properties": {
+    "schema": { "const": "kernel.acceptance/v1", "x-kernel-enforced-by": "hook" },
+    "commit": {
+      "type": "string",
+      "description": "The exact commit sha accepted. Acceptance is never inherited by a descendant: a later commit is a different artifact and every fix invalidates part of the evidence collected for the one before it.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "profile_id": { "type": "string", "x-kernel-enforced-by": "compiler" },
+    "profile_hash": {
+      "type": "string",
+      "description": "Hash of the acceptance profile this was judged against. If the profile later changes, the hash stops matching and the acceptance is void, because it was an answer to a question nobody is asking any more.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "accepted_at": { "type": "string", "x-kernel-enforced-by": "agent" },
+    "signer": {
+      "type": "string",
+      "description": "Who said yes. A named authority, never the last agent to speak.",
+      "x-kernel-enforced-by": "agent"
+    },
+    "cannot_falsify": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Carried from the verdict. What nothing in that run could see. A frozen acceptance whose blind spots were never written down is worse than no acceptance, because it looks settled.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "known_non_blockers": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "The quarantined findings known at acceptance time. A later reviewer raising one of these is repeating a settled question, not making a discovery, and adjudication says so by name.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "accepted_tradeoffs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["tradeoff", "reason"],
+        "properties": {
+          "tradeoff": { "type": "string", "x-kernel-enforced-by": "agent" },
+          "reason": { "type": "string", "x-kernel-enforced-by": "agent" }
+        },
+        "x-kernel-enforced-by": "agent"
+      },
+      "description": "Decisions taken deliberately, with the reason. Reopening one requires new evidence, not a new opinion.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "reopened": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["event", "detail"],
+        "properties": {
+          "event": {
+            "enum": [
+              "new_failing_input",
+              "changed_dependency",
+              "missed_requirement",
+              "disproven_assumption",
+              "profile_changed",
+              "owner_promotion"
+            ],
+            "x-kernel-enforced-by": "compiler"
+          },
+          "detail": { "type": "string", "x-kernel-enforced-by": "agent" },
+          "at": { "type": "string", "x-kernel-enforced-by": "agent" }
+        },
+        "x-kernel-enforced-by": "compiler"
+      },
+      "description": "The audit trail of legitimate reopens. An empty list on an old acceptance is the normal, healthy state.",
+      "x-kernel-enforced-by": "compiler"
+    }
+  }
+}

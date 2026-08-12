@@ -132,6 +132,12 @@ test_generated_governance() {
   python3 "$PLUGIN_ROOT/tests/test_governance.py"
 }
 
+# The acceptance function (#204). Review has no natural stopping condition, so the verdict is
+# decided by scripts/adjudicate.py rather than by the critic that produced the findings.
+test_verdict_adjudication() {
+  python3 "$PLUGIN_ROOT/tests/test_adjudicate.py"
+}
+
 test_agentdb_init_idempotent() {
   agentdb init >/dev/null
   local output
@@ -5070,6 +5076,7 @@ run_test_suite() {
   case "$suite" in
     governance)
       run_test "generated governance adapters and operator" test_generated_governance
+      run_test "verdict adjudication: the acceptance function" test_verdict_adjudication
       ;;
     knowledge_graph)
       run_test "knowledge-graph SKILL.md exists + explains orientation cost" test_knowledge_graph_skill_exists

@@ -51,6 +51,7 @@ HOOK_BINDINGS = [
     {"event": "PreToolUse", "matcher": "Write|Edit", "script": "detect-secrets.sh", "timeout": 5},
     {"event": "PreToolUse", "matcher": "Write|Edit", "script": "validate-structure.sh", "timeout": 5},
     {"event": "PreToolUse", "matcher": "Write|Edit", "script": "warn-hardcoded.sh", "timeout": 5},
+    {"event": "PreToolUse", "matcher": "Write|Edit", "script": "verdict-gate.sh", "timeout": 10},
     {"event": "PreToolUse", "matcher": "Read|Grep|Glob", "script": "guard-context.sh", "timeout": 5},
     {"event": "PermissionRequest", "matcher": "Bash", "script": "auto-approve-safe.sh", "timeout": 5},
     {"event": "PostToolUse", "matcher": "WebFetch|WebSearch|mcp__.*", "script": "scan-output.sh", "timeout": 10},

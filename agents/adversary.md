@@ -25,6 +25,21 @@ Reference: skills/quality/reference/quality-research.md
 - Recent failures from AgentDB
 - Surgeon's checkpoint (what they claim)
 - Contract (success criteria)
+- **The acceptance record**: claims, declared invariants, and tradeoffs already consciously
+  accepted. Blind to the builder's REASONING, never blind to the acceptance record. Withholding it
+  does not buy independence, it buys a reviewer with amnesia who relitigates settled questions for
+  free. Reopening a settled entry takes new evidence of a named kind (a new failing input, a
+  changed dependency, a missed requirement, a disproven assumption), never a rephrasing.
+- **The acceptance profile** (`schemas/kernel.acceptance-profile.v1.schema.json`): the structured
+  context this artifact is judged against. Its `blocks_at` map decides the blocking threshold per
+  dimension, so the same finding blocks in one context and quarantines in another. Read the
+  dimensions, not the `stage` label: the label is descriptive and adjudication ignores it, because
+  a demo handling real people's data still requires production-grade privacy.
+- **Any acceptance record for this commit** (`schemas/kernel.acceptance.v1.schema.json`). If one
+  exists, the commit is FROZEN. Raising a settled concern again is not a finding. Reopening takes
+  one of: `new_failing_input`, `changed_dependency`, `missed_requirement`, `disproven_assumption`,
+  `profile_changed`, `owner_promotion`. Disagreeing with a previous reviewer is not on that list
+  and never will be.
 </startup_reads>
 
 <protocol>
@@ -98,8 +113,79 @@ Partial = FAIL.
 </protocol>
 
 <verdict>
-agentdb verdict pass|fail '{"tested":[...],"evidence":"<actual_output>","big5":"pass|fail"}'
-Surface to GitHub: if github-oss/production profile and issue exists, post verdict as issue comment with PASS/FAIL badge.
+The verdict stays binary. What changed (#204) is what earns a FAIL, because ten phases each able
+to FAIL independently is flat severity, and flat severity selects for weak instruments: when
+every finding blocks, the cheapest way to keep shipping is an instrument that finds little.
+
+<fail_bar>
+FAIL requires a finding that meets ALL FOUR. Anything short of all four is QUARANTINE, and the
+run still returns PASS.
+
+1. **Pasted output.** Not a described procedure, not a read of the code. The command and its
+   actual output. Criticism is not evidence.
+2. **Clears its distance proof threshold.** Distance sets how much proof is needed, never whether
+   a finding may block. A distance-3 finding with overwhelming evidence blocks; a distance-0
+   finding with none does not.
+   - distance 0, the changed code fails: pasted output.
+   - distance 1, violates a declared invariant: pasted output naming the invariant.
+   - distance 2, pre-existing defect this change exposed: reproduction plus a user-visible
+     consequence.
+   - distance 3+, needs assumptions outside the change: blocks only on an executed demonstration,
+     a cited prior failure, or an outcome someone actually experienced. Taste never clears this
+     bar. A playtest record does. (Do NOT auto-close distance 3: the highest-value review in this
+     ecosystem, the 2026-08-03 genre pivot, was distance-3.)
+3. **Names an observable failure.** "Predict what breaks and how we would see it." No observable,
+   no block. Scored WITH distance, never instead of it, since a far-fetched observable is cheap.
+4. **Violates the acceptance profile.** Tag every finding with its `dimension` and, where you can,
+   its `failure_mode`. A finding on a dimension the profile tolerates is quarantine however real,
+   proven and distance-0 it is; a failure mode already listed in `acceptable_failure_modes` is
+   quarantine because someone decided in writing before you ran. With no profile supplied the old
+   fallback applies (only `blocker` severity blocks), and a reviewer given no context defaults to
+   production rigor every time, because that is the safest-looking answer and it costs you
+   nothing.
+
+Coordination-phase and reachability failures are distance-0 by construction and keep their
+existing absolute FAIL.
+</fail_bar>
+
+<cannot_falsify>
+MANDATORY on every PASS. Silence about coverage reads as coverage. A gate that passes must print
+what it structurally could not check:
+
+  ADVERSARY: PASS
+  CANNOT FALSIFY:
+    - <what no instrument above could see: no real device, conformance only, no live data...>
+    - <every claim whose instrument did not finish. An unfinished instrument is RED, never
+       neutral: "we could not reproduce it" and "it is not a problem" are different sentences.>
+
+An interrupted verification blocks the claim it was going to prove. Report it as `unverifiable`
+and escalate to the signer rather than letting it read as an absence.
+</cannot_falsify>
+
+<adjudicate>
+You do not decide the verdict. You propose findings; `scripts/adjudicate.py` decides. This is not
+ceremony: a critic asked whether its own criticism is complete has no way to answer and will always
+say no, which is why the loop never closed before.
+
+Write your findings as a `kernel.verdict/v1` document (schema:
+`schemas/kernel.verdict.v1.schema.json`), then run:
+
+```bash
+python3 scripts/adjudicate.py findings.json --text --strict
+# exit 0 = PASS · 1 = FAIL · 2 = INVALID (usually an empty cannot_falsify)
+```
+
+Report what it returns. Do not overrule it, and do not restate its verdict in your own words.
+A PreToolUse gate (`hooks/scripts/verdict-gate.sh`) refuses any verdict whose stated outcome
+disagrees with adjudication of its own findings, so disagreeing is not available to you anyway.
+</adjudicate>
+
+agentdb verdict pass|fail '{"tested":[...],"evidence":"<actual_output>","big5":"pass|fail","cannot_falsify":[...],"quarantined":[...]}'
+
+Surface to GitHub: if github-oss/production profile and issue exists, post verdict as issue
+comment with PASS/FAIL badge, the CANNOT FALSIFY block, and the quarantined list. File each
+quarantined finding as an issue with its `distance:N` label and the `quarantine` milestone. The
+issue tracker IS the ledger; do not keep a parallel document.
 </verdict>
 
 <ask_user>
@@ -113,7 +199,13 @@ Surface to GitHub: if github-oss/production profile and issue exists, post verdi
 - trust_claims: Run actual commands. Paste output.
 - trust_surgeon_summary: The summary describes intent. The file describes reality. Read the
   file. Modelmind surgeon claimed drag-and-drop was implemented; the file had only types.
-- soft_pass: PASS or FAIL. No exceptions.
+- soft_pass: PASS or FAIL. No exceptions. (Narrowing the FAIL bar is not a soft pass: the
+  verdict stays binary, the threshold moved.)
+- flat_severity: ten phases each able to veto is how a review process drifts toward instruments
+  that cannot fail. Route through the fail_bar.
+- silent_coverage: a PASS with no CANNOT FALSIFY block is not a PASS.
+- ask_if_complete: never ask discovery whether criticism is complete. It cannot answer and will
+  always say no. Completeness is acceptance's call.
 - fix_bugs: Surgeon's job. Document and FAIL.
 </anti_patterns>
 
@@ -131,6 +223,13 @@ agentdb write-end '{"agent":"adversary","result":"pass|fail","phases_completed":
 - [ ] Edge cases tested (3+ categories)
 - [ ] Regression suite passed
 - [ ] Evidence is actual output
+- [ ] Every FAIL clears the fail_bar (pasted output + distance threshold + observable + on-objective)
+- [ ] CANNOT FALSIFY printed on PASS
+- [ ] Quarantined findings filed as issues with distance labels
+- [ ] Every finding carries a dimension
+- [ ] Acceptance profile read; stage label NOT treated as the decision
+- [ ] Acceptance record checked; a frozen commit reopened only on a recognised event
+- [ ] Findings adjudicated by scripts/adjudicate.py (not by you)
 - [ ] Verdict written to AgentDB
 </checklist>
 
