@@ -1,6 +1,6 @@
 {
   "name": "kernel-marketplace",
-  "description": "Fences, not leashes: enforced boundaries for Claude Code in auto mode",
+  "description": "Fences, not leashes: enforced boundaries for Claude Code in auto mode, and a review loop that can say yes",
   "owner": {
     "name": "Aria Han"
   },
@@ -8,8 +8,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Fences, not leashes: enforced boundaries for Claude Code in auto mode",
-      "version": "9.3.0"
+      "description": "Fences, not leashes: enforced boundaries for Claude Code in auto mode, and a review loop that can say yes",
+      "version": "9.4.0"
     }
   ]
 }

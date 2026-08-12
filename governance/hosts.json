@@ -19,7 +19,6 @@
     "hook until #191. It lives here, not in the generator, so it cannot be",
     "chosen without the evidence rule above applying to it."
   ],
-
   "kernel_lifecycle_bindings": [
     "SessionStart",
     "SessionEnd",
@@ -30,7 +29,6 @@
     "PreCompact",
     "PermissionRequest"
   ],
-
   "hosts": {
     "claude": {
       "display_name": "Claude Code",
@@ -57,7 +55,6 @@
       "verified_by": "Claude Code 2.1.220 plugin runtime; bindings exercised by tests/run-tests.sh lifecycle suite",
       "verified_on": "2026-07-29"
     },
-
     "codex": {
       "display_name": "Codex",
       "instruction_file": "AGENTS.md",
@@ -89,14 +86,17 @@
       "verified_on": "2026-07-29"
     }
   },
-
   "interface": {
     "displayName": "KERNEL",
-    "shortDescription": "Fences, not leashes: enforced boundaries for Claude Code in auto mode",
+    "shortDescription": "Fences, not leashes: enforced boundaries for Claude Code in auto mode, and a review loop that can say yes",
     "longDescription": "KERNEL fences your Claude Code agent instead of leashing it. Destructive commands are blocked by hooks, not approved by tired humans; irreversible operations require a one-time token only a human can open; independent verifiers check finished work without seeing the builder's reasoning; every claim carries a receipt. And the fences learn: mistakes a session survives become durable memory that blocks them next time. Review outcomes, not keystrokes.",
     "developerName": "Aria Han",
     "category": "Engineering",
-    "capabilities": ["Read", "Write", "Interactive"],
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
     "websiteURL": "https://github.com/ariaxhan/kernel-claude",
     "brandColor": "#111111",
     "defaultPrompt": [

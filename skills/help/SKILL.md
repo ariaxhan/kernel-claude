@@ -13,7 +13,7 @@ kernel:
 <skill id="help">
 
 <purpose>
-Quick reference for KERNEL v9.3.0.
+Quick reference for KERNEL v9.4.0.
 One primitive: skills (methodology, workflows, state transitions, validators,
 operators). Agents, manifests, philosophy, and current plugin status.
 </purpose>
