@@ -168,9 +168,17 @@ Never ask a reviewer whether criticism is complete; it cannot answer and will al
 </verdict_rules>
 
 <on_complete>
+Emit findings as a `kernel.verdict/v1` document and let the acceptance function decide. The
+reviewer never grades its own completeness.
+
 ```bash
-agentdb write-end '{"command":"review","verdict":"X","critical":N,"high":N,"big5_violations":N}'
+python3 scripts/adjudicate.py findings.json --text --strict   # 0 PASS · 1 FAIL · 2 INVALID
+agentdb write-end '{"command":"review","verdict":"X","critical":N,"high":N,"big5_violations":N,"quarantined":N}'
 ```
+
+`cannot_falsify` is mandatory and non-empty. State what this review structurally could not see
+(no real device, conformance only, no live data, a suite that did not finish). Silence about
+coverage reads as coverage.
 </on_complete>
 
 </skill>

@@ -320,6 +320,21 @@
       "degraded_mode": "fail-open-loud"
     },
     {
+      "id": "verdict-gate",
+      "script": "hooks/scripts/verdict-gate.sh",
+      "class": "gate",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [
+        "jq",
+        "python3"
+      ],
+      "degraded_mode": "fail-closed",
+      "rationale": "Refuses a review verdict that nobody can rely on: an empty cannot_falsify, or a stated outcome that disagrees with adjudication of its own findings. Inert on writes that are not verdict documents; where it applies, a missing dependency REFUSES rather than waving the verdict through. Review has no natural stopping condition, so acceptance has to be a mechanism rather than the last reviewer's opinion (#204)."
+    },
+    {
       "id": "warn-hardcoded",
       "script": "hooks/scripts/warn-hardcoded.sh",
       "class": "advisory",

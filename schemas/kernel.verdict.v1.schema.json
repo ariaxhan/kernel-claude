@@ -1,0 +1,204 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kernel.verdict.v1",
+  "title": "KERNEL review verdict",
+  "description": "A typed review outcome. Findings are proposed by a critic and adjudicated by scripts/adjudicate.py, which the critic does not get to be. Untyped findings cannot be adjudicated, which is why open-ended review never terminates: with everything a free-text string, no policy can be computed over it and the last reviewer to speak wins by default. Refs ariaxhan/kernel-claude#204.",
+  "type": "object",
+  "required": [
+    "schema",
+    "verdict",
+    "cannot_falsify"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "kernel.verdict/v1",
+      "x-kernel-enforced-by": "hook"
+    },
+    "verdict": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "INVALID"
+      ],
+      "description": "PASS when no finding clears the block bar. FAIL when at least one does. INVALID when the verdict itself is malformed, most often an empty cannot_falsify. INVALID is not a soft pass: it means nobody may rely on this run.",
+      "x-kernel-enforced-by": "hook"
+    },
+    "objective": {
+      "type": "object",
+      "description": "What the project is for. Severity is a function of the finding AND this. A reviewer given no objective defaults to production rigor every time, because that is the safest-looking answer and it costs the reviewer nothing.",
+      "properties": {
+        "statement": {
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
+        },
+        "tier": {
+          "enum": [
+            "demo",
+            "real",
+            "critical"
+          ],
+          "description": "demo: survive one scripted walkthrough on a date; off-script findings are quarantine by definition. real: people depend on it, mistakes recoverable. critical: money, health, privacy, irreversible; here the review tax is worth paying.",
+          "x-kernel-enforced-by": "agent"
+        },
+        "date": {
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
+        }
+      },
+      "x-kernel-enforced-by": "agent"
+    },
+    "cannot_falsify": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      },
+      "description": "MANDATORY and non-empty on every verdict, PASS or FAIL. What no instrument in this run could structurally see, plus every claim whose instrument did not finish. Silence about coverage reads as coverage. Two flagship gates in this ecosystem printed PASS for weeks because ripgrep was not installed; the exit code was swallowed and nothing said so.",
+      "x-kernel-enforced-by": "hook"
+    },
+    "blocking": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/finding"
+      },
+      "x-kernel-enforced-by": "compiler"
+    },
+    "quarantined": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/finding"
+      },
+      "x-kernel-enforced-by": "compiler"
+    },
+    "escalate": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/finding"
+      },
+      "description": "Findings that could be neither reproduced nor refuted. They do not block by default and they do not vanish either: the signer waives in writing or blocks. This exists because an interrupted verification otherwise reads as a neutral absence.",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "x-kernel-enforced-by": "compiler"
+    },
+    "counts": {
+      "type": "object",
+      "x-kernel-enforced-by": "compiler"
+    },
+    "validation_rate": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "x-kernel-enforced-by": "compiler"
+    }
+  },
+  "definitions": {
+    "finding": {
+      "type": "object",
+      "required": [
+        "summary",
+        "severity",
+        "distance",
+        "validated"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "summary": {
+          "type": "string",
+          "x-kernel-enforced-by": "agent"
+        },
+        "severity": {
+          "enum": [
+            "blocker",
+            "major",
+            "minor",
+            "nit"
+          ],
+          "description": "Only blocker may block. Ten phases each able to veto independently is flat severity, and flat severity selects for weak instruments: when every finding blocks, the cheapest way to keep shipping is an instrument that finds little.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "distance": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Assumptions outside this change that must be challenged for the finding to matter. 0 the changed code fails; 1 violates a declared invariant; 2 pre-existing defect this change exposed; 3+ needs outside assumptions. Distance sets a PROOF THRESHOLD, never a veto ceiling: the highest-value review on record was distance-3, and a hard cutoff would have auto-closed it.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "validated": {
+          "enum": [
+            "proven",
+            "refuted",
+            "pending",
+            "unverifiable"
+          ],
+          "description": "Criticism is not evidence. Only proven may block. unverifiable routes to escalate, never to silence.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "on_objective": {
+          "type": "boolean",
+          "description": "Does this affect what the project is actually for? Off-objective never blocks however real, proven and distance-0 it is.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "observable": {
+          "type": "string",
+          "description": "The stopping wager: predict a specific failure and how we would see it. No observable, no block. Scored WITH distance, never instead of it, since a far-fetched observable is cheap to invent.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "repro": {
+          "type": "string",
+          "description": "Pasted output from an executed command. Not a described procedure, not a reading of the code.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "consequence": {
+          "type": "string",
+          "description": "Required at distance 2: the user-visible cost of the pre-existing defect this change exposed.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "evidence_kind": {
+          "enum": [
+            "executed_demonstration",
+            "cited_prior_failure",
+            "observed_outcome"
+          ],
+          "description": "Required at distance 3+. Taste never clears this bar; a playtest record does.",
+          "x-kernel-enforced-by": "compiler"
+        },
+        "instrument": {
+          "type": "string",
+          "description": "The exact command that tests this.",
+          "x-kernel-enforced-by": "agent"
+        },
+        "invalidated_by": {
+          "type": "string",
+          "description": "The diff that voids this evidence. Claims expire on a diff, not a timer.",
+          "x-kernel-enforced-by": "agent"
+        },
+        "issue": {
+          "type": "string",
+          "description": "Issue number once filed. Quarantined findings live in the issue tracker with a distance label, not in a parallel document.",
+          "x-kernel-enforced-by": "agent"
+        },
+        "routed": {
+          "enum": [
+            "blocking",
+            "quarantine",
+            "escalate"
+          ],
+          "x-kernel-enforced-by": "compiler"
+        },
+        "not_blocking_because": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "compiler"
+        }
+      }
+    }
+  }
+}

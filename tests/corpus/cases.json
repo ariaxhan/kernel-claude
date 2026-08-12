@@ -384,6 +384,58 @@
           "command": "{{COMMIT_THEN_REAL_COMMAND}}"
         }
       }
+    },
+    {
+      "id": "verdict-gate/blocks-verdict-with-no-declared-blind-spots",
+      "gate": "verdict-gate",
+      "expect": "block",
+      "why": "A PASS that declares nothing it could not check is the fail-dark class wearing a verdict. Two flagship gates in this ecosystem printed PASS for weeks because ripgrep was missing; silence about coverage reads as coverage.",
+      "input": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "/tmp/verdict.json",
+          "content": "{\"schema\": \"kernel.verdict/v1\", \"verdict\": \"PASS\", \"cannot_falsify\": [], \"findings\": [{\"summary\": \"all checks green\", \"severity\": \"nit\", \"distance\": 0, \"validated\": \"proven\", \"on_objective\": true}]}"
+        }
+      }
+    },
+    {
+      "id": "verdict-gate/blocks-pass-over-its-own-blocking-finding",
+      "gate": "verdict-gate",
+      "expect": "block",
+      "why": "The critic proposes findings; adjudication decides the verdict. An agent writing PASS over a proven distance-0 blocker with pasted output is the reviewer grading its own homework.",
+      "input": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "/tmp/verdict.json",
+          "content": "{\"schema\": \"kernel.verdict/v1\", \"verdict\": \"PASS\", \"cannot_falsify\": [\"conformance only\"], \"findings\": [{\"summary\": \"auth accepts an expired token\", \"severity\": \"blocker\", \"distance\": 0, \"validated\": \"proven\", \"on_objective\": true, \"observable\": \"expired JWT returns 200\", \"repro\": \"$ curl -H 'Authorization: Bearer <expired>' /me\\n200 OK\"}]}"
+        }
+      }
+    },
+    {
+      "id": "verdict-gate/allows-honest-pass-with-quarantined-nit",
+      "gate": "verdict-gate",
+      "expect": "allow",
+      "why": "APPROVE must stay reachable with open non-blocking comments, or the gate recreates the tax it exists to end. A nit quarantines and the verdict is still PASS.",
+      "input": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "/tmp/verdict.json",
+          "content": "{\"schema\": \"kernel.verdict/v1\", \"verdict\": \"PASS\", \"cannot_falsify\": [\"no real device: software keyboard and focus zoom are outside every instrument here\"], \"findings\": [{\"summary\": \"naming could be clearer\", \"severity\": \"nit\", \"distance\": 1, \"validated\": \"pending\", \"on_objective\": true}]}"
+        }
+      }
+    },
+    {
+      "id": "verdict-gate/allows-unrelated-write",
+      "gate": "verdict-gate",
+      "expect": "allow",
+      "why": "Armed by payload only. A file that does not declare kernel.verdict/v1 is none of this gate's business.",
+      "input": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "/tmp/notes.md",
+          "content": "# just some notes\n"
+        }
+      }
     }
   ]
 }

@@ -151,6 +151,24 @@ An interrupted verification blocks the claim it was going to prove. Report it as
 and escalate to the signer rather than letting it read as an absence.
 </cannot_falsify>
 
+<adjudicate>
+You do not decide the verdict. You propose findings; `scripts/adjudicate.py` decides. This is not
+ceremony: a critic asked whether its own criticism is complete has no way to answer and will always
+say no, which is why the loop never closed before.
+
+Write your findings as a `kernel.verdict/v1` document (schema:
+`schemas/kernel.verdict.v1.schema.json`), then run:
+
+```bash
+python3 scripts/adjudicate.py findings.json --text --strict
+# exit 0 = PASS · 1 = FAIL · 2 = INVALID (usually an empty cannot_falsify)
+```
+
+Report what it returns. Do not overrule it, and do not restate its verdict in your own words.
+A PreToolUse gate (`hooks/scripts/verdict-gate.sh`) refuses any verdict whose stated outcome
+disagrees with adjudication of its own findings, so disagreeing is not available to you anyway.
+</adjudicate>
+
 agentdb verdict pass|fail '{"tested":[...],"evidence":"<actual_output>","big5":"pass|fail","cannot_falsify":[...],"quarantined":[...]}'
 
 Surface to GitHub: if github-oss/production profile and issue exists, post verdict as issue
@@ -197,6 +215,7 @@ agentdb write-end '{"agent":"adversary","result":"pass|fail","phases_completed":
 - [ ] Every FAIL clears the fail_bar (pasted output + distance threshold + observable + on-objective)
 - [ ] CANNOT FALSIFY printed on PASS
 - [ ] Quarantined findings filed as issues with distance labels
+- [ ] Findings adjudicated by scripts/adjudicate.py (not by you)
 - [ ] Verdict written to AgentDB
 </checklist>
 
