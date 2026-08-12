@@ -2,6 +2,93 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.4.0] - 2026-08-12
+
+Review gets a termination protocol. Until now KERNEL could tell an agent to be thorough
+but had no way to tell it to stop, so the reviewer answered "can I find anything else?"
+rather than "is this shippable?" and the loop never closed. Acceptance is now a mechanism
+that runs, not an instruction the critic is trusted to follow.
+
+### Added
+- **`scripts/adjudicate.py`, the acceptance function.** The critic proposes findings; this
+  decides the verdict, and the critic does not get to be the judge. A finding blocks only
+  with all four of: pasted output from an executed command, a cleared distance proof
+  threshold, a named observable failure, and a violation of the acceptance profile.
+  Everything else quarantines and the run still returns PASS. The decision stays binary;
+  what moved is the bar.
+- **Distance is a proof threshold, never a veto ceiling.** d0 and d1 need pasted output, d2
+  adds a user-visible consequence, d3+ needs an executed demonstration, a cited prior
+  failure, or an observed outcome. Taste never clears d3; a playtest record does. This is
+  deliberately not a scope cutoff: the highest-value review in this ecosystem, a 2026-08-03
+  teardown that concluded an entire product genre was wrong and forced a pivot, is
+  distance-3, and a hard cutoff would have auto-closed it.
+- **`kernel.acceptance-profile/v1`: severity is a function of the finding AND the context.**
+  A profile states users, data sensitivity, lifetime, availability, blast radius,
+  acceptable failure modes, required evidence, and a `blocks_at` map giving the minimum
+  blocking severity per risk dimension. The same finding is therefore blocking in one
+  context and quarantined in another without anyone editing the finding. The `stage` label
+  is descriptive and adjudication never reads it: a demo handling real people's data still
+  requires production-grade privacy, and a production internal tool may tolerate ugly
+  performance. An omitted dimension defaults to the strictest real setting, because silence
+  in a profile must never quietly widen what ships.
+- **`kernel.acceptance/v1`: finality for an accepted commit.** Records that commit X was
+  accepted under profile Y with its blind spots, known non-blockers, and accepted
+  tradeoffs. That exact commit is then frozen from ordinary re-review. Acceptance is never
+  inherited by a descendant, because every fix invalidates part of the evidence gathered
+  for the commit before it, and a changed profile voids it by hash, because it answered a
+  question nobody is asking any more.
+- **Reopen conditions are a closed set**: `new_failing_input`, `changed_dependency`,
+  `missed_requirement`, `disproven_assumption`, `profile_changed`, `owner_promotion`. An
+  event with no detail is refused. A fresh reviewer, a rephrased concern, or a different
+  architectural preference is deliberately absent: those are exactly what an amnesiac
+  critic generates for free, and letting them reopen settled work IS the tax.
+- **`hooks/scripts/verdict-gate.sh`**, a registered `fail-closed` gate. It refuses a verdict
+  with an empty `cannot_falsify`, a stated outcome that disagrees with adjudication of its
+  own findings, and a FAIL written over a frozen commit with no recognised reopen event.
+  Six corpus cases.
+- **`cannot_falsify` is mandatory on every verdict**, PASS or FAIL. Silence about coverage
+  reads as coverage. An unfinished instrument is red, never neutral: "we could not
+  reproduce it" and "it is not a problem" are different sentences, and the loop launders
+  the first into the second.
+- **`unverifiable` escalates to the signer** rather than filing quietly or blocking by
+  default.
+
+### Changed
+- **`agents/adversary.md` no longer has flat severity.** Ten phases each able to veto
+  independently was the pressure that selects for weak instruments: when every finding
+  blocks, the cheapest way to keep shipping is an instrument that finds little. Coordination
+  and reachability failures keep their absolute FAIL, being distance-0 by construction.
+  The adversary now reads the acceptance record and the acceptance profile, and calls the
+  adjudicator instead of grading itself.
+- **`skills/review` can reach APPROVE with open non-blocking comments.** Say the issue
+  number and approve; forcing another round to re-check a nit costs more than the nit.
+- **Verifiers are blind to the builder's reasoning, never to the acceptance record.**
+  Withholding what was already settled does not buy independence, it buys a reviewer with
+  amnesia who relitigates settled questions for free.
+- `scripts/generate-adapters.py` carries the new hook binding, so both host adapters
+  regenerate from one source rather than being hand-edited.
+
+### Evidence
+- 120-pass controlled experiment on a frozen artifact. The status-quo prompt returned
+  **0/20 clean verdicts at 3.7 findings per pass** on code passing 9/9 of its own tests;
+  the acceptance-contract prompt returned **20/20 PASS**. On a null control whose only
+  change is a reworded docstring, the status-quo prompt averaged **4.6 findings per pass
+  and never once returned clean**, more than on the real patch, so findings-per-pass does
+  not track defect density.
+- 13 adversary transcripts across two projects read directly. The recurring defect class is
+  instruments that cannot fail: two flagship gates printed `PASS` for weeks because
+  ripgrep was not installed and the exit code was swallowed.
+- Falsifying power proven rather than assumed: six defects seeded on purpose into the
+  adjudicator, each confirmed to turn tests red, then restored.
+- 37 new tests. Full suite 449 passed, 0 failed. Violation corpus 32 cases over 8 gates.
+
+### Known limits
+- The changed adversary **prompt** is not behaviorally tested; the adjudicator is
+  (ariaxhan/kernel-claude#207).
+- Whether an acceptance profile suppresses defects it was never told to look for is
+  unmeasured (#206). The honest claim is that the acceptance contract terminates, not that
+  we know what it costs.
+
 ## [9.3.0] - 2026-08-10
 
 Structured questions become the default reply shape instead of an escalation. The agent
