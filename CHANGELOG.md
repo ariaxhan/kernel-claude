@@ -2,6 +2,37 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.5.0] - 2026-08-14
+
+Review gets a deterministic lane and a refutation pass. Until now the review skill was
+judgment all the way down: no machine ground truth beneath the LLM's reading, and no
+systematic defense against plausible-but-wrong findings, which a field study of production
+review tooling (Trail of Bits skills, agent-review-panel, tag1 comprehensive-review) plus a
+mined corpus of 33 real false alarms showed to be the two highest-leverage gaps.
+
+### Added
+- **`scripts/deterministic-review.sh`** — the machines-first lane: gitleaks, semgrep
+  (p/security-audit), eslint, ruff, shellcheck, actionlint, zizmor, and osv-scanner run in
+  parallel, diff-scoped when a base ref is given, normalized to one findings TSV. Missing
+  tools skip their lane and are REPORTED as skipped, never silently dropped. Exit 1 only on
+  HIGH classes (secrets, security SAST, high CVEs). Validated by seeded-defect test:
+  planted secrets and an injection in an isolated repo, confirmed 3/3 caught and nonzero
+  exit. Notable calibration: semgrep's `p/ci` ruleset missed a textbook
+  `subprocess(shell=True)` injection; `p/security-audit` catches it, so that is the pinned
+  config.
+- **`skills/review/reference/refutation-patterns.md`** — 11 false-alarm families (fail-open
+  lookalikes, digest-vs-credential, platform-layer auth, settled-decision violations...),
+  the five refutation moves in cost order, severity gates (falsification check before
+  CRITICAL, consensus deflation, CVE authority-stripping, verify-the-judge), and an
+  anti-rationalization table. Distilled from real refuted findings; projects grow their own
+  corpus of refuted false alarms on top.
+
+### Changed
+- **`skills/review/SKILL.md`** — on_start now runs the deterministic lane before any diff
+  is read, and a `refute_before_report` phase checks every candidate finding against the
+  pattern families before it may enter the report. Refuted candidates ship in the report
+  WITH their refutations.
+
 ## [9.4.0] - 2026-08-12
 
 Review gets a termination protocol. Until now KERNEL could tell an agent to be thorough

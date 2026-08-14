@@ -41,6 +41,19 @@ git diff --staged          # For staged
 git diff HEAD~1            # For recent
 ```
 </identify_scope>
+
+<deterministic_lane>
+Machines first, then judgment. Run before reading a single diff hunk:
+
+```bash
+"${CLAUDE_PLUGIN_ROOT:-.}/scripts/deterministic-review.sh" <repo-dir> [base-ref]
+```
+
+Parallel gitleaks / semgrep(p/security-audit) / eslint / ruff / shellcheck / actionlint /
+zizmor / osv-scanner — whatever is installed; diff-scoped when base-ref given; exit 1 on
+HIGH (secrets, security SAST, high CVEs). Feed findings.tsv into the review as ground
+truth. Lanes marked SKIPPED are reported as NOT CHECKED, never as clean.
+</deterministic_lane>
 </on_start>
 
 <confidence_threshold>
@@ -108,6 +121,16 @@ detection: grep -r "catch.*{}" (empty catch)
 - [ ] Appropriate caching
 </section>
 </checklist>
+
+<refute_before_report>
+Before a finding enters the report, check it against
+reference/refutation-patterns.md (11 false-alarm families + 5 refutation moves).
+A finding matching a family needs evidence distinguishing it from the refuted precedent.
+Severity gates from the same file apply: falsification check before CRITICAL, consensus
+deflation, authority stripping on CVEs, and the judge's own additions get refuted too.
+Refuted candidates go in the report WITH their refutations; if the project keeps a
+refutation-corpus file, append new refuted false alarms to it in the same session.
+</refute_before_report>
 
 <output_format>
 CODE REVIEW
