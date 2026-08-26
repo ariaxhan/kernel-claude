@@ -21,6 +21,13 @@ codex plugin marketplace add ariaxhan/kernel-claude
 codex plugin add kernel@kernel-marketplace
 ```
 
+Gemini CLI (methodology only: the 27 skills and `llms.txt` as ambient context; the hooks, the
+approval token, and agentdb do not run on this host):
+
+```bash
+gemini extensions install https://github.com/ariaxhan/kernel-claude
+```
+
 Restart the host, then run `/kernel:help` on Claude Code or `$kernel:help` on Codex to confirm the
 install and list every skill. Requires `git`, `sqlite3`, `jq`, `python3`, `bash`.
 

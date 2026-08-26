@@ -2389,6 +2389,62 @@ test_dream_command_registered_in_plugin_json() {
 
 # --- Version Sync Tests ---
 
+# --- Gemini CLI extension -------------------------------------------------
+# The root manifest is the Gemini gallery's only requirement, but
+# `gemini extensions install` resolves to the latest RELEASE, so what actually
+# reaches a user is the asset built by scripts/build-gemini-extension.sh. Two
+# things must hold: the manifest is valid and names a context file that exists,
+# and the bundle carries every skill while carrying NONE of the Claude-format
+# agents or hooks. Shipping those printed 10 agent-validation errors and 4 failed
+# hooks per Gemini session on gemini-cli 0.44.1 -- measured, not assumed.
+test_gemini_manifest_is_valid() {
+  python3 - "$PLUGIN_ROOT" <<'GEMPY'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+cfg = json.loads((root / "gemini-extension.json").read_text())
+assert cfg["name"] == "kernel", cfg["name"]
+assert cfg["contextFileName"] == "llms.txt", cfg["contextFileName"]
+assert (root / cfg["contextFileName"]).exists(), "contextFileName does not exist"
+# KERNEL ships no MCP server; declaring one would be a false capability claim.
+assert "mcpServers" not in cfg, "KERNEL ships no MCP server"
+desc = cfg["description"]
+for claim in ("hook", "agentdb", "Claude Code and Codex only"):
+    assert claim in desc, "description must state the %s boundary" % claim
+GEMPY
+}
+
+test_gemini_bundle_excludes_incompatible_host_files() {
+  local out asset listing bundled expected rc=0
+  out=$(mktemp -d) || return 1
+  if ! "$PLUGIN_ROOT/scripts/build-gemini-extension.sh" "$out" >/dev/null 2>&1; then
+    /bin/rm -rf "$out"
+    echo "FAIL: build-gemini-extension.sh did not run"
+    return 1
+  fi
+  asset="$out/kernel-gemini-extension.tar.gz"
+  listing=$(tar -tzf "$asset")
+  # Flat layout: the manifest sits at the archive root, so Gemini needs no unwrapping.
+  grep -qx "./gemini-extension.json" <<<"$listing" || { echo "FAIL: manifest not at bundle root"; rc=1; }
+  grep -qx "./llms.txt" <<<"$listing"              || { echo "FAIL: llms.txt missing from bundle"; rc=1; }
+  if grep -qE '^\./(agents|hooks|commands|policies)/' <<<"$listing"; then
+    echo "FAIL: bundle ships a host-incompatible directory"
+    rc=1
+  fi
+  bundled=$(grep -c 'SKILL.md$' <<<"$listing")
+  expected=$(find "$PLUGIN_ROOT/skills" -maxdepth 2 -name SKILL.md | wc -l | tr -d ' ')
+  [ "$bundled" = "$expected" ] || { echo "FAIL: bundle has $bundled skills, repo has $expected"; rc=1; }
+  /bin/rm -rf "$out"
+  return $rc
+}
+
+test_release_docs_document_gemini_install() {
+  grep -q 'gemini extensions install https://github.com/ariaxhan/kernel-claude' "$PLUGIN_ROOT/README.md" || return 1
+  grep -q 'gemini extensions install https://github.com/ariaxhan/kernel-claude' "$PLUGIN_ROOT/llms.txt" || return 1
+  # Honesty gate: neither doc may advertise Gemini without naming what does not run there.
+  grep -q 'Install for Gemini CLI' "$PLUGIN_ROOT/llms.txt" || return 1
+  grep -q 'no agentdb recall' "$PLUGIN_ROOT/llms.txt" || return 1
+}
+
 test_version_sync_all() {
   # plugin.json is the source of truth; EVERY canonical declaration must match it.
   # Drift here = a release that shipped a stale version somewhere. Bump via
@@ -2402,6 +2458,9 @@ test_version_sync_all() {
   grep -qF "<kernel version=\"$v\">" "$PLUGIN_ROOT/CLAUDE.md"      || { echo "FAIL: CLAUDE.md <kernel version> != $v"; fail=1; }
   grep -qF "KERNEL v$v" "$PLUGIN_ROOT/skills/help/SKILL.md"            || { echo "FAIL: skills/help/SKILL.md KERNEL version != $v"; fail=1; }
   grep -qF "Version $v." "$PLUGIN_ROOT/llms.txt"                       || { echo "FAIL: llms.txt Version != $v"; fail=1; }
+  local gv
+  gv=$(python3 -c "import json; print(json.load(open('$PLUGIN_ROOT/gemini-extension.json'))['version'])")
+  [ "$gv" = "$v" ]                                                 || { echo "FAIL: gemini-extension.json ($gv) != plugin.json ($v)"; fail=1; }
   return $fail
 }
 
@@ -5556,6 +5615,9 @@ run_test_suite() {
       ;;
     version_sync)
       run_test "all canonical version declarations in sync" test_version_sync_all
+      run_test "gemini-extension.json is valid and honest" test_gemini_manifest_is_valid
+      run_test "gemini bundle excludes Claude-format agents and hooks" test_gemini_bundle_excludes_incompatible_host_files
+      run_test "README and llms.txt document the Gemini install" test_release_docs_document_gemini_install
       ;;
     release_docs)
       run_test "active docs reject stale claims" test_release_docs_reject_stale_live_claims
