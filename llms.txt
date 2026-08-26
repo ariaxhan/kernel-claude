@@ -6,7 +6,7 @@
 > that carries lessons between sessions.
 
 Repository: https://github.com/ariaxhan/kernel-claude
-License: MIT. Version 9.5.2. Requires `git`, `sqlite3`, `jq`, `python3`, `bash`.
+License: MIT. Version 9.5.3. Requires `git`, `sqlite3`, `jq`, `python3`, `bash`.
 
 ## What it is
 
@@ -62,6 +62,21 @@ Restart Codex, then invoke `$kernel:init`. Two differences: Codex does not imple
 `PostToolUseFailure`, so `capture-error.sh` is unbound and tool-error recording degrades to what
 `PostToolUse` observes; and Codex maps KERNEL's agent roles onto its own rather than registering
 the Claude Code agent definitions natively. Matrix: `docs/kernel-9/HOST-CAPABILITIES.md`.
+
+## Install for Gemini CLI
+
+```bash
+gemini extensions install https://github.com/ariaxhan/kernel-claude
+```
+
+Gemini CLI gets the methodology layer only: the 27 skills and this file as ambient context. It does
+not get the enforcement layer. Gemini CLI 0.44.1 implements no `PreToolUse`, `PostToolUse`,
+`UserPromptSubmit`, `Stop`, `PreCompact`, `PermissionRequest`, or `PostToolUseFailure` event, which
+is where every KERNEL guardrail binds, and it does not substitute `${CLAUDE_PLUGIN_ROOT}` in a hook
+command. So: no destructive-command blocking, no secret-write blocking, no one-time approval token,
+no agentdb recall. The command above installs a curated release bundle carrying only
+`gemini-extension.json`, `llms.txt`, `LICENSE`, and `skills/`, so no Claude-format hook or agent
+definition is loaded and no host-mismatch errors are printed.
 
 ## What it adds
 

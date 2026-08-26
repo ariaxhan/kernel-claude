@@ -11,6 +11,7 @@
 #   AGENTS.md + CLAUDE.md             generated from the canonical template
 #   skills/help/SKILL.md              KERNEL vX.Y.Z
 #   llms.txt                          Version X.Y.Z
+#   gemini-extension.json             "version"
 #
 # NOT touched here (human-authored per release, intentionally version-specific prose):
 #   - plugin.json / marketplace.json `description` highlight (v7.x: ...)
@@ -43,6 +44,7 @@ sub('.claude-plugin/marketplace.json', r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(
 sub('.codex-plugin/plugin.json',       r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(")',     rf'\g<1>{new}\g<2>')
 sub('skills/help/SKILL.md',            r'(KERNEL v)[0-9]+\.[0-9]+\.[0-9]+',               rf'\g<1>{new}')
 sub('llms.txt',                        r'(Version )[0-9]+\.[0-9]+\.[0-9]+',              rf'\g<1>{new}')
+sub('gemini-extension.json',           r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(")',     rf'\g<1>{new}\g<2>')
 # NOTE: governance/kernel.md.tmpl no longer carries a hardcoded version — it uses the
 # {{VERSION}} token, which generate-governance.py derives from plugin.json below. So the
 # template is not stamped here; regenerating governance is what propagates the version.
@@ -51,6 +53,7 @@ sub('llms.txt',                        r'(Version )[0-9]+\.[0-9]+\.[0-9]+',     
 assert json.load(open('.claude-plugin/plugin.json'))['version'] == new, "plugin.json"
 assert json.load(open('.claude-plugin/marketplace.json'))['plugins'][0]['version'] == new, "marketplace.json"
 assert json.load(open('.codex-plugin/plugin.json'))['version'] == new, "codex plugin.json"
+assert json.load(open('gemini-extension.json'))['version'] == new, "gemini-extension.json"
 print(f"OK: all canonical declarations at {new}")
 print("Remember (human-authored): update the description highlight + add a CHANGELOG entry.")
 PY
