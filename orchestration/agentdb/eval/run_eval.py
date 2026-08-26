@@ -109,7 +109,7 @@ def main(argv):
 
     if not args.quiet:
         print("=" * 64)
-        print("agentdb recall eval  (%d gold queries, backend: %s)" % (len(gold), args.backend or "auto"))
+        print("agentdb recall evaluation (%d gold queries, backend: %s)" % (len(gold), args.backend or "auto"))
         print("-" * 64)
         print("  %-10s %8s %8s %8s %8s %8s" % ("arm", "r@1", "r@3", "r@5", "r@10", "MRR"))
         for label, m in (("FTS-only", m_base), ("HYBRID", m_hyb)):

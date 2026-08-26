@@ -2,7 +2,7 @@
 
 All notable changes to KERNEL are documented in this file.
 
-## [9.5.2] - 2026-08-26
+## [9.5.4] - 2026-08-26
 
 Guards that refuse teach nothing; hooks that correct teach in the same turn.
 
@@ -91,6 +91,68 @@ that rewrite or coach instead of refusing.
 ### Tests
 - 14 new cases in `tests/run-tests.sh`: eight guard precision cases (five must-pass shapes,
   three must-block shapes) and six hook cases (rewrite, coach, silence on clean input).
+
+## [9.5.3] - 2026-08-26
+
+Gemini CLI can load KERNEL's methodology layer. It cannot load the enforcement layer, and the
+release now makes that difference structural rather than a footnote.
+
+### Added
+- **`gemini-extension.json`** at the repo root. `name`, `version`, `description`, and
+  `contextFileName: llms.txt`. No `mcpServers` key, because KERNEL ships no MCP server and
+  declaring one would be a false capability claim. The description states plainly what runs on
+  Gemini (the 27 skills, `llms.txt` as ambient context) and what does not (the PreToolUse hooks,
+  the one-time approval token, agentdb recall).
+- **`scripts/build-gemini-extension.sh`**, which builds the single release asset
+  `kernel-gemini-extension.tar.gz`: the manifest, `llms.txt`, `LICENSE`, and `skills/`, packed
+  flat, and nothing else. `gemini extensions install <github-url>` resolves to the latest release
+  and prefers a lone platform-neutral asset over GitHub's source tarball, so this is what a Gemini
+  user actually gets.
+- **Three tests in the `version_sync` suite**: the manifest is valid and names the boundary in its
+  description, the bundle carries all 27 skills and none of `agents/`, `hooks/`, `commands/`, or
+  `policies/`, and both `README.md` and `llms.txt` document the Gemini install alongside what does
+  not run there. `gemini-extension.json` joins the canonical version declarations checked by
+  `test_version_sync_all` and bumped by `scripts/bump-version.sh`.
+
+### Why the bundle instead of the source tarball
+Measured against gemini-cli 0.44.1, not assumed. Gemini discovers `skills/`, `agents/`,
+`hooks/hooks.json`, and `policies/` by convention, relative to the extension root. `skills/` is
+compatible: KERNEL's `name`/`description` frontmatter is exactly what Gemini wants, and all 27 load.
+The other two collide. Claude agent definitions declare `tools` as a comma-separated string where
+Gemini's schema requires an array, which printed 10 validation errors on every session and every
+extension command. `hooks/hooks.json` is worse: Gemini leaves unknown hydration keys literal, so
+`${CLAUDE_PLUGIN_ROOT}` never resolves; it reads `timeout` as milliseconds rather than seconds; and
+it implements none of PreToolUse, PostToolUse, UserPromptSubmit, Stop, PreCompact,
+PermissionRequest, or PostToolUseFailure. Installing the source tarball produced 7 "Invalid hook
+event name" warnings, SessionStart 0 of 3 hooks succeeded, and SessionEnd 0 of 1. Installing the
+curated bundle produces none of that. This is the same failure class as the `CODEX_PLUGIN_ROOT`
+defect in #191: a host substitutes the variable names it knows, and a name it does not know is not
+a warning, it is a hook running an absolute path off `/`.
+
+## [9.5.2] - 2026-08-26
+
+The reader this repo optimises for is now an agent deciding whether to install it.
+
+### Added
+- **`llms.txt`** (llmstxt.org format, under 150 lines): what KERNEL is in mechanism terms,
+  the exact install command sequence for Claude Code and for Codex, every hook, skill, and
+  agent with its `/kernel:<name>` and `$kernel:<name>` invocation form, what to run first,
+  and when not to use it. Stated limits ride along with the pitch: the hooks are a tripwire,
+  not a sandbox, and remote Claude Code sessions cannot load plugins at all.
+- **`README.md` `## For agents`**, the first section under the title: two fenced blocks an
+  agent can execute verbatim, one per host, and a pointer to `llms.txt`. The human pitch
+  keeps its place directly below.
+
+### Changed
+- **`governance/hosts.json`** interface descriptions are written for agent search rather than
+  for a human browsing a marketplace listing. "Fences, not leashes" was a good line and a bad
+  index entry: it names no host, no mechanism, and no artifact. The replacements name Claude
+  Code, Codex, hooks, agentdb, verification, and auto mode, which are the words an agent
+  actually queries.
+- **`scripts/generate-adapters.py`** keywords now lead with `claude-code`, `codex`, `plugin`,
+  `hooks`, `guardrails`, `agent-memory`, `agentdb`, `verification`, `auto-mode`, and `safety`.
+  The previous seven are kept, not replaced. Both plugin manifests and the marketplace
+  manifest are regenerated from those two sources, so no manifest was hand-edited.
 
 ## [9.5.1] - 2026-08-26
 

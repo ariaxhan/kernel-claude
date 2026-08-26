@@ -155,8 +155,9 @@ def build_plugin_manifest(host_key: str, host: dict, spec: dict) -> dict:
         "repository": base.get("repository"),
         "license": base.get("license", "MIT"),
         "keywords": [
-            "adaptive-execution", "agentdb", "memory", "safety",
-            "orchestration", "handoff", "methodology",
+            "claude-code", "codex", "plugin", "hooks", "guardrails",
+            "agent-memory", "agentdb", "verification", "auto-mode", "safety",
+            "adaptive-execution", "memory", "orchestration", "handoff", "methodology",
         ],
     }
 
