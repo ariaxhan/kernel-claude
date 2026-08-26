@@ -75,6 +75,13 @@ that rewrite or coach instead of refusing.
   `rm -rf "$HOME"/*` and `"/"*` (a glob after the closing quote) now block too. One added
   test was brittle (asserted empty output where an unrelated note is legitimate); it now
   asserts the absence of a rewrite.
+- Third blind pass: the respelling class was dead, but the body-flag check was still a
+  denylist and `--json @file`, `-K config` and `CURL_HOME=` carried a file-staged secret out
+  (confirmed live against a listener). The curl/wget option set is now an allowlist as well:
+  header, output, write-out, method, timeout, retry, user-agent, proxy, the silent/fail/
+  location/include family, and exactly one URL; any other token, any env assignment on the
+  segment, or any second bare word blocks. `rm -rf "$HOME"/` with a bare trailing slash
+  blocks. Two more tests carry the reproducers.
 
 ### Tests
 - 14 new cases in `tests/run-tests.sh`: eight guard precision cases (five must-pass shapes,

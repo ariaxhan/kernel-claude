@@ -1464,6 +1464,17 @@ test_guard_bash_keychain_allowlist_mixed_quotes_pass() {
   _gb 'K=$(security find-generic-password -s svc -w) && curl -sf -H '"'"'Authorization: Bearer '"'"'\"$K\" https://api.example.com/v1/x'
   assert_exit_code 0 "$?" "a header built from adjacent quoted pieces is still one header word"
 }
+test_guard_bash_keychain_option_allowlist() {
+  local S='K=$(security find-generic-password -s svc -w)' r=""
+  _gb "$S && echo \$K > /tmp/f && curl -H \\\"Authorization: Bearer x\\\" --json @/tmp/f https://api.example.com/a"; r="$r$?"
+  _gb "$S && echo \$K > /tmp/f && curl -H \\\"Authorization: Bearer x\\\" -K /tmp/f https://api.example.com/a"; r="$r$?"
+  _gb "$S && echo \$K > /tmp/f && CURL_HOME=/tmp curl -H \\\"Authorization: Bearer x\\\" https://api.example.com/a"; r="$r$?"
+  _gb "$S && curl -sSfL -m 20 -o /tmp/out -w '%{http_code}' -X GET -H \\\"Authorization: Bearer \$K\\\" https://api.example.com/a"; r="$r$?"
+  assert_equals "2220" "$r" "--json/-K/CURL_HOME block; the plain allowlisted option set passes"
+}
+test_guard_bash_blocks_root_home_trailing_slash() {
+  _gb 'rm -rf \"$HOME\"/'; assert_exit_code 2 "$?" "a bare trailing slash after the quote is still home"
+}
 test_guard_bash_blocks_root_home_glob_after_quote() {
   _gb 'rm -rf \"$HOME\"/*'; local a=$?
   _gb 'rm -rf \"/\"*'; local b=$?
@@ -2078,7 +2089,7 @@ test_critical_guard_scripts_unchanged_for_820() {
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-80ea124693e124b084917b8e2c1bc11e27a1981656addc9e80814880c38e5da5 guard-bash.sh
+b112a2855efd8bb7a545f8ccf2c6b005596d6a80001f174f28fad68d3b122612 guard-bash.sh
 6a885672ad9f643bc0ac60cc3cfe3f2366a890faaa3a4bee132afb2d99cde731 guard-config.sh
 d3611267b4f135c5b96e8a4a8af60f296b196efc135e3dfbef63d7683065608c detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
@@ -5452,6 +5463,8 @@ run_test_suite() {
       run_test "verifier pass 2: keychain respellings block" test_guard_bash_keychain_allowlist_respellings_block
       run_test "verifier pass 2: mixed-quote Authorization header passes" test_guard_bash_keychain_allowlist_mixed_quotes_pass
       run_test "verifier pass 2: glob after quote blocks" test_guard_bash_blocks_root_home_glob_after_quote
+      run_test "verifier pass 3: curl option allowlist" test_guard_bash_keychain_option_allowlist
+      run_test "verifier pass 3: trailing slash after quote blocks" test_guard_bash_blocks_root_home_trailing_slash
       run_test "verifier: autocorrect never redirects a write" test_autocorrect_bash_never_redirects_a_write
       run_test "verifier: sed -i \"\" untouched" test_autocorrect_bash_sed_i_empty_dquote_untouched
       run_test "verifier: heredoc body untouched by R9/R10" test_autocorrect_bash_heredoc_body_untouched

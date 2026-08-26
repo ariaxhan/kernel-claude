@@ -308,7 +308,7 @@ rm_targets_root_home() {
   # Quotes are optional on both sides: `rm -rf "$HOME"` and `rm -rf '/'` are the same wipe.
   # (Pre-existing miss found by the 9.5.2 blind verifier; the regex had required bare whitespace.)
   # A trailing glob after the quote (`"$HOME"/*`, `"/"*`) is the same wipe (second-pass find).
-  echo "$1" | grep -qE '(^|[[:space:]])["'"'"']?(/|/\*|~|~/|~/\*|\$HOME/?|\$\{HOME\}/?)["'"'"']?(/?\*+)?([[:space:]]|$)'
+  echo "$1" | grep -qE '(^|[[:space:]])["'"'"']?(/|/\*|~|~/|~/\*|\$HOME/?|\$\{HOME\}/?)["'"'"']?/?(\*+)?([[:space:]]|$)'
 }
 while IFS= read -r _seg; do
   if rm_recursive_force "$_seg" && rm_targets_root_home "$_seg"; then
@@ -395,7 +395,27 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[
       # (`-H 'Authorization: Bearer '"$K"` is one word to the shell).
       _noh=$(printf '%s' "$_seg" | sed -E 's/-H[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]"'"'"'])+//g')
       printf '%s' "$_noh" | grep -q '\$' && { _kc_exfil=1; break; }
-      printf '%s' "$_seg" | grep -qE '(^|[[:space:]])(-d|--data[a-z-]*|-F|--form|-T|--upload-file|--post-data|--post-file)([[:space:]=]|$)' && { _kc_exfil=1; break; }
+      # The option set is an allowlist too (third blind pass: `--json @file`, `-K config` and
+      # `CURL_HOME=` carried a staged secret out past a denylist of body flags). Quoted words
+      # collapse to one token; a quoted https URL keeps its text. Any token not on the list,
+      # any env assignment on the segment, any second bare word: block.
+      _toks=$(printf '%s' "$_seg" | sed -E 's/"(https:\/\/[^"]*)"/\1/g; s/'"'"'(https:\/\/[^'"'"']*)'"'"'/\1/g; s/"[^"]*"/Q/g; s/'"'"'[^'"'"']*'"'"'/Q/g')
+      _ok=1; _skip=0; _seen_cmd=0; _url_n=0
+      for _t in $_toks; do
+        if [ "$_skip" = 1 ]; then _skip=0; continue; fi
+        if [ "$_seen_cmd" = 0 ]; then
+          case "$_t" in curl|wget) _seen_cmd=1;; *=*) _ok=0; break;; *) ;; esac
+          continue
+        fi
+        case "$_t" in
+          -H|--header|-o|--output|-w|--write-out|-X|--request|-m|--max-time|--retry|-A|--user-agent|--connect-timeout|-x|--proxy) _skip=1;;
+          -[sSfLiIN]*) case "$_t" in -[sSfLiIN]*[!sSfLiIN]*) _ok=0; break;; esac;;
+          --silent|--show-error|--fail|--fail-with-body|--location|--include|--head|--no-progress-meter|--compressed) ;;
+          https://*) _url_n=$((_url_n+1));;
+          Q|*) _ok=0; break;;
+        esac
+      done
+      [ "$_ok" = 1 ] && [ "$_url_n" = 1 ] || { _kc_exfil=1; break; }
     done < <(printf '%s\n' "$COMMAND_CODE" | tr ';|&' '\n')
     if [ "$_kc_exfil" = 1 ]; then
       block "keychain read combined with network egress that carries the secret OUT (body/upload, plaintext http, raw ip, or a raw socket)." "Authenticate with an Authorization header over https; never put a keychain value in a request body."
