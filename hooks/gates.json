@@ -28,6 +28,34 @@
       "rationale": "Auto-approves demonstrably safe commands. Its dangerous direction is YES, so when it cannot evaluate it emits no decision and the human is asked."
     },
     {
+      "id": "autocorrect-bash",
+      "script": "hooks/scripts/autocorrect-bash.py",
+      "class": "advisory",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Bash",
+      "external_deps": [
+        "python3"
+      ],
+      "degraded_mode": "fail-open-loud",
+      "rationale": "Rewrites known-wrong shell invocations (dropped && after cd, GNU flags on macOS, python on python3-only hosts, unescaped backticks in a message) and announces each rewrite. Cannot refuse; a missing interpreter means no correction, which the guard behind it tolerates."
+    },
+    {
+      "id": "autocorrect-tool-input",
+      "script": "hooks/scripts/autocorrect-tool-input.py",
+      "class": "advisory",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "WebFetch|Read|Edit|mcp__claude-in-chrome__.*",
+      "external_deps": [
+        "python3"
+      ],
+      "degraded_mode": "fail-open-loud",
+      "rationale": "Fills or reshapes tool input the model gets wrong mechanically (WebFetch prompt, Chrome tabIds, Read offset on big files). Cannot refuse."
+    },
+    {
       "id": "autopush",
       "script": "hooks/scripts/autopush.sh",
       "class": "advisory",
@@ -282,6 +310,20 @@
         "jq"
       ],
       "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "syntax-coach",
+      "script": "hooks/scripts/syntax-coach.py",
+      "class": "advisory",
+      "events": [
+        "PostToolUse"
+      ],
+      "matcher": "Bash",
+      "external_deps": [
+        "python3"
+      ],
+      "degraded_mode": "fail-open-loud",
+      "rationale": "Reads Bash output regardless of exit code and names the correct form after a usage banner, illegal option, not-found, or failed cd. Post-hoc and additive only."
     },
     {
       "id": "test-gate",

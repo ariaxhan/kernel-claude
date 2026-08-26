@@ -140,8 +140,19 @@ if printf '%s' "$COMMAND" | grep -qE '(git[[:space:]]+(commit|tag)|gh[[:space:]]
   fi
 fi
 
+# (9.5.2) An interpreter-fed heredoc is only CODE if its body can execute a subprocess. A python
+# script that analyses transcripts and holds the string 'git branch -D' in a literal cannot
+# run git; a script that calls subprocess/os.system/child_process/system()/backticks can. Six
+# false positives in two weeks came from analysis scripts quoting the very commands this guard
+# watches. Bodies without an execution primitive are stripped like any other data heredoc.
+_heredoc_feeds_executor() {
+  printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash)[^|;&]*<<' && return 0
+  printf '%s' "$COMMAND" | grep -qE '(python[0-9.]*|perl|ruby|node)[^|;&]*<<' || return 1
+  printf '%s' "$COMMAND" | grep -qE 'subprocess|os\.system|os\.popen|os\.exec|shutil\.rmtree|child_process|execSync|spawnSync|spawn\(|exec\(|system\(|Open3|IO\.popen|`[^`]*(rm|git|curl)' && return 0
+  return 1
+}
 if printf '%s' "$COMMAND" | grep -q '<<'; then
-  if ! printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node)[^|;&]*<<'; then
+  if ! _heredoc_feeds_executor; then
     COMMAND_CODE=$(printf '%s' "$COMMAND_CODE" | awk '
       BEGIN { in_doc = 0 }
       {
@@ -221,8 +232,37 @@ printf '%s' "$LOW" | grep -qE 'git +clean +-[a-z]*f' \
 # safe delete indistinguishable from the destructive one and blocked `git branch -d`
 # five times across three sessions in one day. A guard that cries wolf on the safe form
 # of a command teaches people to override it, which costs more than it ever saves.
-printf '%s' "$COMMAND_CODE" | grep -qE 'git +branch +(-[a-zA-Z]*D|--delete --force|--force --delete)' \
-  && block "git branch -D force-deletes a branch (may drop unmerged commits)." "Confirm it's merged, or use -d (safe delete)."
+# (9.5.2) -D on a branch that is already merged into HEAD or its upstream drops nothing, and
+# that is what 17 of 17 blocked -D calls in two weeks were: post-merge cleanup, each retried
+# with -d. Branches that git would refuse to -d are still blocked. Names are checked against
+# the repo the command runs in (a `cd X &&` / `git -C X` prefix is honoured).
+_branch_D_unmerged() {
+  local _seg _dir _names _n _repo
+  while IFS= read -r _seg; do
+    printf '%s' "$_seg" | grep -qE 'git +(-C +[^ ]+ +)?branch +(-[a-zA-Z]*D|--delete --force|--force --delete)' || continue
+    _repo="$PWD"
+    _dir=$(printf '%s' "$_seg" | sed -nE 's/.*git +-C +([^ ]+) +branch.*/\1/p')
+    [ -n "$_dir" ] && _repo="$_dir"
+    _names=$(printf '%s' "$_seg" | sed -E 's/.*git +(-C +[^ ]+ +)?branch +//' | tr ' ' '\n' | grep -vE '^(-|$)' | sed -E "s/^[\"']//; s/[\"']$//")
+    [ -n "$_names" ] || return 0
+    for _n in $_names; do
+      git -C "$_repo" rev-parse --verify -q "refs/heads/$_n" >/dev/null 2>&1 || return 0   # unknown branch: keep the block
+      git -C "$_repo" branch --merged HEAD 2>/dev/null | sed 's/^[* +] *//' | grep -qx "$_n" && continue
+      _up=$(git -C "$_repo" rev-parse --abbrev-ref "$_n@{upstream}" 2>/dev/null)
+      [ -n "$_up" ] && git -C "$_repo" merge-base --is-ancestor "$_n" "$_up" 2>/dev/null && continue
+      return 0
+    done
+  done < <(printf '%s\n' "$COMMAND_CODE" | tr ';|&' '\n')
+  return 1
+}
+_cd_prefix=$(printf '%s' "$COMMAND_CODE" | sed -nE 's/^[[:space:]]*cd[[:space:]]+("[^"]+"|[^[:space:];&|]+).*/\1/p' | head -1 | sed -E "s/^\"//; s/\"$//")
+if printf '%s' "$COMMAND_CODE" | grep -qE 'git +(-C +[^ ]+ +)?branch +(-[a-zA-Z]*D|--delete --force|--force --delete)'; then
+  if [ -n "$_cd_prefix" ] && [ -d "$_cd_prefix" ]; then
+    ( cd "$_cd_prefix" && _branch_D_unmerged ) && block "git branch -D force-deletes a branch (may drop unmerged commits)." "Confirm it's merged, or use -d (safe delete)."
+  else
+    _branch_D_unmerged && block "git branch -D force-deletes a branch (may drop unmerged commits)." "Confirm it's merged, or use -d (safe delete)."
+  fi
+fi
 printf '%s' "$LOW" | grep -qE 'filter-repo|filter-branch|(^| )bfg( |$)' \
   && block "git history rewrite (filter-repo/filter-branch/bfg) is destructive + non-collaborative." "Verify a backup ref exists first."
 
@@ -248,23 +288,33 @@ printf '%s' "$LOW" | grep -qE '>[[:space:]]*/dev/(r?disk|sd|nvme|hd)' \
   && block "overwrite of a raw disk device." "Refusing to redirect into a block device."
 
 # --- Recursive forced rm of root or home (common flag orderings) ---
+# (9.5.2) Both tests run on COMMAND_CODE (data heredocs stripped) and on the SAME shell
+# segment. The old form grepped the raw command for `rm -rf` anywhere and for a bare ` / `
+# anywhere else, so `rm -rf "$SCRATCH" && cat > note.md <<'EOF' ... a / b ... EOF` was
+# refused as a root wipe (6 false positives in two weeks, zero true ones).
 rm_recursive_force() {
-  echo "$COMMAND" | grep -qE '\brm\b' || return 1
-  echo "$COMMAND" | grep -qE '\brm\b[^;&|]*(-[a-zA-Z]*[rR][a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*[rR])' && return 0
-  { echo "$COMMAND" | grep -qE '\brm\b[^;&|]*-[a-zA-Z]*[rR]([[:space:]]|$)' \
-    && echo "$COMMAND" | grep -qE '\brm\b[^;&|]*-[a-zA-Z]*f([[:space:]]|$)'; } && return 0
-  { echo "$COMMAND" | grep -qE '\brm\b[^;&|]*--recursive' \
-    && echo "$COMMAND" | grep -qE '\brm\b[^;&|]*--force'; } && return 0
-  echo "$COMMAND" | grep -qE '\brm\b[^;&|]*--no-preserve-root' && return 0
+  local _s="$1"
+  echo "$_s" | grep -qE '\brm\b' || return 1
+  echo "$_s" | grep -qE '\brm\b[^;&|]*(-[a-zA-Z]*[rR][a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*[rR])' && return 0
+  { echo "$_s" | grep -qE '\brm\b[^;&|]*-[a-zA-Z]*[rR]([[:space:]]|$)' \
+    && echo "$_s" | grep -qE '\brm\b[^;&|]*-[a-zA-Z]*f([[:space:]]|$)'; } && return 0
+  { echo "$_s" | grep -qE '\brm\b[^;&|]*--recursive' \
+    && echo "$_s" | grep -qE '\brm\b[^;&|]*--force'; } && return 0
+  echo "$_s" | grep -qE '\brm\b[^;&|]*--no-preserve-root' && return 0
   return 1
 }
 # Targets root or home ITSELF (not a subdir): / , /* , ~ , ~/ , ~/* , $HOME .
 rm_targets_root_home() {
-  echo "$COMMAND" | grep -qE '(^|[[:space:]])(/|/\*|~|~/|~/\*|\$HOME/?|\$\{HOME\}/?)([[:space:]]|$)'
+  # Quotes are optional on both sides: `rm -rf "$HOME"` and `rm -rf '/'` are the same wipe.
+  # (Pre-existing miss found by the 9.5.2 blind verifier; the regex had required bare whitespace.)
+  # A trailing glob after the quote (`"$HOME"/*`, `"/"*`) is the same wipe (second-pass find).
+  echo "$1" | grep -qE '(^|[[:space:]])["'"'"']?(/|/\*|~|~/|~/\*|\$HOME/?|\$\{HOME\}/?)["'"'"']?/?(\*+)?([[:space:]]|$)'
 }
-if rm_recursive_force && rm_targets_root_home; then
+while IFS= read -r _seg; do
+  if rm_recursive_force "$_seg" && rm_targets_root_home "$_seg"; then
     block "Refusing recursive forced delete of root or home." "Target a specific subdirectory, not / or ~."
-fi
+  fi
+done < <(printf '%s\n' "$COMMAND_CODE" | tr ';|&' '\n')
 
 # --- Recursive chmod/chown of root or home ITSELF (bricks the account/login) ---
 if printf '%s' "$LOW" | grep -qE '(chmod|chown)[[:space:]]+(-[a-z]*r|--recursive)'; then
@@ -300,7 +350,10 @@ fi
 # --- T3 EXFILTRATION: secret material + network egress in one command (irreversible) ---
 # Egress tools that carry data out. ssh/scp identity flags are excluded from the
 # credential-path rule below to avoid false-positives on `scp -i ~/.ssh/key` usage.
-if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[:space:]]|$)'; then
+# (9.5.2, fourth blind pass) `/usr/bin/curl`, `\curl`, `command curl`, `env curl` and
+# `sh -c "curl ..."` are curl too; the detector matches the basename after any path,
+# backslash, wrapper word, or opening quote. Pre-existing miss, closed here.
+if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(curl|wget|nc|ncat|sftp)([[:space:]"'"'"']|$)'; then
   # A LITERAL secret token inline with an egress tool. Env-var references ($KEY) pass.
   printf '%s' "$COMMAND" | grep -qE 'AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN[A-Z ]*PRIVATE KEY|eyJ[A-Za-z0-9_-]{17,}\.eyJ' \
     && block "a literal secret appears in the same command as a network egress tool -- exfiltration cannot be undone." "Reference secrets via environment variables (\$VAR), never inline."
@@ -313,8 +366,65 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[
       block "a credential file (~/.ssh, ~/.aws, .env, private key) is referenced in the same command as a network egress tool." "This is the exfiltration signature (Nx s1ngularity class). Separate the read from any network call, or hand to the human."
     fi
   fi
-  printf '%s' "$LOW" | grep -qE 'security[[:space:]]+find-(generic|internet)-password' \
-    && block "keychain read combined with network egress in one command." "Extract-and-send of keychain secrets is exfiltration."
+  # (9.5.2) A keychain read whose value goes into an Authorization header of an https request
+  # is AUTHENTICATION, and it is the sanctioned way to use a secret that lives in the keychain
+  # (15 of 15 blocked calls in two weeks were exactly this: `K=$(security find-generic-password
+  # -s <svc> -w) && curl -H "Authorization: Bearer $K" https://api.<vendor>/...`). Exfiltration
+  # is the secret leaving as a BODY or an UPLOAD, or going to a plaintext / raw-socket target.
+  if printf '%s' "$LOW" | grep -qE 'security[[:space:]]+find-(generic|internet)-password'; then
+    _kc_exfil=0
+    printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(nc|ncat|sftp)([[:space:]]|$)' && _kc_exfil=1
+    printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*http://' && ! printf '%s' "$LOW" | grep -qE 'http://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])' && _kc_exfil=1
+    printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*(-d|--data|--data-binary|--data-raw|--data-urlencode|-f |--form|-t |--upload-file|--post-data|--post-file)[^;|&]*(\$|@-|@/dev/stdin)' && _kc_exfil=1
+    printf '%s' "$LOW" | grep -qE 'security[[:space:]]+find-(generic|internet)-password[^;&]*\|[^;&]*(curl|wget|nc|ncat)' && _kc_exfil=1
+    # POSITIVE allowlist, not a list of bad spellings. The 9.5.2 blind verifier walked past
+    # every negative rule by respelling (URL in a variable, HTTPS://, hex IP, user@host). A
+    # text guard can only defend a shape it can fully recognise, so a curl/wget segment that
+    # shares a command with a keychain read is allowed ONLY when all of these hold:
+    #   * exactly one URL token, a lowercase literal https:// with a dotted alphabetic host
+    #     (or localhost), optional port, path free of $ @ and quotes;
+    #   * an -H "Authorization: ..." header is present;
+    #   * outside -H arguments the segment contains no $ at all (no variable URL, no
+    #     substitution, no smuggled value);
+    #   * no body/upload flag.
+    # Anything else in that segment blocks. gh / env-only commands have no such segment.
+    # Backslash-newline continuations are joined first so a multi-line curl is one segment.
+    while IFS= read -r _seg; do
+      printf '%s' "$_seg" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(curl|wget)([[:space:]"'"'"']|$)' || continue
+      _nurl=$(printf '%s' "$_seg" | grep -oiE '[a-z][a-z0-9+.-]*://[^[:space:]"'"'"']*' | wc -l | tr -d ' ')
+      [ "$_nurl" = 1 ] || { _kc_exfil=1; break; }
+      printf '%s' "$_seg" | grep -qE '(^|[[:space:]"'"'"'])https://(localhost|[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,})(:[0-9]+)?(/[^[:space:]"'"'"'$@]*)?(["'"'"']|[[:space:]]|$)' || { _kc_exfil=1; break; }
+      printf '%s' "$_seg" | grep -qiE -- '(^|[[:space:]])-H[[:space:]]+["'"'"']?authorization:' || { _kc_exfil=1; break; }
+      # Strip each -H argument as ONE shell word, including adjacent quoted pieces
+      # (`-H 'Authorization: Bearer '"$K"` is one word to the shell).
+      _noh=$(printf '%s' "$_seg" | sed -E 's/-H[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]"'"'"'])+//g')
+      printf '%s' "$_noh" | grep -q '\$' && { _kc_exfil=1; break; }
+      # The option set is an allowlist too (third blind pass: `--json @file`, `-K config` and
+      # `CURL_HOME=` carried a staged secret out past a denylist of body flags). Quoted words
+      # collapse to one token; a quoted https URL keeps its text. Any token not on the list,
+      # any env assignment on the segment, any second bare word: block.
+      _toks=$(printf '%s' "$_seg" | sed -E 's/"(https:\/\/[^"]*)"/\1/g; s/'"'"'(https:\/\/[^'"'"']*)'"'"'/\1/g; s/"[^"]*"/Q/g; s/'"'"'[^'"'"']*'"'"'/Q/g')
+      _ok=1; _skip=0; _seen_cmd=0; _url_n=0
+      for _t in $_toks; do
+        if [ "$_skip" = 1 ]; then _skip=0; continue; fi
+        if [ "$_seen_cmd" = 0 ]; then
+          case "$_t" in curl|wget) _seen_cmd=1;; *=*) _ok=0; break;; *) ;; esac
+          continue
+        fi
+        case "$_t" in
+          -H|--header|-o|--output|-w|--write-out|-X|--request|-m|--max-time|--retry|-A|--user-agent|--connect-timeout) _skip=1;;
+          -[sSfLiIN]*) case "$_t" in -[sSfLiIN]*[!sSfLiIN]*) _ok=0; break;; esac;;
+          --silent|--show-error|--fail|--fail-with-body|--location|--include|--head|--no-progress-meter|--compressed) ;;
+          https://*) _url_n=$((_url_n+1));;
+          Q|*) _ok=0; break;;
+        esac
+      done
+      [ "$_ok" = 1 ] && [ "$_url_n" = 1 ] || { _kc_exfil=1; break; }
+    done < <(printf '%s\n' "$COMMAND_CODE" | awk '{ if (sub(/\\$/, "")) { printf "%s ", $0 } else { print } }' | tr ';|&' '\n')
+    if [ "$_kc_exfil" = 1 ]; then
+      block "keychain read combined with network egress that carries the secret OUT (body/upload, plaintext http, raw ip, or a raw socket)." "Authenticate with an Authorization header over https; never put a keychain value in a request body."
+    fi
+  fi
 fi
 
 # --- T5 SCOPE ESCAPE: permission bypass, silent persistence, auto-executed config ---

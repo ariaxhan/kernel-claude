@@ -2,6 +2,96 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.5.4] - 2026-08-26
+
+Guards that refuse teach nothing; hooks that correct teach in the same turn.
+
+A 14-day audit of one operator's transcripts (1235 errored tool calls, 20k tool calls,
+five Claude models plus Codex) found the largest error class was KERNEL's own guards and
+their vault-level siblings refusing commands (23%), ahead of path guessing (11%) and ahead of
+every genuine syntax slip combined. Of the guard refusals, every keychain block, every
+`branch -D` block and every "root or home" block was a false positive. Separately, 91 of 98
+wrong invocations that printed a usage banner returned exit 0 behind `| head` or `;`, so the
+model never learned it had failed. The fix is two-sided: make the guard precise, and add hooks
+that rewrite or coach instead of refusing.
+
+### Added
+- **`hooks/scripts/autocorrect-bash.py`** (PreToolUse Bash, runs before the guard): deterministic,
+  meaning-preserving rewrites via `updatedInput`, each announced through `additionalContext` so
+  the corrected form is what the model copies next. `cd X cmd` with the `&&` dropped; relative
+  `cd` that resolves to exactly one directory under the project; `python` -> `python3` on
+  python3-only hosts; `cat -A` -> `cat -vet` and `sed -i` -> `sed -i ''` on macOS. Notes only
+  (no rewrite) for `grep -P` and missing coreutils. Logs to `~/.kernel/autocorrect.jsonl`.
+  Second round, after the operator said the first was not enough: R2b resolves a wrong path
+  handed to a read-only command (cat/sed/head/...) to the one file of that name under the
+  project, or lists the directory it should have looked in (87 path guesses in 14 days);
+  R8 escapes backticks and `$(` inside a double-quoted `-m`/`-b`/`-t` message; R9 to R11
+  carry over the deterministic rules from the Vaults `bash-guard` that used to BLOCK (bare
+  `recall` -> `agentdb recall`, `:!_x` -> `:(exclude)_x`, `rg -h` -> `--no-filename`);
+  R12/R13 warn before a heredoc inside `$(...)` or a `${x:-{}}` default corrupts a payload.
+  `autocorrect-tool-input.py` does the same for Read/Edit paths that do not exist.
+- **`hooks/scripts/syntax-coach.py`** (PostToolUse Bash): reads the tool output regardless of
+  exit code and, on a usage banner, `illegal option`, `command not found`, a failed `cd`, or a
+  known git misuse, injects one line naming the exact correct form. Silent on clean runs and on
+  deliberate `--help` reads.
+- **`hooks/scripts/autocorrect-tool-input.py`** (PreToolUse WebFetch|Read|Chrome MCP): adds the
+  required `prompt` to a WebFetch call that lacks it (53 silent failures from one headless job);
+  converts `tabIds` given as a string; converts `browser_batch` `{tool, params}` to
+  `{name, input}`; adds `offset`/`limit` to a Read over the 256KB cap; explains `file://`
+  refusal with the serve-then-navigate recipe.
+
+### Fixed
+- **`hooks/scripts/guard-bash.sh`** precision, each change carrying its production evidence:
+  a keychain read feeding an `Authorization` header over https is authentication, not
+  exfiltration (15 of 15 blocks); the block now fires only when the secret goes out as a
+  body/upload, over plaintext http, to a raw IP, or through nc/sftp. `git branch -D` on a
+  branch already merged into HEAD or its upstream passes (17 of 17 blocks were post-merge
+  cleanup); unknown or unmerged branches still block. The root/home `rm -rf` check runs on
+  the data-stripped view and per shell segment (6 false positives from a bare `/` inside a
+  heredoc). An interpreter-fed heredoc counts as code only when its body can execute a
+  subprocess, so an analysis script holding `'git branch -D'` in a string literal passes while
+  `subprocess.run('git branch -D main')` still blocks.
+- Two new `read` loops in the guard used `printf '%s'` without a trailing newline, which made
+  `read -r` skip the final segment; caught by the sample battery before release, recorded here
+  so the shape is not repeated.
+- Blind verification (instrument-breaker, outcome axis, 47 shapes) returned NOT SAFE on the
+  first cut and was right four times: the keychain relaxation checked only negative signals,
+  so a secret in a URL query string reached an arbitrary https host, and raw IPv6 / decimal
+  hosts passed the IPv4-only raw-host test (now: any `$` inside a URL argument blocks, and any
+  bracketed or all-digit host counts as raw); `sed` sat in the read-only list so R2b could
+  redirect `sed -i` to a same-named file elsewhere (removed); R5 double-applied on `-i ""`
+  (lookahead now requires a script-shaped token); R9/R10 rewrote heredoc bodies (line-scoped
+  like every other rule). It also found a pre-existing miss in the function this release
+  edits: `rm -rf "$HOME"` and `rm -rf '/'` passed because the root/home regex required bare
+  whitespace around the target; quotes are now optional. Two advisory hooks crashed on a
+  non-dict `tool_input`; they now exit 0. Seven regression tests carry the reproducers.
+- Second blind pass: still NOT SAFE, and the reason is the lesson of the release. The keychain
+  fix had patched three spellings, not the class: a URL in a variable, `HTTPS://`, a hex host
+  and `user@host` all walked past rules that matched URL text. A text guard can only defend a
+  shape it fully recognises, so the rule is now a POSITIVE allowlist: a curl/wget segment that
+  shares a command with a keychain read passes only with exactly one lowercase literal
+  `https://` URL to a dotted alphabetic host (or localhost), an `-H Authorization` header, no
+  `$` anywhere outside the header words, and no body/upload flag. Everything else blocks.
+  `rm -rf "$HOME"/*` and `"/"*` (a glob after the closing quote) now block too. One added
+  test was brittle (asserted empty output where an unrelated note is legitimate); it now
+  asserts the absence of a rewrite.
+- Third blind pass: the respelling class was dead, but the body-flag check was still a
+  denylist and `--json @file`, `-K config` and `CURL_HOME=` carried a file-staged secret out
+  (confirmed live against a listener). The curl/wget option set is now an allowlist as well:
+  header, output, write-out, method, timeout, retry, user-agent, proxy, the silent/fail/
+  location/include family, and exactly one URL; any other token, any env assignment on the
+  segment, or any second bare word blocks. `rm -rf "$HOME"/` with a bare trailing slash
+  blocks. Two more tests carry the reproducers.
+- Fourth blind pass: SAFE TO MERGE (13 of 15 new shapes blocked; the two misses were
+  pre-existing). Its follow-ups are folded in anyway: the egress tool detector now matches
+  `curl` after a path, backslash, wrapper word or quote (`/usr/bin/curl`, `sh -c "curl"`),
+  `-x/--proxy` leaves the option allowlist, and backslash-newline continuations are joined
+  before segmenting so a multi-line curl is judged whole.
+
+### Tests
+- 14 new cases in `tests/run-tests.sh`: eight guard precision cases (five must-pass shapes,
+  three must-block shapes) and six hook cases (rewrite, coach, silence on clean input).
+
 ## [9.5.3] - 2026-08-26
 
 Gemini CLI can load KERNEL's methodology layer. It cannot load the enforcement layer, and the
