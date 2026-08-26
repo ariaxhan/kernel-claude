@@ -29,6 +29,10 @@ codex-cli 0.147.0 hard-clamps SessionEnd hook timeouts and says so on every sess
 
 - **PostToolUseFailure** — Not implemented by Codex 0.146.0. Exact symbol search over the shipped binary returns zero occurrences, while every lifecycle event Kernel binds on this host returns 17 or more. Kernel's capture-error.sh is therefore not bound on this host, and error capture degrades to what PostToolUse can observe.
 
+### Codex — capabilities lost to a ceiling
+
+- **red-suite detection** — Kernel's session-end.sh runs the test gate as its last block, after the AgentDB write. Under the 3s SessionEnd ceiling the write survives and the gate does not, and this repo's own suite is 446 tests at roughly 100s. On Codex there is therefore no _meta/.test-status verdict and no _meta/plans/tests-red.md, so the SessionStart red-suite flag never fires. Red-suite detection is Claude-only until the gate is redesigned to run outside SessionEnd.
+
 ## Adapter targets
 
 ### Claude Code (`claude`)
