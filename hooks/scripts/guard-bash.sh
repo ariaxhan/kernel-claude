@@ -305,7 +305,9 @@ rm_recursive_force() {
 }
 # Targets root or home ITSELF (not a subdir): / , /* , ~ , ~/ , ~/* , $HOME .
 rm_targets_root_home() {
-  echo "$1" | grep -qE '(^|[[:space:]])(/|/\*|~|~/|~/\*|\$HOME/?|\$\{HOME\}/?)([[:space:]]|$)'
+  # Quotes are optional on both sides: `rm -rf "$HOME"` and `rm -rf '/'` are the same wipe.
+  # (Pre-existing miss found by the 9.5.2 blind verifier; the regex had required bare whitespace.)
+  echo "$1" | grep -qE '(^|[[:space:]])["'"'"']?(/|/\*|~|~/|~/\*|\$HOME/?|\$\{HOME\}/?)["'"'"']?([[:space:]]|$)'
 }
 while IFS= read -r _seg; do
   if rm_recursive_force "$_seg" && rm_targets_root_home "$_seg"; then
@@ -371,7 +373,13 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[
     printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*http://' && ! printf '%s' "$LOW" | grep -qE 'http://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])' && _kc_exfil=1
     printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*(-d|--data|--data-binary|--data-raw|--data-urlencode|-f |--form|-t |--upload-file|--post-data|--post-file)[^;|&]*(\$|@-|@/dev/stdin)' && _kc_exfil=1
     printf '%s' "$LOW" | grep -qE 'security[[:space:]]+find-(generic|internet)-password[^;&]*\|[^;&]*(curl|wget|nc|ncat)' && _kc_exfil=1
-    printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*https?://[0-9]{1,3}(\.[0-9]{1,3}){3}' && _kc_exfil=1
+    # Raw host: dotted IPv4, bracketed IPv6, or an all-digit (decimal-encoded) host.
+    printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*https?://(\[|[0-9]+([./:"'"'"' ]|$))' && _kc_exfil=1
+    # The secret may only travel in a header. A `$` anywhere inside a URL argument means the
+    # value (or a substitution of it) is in the query string or path: that is the exfil shape
+    # a header rule must refuse, and the shape the 9.5.2 verifier walked straight through.
+    printf '%s' "$COMMAND_CODE" | grep -qE '(curl|wget)[^;|&]*https?://[^[:space:]"'"'"']*\$' && _kc_exfil=1
+    printf '%s' "$COMMAND_CODE" | grep -qE '(curl|wget)[^;|&]*"https?://[^"]*\$[^"]*"' && _kc_exfil=1
     if [ "$_kc_exfil" = 1 ]; then
       block "keychain read combined with network egress that carries the secret OUT (body/upload, plaintext http, raw ip, or a raw socket)." "Authenticate with an Authorization header over https; never put a keychain value in a request body."
     fi

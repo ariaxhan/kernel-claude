@@ -54,6 +54,17 @@ that rewrite or coach instead of refusing.
 - Two new `read` loops in the guard used `printf '%s'` without a trailing newline, which made
   `read -r` skip the final segment; caught by the sample battery before release, recorded here
   so the shape is not repeated.
+- Blind verification (instrument-breaker, outcome axis, 47 shapes) returned NOT SAFE on the
+  first cut and was right four times: the keychain relaxation checked only negative signals,
+  so a secret in a URL query string reached an arbitrary https host, and raw IPv6 / decimal
+  hosts passed the IPv4-only raw-host test (now: any `$` inside a URL argument blocks, and any
+  bracketed or all-digit host counts as raw); `sed` sat in the read-only list so R2b could
+  redirect `sed -i` to a same-named file elsewhere (removed); R5 double-applied on `-i ""`
+  (lookahead now requires a script-shaped token); R9/R10 rewrote heredoc bodies (line-scoped
+  like every other rule). It also found a pre-existing miss in the function this release
+  edits: `rm -rf "$HOME"` and `rm -rf '/'` passed because the root/home regex required bare
+  whitespace around the target; quotes are now optional. Two advisory hooks crashed on a
+  non-dict `tool_input`; they now exit 0. Seven regression tests carry the reproducers.
 
 ### Tests
 - 14 new cases in `tests/run-tests.sh`: eight guard precision cases (five must-pass shapes,

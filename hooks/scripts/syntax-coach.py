@@ -110,7 +110,10 @@ def main():
         return
     if data.get("tool_name") not in (None, "Bash"):
         return
-    command = (data.get("tool_input") or {}).get("command") or ""
+    if not isinstance(data, dict):
+        return
+    ti = data.get("tool_input")
+    command = (ti.get("command") if isinstance(ti, dict) else None) or ""
     outp = text_of(data.get("tool_response"))
     if not outp:
         return

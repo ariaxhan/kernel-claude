@@ -214,11 +214,13 @@ def rule_sed_i(command, notes):
         return command
     if have("gsed") and re.search(r"(^|\s)gsed\s", command):
         return command
-    pat = re.compile(r"(^|[|;&(]\s*|\s)sed\s+(-[a-zA-Z]*)?-i\s+(?=(['\"]|s/|s\|))")
+    # The token after -i must LOOK like a sed script (s/, y/, an address, -e), not an empty
+    # suffix (`''` or `""`) and not a real suffix like .bak. `-i ""` was double-applied before
+    # the 9.5.2 blind verifier caught it.
+    pat = re.compile(r"(^|[|;&(]\s*|\s)sed\s+(-[a-zA-Z]*)?-i\s+(?=['\"]?(?:[sy]/|s\||[0-9]+[,!]?|/|\$|-e\b|-E\b|-n\b))")
     new = pat.sub(lambda m: f"{m.group(1)}sed {m.group(2) or ''}-i '' ", command)
     if new != command:
-        # avoid double-applying when the agent already wrote -i ''
-        if re.search(r"sed\s+(-[a-zA-Z]*)?-i\s+''\s+''", new):
+        if re.search(r"""sed\s+(-[a-zA-Z]*)?-i\s+(''|"")\s+(''|"")""", new):
             return command
         notes.append("R5 rewrote `sed -i` -> `sed -i ''`: BSD sed needs an explicit (empty) backup suffix, "
                      "otherwise the script is eaten as the suffix and you get `invalid command code`.")
@@ -252,7 +254,9 @@ def rule_backticks_in_text_args(command, notes):
     return out_cmd
 
 
-READ_CMDS = ("cat", "head", "tail", "sed", "wc", "less", "more", "nl", "sort", "uniq", "stat", "file", "md5", "shasum")
+# Strictly read-only commands. `sed` is NOT here: `sed -i` writes, and redirecting a write to a
+# same-named file elsewhere is a silent clobber (found by the 9.5.2 blind verifier).
+READ_CMDS = ("cat", "head", "tail", "wc", "less", "more", "nl", "stat", "file", "md5", "shasum")
 
 
 def find_by_basename(path, project_dir):
@@ -314,20 +318,31 @@ def rule_house_forms(command, notes):
     R9  bare `recall|learn ...` at command start -> `agentdb recall|learn ...`   (~173 blocks lifetime)
     R10 git pathspec `:!_x` (leading _ parses as pathspec magic) -> `:(exclude)_x`   (~20)
     R11 `rg -h` means --help, not --no-filename -> `rg --no-filename`   (misread of grep -h)"""
-    new = command
-    new2 = re.sub(r"(^|[;&|]\s*)(recall|learn|write-end|read-start)(\s)", r"\1agentdb \2\3", new, flags=re.M)
-    if new2 != new:
+    # Line-scoped like every other rule: heredoc BODIES are data and are never rewritten
+    # (the 9.5.2 blind verifier caught R9/R10 editing text inside a heredoc).
+    lines = command.split("\n")
+    hit = set()
+    for i, line in first_line_segments(command):
+        l2 = re.sub(r"(^|[;&|]\s*)(recall|learn|write-end|read-start)(\s)", r"\1agentdb \2\3", line)
+        if l2 != line:
+            hit.add("R9")
+            line = l2
+        l2 = re.sub(r"(?<![A-Za-z0-9_]):!(_[A-Za-z0-9_./-]+)", r":(exclude)\1", line)
+        if l2 != line:
+            hit.add("R10")
+            line = l2
+        l2 = re.sub(r"(^|[;&|(]\s*|\s)rg(\s+-[a-zA-Z]*)h(\s|$)", lambda m: f"{m.group(1)}rg{m.group(2).rstrip('-') if m.group(2).strip('-') else ''} --no-filename{m.group(3)}" if m.group(2).strip("-") else f"{m.group(1)}rg --no-filename{m.group(3)}", line)
+        if l2 != line:
+            hit.add("R11")
+            line = l2
+        lines[i] = line
+    if "R9" in hit:
         notes.append("R9 `recall`/`learn` are agentdb subcommands, rewrote to `agentdb ...`.")
-        new = new2
-    new2 = re.sub(r"(['\"]?):!(_[A-Za-z0-9_./-]+)", r"\1:(exclude)\2", new)
-    if new2 != new:
+    if "R10" in hit:
         notes.append("R10 git pathspec `:!_x` fails (leading underscore is pathspec magic); rewrote to `:(exclude)_x`.")
-        new = new2
-    new2 = re.sub(r"(^|[;&|(]\s*|\s)rg(\s+-[a-zA-Z]*)h(\s|$)", lambda m: f"{m.group(1)}rg{m.group(2).rstrip('-') if m.group(2).strip('-') else ''} --no-filename{m.group(3)}" if m.group(2).strip("-") else f"{m.group(1)}rg --no-filename{m.group(3)}", new)
-    if new2 != new:
+    if "R11" in hit:
         notes.append("R11 in ripgrep `-h` is --help; rewrote to `--no-filename`.")
-        new = new2
-    return new
+    return "\n".join(lines) if hit else command
 
 
 def rule_shell_shape_notes(command, notes):
@@ -360,7 +375,9 @@ def main():
         return
     if data.get("tool_name") not in (None, "Bash"):
         return
-    ti = data.get("tool_input") or {}
+    ti = data.get("tool_input") if isinstance(data, dict) else None
+    if not isinstance(ti, dict):
+        return
     command = ti.get("command")
     if not isinstance(command, str) or not command.strip():
         return
