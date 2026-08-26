@@ -2,6 +2,63 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.5.2] - 2026-08-26
+
+Guards that refuse teach nothing; hooks that correct teach in the same turn.
+
+A 14-day audit of one operator's transcripts (1235 errored tool calls, 20k tool calls,
+five Claude models plus Codex) found the largest error class was KERNEL's own guards and
+their vault-level siblings refusing commands (23%), ahead of path guessing (11%) and ahead of
+every genuine syntax slip combined. Of the guard refusals, every keychain block, every
+`branch -D` block and every "root or home" block was a false positive. Separately, 91 of 98
+wrong invocations that printed a usage banner returned exit 0 behind `| head` or `;`, so the
+model never learned it had failed. The fix is two-sided: make the guard precise, and add hooks
+that rewrite or coach instead of refusing.
+
+### Added
+- **`hooks/scripts/autocorrect-bash.py`** (PreToolUse Bash, runs before the guard): deterministic,
+  meaning-preserving rewrites via `updatedInput`, each announced through `additionalContext` so
+  the corrected form is what the model copies next. `cd X cmd` with the `&&` dropped; relative
+  `cd` that resolves to exactly one directory under the project; `python` -> `python3` on
+  python3-only hosts; `cat -A` -> `cat -vet` and `sed -i` -> `sed -i ''` on macOS. Notes only
+  (no rewrite) for `grep -P` and missing coreutils. Logs to `~/.kernel/autocorrect.jsonl`.
+  Second round, after the operator said the first was not enough: R2b resolves a wrong path
+  handed to a read-only command (cat/sed/head/...) to the one file of that name under the
+  project, or lists the directory it should have looked in (87 path guesses in 14 days);
+  R8 escapes backticks and `$(` inside a double-quoted `-m`/`-b`/`-t` message; R9 to R11
+  carry over the deterministic rules from the Vaults `bash-guard` that used to BLOCK (bare
+  `recall` -> `agentdb recall`, `:!_x` -> `:(exclude)_x`, `rg -h` -> `--no-filename`);
+  R12/R13 warn before a heredoc inside `$(...)` or a `${x:-{}}` default corrupts a payload.
+  `autocorrect-tool-input.py` does the same for Read/Edit paths that do not exist.
+- **`hooks/scripts/syntax-coach.py`** (PostToolUse Bash): reads the tool output regardless of
+  exit code and, on a usage banner, `illegal option`, `command not found`, a failed `cd`, or a
+  known git misuse, injects one line naming the exact correct form. Silent on clean runs and on
+  deliberate `--help` reads.
+- **`hooks/scripts/autocorrect-tool-input.py`** (PreToolUse WebFetch|Read|Chrome MCP): adds the
+  required `prompt` to a WebFetch call that lacks it (53 silent failures from one headless job);
+  converts `tabIds` given as a string; converts `browser_batch` `{tool, params}` to
+  `{name, input}`; adds `offset`/`limit` to a Read over the 256KB cap; explains `file://`
+  refusal with the serve-then-navigate recipe.
+
+### Fixed
+- **`hooks/scripts/guard-bash.sh`** precision, each change carrying its production evidence:
+  a keychain read feeding an `Authorization` header over https is authentication, not
+  exfiltration (15 of 15 blocks); the block now fires only when the secret goes out as a
+  body/upload, over plaintext http, to a raw IP, or through nc/sftp. `git branch -D` on a
+  branch already merged into HEAD or its upstream passes (17 of 17 blocks were post-merge
+  cleanup); unknown or unmerged branches still block. The root/home `rm -rf` check runs on
+  the data-stripped view and per shell segment (6 false positives from a bare `/` inside a
+  heredoc). An interpreter-fed heredoc counts as code only when its body can execute a
+  subprocess, so an analysis script holding `'git branch -D'` in a string literal passes while
+  `subprocess.run('git branch -D main')` still blocks.
+- Two new `read` loops in the guard used `printf '%s'` without a trailing newline, which made
+  `read -r` skip the final segment; caught by the sample battery before release, recorded here
+  so the shape is not repeated.
+
+### Tests
+- 14 new cases in `tests/run-tests.sh`: eight guard precision cases (five must-pass shapes,
+  three must-block shapes) and six hook cases (rewrite, coach, silence on clean input).
+
 ## [9.5.1] - 2026-08-26
 
 Two timestamp defects that misled the tools meant to catch defects.

@@ -145,7 +145,7 @@ agentdb wtf                                        # confused? full ref: agentdb
 Recall with concrete nouns, not prose. Recall again after discovery, when scope/hypothesis changes, or on a new failure.
 
 Optimize for the fastest correct, robust path. Tier by reversibility x blast radius, NOT file count. Gate hard only where an op is irreversible. T1 execute, T2 plan+verify, T3 confirm.
-Default is inline. Spawn a subagent only to protect context, to buy real wall-clock on heavy file-disjoint work, when explicitly asked, or for independent verification, never for independence alone. When work is genuinely high-blast-radius or delegated, contract it, then verify with an adversary.
+Inline for single-file, single-step work. Delegate by default when any of these hold: the work splits into file-disjoint slices, a read would dump more than a few hundred lines into your context (transcripts, logs, corpora), a verification must be blind to your reasoning, or two independent questions can be answered at once. Fan out in ONE message with several Agent calls; serial spawns cost wall-clock for nothing. Never spawn for independence alone. When work is genuinely high-blast-radius or delegated, contract it, then verify with an adversary.
 Route model and effort by task shape and measured evidence, never prestige. Preserve the exact request; never silently substitute. Receipts keep `requested_model` and `requested_effort` separate from `observed_model` and `observed_effort`, and use `unavailable` when the runtime does not expose a value.
 Protected receipts require distinct `builder_identity` and `verifier_identity`; the builder never grades its own protected work.
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
@@ -153,6 +153,29 @@ Structured questions are the default reply shape, not an escalation. End every u
 Subagents never ask the user. They escalate through their contract's ESCALATE IF line and stop; the orchestrator answers what its own context can answer and batches the rest into ONE round. Guessing is the top defect source: an unstated assumption you acted on is a defect you shipped.
 KERNEL_CONTEXT
 # END GENERATED KERNEL AMBIENT
+
+# --- This machine (9.5.2): the facts a model's Linux/GNU prior gets wrong here ------------
+# Prevention, not catching. A 14-day audit found 135 path guesses from a shell whose cwd
+# resets, 45 calls to GNU tools macOS does not ship, and a commit message eaten by backticks.
+# Six lines at session start are cheaper than one retry. Only lines that are TRUE on this
+# host are printed, so a Linux box with coreutils sees almost nothing.
+{
+  _mc=""
+  # Printed only when the GNU forms actually fail here. A host with compat shims on PATH
+  # (Vaults: _meta/services/install-agent-compat.sh) or GNU coreutils prints nothing.
+  if [ "$(uname -s)" = "Darwin" ] && ! printf 'x\n' | cat -A >/dev/null 2>&1; then
+    _mc="${_mc}- macOS BSD userland: \`cat -vet\` not \`-A\`; \`rg -P\` not \`grep -P\`; \`sed -i ''\` for in-place; \`date -j\`, no \`-d\`; \`stat -f\`, no \`-c\`.\n"
+  fi
+  command -v python >/dev/null 2>&1 || _mc="${_mc}- \`python\` is not on PATH: use \`python3\`.\n"
+  command -v timeout >/dev/null 2>&1 || _mc="${_mc}- no \`timeout\`: use \`gtimeout\` (brew install coreutils) or the Bash tool's timeout parameter.\n"
+  _mc="${_mc}- The Bash tool's cwd resets between calls. Always \`cd /absolute/path && ...\` or use absolute paths; never a bare relative \`cd\`.\n"
+  _mc="${_mc}- Messages (\`git commit -m\`, \`gh ... -b\`) go in single quotes or \`-F file\`; backticks and \$( inside double quotes execute.\n"
+  _mc="${_mc}- Stage files by name; \`git add -A\` picks up tracked binaries and runtime state that pre-commit guards refuse.\n"
+  _mc="${_mc}- \`agentdb learn <type> \"what\" \"why\" [--global]\` (type first); \`graphify query|path|affected|stats\`.\n"
+  echo "## This machine"
+  printf "%b" "$_mc"
+  echo ""
+}
 
 # =============================================================================
 # AGENTDB CONTEXT (if initialized)

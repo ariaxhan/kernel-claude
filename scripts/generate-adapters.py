@@ -46,7 +46,11 @@ HOOK_BINDINGS = [
      "statusMessage": "Loading KERNEL context..."},
     {"event": "SessionStart", "matcher": "", "script": "autopush.sh install", "timeout": 15},
     {"event": "SessionStart", "matcher": "", "script": "knowledge-graph.sh install", "timeout": 15},
+    # autocorrect runs BEFORE the guard so the guard judges the corrected shape (9.5.2).
+    {"event": "PreToolUse", "matcher": "Bash", "script": "autocorrect-bash.py", "timeout": 5},
     {"event": "PreToolUse", "matcher": "Bash", "script": "guard-bash.sh", "timeout": 5},
+    {"event": "PreToolUse", "matcher": "WebFetch|Read|Edit|mcp__claude-in-chrome__.*", "script": "autocorrect-tool-input.py", "timeout": 5},
+    {"event": "PostToolUse", "matcher": "Bash", "script": "syntax-coach.py", "timeout": 5},
     {"event": "PreToolUse", "matcher": "Write|Edit", "script": "guard-config.sh", "timeout": 5},
     {"event": "PreToolUse", "matcher": "Write|Edit", "script": "detect-secrets.sh", "timeout": 5},
     {"event": "PreToolUse", "matcher": "Write|Edit", "script": "validate-structure.sh", "timeout": 5},
