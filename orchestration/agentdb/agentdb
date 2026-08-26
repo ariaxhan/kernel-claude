@@ -733,7 +733,7 @@ cmd_learn() {
   local existing
   existing=$(db_exec "SELECT id FROM learnings WHERE insight LIKE '%${safe_substr}%' AND type='$safe_type' LIMIT 1;" 2>/dev/null || echo "")
   if [ -n "$existing" ]; then
-    db_exec "UPDATE learnings SET hit_count = hit_count + 1 WHERE id='$existing';"
+    db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='$existing';"
     # Observation: a near-identical insight recurred and reinforced an existing row.
     emit_memory_event reinforced "$existing" "learn dedup: near-identical insight recurred" \
       "{\"type\":\"$(json_escape "$type")\",\"domain\":\"$(json_escape "$domain")\"}"
