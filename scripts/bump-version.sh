@@ -10,6 +10,7 @@
 #   governance/kernel.md.tmpl         <kernel version="X.Y.Z">
 #   AGENTS.md + CLAUDE.md             generated from the canonical template
 #   skills/help/SKILL.md              KERNEL vX.Y.Z
+#   llms.txt                          Version X.Y.Z
 #
 # NOT touched here (human-authored per release, intentionally version-specific prose):
 #   - plugin.json / marketplace.json `description` highlight (v7.x: ...)
@@ -41,6 +42,7 @@ sub('.claude-plugin/plugin.json',      r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(
 sub('.claude-plugin/marketplace.json', r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(")',     rf'\g<1>{new}\g<2>')
 sub('.codex-plugin/plugin.json',       r'("version":\s*")[0-9]+\.[0-9]+\.[0-9]+(")',     rf'\g<1>{new}\g<2>')
 sub('skills/help/SKILL.md',            r'(KERNEL v)[0-9]+\.[0-9]+\.[0-9]+',               rf'\g<1>{new}')
+sub('llms.txt',                        r'(Version )[0-9]+\.[0-9]+\.[0-9]+',              rf'\g<1>{new}')
 # NOTE: governance/kernel.md.tmpl no longer carries a hardcoded version — it uses the
 # {{VERSION}} token, which generate-governance.py derives from plugin.json below. So the
 # template is not stamped here; regenerating governance is what propagates the version.
