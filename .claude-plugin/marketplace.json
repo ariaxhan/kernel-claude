@@ -9,7 +9,7 @@
       "name": "kernel",
       "source": "./",
       "description": "Fences, not leashes: enforced boundaries for Claude Code in auto mode, and a review loop that can say yes",
-      "version": "9.5.0"
+      "version": "9.5.1"
     }
   ]
 }

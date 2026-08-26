@@ -2,6 +2,22 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.5.1] - 2026-08-26
+
+Two timestamp defects that misled the tools meant to catch defects.
+
+### Fixed
+- **`hooks/scripts/session-start.sh`**: three queries compared agentdb's ISO `T` timestamps
+  against `datetime('now', ...)` output (space-separated). `T` sorts above space, so every
+  row from today beat a one-hour cutoff and the "N errors in last hour (possible loop)"
+  banner counted unrelated errors spanning seventeen hours. Cutoffs now use `strftime` in
+  the same ISO layout. Proof on a live DB: old query 15, fixed query 5.
+- **`orchestration/agentdb/agentdb`**: `agentdb learn` reinforcing an existing near-identical
+  row bumped `hit_count` without stamping `last_hit`, so the retrospective stale predicate
+  `COALESCE(last_hit, ts) < now-30d` listed the MOST reinforced learnings (a 125-hit gotcha)
+  as archival candidates. The dedup path now stamps `last_hit`.
+- **`.codex-plugin/plugin.json`** was left at 9.4.0 by the 9.5.0 release; pinned.
+
 ## [9.5.0] - 2026-08-14
 
 Review gets a deterministic lane and a refutation pass. Until now the review skill was
