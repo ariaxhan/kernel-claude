@@ -82,6 +82,11 @@ that rewrite or coach instead of refusing.
   location/include family, and exactly one URL; any other token, any env assignment on the
   segment, or any second bare word blocks. `rm -rf "$HOME"/` with a bare trailing slash
   blocks. Two more tests carry the reproducers.
+- Fourth blind pass: SAFE TO MERGE (13 of 15 new shapes blocked; the two misses were
+  pre-existing). Its follow-ups are folded in anyway: the egress tool detector now matches
+  `curl` after a path, backslash, wrapper word or quote (`/usr/bin/curl`, `sh -c "curl"`),
+  `-x/--proxy` leaves the option allowlist, and backslash-newline continuations are joined
+  before segmenting so a multi-line curl is judged whole.
 
 ### Tests
 - 14 new cases in `tests/run-tests.sh`: eight guard precision cases (five must-pass shapes,

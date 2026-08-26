@@ -350,7 +350,10 @@ fi
 # --- T3 EXFILTRATION: secret material + network egress in one command (irreversible) ---
 # Egress tools that carry data out. ssh/scp identity flags are excluded from the
 # credential-path rule below to avoid false-positives on `scp -i ~/.ssh/key` usage.
-if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[:space:]]|$)'; then
+# (9.5.2, fourth blind pass) `/usr/bin/curl`, `\curl`, `command curl`, `env curl` and
+# `sh -c "curl ..."` are curl too; the detector matches the basename after any path,
+# backslash, wrapper word, or opening quote. Pre-existing miss, closed here.
+if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(curl|wget|nc|ncat|sftp)([[:space:]"'"'"']|$)'; then
   # A LITERAL secret token inline with an egress tool. Env-var references ($KEY) pass.
   printf '%s' "$COMMAND" | grep -qE 'AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|-----BEGIN[A-Z ]*PRIVATE KEY|eyJ[A-Za-z0-9_-]{17,}\.eyJ' \
     && block "a literal secret appears in the same command as a network egress tool -- exfiltration cannot be undone." "Reference secrets via environment variables (\$VAR), never inline."
@@ -385,8 +388,9 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[
     #     substitution, no smuggled value);
     #   * no body/upload flag.
     # Anything else in that segment blocks. gh / env-only commands have no such segment.
+    # Backslash-newline continuations are joined first so a multi-line curl is one segment.
     while IFS= read -r _seg; do
-      printf '%s' "$_seg" | grep -qE '(^|[[:space:];|&(])(curl|wget)([[:space:]]|$)' || continue
+      printf '%s' "$_seg" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(curl|wget)([[:space:]"'"'"']|$)' || continue
       _nurl=$(printf '%s' "$_seg" | grep -oiE '[a-z][a-z0-9+.-]*://[^[:space:]"'"'"']*' | wc -l | tr -d ' ')
       [ "$_nurl" = 1 ] || { _kc_exfil=1; break; }
       printf '%s' "$_seg" | grep -qE '(^|[[:space:]"'"'"'])https://(localhost|[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,})(:[0-9]+)?(/[^[:space:]"'"'"'$@]*)?(["'"'"']|[[:space:]]|$)' || { _kc_exfil=1; break; }
@@ -408,7 +412,7 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[
           continue
         fi
         case "$_t" in
-          -H|--header|-o|--output|-w|--write-out|-X|--request|-m|--max-time|--retry|-A|--user-agent|--connect-timeout|-x|--proxy) _skip=1;;
+          -H|--header|-o|--output|-w|--write-out|-X|--request|-m|--max-time|--retry|-A|--user-agent|--connect-timeout) _skip=1;;
           -[sSfLiIN]*) case "$_t" in -[sSfLiIN]*[!sSfLiIN]*) _ok=0; break;; esac;;
           --silent|--show-error|--fail|--fail-with-body|--location|--include|--head|--no-progress-meter|--compressed) ;;
           https://*) _url_n=$((_url_n+1));;
@@ -416,7 +420,7 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[
         esac
       done
       [ "$_ok" = 1 ] && [ "$_url_n" = 1 ] || { _kc_exfil=1; break; }
-    done < <(printf '%s\n' "$COMMAND_CODE" | tr ';|&' '\n')
+    done < <(printf '%s\n' "$COMMAND_CODE" | awk '{ if (sub(/\\$/, "")) { printf "%s ", $0 } else { print } }' | tr ';|&' '\n')
     if [ "$_kc_exfil" = 1 ]; then
       block "keychain read combined with network egress that carries the secret OUT (body/upload, plaintext http, raw ip, or a raw socket)." "Authenticate with an Authorization header over https; never put a keychain value in a request body."
     fi
