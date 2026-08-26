@@ -17,11 +17,6 @@ Pre-implementation review. Check Big 5, security, testing, architecture.
 Goal: find real problems, not generic concerns.
 </purpose>
 
-<skill_load>
-Load: skills/quality/SKILL.md, skills/testing/SKILL.md, skills/security/SKILL.md
-Reference: skills/quality/reference/quality-research.md
-</skill_load>
-
 <on_start>
 ```bash
 agentdb read-start
@@ -42,7 +37,7 @@ output:
 </phase>
 
 <phase id="2_big5">
-Run Big 5 checks from skills/quality/SKILL.md:
+Run the Big 5 checks:
 
 1. input_validation: Zod schema? Parameterized queries?
 2. edge_cases: null, empty, unicode, timeout?
@@ -50,12 +45,20 @@ Run Big 5 checks from skills/quality/SKILL.md:
 4. duplication: same logic repeated?
 5. complexity: functions < 30 lines?
 
-Use quick_checks from quality skill for detection.
+quick_checks:
+```bash
+# 1. Missing validation
+grep -r "req\.body" --include="*.ts" --include="*.js" | grep -v "parse\|validate\|z\." | head -5
+
+# 2. Empty catch blocks
+grep -r "catch.*{}" --include="*.ts" --include="*.js" | head -5
+
+# 3. String concat in queries (SQL injection)
+grep -rE "SELECT.*\$\{|INSERT.*\$\{" --include="*.ts" --include="*.js" | head -5
+```
 </phase>
 
 <phase id="3_security">
-Load: skills/security/SKILL.md
-
 critical:
 - [ ] No hardcoded secrets
 - [ ] Auth tokens in httpOnly cookies
@@ -69,8 +72,6 @@ injection:
 </phase>
 
 <phase id="4_testing">
-Load: skills/testing/SKILL.md
-
 verify:
 - Tests exist BEFORE implementation?
 - Edge cases covered?

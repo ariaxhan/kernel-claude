@@ -18,7 +18,6 @@ agentdb inject-context adversary
 
 <skill_load>
 Load: skills/tearitapart/SKILL.md, skills/debug/SKILL.md
-Reference: skills/quality/reference/quality-research.md
 </skill_load>
 
 <startup_reads>
