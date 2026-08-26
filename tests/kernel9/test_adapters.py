@@ -372,6 +372,27 @@ class TruthfulCapabilityReporting(unittest.TestCase):
                     self.assertIn(event, report)
                     self.assertIn("**no**", report, "report must mark gaps visibly")
 
+    def test_degraded_capabilities_are_substantive(self):
+        """A capability lost to a ceiling gets the same explanation bar as a gap."""
+        for key, host in spec()["hosts"].items():
+            for capability, why in host.get("degraded_capabilities", {}).items():
+                with self.subTest(host=key, capability=capability):
+                    self.assertGreater(
+                        len(why),
+                        60,
+                        f"{key}/{capability}: explanation is too thin to be useful",
+                    )
+
+    def test_capability_report_names_every_degraded_capability(self):
+        """Stating the ceiling without stating its cost is how a gap stays invisible."""
+        with open(CAPABILITY_DOC) as fh:
+            report = fh.read()
+        for key, host in spec()["hosts"].items():
+            for capability, why in host.get("degraded_capabilities", {}).items():
+                with self.subTest(host=key, capability=capability):
+                    self.assertIn(capability, report)
+                    self.assertIn(why, report)
+
     def test_every_host_declares_its_evidence(self):
         """A capability claim with no named instrument is an assertion."""
         for key, host in spec()["hosts"].items():

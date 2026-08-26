@@ -56,6 +56,27 @@ truth. Lanes marked SKIPPED are reported as NOT CHECKED, never as clean.
 </deterministic_lane>
 </on_start>
 
+<two_axis_discovery>
+The acceptance profile is a bounding device, so a pass that receives it finds what the invariants
+anticipated and stops. Measured, not assumed: EXP-RTP1 M arm, 20 passes per arm, run
+`20260814T183129Z`, against a certified reproducible defect the profile never names (`capacity=0`
+accepted, so the limiter denies every request forever). The unbounded arm caught it 18/20. The
+profile-bounded arm caught it 0/20. That is not undercounting, it is blindness.
+
+So the bounded pass NEVER runs alone. Discovery is two passes on DIFFERENT axes:
+
+- **outcome-shaped**, and it receives NO acceptance profile, NO acceptance record, NO invariant
+  list. "You are the user. What is wrong, what is strange, what would make you screenshot this and
+  complain?" This pass exists to find what the invariants failed to anticipate; bounding it defeats
+  the only thing it is for.
+- **invariant-shaped**, fully bounded by the profile. This is the pass everything below governs:
+  the Big 5, the checklist, the block bar, `blocks_at`.
+
+Running the bounded prompt twice is not two passes, it is one pass billed twice. A review that ran
+only the invariant-shaped axis is INCOMPLETE, not clean: name the missing axis in `cannot_falsify`
+and never let a bounded PASS stand in for coverage.
+</two_axis_discovery>
+
 <confidence_threshold>
 | Confidence | Category | Report? |
 |------------|----------|---------|
@@ -205,8 +226,9 @@ agentdb write-end '{"command":"review","verdict":"X","critical":N,"high":N,"big5
 ```
 
 `cannot_falsify` is mandatory and non-empty. State what this review structurally could not see
-(no real device, conformance only, no live data, a suite that did not finish). Silence about
-coverage reads as coverage.
+(no real device, conformance only, no live data, a suite that did not finish). If the
+outcome-shaped axis did not run, that is the first entry: a profile-bounded pass alone scored 0/20
+on an off-contract defect. Silence about coverage reads as coverage.
 </on_complete>
 
 </skill>

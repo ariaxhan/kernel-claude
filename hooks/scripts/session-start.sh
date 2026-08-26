@@ -135,13 +135,7 @@ fi
 cat << 'KERNEL_CONTEXT'
 ## KERNEL quick reference
 
-```
-agentdb recall "<feature> <subsystem> <files/symbols> <error/outcome>" [--global]
-agentdb learn failure|pattern|gotcha "what" "why"  # capture as discovered
-agentdb write-end '{"did":"X","learned":["Y"]}'    # at session end
-agentdb wtf                                        # confused? full ref: agentdb guide
-```
-
+agentdb: `recall "<feature> <subsystem> <files/symbols> <error/outcome>" [--global]` before acting, `learn failure|pattern|gotcha` as discovered, `write-end` at session end. Full syntax: `agentdb wtf`.
 Recall with concrete nouns, not prose. Recall again after discovery, when scope/hypothesis changes, or on a new failure.
 
 Optimize for the fastest correct, robust path. Tier by reversibility x blast radius, NOT file count. Gate hard only where an op is irreversible. T1 execute, T2 plan+verify, T3 confirm.
@@ -255,20 +249,16 @@ else
 fi
 
 # --- Knowledge-graph auto-orientation (8.6.1) ---
-# If this repo has a code graph, inject its architectural spine so the agent boots ALREADY
-# oriented instead of file-crawling to rebuild the map every session. This is the automatic
-# half of the knowledge-graph capability: ambient context, not a tool the agent must remember
-# to call. Self-gating: silent when no graph exists, so users without graphs see no change.
+# If this repo has a code graph, tell the agent it exists so it queries the graph instead of
+# file-crawling to rebuild the map every session. This is the automatic half of the
+# knowledge-graph capability: ambient context, not a tool the agent must remember to call.
+# A pointer, not a hub dump: the top god-nodes went stale within a day and cost ~0.5KB of
+# SessionStart payload every session to say what one `graphify god-nodes` call says on demand.
+# Self-gating: silent when no graph exists, so users without graphs see no change.
 if command -v graphify >/dev/null 2>&1; then
   for _gj in "$PROJECT_ROOT/graphify-out/graph.json" "$PROJECT_ROOT/_meta/graphify-out/graph.json"; do
     [ -f "$_gj" ] || continue
-    _hubs="$(graphify god-nodes --top 8 --graph "$_gj" 2>/dev/null | grep -E '^[[:space:]]*[0-9]+\.' | sed 's/^[[:space:]]*/  /')"
-    [ -n "$_hubs" ] || continue
-    echo "## Code map (auto-orientation)"
-    echo "This repo has a knowledge graph — these are its architectural hubs. Consult the graph"
-    echo "BEFORE crawling files to find where something lives:"
-    echo "$_hubs"
-    echo "Query without reading files: \`graphify query \"<question>\"\` · \`graphify path A B\` · \`graphify affected X\`"
+    echo "Code map: this repo has a knowledge graph. Query it BEFORE crawling files — \`graphify query \"<question>\"\` · \`graphify path A B\` · \`graphify affected X\` · \`graphify god-nodes\`."
     echo ""
     break
   done

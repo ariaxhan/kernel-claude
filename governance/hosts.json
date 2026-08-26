@@ -12,6 +12,12 @@
     "HOST enforces regardless of what Kernel asks for. Binding a timeout above a",
     "ceiling does not buy time, it buys a truncated hook and a startup warning.",
     "",
+    "degraded_capabilities names a Kernel capability that the host supports on",
+    "paper but cannot actually deliver, usually because a ceiling truncates the",
+    "hook it rides on. A supported event with a cost is not the same claim as a",
+    "supported event, and stating the ceiling without stating what it costs is",
+    "how a gap stays invisible.",
+    "",
     "plugin_root_var is the same kind of claim: the variable name the HOST",
     "substitutes in a hook command. A name the host does not know expands to",
     "the empty string, so every hook runs an absolute path off / and exits",
@@ -79,6 +85,9 @@
         "SessionEnd": 3
       },
       "hook_timeout_ceiling_evidence": "codex-cli 0.147.0 hard-clamps SessionEnd hook timeouts and says so on every session start: `clamping SessionEnd hook timeout to 3s in <plugin>/hooks.json`. The clamp string is extracted from the shipped binary and is SessionEnd-specific; no other lifecycle event carries one. A declared timeout above this ceiling is not honoured, it is overruled.",
+      "degraded_capabilities": {
+        "red-suite detection": "Kernel's session-end.sh runs the test gate as its last block, after the AgentDB write. Under the 3s SessionEnd ceiling the write survives and the gate does not, and this repo's own suite is 446 tests at roughly 100s. On Codex there is therefore no _meta/.test-status verdict and no _meta/plans/tests-red.md, so the SessionStart red-suite flag never fires. Red-suite detection is Claude-only until the gate is redesigned to run outside SessionEnd."
+      },
       "unsupported_lifecycle_events": {
         "PostToolUseFailure": "Not implemented by Codex 0.146.0. Exact symbol search over the shipped binary returns zero occurrences, while every lifecycle event Kernel binds on this host returns 17 or more. Kernel's capture-error.sh is therefore not bound on this host, and error capture degrades to what PostToolUse can observe."
       },

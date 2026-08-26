@@ -255,6 +255,16 @@ def build_capability_report(spec: dict) -> str:
         for event, why in gaps.items():
             lines.append(f"- **{event}** — {why}")
         lines.append("")
+    for key, host in spec["hosts"].items():
+        degraded = host.get("degraded_capabilities", {})
+        if not degraded:
+            continue
+        any_gap = True
+        lines.append(f"### {host['display_name']} — capabilities lost to a ceiling")
+        lines.append("")
+        for capability, why in degraded.items():
+            lines.append(f"- **{capability}** — {why}")
+        lines.append("")
     if not any_gap:
         lines.append("No gaps recorded.")
         lines.append("")
