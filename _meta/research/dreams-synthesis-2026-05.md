@@ -36,7 +36,7 @@ Sourced from /Users/ariaxhan/Vaults/CodingVault/dreams/. 18 of 25 graduated docs
 |---|---|---|
 | Skills-first 8:4:2 ratio (skills are primary unit; if agents outnumber skills, over-partitioned) | agent-architecture-composition | CLAUDE.md philosophy + orchestration skill |
 | CLAUDE.md as behavioral router (under ~200 tokens; skills carry depth; extract if >500) | agent-architecture-composition, multi-ai-config-transpilation | CLAUDE.md + anti_patterns rule |
-| Task-property-conditional parallelism (verify independence + duration > spawn overhead BEFORE multi-agent) | agent-architecture-composition | orchestration SKILL.md |
+| Task-property conditional parallelism (verify independence + duration > spawn overhead BEFORE multi-agent) | agent-architecture-composition | orchestration SKILL.md |
 | Devcontainer delivery (Docker + keychain secrets-bridge + skills + CLAUDE.md = reproducible agent env) | agent-architecture-composition | new docs/DEVCONTAINER-DELIVERY.md |
 | MAS coordination overhead threshold (ask "do tasks share state?" + "task longer than spawn overhead?" before N agents) | agent-architecture-composition | orchestration SKILL.md |
 | Skills and evals designed simultaneously (skills first, evals second, code third) | evaluation-architecture | eval SKILL.md + ingest command |
@@ -91,7 +91,7 @@ Sourced from /Users/ariaxhan/Vaults/CodingVault/dreams/. 18 of 25 graduated docs
 - "Skills as secondary" → **Skills-first 8:4:2 as primary scaling axis** (more skills per agent, not more agents) — needs ratio guidance in CLAUDE.md agents section
 - "Single flat CLAUDE.md" → **CLAUDE.md as router + skills as payloads + settings.json as permissions** (three-part contract)
 - "Devcontainer is optional" → **Devcontainer + secrets-bridge is canonical reproducible delivery**
-- "Always parallelize" → **Task-property-conditional parallelize** (MAS overhead often exceeds benefit) — parallel_first invariant needs nuance
+- "Always parallelize" → **Task-property conditional parallelize** (MAS overhead often exceeds benefit) — parallel_first invariant needs nuance
 - "LLM-as-judge for eval" → **Programmatic verifiers preferred; LLM judge only where deterministic scoring impossible**
 - "Single-run evaluation" → **Two-phase protocol (Run 1 cold-scored + Run 2 optimized)**
 - "Skills/evals designed after code" → **Skills and evals written simultaneously before first code commit**
