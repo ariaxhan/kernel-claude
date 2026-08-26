@@ -3793,10 +3793,15 @@ test_knowledge_graph_installer_optin_installs() {
 }
 
 test_knowledge_graph_session_start_auto_orientation() {
-  # session-start.sh must contain the ambient auto-orientation block (god-nodes injection)
+  # session-start.sh must point at the graph, but as a pointer, not a hub dump: the
+  # top god-nodes go stale within a day and cost payload on every single session.
   local content; content=$(cat "$PLUGIN_ROOT/hooks/scripts/session-start.sh")
   assert_contains "$content" "auto-orientation" "session-start must inject graph orientation" || return 1
-  assert_contains "$content" "god-nodes" "auto-orientation must emit god-nodes (architectural hubs)"
+  assert_contains "$content" "graphify query" "auto-orientation must point at graph queries" || return 1
+  if grep -q 'graphify god-nodes --top' "$PLUGIN_ROOT/hooks/scripts/session-start.sh"; then
+    echo "FAIL: session-start.sh must not dump god-node hubs into the SessionStart payload"
+    return 1
+  fi
 }
 
 test_knowledge_graph_auto_orientation_self_gates() {
@@ -5085,7 +5090,7 @@ run_test_suite() {
       run_test "installer is opt-in (no stamp without KERNEL_GRAPH_ON)" test_knowledge_graph_installer_is_optin
       run_test "installer stamps marked hook with KERNEL_GRAPH_ON=1" test_knowledge_graph_installer_optin_installs
       run_test "installer preserves a foreign post-commit" test_knowledge_graph_installer_preserves_foreign_hook
-      run_test "session-start injects auto-orientation (god-nodes)" test_knowledge_graph_session_start_auto_orientation
+      run_test "session-start points at the graph without dumping hubs" test_knowledge_graph_session_start_auto_orientation
       run_test "auto-orientation self-gates on graph existence" test_knowledge_graph_auto_orientation_self_gates
       ;;
     manifest)

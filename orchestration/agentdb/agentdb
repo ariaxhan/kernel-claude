@@ -536,16 +536,16 @@ cmd_read_start() {
       echo "Recall now: agentdb recall \"<feature> <subsystem> <files/symbols> <error/outcome>\" [--global]"
       echo "Recall again when scope, files, hypothesis, or failure changes. Use concrete nouns, not prose."
       echo ""
-      top_fail=$(db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha') ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null)
+      top_fail=$(db_exec "SELECT '- [' || type || '] ' || insight FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha') ORDER BY hit_count DESC, ts DESC LIMIT 3;" 2>/dev/null)
       if [ -n "$top_fail" ]; then
         echo "### Highest-hit failures (avoid these; recall the rest by task):"
         echo "$top_fail"
       fi
       db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE id IN (
         SELECT id FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha')
-        ORDER BY hit_count DESC, ts DESC LIMIT 5);" 2>/dev/null
+        ORDER BY hit_count DESC, ts DESC LIMIT 3);" 2>/dev/null
       loaded_ids=$(db_exec "SELECT id FROM learnings WHERE archived_at IS NULL AND type IN ('failure','gotcha')
-        ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null); sf_mode="lean"
+        ORDER BY hit_count DESC, ts DESC LIMIT 3;" 2>/dev/null); sf_mode="lean"
       ;;
 
     --weighted|*)
