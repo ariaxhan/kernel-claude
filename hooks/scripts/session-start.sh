@@ -183,7 +183,7 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   echo ""
 
   # Prune stale learnings (0 hits, >30 days old)
-  "$AGENTDB" query "DELETE FROM learnings WHERE hit_count = 0 AND ts < datetime('now', '-30 days');" 2>/dev/null || true
+  "$AGENTDB" query "DELETE FROM learnings WHERE hit_count = 0 AND ts < strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days');" 2>/dev/null || true
 
   # (Top-learnings surfacing folded into the --lean dump above — no separate section.)
 
@@ -222,14 +222,14 @@ if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
   # Check for stale contracts (>24h with no checkpoint)
   # `agentdb query` prints a formatted table (header + separator + value), so pull the
   # last numeric line and coerce to an int (+0) before any `-gt` comparison.
-  STALE_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM context WHERE type='contract' AND ts < datetime('now', '-1 day') AND contract_id NOT IN (SELECT COALESCE(contract_id, '') FROM context WHERE type='verdict');" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
+  STALE_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM context WHERE type='contract' AND ts < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day') AND contract_id NOT IN (SELECT COALESCE(contract_id, '') FROM context WHERE type='verdict');" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
   STALE_COUNT=${STALE_COUNT:-0}
   if [ "$STALE_COUNT" -gt 0 ]; then
     BLOCKERS="${BLOCKERS}\n- $STALE_COUNT stale contract(s) >24h without verdict"
   fi
 
   # Check for recent errors (>3 in last hour)
-  ERROR_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM errors WHERE ts > datetime('now', '-1 hour');" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
+  ERROR_COUNT=$("$AGENTDB" query "SELECT COUNT(*) FROM errors WHERE ts > strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour');" 2>/dev/null | awk '/^[0-9]/{v=$1} END{print v+0}')
   ERROR_COUNT=${ERROR_COUNT:-0}
   if [ "$ERROR_COUNT" -gt 3 ]; then
     BLOCKERS="${BLOCKERS}\n- $ERROR_COUNT errors in last hour (possible loop)"
