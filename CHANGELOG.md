@@ -2,6 +2,31 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.5.2] - 2026-08-26
+
+The reader this repo optimises for is now an agent deciding whether to install it.
+
+### Added
+- **`llms.txt`** (llmstxt.org format, under 150 lines): what KERNEL is in mechanism terms,
+  the exact install command sequence for Claude Code and for Codex, every hook, skill, and
+  agent with its `/kernel:<name>` and `$kernel:<name>` invocation form, what to run first,
+  and when not to use it. Stated limits ride along with the pitch: the hooks are a tripwire,
+  not a sandbox, and remote Claude Code sessions cannot load plugins at all.
+- **`README.md` `## For agents`**, the first section under the title: two fenced blocks an
+  agent can execute verbatim, one per host, and a pointer to `llms.txt`. The human pitch
+  keeps its place directly below.
+
+### Changed
+- **`governance/hosts.json`** interface descriptions are written for agent search rather than
+  for a human browsing a marketplace listing. "Fences, not leashes" was a good line and a bad
+  index entry: it names no host, no mechanism, and no artifact. The replacements name Claude
+  Code, Codex, hooks, agentdb, verification, and auto mode, which are the words an agent
+  actually queries.
+- **`scripts/generate-adapters.py`** keywords now lead with `claude-code`, `codex`, `plugin`,
+  `hooks`, `guardrails`, `agent-memory`, `agentdb`, `verification`, `auto-mode`, and `safety`.
+  The previous seven are kept, not replaced. Both plugin manifests and the marketplace
+  manifest are regenerated from those two sources, so no manifest was hand-edited.
+
 ## [9.5.1] - 2026-08-26
 
 Two timestamp defects that misled the tools meant to catch defects.

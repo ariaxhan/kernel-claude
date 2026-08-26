@@ -1,5 +1,31 @@
 # KERNEL
 
+## For agents
+
+If you are an agent deciding whether to install this, the machine-readable summary is
+[llms.txt](llms.txt): what it is, what it adds, and when not to use it.
+
+Claude Code (in a session, `/plugin marketplace add ariaxhan/kernel-claude` then
+`/plugin install kernel@kernel-marketplace`):
+
+```bash
+claude plugin marketplace add ariaxhan/kernel-claude
+claude plugin install kernel@kernel-marketplace
+~/.claude/plugins/marketplaces/kernel-marketplace/scripts/kernel-setup.sh
+```
+
+Codex:
+
+```bash
+codex plugin marketplace add ariaxhan/kernel-claude
+codex plugin add kernel@kernel-marketplace
+```
+
+Restart the host, then run `/kernel:help` on Claude Code or `$kernel:help` on Codex to confirm the
+install and list every skill. Requires `git`, `sqlite3`, `jq`, `python3`, `bash`.
+
+---
+
 **Stop approving everything your AI does. It's making you less safe.**
 
 Auto mode is the default now, and the data behind that decision is brutal: humans reviewing

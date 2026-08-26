@@ -1,0 +1,149 @@
+# KERNEL
+
+> A Claude Code plugin, also loadable by Codex, that replaces per-action approval prompts with
+> enforced boundaries: hooks that block destructive commands, a one-time human token for
+> irreversible operations, verifier agents blind to the builder's reasoning, and a SQLite memory
+> that carries lessons between sessions.
+
+Repository: https://github.com/ariaxhan/kernel-claude
+License: MIT. Version 9.5.2. Requires `git`, `sqlite3`, `jq`, `python3`, `bash`.
+
+## What it is
+
+Auto mode removes the per-action prompt. KERNEL supplies what the prompt was supposed to do: the
+agent runs without per-action confirmation, inside boundaries enforced by hook scripts rather than
+by instructions the model could talk itself past.
+
+- Shell commands and writes are classified by how hard they are to undo. Recoverable mistakes get
+  a warning the model can act on; destructive ones are blocked in a PreToolUse hook.
+- Irreversible operations require a one-time approval token that a prompt-injected command cannot
+  forge, because only a human can open it.
+- High-consequence work is checked by a separate agent that receives the diff and the acceptance
+  record but never the builder's reasoning.
+- Session state persists as schema-validated JSON manifests, so a resume reconstructs the pinned
+  state instead of inheriting a transcript. Failures recorded to `agentdb` in one session are
+  recalled by keyword in the next.
+
+Ambient context cost to a plugin user is about 4,600 tokens: ~1,900 from the SessionStart hook and
+~2,700 from skill frontmatter the host keeps visible for routing. This repo's `CLAUDE.md` is not
+loaded for plugin users.
+
+Limits stated by the project: the hooks are a tripwire, not a sandbox (`docs/safety.md`), and the
+model-routing and builder-is-not-verifier rules are checked when receipt validation runs, not on
+every request.
+
+## Install for Claude Code
+
+From a shell (in-session equivalents: `/plugin marketplace add ariaxhan/kernel-claude` then
+`/plugin install kernel@kernel-marketplace`):
+
+```bash
+claude plugin marketplace add ariaxhan/kernel-claude
+claude plugin install kernel@kernel-marketplace
+~/.claude/plugins/marketplaces/kernel-marketplace/scripts/kernel-setup.sh
+```
+
+`kernel-setup.sh` creates the AgentDB, writes one row and reads it back by keyword as proof, and
+exits non-zero naming which half failed if it cannot. It asks before writing and never touches
+shell configuration. Terminal, Desktop (local and SSH), and VS Code support plugins; remote Claude
+Code sessions do not.
+
+## Install for Codex
+
+Codex CLI and the Codex app load the same package through the Claude-marketplace compatibility
+loader:
+
+```bash
+codex plugin marketplace add ariaxhan/kernel-claude
+codex plugin add kernel@kernel-marketplace
+```
+
+Restart Codex, then invoke `$kernel:init`. Two differences: Codex does not implement
+`PostToolUseFailure`, so `capture-error.sh` is unbound and tool-error recording degrades to what
+`PostToolUse` observes; and Codex maps KERNEL's agent roles onto its own rather than registering
+the Claude Code agent definitions natively. Matrix: `docs/kernel-9/HOST-CAPABILITIES.md`.
+
+## What it adds
+
+Skills are namespaced per host: Claude Code invokes `/kernel:<name>`, Codex invokes
+`$kernel:<name>`.
+
+### Hooks (`hooks.json`, scripts in `hooks/scripts/`)
+
+Bound to SessionStart, PreToolUse, PermissionRequest, PostToolUse, UserPromptSubmit, Stop,
+PreCompact, SessionEnd.
+
+- `guard-bash.sh` classifies bash commands by reversibility and blocks the destructive ones.
+- `detect-secrets.sh` blocks writes that would commit a credential; `guard-config.sh` restricts
+  edits to agent-configuration paths.
+- `guard-context.sh` enforces the active manifest's context policy (sealed, bounded, advisory).
+- `session-start.sh` delivers the ambient methodology and the AgentDB recall banner; `session-end.sh`
+  writes the session record; `pre-compact-commit.sh` checkpoints before compaction.
+- `test-gate.sh` and `verdict-gate.sh` hold work at the declared quality gate; `circuit-breaker.sh`
+  stops a session looping on the same failure.
+
+### Memory (`agentdb`, `orchestration/agentdb/agentdb`)
+
+A SQLite database at `_meta/agentdb/agent.db` in the selected Vaults directory. FTS5 keyword recall by default; local semantic search is opt-in and makes no network calls.
+
+```bash
+agentdb recall "<concrete nouns, files, symbols, errors>"   # before acting
+agentdb learn failure|pattern|gotcha "<what>" "<evidence>"  # after discovering
+```
+
+### Skills (27, `skills/<name>/SKILL.md`)
+
+- `/kernel:ingest` · `$kernel:ingest`: entry point for new and resumed work: research, classify, scope, execute, or resume from a manifest.
+- `/kernel:help` · `$kernel:help`: KERNEL reference plus live plugin status.
+- `/kernel:build` · `$kernel:build`: generate two or three approaches before implementing, take the simplest.
+- `/kernel:debug` · `$kernel:debug`: reproduce, hypothesize, isolate by binary search, fix root cause, add a regression test.
+- `/kernel:diagnose` · `$kernel:diagnose`: diagnosis before prescription for bugs and refactors.
+- `/kernel:review` · `$kernel:review`: code review with a deterministic scanner lane and a refutation pass; APPROVE, REQUEST CHANGES, or COMMENT.
+- `/kernel:tearitapart` · `$kernel:tearitapart`: pre-implementation critique; PROCEED, REVISE, or RETHINK.
+- `/kernel:ship` · `$kernel:ship`: release gate: validate, review, publish, tag.
+- `/kernel:handoff` · `$kernel:handoff`: compile a `kernel.handoff/v1` manifest for bounded resume.
+- `/kernel:checkpoint` · `$kernel:checkpoint`: mid-task `kernel.checkpoint/v1` manifest for a safe context reset.
+- `/kernel:retrospective` · `$kernel:retrospective`: cross-session synthesis; promotes lessons to hook, agent, or skill.
+- `/kernel:metrics` · `$kernel:metrics`: session, agent, hook, and learning-health dashboard.
+- `/kernel:architecture` · `$kernel:architecture`: modular design, interface stability, coupling analysis.
+- `/kernel:orchestration` · `$kernel:orchestration`: multi-agent lane contracts and fault tolerance.
+- `/kernel:context-mgmt` · `$kernel:context-mgmt`: compaction strategy, progressive disclosure, token budget.
+- `/kernel:knowledge-graph` · `$kernel:knowledge-graph`: deterministic local code graph to cut orientation-token cost.
+- `/kernel:eval` · `$kernel:eval`: eval-driven development: pass@k, capability and regression evals.
+- `/kernel:human-pass` · `$kernel:human-pass`: the acceptance pass a human runs against a real build.
+- `/kernel:frontend` · `$kernel:frontend`: art direction derived from product and audience, not a house style.
+- `/kernel:marketing-site` · `$kernel:marketing-site`: marketing and client-site methodology.
+- `/kernel:app-dev` · `$kernel:app-dev`: fastlane-first mobile and web build and store submission.
+- `/kernel:dream` · `$kernel:dream`: competing approaches stress-tested by a four-persona council.
+- `/kernel:init` · `$kernel:init`: one-time machine setup (explicit invocation only).
+- `/kernel:forge` · `$kernel:forge`: autonomous build loop; requires `max_budget_usd` (explicit only).
+- `/kernel:experiment` · `$kernel:experiment`: treat each rule as a hypothesis: seed, test, graduate, kill (explicit only).
+- `/kernel:landing-page` · `$kernel:landing-page`: landing-page build and deploy operator (explicit only).
+- `/kernel:governance-sync` · `$kernel:governance-sync`: audit or sync `CLAUDE.md` and `AGENTS.md` across repositories (explicit only).
+
+### Agents (10, `agents/<name>.md`)
+
+- `surgeon`: minimal-diff implementation, touches only contract-listed files.
+- `adversary`: QA that assumes the code is broken until evidence says otherwise.
+- `reviewer`: PR review against logic, security, performance, maintainability.
+- `researcher`: pre-implementation research on unfamiliar tech and package choices.
+- `deep-diver`: failure-mode research map before non-trivial infrastructure or schema work.
+- `scout`: codebase reconnaissance: structure, tooling, conventions, risk zones.
+- `blind-evaluator`: receives the problem and rubric only, never the solution.
+- `lane-worker`: one file-disjoint slice of a parallel burn; never commits.
+- `transcript-archaeologist`: read-only forensic mining of session logs and git history.
+- `dreamer`: minimalist, maximalist, and pragmatist positions on the same problem.
+
+## First thing to run after install
+
+`/kernel:help` in Claude Code, `$kernel:help` in Codex. It prints the skill inventory, the state
+operations, and live plugin status, so it doubles as an install check.
+
+## When not to use it
+
+- You want an agent with no boundaries. KERNEL's whole surface is boundaries.
+- You want a sandbox. The hooks are a tripwire in the agent's own process, not isolation.
+- You want a replacement for tests, code review, and reading the diff. It gates those, it does not
+  replace them.
+- You run Claude Code only in remote sessions, which do not support plugins, or your environment
+  cannot provide `sqlite3`, `jq`, and `python3`, without which the memory will not start.

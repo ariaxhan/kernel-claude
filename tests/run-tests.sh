@@ -2401,6 +2401,7 @@ test_version_sync_all() {
   grep -qF "<kernel version=\"$v\">" "$PLUGIN_ROOT/AGENTS.md"       || { echo "FAIL: AGENTS.md <kernel version> != $v"; fail=1; }
   grep -qF "<kernel version=\"$v\">" "$PLUGIN_ROOT/CLAUDE.md"      || { echo "FAIL: CLAUDE.md <kernel version> != $v"; fail=1; }
   grep -qF "KERNEL v$v" "$PLUGIN_ROOT/skills/help/SKILL.md"            || { echo "FAIL: skills/help/SKILL.md KERNEL version != $v"; fail=1; }
+  grep -qF "Version $v." "$PLUGIN_ROOT/llms.txt"                       || { echo "FAIL: llms.txt Version != $v"; fail=1; }
   return $fail
 }
 
