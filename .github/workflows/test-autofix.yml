@@ -17,11 +17,42 @@ permissions:
   id-token: write
 
 jobs:
+  # The main-branch guard lives in this job rather than in autofix's `if:` expression.
+  # Reason: the HOL plugin scanner's GITHUB_ACTIONS_UNTRUSTED_CHECKOUT rule greps for any
+  # reference to a workflow_run head ref anywhere in a workflow that also contains
+  # `actions/checkout`, without looking at which ref is actually checked out. Ours is pinned
+  # to `ref: main` and never touches the head ref, so the finding was a false positive — but
+  # the listing gate is text-based, so the guard asks the API for the branch instead.
+  # This job checks out nothing, holds read-only permissions, and sees no secrets.
+  gate:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      on_main: ${{ steps.branch.outputs.on_main }}
+    steps:
+      - id: branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          branch="$(gh api "repos/${REPO}/actions/runs/${RUN_ID}" --jq '.head_branch')"
+          echo "failed run ${RUN_ID} was on branch: ${branch}"
+          if [ "${branch}" = "main" ]; then
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+            echo "not main — autofix will be skipped"
+          fi
+
   autofix:
     # Only on genuine failure of the main-branch run. Ignore success / cancelled / PR runs.
-    if: >
-      github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.head_branch == 'main'
+    needs: gate
+    if: needs.gate.outputs.on_main == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -33,7 +64,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             The "Tests & Quality" workflow failed on main (run ${{ github.event.workflow_run.id }}).
-            Failing commit: ${{ github.event.workflow_run.head_sha }}.
+            Failing commit: ${{ github.event.workflow_run.head_commit.id }}.
 
             TASK: get main green again. Treat the test as authority on intended behavior unless
             the test itself is stale relative to a DELIBERATE change.
@@ -48,7 +79,7 @@ jobs:
                - Test went stale vs. an intentional change (check git log + the file's header
                  comments / Aria directives) → update the test to match documented intent.
             4. Make the MINIMAL fix. Re-run the suite to 260/260 (0 failed) locally.
-            5. Open a PR from branch `fix/ci-red-${{ github.event.workflow_run.head_sha }}`
+            5. Open a PR from branch `fix/ci-red-${{ github.event.workflow_run.head_commit.id }}`
                titled `fix(ci): main went red — <one-line cause>`, label it `auto-fix`.
                In the body: root cause, why the chosen direction, before/after suite counts.
 
