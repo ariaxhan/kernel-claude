@@ -307,7 +307,8 @@ rm_recursive_force() {
 rm_targets_root_home() {
   # Quotes are optional on both sides: `rm -rf "$HOME"` and `rm -rf '/'` are the same wipe.
   # (Pre-existing miss found by the 9.5.2 blind verifier; the regex had required bare whitespace.)
-  echo "$1" | grep -qE '(^|[[:space:]])["'"'"']?(/|/\*|~|~/|~/\*|\$HOME/?|\$\{HOME\}/?)["'"'"']?([[:space:]]|$)'
+  # A trailing glob after the quote (`"$HOME"/*`, `"/"*`) is the same wipe (second-pass find).
+  echo "$1" | grep -qE '(^|[[:space:]])["'"'"']?(/|/\*|~|~/|~/\*|\$HOME/?|\$\{HOME\}/?)["'"'"']?(/?\*+)?([[:space:]]|$)'
 }
 while IFS= read -r _seg; do
   if rm_recursive_force "$_seg" && rm_targets_root_home "$_seg"; then
@@ -373,13 +374,29 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(curl|wget|nc|ncat|sftp)([[
     printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*http://' && ! printf '%s' "$LOW" | grep -qE 'http://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])' && _kc_exfil=1
     printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*(-d|--data|--data-binary|--data-raw|--data-urlencode|-f |--form|-t |--upload-file|--post-data|--post-file)[^;|&]*(\$|@-|@/dev/stdin)' && _kc_exfil=1
     printf '%s' "$LOW" | grep -qE 'security[[:space:]]+find-(generic|internet)-password[^;&]*\|[^;&]*(curl|wget|nc|ncat)' && _kc_exfil=1
-    # Raw host: dotted IPv4, bracketed IPv6, or an all-digit (decimal-encoded) host.
-    printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*https?://(\[|[0-9]+([./:"'"'"' ]|$))' && _kc_exfil=1
-    # The secret may only travel in a header. A `$` anywhere inside a URL argument means the
-    # value (or a substitution of it) is in the query string or path: that is the exfil shape
-    # a header rule must refuse, and the shape the 9.5.2 verifier walked straight through.
-    printf '%s' "$COMMAND_CODE" | grep -qE '(curl|wget)[^;|&]*https?://[^[:space:]"'"'"']*\$' && _kc_exfil=1
-    printf '%s' "$COMMAND_CODE" | grep -qE '(curl|wget)[^;|&]*"https?://[^"]*\$[^"]*"' && _kc_exfil=1
+    # POSITIVE allowlist, not a list of bad spellings. The 9.5.2 blind verifier walked past
+    # every negative rule by respelling (URL in a variable, HTTPS://, hex IP, user@host). A
+    # text guard can only defend a shape it can fully recognise, so a curl/wget segment that
+    # shares a command with a keychain read is allowed ONLY when all of these hold:
+    #   * exactly one URL token, a lowercase literal https:// with a dotted alphabetic host
+    #     (or localhost), optional port, path free of $ @ and quotes;
+    #   * an -H "Authorization: ..." header is present;
+    #   * outside -H arguments the segment contains no $ at all (no variable URL, no
+    #     substitution, no smuggled value);
+    #   * no body/upload flag.
+    # Anything else in that segment blocks. gh / env-only commands have no such segment.
+    while IFS= read -r _seg; do
+      printf '%s' "$_seg" | grep -qE '(^|[[:space:];|&(])(curl|wget)([[:space:]]|$)' || continue
+      _nurl=$(printf '%s' "$_seg" | grep -oiE '[a-z][a-z0-9+.-]*://[^[:space:]"'"'"']*' | wc -l | tr -d ' ')
+      [ "$_nurl" = 1 ] || { _kc_exfil=1; break; }
+      printf '%s' "$_seg" | grep -qE '(^|[[:space:]"'"'"'])https://(localhost|[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,})(:[0-9]+)?(/[^[:space:]"'"'"'$@]*)?(["'"'"']|[[:space:]]|$)' || { _kc_exfil=1; break; }
+      printf '%s' "$_seg" | grep -qiE -- '(^|[[:space:]])-H[[:space:]]+["'"'"']?authorization:' || { _kc_exfil=1; break; }
+      # Strip each -H argument as ONE shell word, including adjacent quoted pieces
+      # (`-H 'Authorization: Bearer '"$K"` is one word to the shell).
+      _noh=$(printf '%s' "$_seg" | sed -E 's/-H[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]"'"'"'])+//g')
+      printf '%s' "$_noh" | grep -q '\$' && { _kc_exfil=1; break; }
+      printf '%s' "$_seg" | grep -qE '(^|[[:space:]])(-d|--data[a-z-]*|-F|--form|-T|--upload-file|--post-data|--post-file)([[:space:]=]|$)' && { _kc_exfil=1; break; }
+    done < <(printf '%s\n' "$COMMAND_CODE" | tr ';|&' '\n')
     if [ "$_kc_exfil" = 1 ]; then
       block "keychain read combined with network egress that carries the secret OUT (body/upload, plaintext http, raw ip, or a raw socket)." "Authenticate with an Authorization header over https; never put a keychain value in a request body."
     fi

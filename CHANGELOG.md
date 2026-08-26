@@ -65,6 +65,16 @@ that rewrite or coach instead of refusing.
   edits: `rm -rf "$HOME"` and `rm -rf '/'` passed because the root/home regex required bare
   whitespace around the target; quotes are now optional. Two advisory hooks crashed on a
   non-dict `tool_input`; they now exit 0. Seven regression tests carry the reproducers.
+- Second blind pass: still NOT SAFE, and the reason is the lesson of the release. The keychain
+  fix had patched three spellings, not the class: a URL in a variable, `HTTPS://`, a hex host
+  and `user@host` all walked past rules that matched URL text. A text guard can only defend a
+  shape it fully recognises, so the rule is now a POSITIVE allowlist: a curl/wget segment that
+  shares a command with a keychain read passes only with exactly one lowercase literal
+  `https://` URL to a dotted alphabetic host (or localhost), an `-H Authorization` header, no
+  `$` anywhere outside the header words, and no body/upload flag. Everything else blocks.
+  `rm -rf "$HOME"/*` and `"/"*` (a glob after the closing quote) now block too. One added
+  test was brittle (asserted empty output where an unrelated note is legitimate); it now
+  asserts the absence of a rewrite.
 
 ### Tests
 - 14 new cases in `tests/run-tests.sh`: eight guard precision cases (five must-pass shapes,
