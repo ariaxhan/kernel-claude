@@ -1530,6 +1530,8 @@ test_autocorrect_bash_pipestatus_under_zsh() {
   if printf '%s' "$out" | grep -q 'pipestatus'; then echo "FAIL: a heredoc body runs under bash; never rewrite it: $out"; return 1; fi
   out=$(printf '%s' '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"bash -c '"'"'a | b; echo ${PIPESTATUS[0]}'"'"'; echo '"'"'${PIPESTATUS[0]}'"'"'"}}' | SHELL=/bin/zsh KERNEL_AUTOCORRECT_LOG="$TEST_DIR/autocorrect.jsonl" python3 "$PLUGIN_ROOT/hooks/scripts/autocorrect-bash.py" 2>/dev/null)
   if printf '%s' "$out" | grep -q 'updatedInput'; then echo "FAIL: a string handed to bash -c or a single-quoted literal is never rewritten: $out"; return 1; fi
+  out=$(printf '%s' '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"sh -c \"a | b; echo ${PIPESTATUS[0]}\""}}' | SHELL=/bin/zsh KERNEL_AUTOCORRECT_LOG="$TEST_DIR/autocorrect.jsonl" python3 "$PLUGIN_ROOT/hooks/scripts/autocorrect-bash.py" 2>/dev/null)
+  if printf '%s' "$out" | grep -q 'updatedInput'; then echo "FAIL: a double-quoted string handed to sh -c runs under sh, never rewritten: $out"; return 1; fi
   out=$(printf '%s' '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"cat <<\"EOF\"\n${PIPESTATUS[0]}\nEOF"}}' | SHELL=/bin/zsh KERNEL_AUTOCORRECT_LOG="$TEST_DIR/autocorrect.jsonl" python3 "$PLUGIN_ROOT/hooks/scripts/autocorrect-bash.py" 2>/dev/null)
   if printf '%s' "$out" | grep -q 'pipestatus'; then echo "FAIL: a double-quoted heredoc delimiter still marks a body: $out"; return 1; fi
 }
