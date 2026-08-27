@@ -17,6 +17,11 @@ working script with awk (#226). Three smaller noise sources rode along.
   as a missing path, and expands `~` before joining with cwd.
 - `syntax-coach` only coaches `command not found` from a whole output line; the phrase inside
   quoted text (an issue body, a transcript) no longer coaches a curl that never ran.
+- `retrospective` can no longer authorise an archive from `last_hit` alone. Injection rules and
+  `agentdb learn`'s dedup path both deliver or reinforce a learning without stamping it, so the
+  bare predicate reads a load-bearing row as stale. Step 3 now subtracts the injected set and
+  `hit_count >= 5`. Measured on the operator's vault: the bare predicate named 22 rows, 11 of
+  them protected, including the most-recalled row in the database at `hit_count` 125.
 
 ### Added
 - `autocorrect-bash` R14: under a zsh tool shell, top-level `${PIPESTATUS[n]}` becomes
