@@ -14,6 +14,7 @@
 #
 # Install the lanes (all free; any subset works, missing ones are reported as SKIPPED):
 #   brew install gitleaks semgrep actionlint zizmor osv-scanner shellcheck jq
+#   pip install lizard   (or have uvx on PATH; complexity lane, MED severity, never gates)
 # Licensing: semgrep Community rules are internal-use only (no resale/SaaS on top of them);
 # gitleaks/actionlint/zizmor MIT, osv-scanner Apache-2.0, shellcheck GPL-3.0 (tool-only).
 set -u
@@ -86,6 +87,12 @@ if command -v osv-scanner >/dev/null; then
   note osv-scanner RAN
 else note osv-scanner SKIPPED; fi
 
+CX_SH="$(dirname "$0")/complexity.sh"
+if [ -x "$CX_SH" ] && { command -v lizard >/dev/null || command -v uvx >/dev/null; }; then
+  ( "$CX_SH" . ${BASE:+"$BASE"} > "$T/complexity.tsv" 2>/dev/null; true ) &
+  note complexity RAN
+else note complexity SKIPPED; fi
+
 wait
 
 # --- normalize -------------------------------------------------------------------------
@@ -100,6 +107,8 @@ J "$T/shellcheck.json" && jq -r '.[] | [.file, (.line|tostring), "shellcheck", (
 J "$T/actionlint.json" && jq -r '.[] | [.filepath, (.line|tostring), "actionlint", "MED", .message] | @tsv' "$T/actionlint.json" >> "$F" 2>/dev/null
 J "$T/zizmor.json" && jq -r '.[]? | (.locations[0].symbolic.key.Local.given_path // "workflow") as $f | [$f, "0", "zizmor", (if .determinations.severity=="High" then "HIGH" else "MED" end), .ident] | @tsv' "$T/zizmor.json" >> "$F" 2>/dev/null
 J "$T/osv.json" && jq -r '.results[]?.packages[]? | .package.name as $p | .vulnerabilities[]? | [$p, "0", "osv-scanner", (if ((.database_specific.severity//"")|ascii_downcase)=="critical" or ((.database_specific.severity//"")|ascii_downcase)=="high" then "HIGH" else "MED" end), .id] | @tsv' "$T/osv.json" >> "$F" 2>/dev/null
+
+[ -s "$T/complexity.tsv" ] && awk -F'\t' 'BEGIN{OFS="\t"} {print $1, $2, "complexity", "MED", $3 " CCN " $4 " (>= " CCN_MAX ")"}' CCN_MAX="${CCN_MAX:-15}" "$T/complexity.tsv" >> "$F"
 
 sort -t"$(printf '\t')" -k4,4 -k1,1 -o "$F" "$F"
 
