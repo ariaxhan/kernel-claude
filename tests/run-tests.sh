@@ -1508,6 +1508,35 @@ test_autocorrect_bash_heredoc_body_untouched() {
   local out; out=$(_hook autocorrect-bash.py "{\"tool_name\":\"Bash\",\"cwd\":\"$PLUGIN_ROOT\",\"tool_input\":{\"command\":\"cat > n.md <<'EOF'\\nrecall this later :!_meta\\nEOF\"}}")
   if printf '%s' "$out" | grep -q 'updatedInput'; then assert_equals "no rewrite" "rewrite" "R9/R10 never rewrite inside a heredoc body"; else assert_equals 0 0 "ok"; fi
 }
+# kernel #226: a static note outlived the shim that fixed it; the model rewrote working code.
+test_autocorrect_bash_grep_P_probes_host() {
+  local out; out=$(_hook autocorrect-bash.py '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"grep -P x f"}}')
+  if printf 'a\n' | grep -P a >/dev/null 2>&1; then assert_equals "" "$out" "R6 stays silent where grep -P works"; else assert_contains "$out" 'R6' "R6 fires where grep -P fails"; fi
+  local off; off=$(printf '%s' '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"grep -P x f"}}' | PATH=/usr/bin:/bin KERNEL_AUTOCORRECT_LOG="$TEST_DIR/autocorrect.jsonl" python3 "$PLUGIN_ROOT/hooks/scripts/autocorrect-bash.py" 2>/dev/null)
+  if [ "$(uname)" = "Darwin" ]; then assert_contains "$off" 'R6' "R6 fires on a bare BSD PATH"; else assert_equals 0 0 "ok"; fi
+}
+test_autocorrect_bash_redirect_and_tilde_are_not_paths() {
+  local out; out=$(_hook autocorrect-bash.py '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"cat /etc/hosts 2>/dev/null; cat > new-file.md <<EOF\nx\nEOF"}}')
+  assert_equals "" "$out" "a redirection or a write target is never a missing read path"
+  out=$(_hook autocorrect-bash.py '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"cat ~/.kernel-does-not-exist.md"}}')
+  if printf '%s' "$out" | grep -q '/~/'; then assert_equals "expanded" "joined" "~ must be expanded before joining with cwd"; else assert_equals 0 0 "ok"; fi
+}
+test_autocorrect_bash_pipestatus_under_zsh() {
+  local out; out=$(printf '%s' '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"a | b; echo ${PIPESTATUS[0]}"}}' | SHELL=/bin/zsh KERNEL_AUTOCORRECT_LOG="$TEST_DIR/autocorrect.jsonl" python3 "$PLUGIN_ROOT/hooks/scripts/autocorrect-bash.py" 2>/dev/null)
+  assert_contains "$out" 'echo ${pipestatus[1]}' "zsh: PIPESTATUS[0] becomes pipestatus[1]"
+  out=$(printf '%s' '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"a | b; echo ${PIPESTATUS[0]}"}}' | SHELL=/bin/bash KERNEL_AUTOCORRECT_LOG="$TEST_DIR/autocorrect.jsonl" python3 "$PLUGIN_ROOT/hooks/scripts/autocorrect-bash.py" 2>/dev/null)
+  assert_equals "" "$out" "bash: PIPESTATUS is left alone"
+  out=$(printf '%s' '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"cat > s.sh <<'"'"'EOF'"'"'\na | b\n[ ${PIPESTATUS[1]} -eq 0 ]\nEOF"}}' | SHELL=/bin/zsh KERNEL_AUTOCORRECT_LOG="$TEST_DIR/autocorrect.jsonl" python3 "$PLUGIN_ROOT/hooks/scripts/autocorrect-bash.py" 2>/dev/null)
+  if printf '%s' "$out" | grep -q 'pipestatus'; then assert_equals "untouched" "rewritten" "a heredoc body runs under bash; never rewrite it"; else assert_equals 0 0 "ok"; fi
+}
+test_syntax_coach_not_found_needs_a_whole_line() {
+  local out; out=$(_hook syntax-coach.py '{"tool_name":"Bash","tool_input":{"command":"gh issue view 47"},"tool_response":"`not found: curl` from a zsh exec_command while /usr/bin/curl exists"}')
+  assert_equals "" "$out" "not found inside quoted text is not a failed command"
+  out=$(_hook syntax-coach.py '{"tool_name":"Bash","tool_input":{"command":"curl x"},"tool_response":"zsh: command not found: curl"}')
+  assert_contains "$out" 'curl' "a real zsh not-found still coaches"
+  out=$(_hook syntax-coach.py '{"tool_name":"Bash","tool_input":{"command":"python x"},"tool_response":"sh: 1: python: not found"}')
+  assert_contains "$out" 'python' "a real sh not-found still coaches"
+}
 test_hooks_survive_non_dict_tool_input() {
   printf '{"tool_name":"Bash","tool_input":"ls"}' | python3 "$PLUGIN_ROOT/hooks/scripts/autocorrect-bash.py" >/dev/null 2>&1; local a=$?
   printf '{"tool_name":"Bash","tool_input":"ls","tool_response":"x"}' | python3 "$PLUGIN_ROOT/hooks/scripts/syntax-coach.py" >/dev/null 2>&1; local b=$?
@@ -5521,6 +5550,10 @@ run_test_suite() {
       run_test "autocorrect-bash inserts && after cd" test_autocorrect_bash_cd_separator
       run_test "autocorrect-bash rewrites cat -A on macOS" test_autocorrect_bash_cat_A
       run_test "autocorrect-bash is silent on a clean command" test_autocorrect_bash_silent
+      run_test "autocorrect-bash R6 probes grep -P instead of assuming (#226)" test_autocorrect_bash_grep_P_probes_host
+      run_test "autocorrect-bash R2b ignores redirections, write targets and ~ (#226)" test_autocorrect_bash_redirect_and_tilde_are_not_paths
+      run_test "autocorrect-bash R14 PIPESTATUS -> pipestatus under zsh (#226)" test_autocorrect_bash_pipestatus_under_zsh
+      run_test "syntax-coach not-found needs a whole line (#226)" test_syntax_coach_not_found_needs_a_whole_line
       run_test "syntax-coach names the fix for a usage banner" test_syntax_coach_usage
       run_test "syntax-coach is silent on a clean run" test_syntax_coach_silent
       run_test "autocorrect-tool-input adds WebFetch prompt" test_autocorrect_webfetch_prompt
