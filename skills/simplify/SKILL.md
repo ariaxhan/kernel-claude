@@ -1,8 +1,8 @@
 ---
 name: simplify
-description: "Reduce cyclomatic complexity with a number, not an opinion. Measures every function with lizard, refactors the worst first, refuses to game the metric, and hands the before/after table to a verifier that re-measures. Triggers: simplify, refactor, complexity, spaghetti, nested, god function, untangle."
+description: "Cut cyclomatic complexity: lizard measures, worst first, a verifier re-measures. Triggers: simplify, refactor, complexity, spaghetti, god function."
 user-invocable: true
-allowed-tools: Agent, Bash, Read, Edit, Write, Grep, Glob
+allowed-tools: Agent, Bash, Read, Edit, Grep, Glob
 kernel:
   kind: workflow
   version: 1
