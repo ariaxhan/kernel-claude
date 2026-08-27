@@ -113,9 +113,9 @@ def first_line_segments(command):
             if line.strip() == in_doc:
                 in_doc = None
             continue
-        m = re.search(r"<<-?\s*'?([A-Za-z_][A-Za-z0-9_]*)'?", line)
+        m = re.search(r"<<-?\s*(?:'([A-Za-z_][A-Za-z0-9_]*)'|\"([A-Za-z_][A-Za-z0-9_]*)\"|\\?([A-Za-z_][A-Za-z0-9_]*))", line)
         if m:
-            in_doc = m.group(1)
+            in_doc = m.group(1) or m.group(2) or m.group(3)
         yield i, line
 
 
@@ -309,6 +309,7 @@ def rule_read_paths(command, cwd, project_dir, notes):
     # A file this same command creates (`... > out.txt; wc -l out.txt`) does not exist yet at
     # hook time and must not be reported missing.
     created = set(m.group(1).strip("\"'") for m in re.finditer(r"(?:^|[^<>])>{1,2}\s*([^\s;&|]+)", command))
+    created |= set(m.group(1).strip("\"'") for m in re.finditer(r"(?:^|[|;&(]\s*|\s)tee\s+(?:-[a-z]+\s+)*([^\s;&|]+)", command))
     for i, line in first_line_segments(command):
         for seg in re.split(r"\s*(?:&&|\|\||;|\|)\s*", line):
             toks = seg.strip().split()
@@ -400,7 +401,15 @@ def rule_pipestatus_zsh(command, notes):
     lines = command.split("\n")
     changed = False
     noted = False
+    # A string handed to another interpreter runs THERE, not in the tool shell: bash -c, sh -c,
+    # ssh, sudo, env, xargs, script. Leave the whole line alone (the blind verifier's bash -c
+    # reproducer printed rc= instead of rc=1 after a rewrite).
+    other_shell = re.compile(r"(^|[|;&(]\s*|\s)(bash|sh|zsh|dash|ksh|ssh|sudo|env|xargs|script|nohup|caffeinate)(\s|$)")
     for i, line in first_line_segments(command):
+        if other_shell.search(line):
+            if "${PIPESTATUS[" in line:
+                noted = True
+            continue
         def fix(m):
             nonlocal changed, noted
             idx = m.group(1)
@@ -412,7 +421,11 @@ def rule_pipestatus_zsh(command, notes):
                 return "${pipestatus[" + str(int(idx) + 1) + "]"
             noted = True
             return m.group(0)
-        new = re.sub(r"\$\{PIPESTATUS\[([^\]]+)\]", fix, line)
+        # Single-quoted spans are literal text in every shell; rewrite only outside them.
+        parts = re.split(r"('[^']*')", line)
+        for k in range(0, len(parts), 2):
+            parts[k] = re.sub(r"\$\{PIPESTATUS\[([^\]]+)\]", fix, parts[k])
+        new = "".join(parts)
         if new != line:
             lines[i] = new
     if changed:
@@ -420,13 +433,13 @@ def rule_pipestatus_zsh(command, notes):
                      "array is lowercase and 1-indexed and `PIPESTATUS` expands to nothing. Inside a script run "
                      "by bash, keep `PIPESTATUS` (0-indexed) or use `set -o pipefail`.")
     if noted:
-        notes.append("R14 `${PIPESTATUS[<expr>]}` under zsh expands to nothing; the array is `pipestatus`, 1-indexed. Not rewritten (index is not a literal).")
+        notes.append("R14 `${PIPESTATUS[...]}` left alone (non-literal index, or the line hands a string to another shell such as bash -c / ssh, where PIPESTATUS is correct). In this zsh tool shell the array is `pipestatus`, 1-indexed.")
     return "\n".join(lines) if changed else command
 
 
 def rule_notes_only(command, notes):
     """R6/R7: things we will not rewrite, but the model should hear about BEFORE the call fails."""
-    if is_macos() and re.search(r"(^|[|;&(]\s*|\s)grep\s+-[a-zA-Z]*P", command) and not grep_has_P():
+    if is_macos() and re.search(r"(^|[|;&(]\s*|\s)grep\s+(-[a-zA-Z]*P|--perl-regexp)", command) and not grep_has_P():
         notes.append("R6 grep on this host has no -P (PCRE) and no shim is installed. Use `rg -P '<pattern>'`, "
                      "or `grep -E` for an ERE pattern.")
     for tool, alt in (("timeout", "gtimeout (brew install coreutils) or the Bash tool's own `timeout` parameter"),
@@ -443,9 +456,11 @@ def main():
         data = json.load(sys.stdin)
     except Exception:
         return
+    if not isinstance(data, dict):
+        return
     if data.get("tool_name") not in (None, "Bash"):
         return
-    ti = data.get("tool_input") if isinstance(data, dict) else None
+    ti = data.get("tool_input")
     if not isinstance(ti, dict):
         return
     command = ti.get("command")
