@@ -1,6 +1,6 @@
 ---
 name: simplify
-description: "Cut cyclomatic complexity: lizard measures, worst first, a verifier re-measures. Triggers: simplify, refactor, complexity, spaghetti, god function."
+description: "Lower cyclomatic complexity: lizard measures, a verifier re-measures. Triggers: simplify, refactor, complexity, spaghetti."
 user-invocable: true
 allowed-tools: Agent, Bash, Read, Edit, Grep, Glob
 kernel:
