@@ -69,7 +69,7 @@ the Claude Code agent definitions natively. Matrix: `docs/kernel-9/HOST-CAPABILI
 gemini extensions install https://github.com/ariaxhan/kernel-claude
 ```
 
-Gemini CLI gets the methodology layer only: the 27 skills and this file as ambient context. It does
+Gemini CLI gets the methodology layer only: the 28 skills and this file as ambient context. It does
 not get the enforcement layer. Gemini CLI 0.44.1 implements no `PreToolUse`, `PostToolUse`,
 `UserPromptSubmit`, `Stop`, `PreCompact`, `PermissionRequest`, or `PostToolUseFailure` event, which
 is where every KERNEL guardrail binds, and it does not substitute `${CLAUDE_PLUGIN_ROOT}` in a hook
