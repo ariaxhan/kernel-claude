@@ -95,8 +95,10 @@ detection: grep -r "catch.*{}" (empty catch)
 </check>
 
 <check id="5_complexity">
-- Functions > 30 lines?
+- Any function with cyclomatic complexity >= 15? A number, not a guess.
 - Nested ternaries > 2 levels?
+detection: ${CLAUDE_PLUGIN_ROOT}/scripts/complexity.sh <repo> <base-ref>  (exit 1 = hotspots listed, exit 3 = no tool, say so)
+fix: /kernel:simplify on the listed functions
 </check>
 </big5>
 

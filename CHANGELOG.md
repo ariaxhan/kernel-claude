@@ -2,6 +2,29 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.0] - 2026-08-27
+
+A skill is only as strong as the one measurement it refuses to let the model skip.
+
+Adapted from saurabhkumar8112/cyclomatic-complexity-skill (Apache-2.0), a 60-line skill whose
+only non-generic line is "don't game the metric". KERNEL's review check 5 asked two yes/no
+questions about complexity; a model answering questions about its own code is not a
+measurement. Now it runs lizard.
+
+### Added
+- `/kernel:simplify`: cyclomatic complexity per function via lizard (from PATH or `uvx`, no
+  install), refactor worst first, explicit anti-gaming rule, and the before/after table is
+  re-measured by a verifier that never saw the builder's reasoning. The builder never signs
+  "behavior verified".
+- `scripts/complexity.sh <repo> [base-ref]`: TSV of functions at or over `CCN_MAX` (default
+  15), worst first. Exit 0 clean, 1 hotspots, 3 no tool (reported, never a silent pass).
+
+### Changed
+- `review` check `5_complexity` now cites `complexity.sh` output instead of "functions > 30
+  lines?".
+- `deterministic-review.sh` gains a `complexity` lane at MED severity. It never gates: a new
+  lane that breaks a build on first run is worse than no lane.
+
 ## [9.5.4] - 2026-08-26
 
 Guards that refuse teach nothing; hooks that correct teach in the same turn.

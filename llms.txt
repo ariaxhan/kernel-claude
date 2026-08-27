@@ -6,7 +6,7 @@
 > that carries lessons between sessions.
 
 Repository: https://github.com/ariaxhan/kernel-claude
-License: MIT. Version 9.5.4. Requires `git`, `sqlite3`, `jq`, `python3`, `bash`.
+License: MIT. Version 9.6.0. Requires `git`, `sqlite3`, `jq`, `python3`, `bash`.
 
 ## What it is
 
@@ -113,6 +113,7 @@ agentdb learn failure|pattern|gotcha "<what>" "<evidence>"  # after discovering
 - `/kernel:build` · `$kernel:build`: generate two or three approaches before implementing, take the simplest.
 - `/kernel:debug` · `$kernel:debug`: reproduce, hypothesize, isolate by binary search, fix root cause, add a regression test.
 - `/kernel:diagnose` · `$kernel:diagnose`: diagnosis before prescription for bugs and refactors.
+- `/kernel:simplify` · `$kernel:simplify`: reduce cyclomatic complexity, measured by lizard, worst function first, before/after table re-measured by a verifier.
 - `/kernel:review` · `$kernel:review`: code review with a deterministic scanner lane and a refutation pass; APPROVE, REQUEST CHANGES, or COMMENT.
 - `/kernel:tearitapart` · `$kernel:tearitapart`: pre-implementation critique; PROCEED, REVISE, or RETHINK.
 - `/kernel:ship` · `$kernel:ship`: release gate: validate, review, publish, tag.
