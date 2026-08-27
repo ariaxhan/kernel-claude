@@ -21,11 +21,21 @@ if ! echo "$INPUT" | jq -e 'type == "object" and (.tool_input | type == "object"
 fi
 
 # Claude sends Write/Edit text as content/new_string. Codex maps those hook
-# matchers to apply_patch and sends the complete patch in tool_input.patch.
+# matchers to apply_patch and sends the complete patch in tool_input.COMMAND,
+# not tool_input.patch. Verified against a live codex-cli 0.150.1 payload
+# 2026-08-27; the .patch-only read returned empty for every Codex write since
+# 2026-07-14, so this scanner passed everything on that host. .patch is still
+# accepted in case a host uses it. .command counts only when it opens with the
+# apply_patch header, because a shell tool puts a command line in the same key.
 CONTENT=$(echo "$INPUT" | jq -r '
+  def patch_text:
+    if (.tool_input.patch | type) == "string" then .tool_input.patch
+    elif (.tool_input.command | type) == "string"
+      and (.tool_input.command | test("^\\*\\*\\* Begin Patch")) then .tool_input.command
+    else null end;
   [.tool_input.content, .tool_input.new_string,
-   (if (.tool_input.patch | type) == "string" then
-      [.tool_input.patch | split("\n")[] | select(startswith("+"))] | join("\n")
+   (if (patch_text != null) then
+      [patch_text | split("\n")[] | select(startswith("+"))] | join("\n")
     else empty end)]
   | map(select(type == "string"))
   | join("\n")

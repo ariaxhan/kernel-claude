@@ -250,6 +250,15 @@ get_project_root() {
 # Emit one compact JSON record per affected file: {path, content}. Claude
 # Write/Edit produces one record. Codex apply_patch preserves file order, keeps
 # added content scoped to its file, and treats Move to as the effective path.
+#
+# Codex carries the whole patch in .tool_input.COMMAND, not .tool_input.patch.
+# Captured from a live codex-cli 0.150.1 PostToolUse payload, 2026-08-27:
+#   {"tool_name":"apply_patch",
+#    "tool_input":{"command":"*** Begin Patch\n*** Add File: /abs/path\n+line\n*** End Patch"}}
+# Reading only .patch returned empty for 744 recorded apply_patch fires since
+# 2026-07-14, which silently disabled every path- and content-gated hook on Codex.
+# .command is only treated as a patch when it opens with the apply_patch header,
+# because on a shell tool the same key holds a command line.
 kernel_hook_file_records() {
   printf '%s' "$1" | jq -c '
     def finish:
@@ -257,8 +266,13 @@ kernel_hook_file_records() {
       else .records += [(.current | .content = (.content | join("\n")))]
            | .current = null
       end;
-    if (.tool_input.patch | type) == "string" then
-      (reduce (.tool_input.patch | split("\n")[]) as $line
+    def patch_text:
+      if (.tool_input.patch | type) == "string" then .tool_input.patch
+      elif (.tool_input.command | type) == "string"
+        and (.tool_input.command | test("^\\*\\*\\* Begin Patch")) then .tool_input.command
+      else null end;
+    if (patch_text != null) then
+      (reduce (patch_text | split("\n")[]) as $line
         ({records: [], current: null};
          if ($line | test("^\\*\\*\\* (Add File|Update File|Delete File): ")) then
            finish
