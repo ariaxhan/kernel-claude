@@ -1161,6 +1161,55 @@ test_detect_secrets_allows_codex_secret_removal() {
   assert_exit_code 0 "$?" "Codex must be able to remove an existing secret"
 }
 
+# --- Codex ships the patch in tool_input.COMMAND, not tool_input.patch -------
+# The .patch tests above assert a shape codex-cli never sends. They passed for
+# months while every path- and content-gated hook saw nothing on Codex. Payload
+# captured live from codex-cli 0.150.1 on 2026-08-27. Keep BOTH shapes tested:
+# .patch is the tolerated fallback, .command is what actually arrives.
+
+test_detect_secrets_blocks_codex_command_shape() {
+  local key="AKIA"; key+="IOSFODNN7EXAMPLE"
+  local patch json ec=0
+  patch=$(printf '*** Begin Patch\n*** Add File: config.ts\n+const key = "%s";\n*** End Patch' "$key")
+  json=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{command:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "a secret in the real Codex apply_patch shape must be blocked"
+}
+
+test_detect_secrets_allows_clean_codex_command_shape() {
+  local patch json
+  patch=$(printf '*** Begin Patch\n*** Add File: hello.ts\n+console.log("hi");\n*** End Patch')
+  json=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{command:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  assert_exit_code 0 "$?" "a clean Codex apply_patch must not be blocked"
+}
+
+test_detect_secrets_ignores_shell_command_key() {
+  local json
+  json=$(jq -n '{tool_name:"Bash",tool_input:{command:"echo not-a-patch"}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh" >/dev/null 2>&1
+  assert_exit_code 0 "$?" "a shell command in tool_input.command must not be parsed as a patch"
+}
+
+test_guard_config_blocks_codex_command_shape() {
+  local patch json ec=0
+  patch=$(printf '*** Begin Patch\n*** Add File: /repo/.git/hooks/pre-commit\n+x\n*** End Patch')
+  json=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{command:$patch}}')
+  printf '%s\n' "$json" | "$PLUGIN_ROOT/hooks/scripts/guard-config.sh" >/dev/null 2>&1 || ec=$?
+  assert_exit_code 2 "$ec" "a .git/hooks write in the real Codex shape must be blocked"
+}
+
+test_hook_file_records_reads_codex_command_shape() {
+  local patch json out
+  patch=$(printf '*** Begin Patch\n*** Add File: /abs/seed.txt\n+PROBE\n*** End Patch')
+  json=$(jq -n --arg patch "$patch" '{tool_name:"apply_patch",tool_input:{command:$patch}}')
+  # shellcheck source=/dev/null
+  . "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  out=$(kernel_hook_file_records "$json")
+  assert_contains "$out" '"path":"/abs/seed.txt"' "file records must extract the path from tool_input.command"
+  assert_contains "$out" '"content":"PROBE"' "file records must extract added content from tool_input.command"
+}
+
 test_guard_config_blocks_codex_apply_patch() {
   local patch json ec=0
   patch=$'*** Begin Patch\n*** Add File: .claude/generated/foo.md\n+generated\n*** End Patch'
@@ -2135,14 +2184,18 @@ test_critical_guard_scripts_unchanged_for_820() {
   # guard-bash pin moved once, when it was changed to fail CLOSED on a missing
   # jq (it warned and allowed, so the destructive-command fence opened whenever
   # its parser went missing -- found by tests/corpus/run-corpus.py).
+  # The guard-config and detect-secrets pins moved 2026-08-27, when both were
+  # taught to read tool_input.command: Codex sends apply_patch there, not in
+  # tool_input.patch, so both gates had been reading an empty string and
+  # passing everything on that host since 2026-07-14.
   local expected actual file
   while read -r expected file; do
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
 bf1ed3df128d833bc8e18837669bcda2e47178fc68a746691ac90f3de93e68a7 guard-bash.sh
-6a885672ad9f643bc0ac60cc3cfe3f2366a890faaa3a4bee132afb2d99cde731 guard-config.sh
-d3611267b4f135c5b96e8a4a8af60f296b196efc135e3dfbef63d7683065608c detect-secrets.sh
+ce20904682f9e53593328cc957c3039e99b7afe5eb9dc9cbea2f6dacbf650191 guard-config.sh
+c0afdb26d6794934e4e0758cdcd5e03aeb8abbd44a03daf781a7410fbb2e5ea9 detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
 EOF
 }
@@ -5542,6 +5595,11 @@ run_test_suite() {
       run_test "detect-secrets allows clean code" test_detect_secrets_allows_clean_code
       run_test "detect-secrets blocks Codex apply_patch" test_detect_secrets_blocks_codex_apply_patch
       run_test "detect-secrets allows Codex secret removal" test_detect_secrets_allows_codex_secret_removal
+      run_test "detect-secrets blocks the real Codex shape" test_detect_secrets_blocks_codex_command_shape
+      run_test "detect-secrets allows a clean Codex patch" test_detect_secrets_allows_clean_codex_command_shape
+      run_test "detect-secrets ignores a shell command key" test_detect_secrets_ignores_shell_command_key
+      run_test "guard-config blocks the real Codex shape" test_guard_config_blocks_codex_command_shape
+      run_test "file records read the real Codex shape" test_hook_file_records_reads_codex_command_shape
       run_test "guard-bash blocks force push" test_guard_bash_blocks_force_push
       run_test "guard-bash allows safe commands" test_guard_bash_allows_safe_commands
       run_test "guard-bash allows git log" test_guard_bash_allows_git_log

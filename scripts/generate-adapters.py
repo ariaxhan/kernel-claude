@@ -272,8 +272,24 @@ def build_capability_report(spec: dict) -> str:
             f"- instruction file: `{host['instruction_file']}`",
             f"- plugin manifest: `{host['plugin_manifest']}`",
             f"- marketplace manifest: `{host['marketplace_manifest']}`",
-            f"- hook bindings: `{host['hooks_file']}`",
+            f"- hook bindings written to: `{host['hooks_file']}`",
             f"- skill invocation: `{host['invoke_prefix']}<name>`",
+        ]
+        # Operator-facing truths that are not derivable from the paths above.
+        # A host can decline to read the file Kernel writes, refuse to run hooks
+        # until a flag is set, or require per-hook approval. Each is a silent
+        # failure if it is not stated here.
+        for field, label in (
+            ("hooks_file_note", "hook bindings actually read from"),
+            ("hooks_declaration_note", "manifest declaration"),
+            ("hooks_feature_flag", "hooks feature flag"),
+            ("project_hook_trust", "project hook trust"),
+            ("lifecycle_events_evidence", "lifecycle evidence"),
+            ("agents_support", "agents"),
+        ):
+            if host.get(field):
+                lines.append(f"- {label}: {host[field]}")
+        lines += [
             f"- verified by: {host['verified_by']}",
             f"- verified on: {host['verified_on']}",
             "",

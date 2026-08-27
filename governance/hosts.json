@@ -53,7 +53,8 @@
         "Notification"
       ],
       "verified_by": "Claude Code 2.1.220 plugin runtime; bindings exercised by tests/run-tests.sh lifecycle suite",
-      "verified_on": "2026-07-29"
+      "verified_on": "2026-07-29",
+      "agents_support": "agents/*.md at plugin root are discovered automatically and invoked through the Task tool."
     },
     "codex": {
       "display_name": "Codex",
@@ -73,7 +74,10 @@
         "PreCompact",
         "PermissionRequest",
         "Stop",
-        "SubagentStop"
+        "SubagentStop",
+        "PostCompact",
+        "SubagentStart",
+        "Interrupt"
       ],
       "hook_timeout_ceilings_seconds": {
         "SessionEnd": 3
@@ -82,8 +86,14 @@
       "unsupported_lifecycle_events": {
         "PostToolUseFailure": "Not implemented by Codex 0.146.0. Exact symbol search over the shipped binary returns zero occurrences, while every lifecycle event Kernel binds on this host returns 17 or more. Kernel's capture-error.sh is therefore not bound on this host, and error capture degrades to what PostToolUse can observe."
       },
-      "verified_by": "codex-cli 0.146.0; symbol extraction from the shipped binary; native manifest shape read from installed OpenAI plugins (visualize, codex-security); plugin-level hooks.json shape read from installed figma and replayio plugins",
-      "verified_on": "2026-07-29"
+      "verified_by": "codex-cli 0.150.1, re-verified 2026-08-27 by live payload capture and controlled A/B runs, superseding the 0.146.0 static reading; symbol and doc extraction from the shipped binary; native manifest shape read from installed OpenAI plugins",
+      "verified_on": "2026-08-27",
+      "hooks_file_note": "hooks_file is the path Kernel WRITES, not the path Codex READS. Measured on codex-cli 0.150.1, 2026-08-27: Codex reads hooks/hooks.json, the Claude manifest, and never reads this root hooks.json. Proof is the per-session warning `clamping SessionEnd hook timeout to 3s in <plugin>/hooks/hooks.json` -- only hooks/hooks.json declares 210, the root file already declares 3. So the root manifest's Codex-specific values (SessionEnd 3, PostToolUseFailure dropped) have never taken effect on any Codex session.",
+      "hooks_declaration_note": "Do NOT add \"hooks\": \"./hooks.json\" to .codex-plugin/plugin.json. The plugin-json spec shipped inside the codex binary says path values are supplemented on top of default discovery, but the measured behaviour on 0.150.1 is the opposite and worse: with the key declared, a PostToolUse hook that fires without it stopped firing entirely (log-write rows per apply_patch went 1 -> 0, repeated twice, and back to 1 on removal). Fixing the split needs ONE manifest at hooks/hooks.json, not a declaration.",
+      "lifecycle_events_evidence": "Full enum extracted from the codex-cli 0.150.1 binary, contiguous in one string: PreToolUse PermissionRequest PostToolUse PreCompact PostCompact SessionStart SessionEnd UserPromptSubmit SubagentStart SubagentStop Stop Interrupt. PostCompact, SubagentStart and Interrupt were absent from this list until 2026-08-27 and are still unbound by Kernel; PostCompact is the notable one, the Vaults host config already uses it.",
+      "hooks_feature_flag": "Codex runs no hooks at all unless config.toml carries [features] hooks = true. It is off by default and fails silently: no error, no warning, every guard simply absent. Kernel's install path does not check for it.",
+      "project_hook_trust": "Project-level .codex/hooks.json hooks are trusted individually in config.toml under [hooks.state.\"<path>:<snake_case_event>:<group_index>:<hook_index>\"] with a trusted_hash. Editing a hook command or inserting one invalidates its hash and the hook silently stops running until a human re-approves it in an interactive session. A headless codex exec cannot grant that approval. Plugin-shipped hooks need no such entry.",
+      "agents_support": "Kernel's ten agents/*.md are a Claude Code plugin surface with no Codex equivalent. In a Codex plugin, agents/ means agents/openai.yaml, per-skill UI metadata and invocation policy, confirmed in the 0.150.1 binary alongside .codex-plugin/plugin.json in the same component-discovery string. Codex has native multi-agent spawn (spawn_agent, wait_agent, close_agent, assign_agent_task) but no plugin-level agent definitions to point it at. So surgeon, adversary, blind-evaluator, deep-diver, reviewer, researcher, scout, dreamer, lane-worker and transcript-archaeologist do not exist on this host, and the tier-3 contract -> surgeon -> adversary flow has no Codex implementation. Independent verification on Codex is a human or a second CLI, not a Kernel agent."
     }
   },
   "interface": {

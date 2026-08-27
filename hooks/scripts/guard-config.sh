@@ -19,10 +19,18 @@ if ! echo "$INPUT" | jq -e 'type == "object" and (.tool_input | type == "object"
   exit 2
 fi
 
+# Codex apply_patch carries the patch in tool_input.command, not .patch
+# (live codex-cli 0.150.1 payload, 2026-08-27). Reading only .patch made this
+# allowlist see no paths at all on Codex, so it guarded nothing there.
 FILE_PATHS=$(echo "$INPUT" | jq -r '
+  def patch_text:
+    if (.tool_input.patch | type) == "string" then .tool_input.patch
+    elif (.tool_input.command | type) == "string"
+      and (.tool_input.command | test("^\\*\\*\\* Begin Patch")) then .tool_input.command
+    else null end;
   if (.tool_input.file_path | type) == "string" then .tool_input.file_path
-  elif (.tool_input.patch | type) == "string" then
-    .tool_input.patch
+  elif (patch_text != null) then
+    patch_text
     | split("\n")[]
     | select(test("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "))
     | sub("^\\*\\*\\* (Add File|Update File|Delete File|Move to): "; "")
