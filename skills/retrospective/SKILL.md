@@ -40,6 +40,17 @@ sentence in a doc is honor-system; an artifact fires on its own.
      recalled) is older than 30 days. Load-bearing predicate:
      `COALESCE(last_hit, ts) < datetime('now', '-30 days')`. A recently recalled
      learning is not stale even when its original `ts` is old.
+     **`last_hit` alone is not sufficient evidence to delete.** Two mechanisms deliver a
+     learning without ever stamping it: an injection rule that fires it into every session,
+     and `agentdb learn`'s dedup path, which bumps `hit_count` and leaves `last_hit` null.
+     So before archiving ANY row, subtract the two protected sets:
+     - referenced by a `learning_id` in the project's injection rules, and
+     - `hit_count >= 5`, which is a recall record the stamp failed to reflect.
+     Measured on 2026-08-27 in Vaults: the bare predicate named 22 rows, 11 of them
+     protected, including the most-recalled row in the database (`hit_count` 125) and three
+     rows injected into every session. Archiving on the bare predicate is silent and
+     irreversible. A reference implementation of the subtraction is
+     `_meta/services/agentdb-archive-guard.py`.
    - **Promotable**: Identify patterns worth encoding as artifacts (hit_count 2+, OR hit_count 1x
      when the failure mode is quiet/expensive, don't wait for a third burn on a costly lesson)
    - **Project fit**: Audit the host project's `.claude/` against its actual work. A recurring

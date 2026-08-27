@@ -59,6 +59,11 @@ kernel:
      proven compatibility loader, record the limitation, and defer the native
      manifest until both schemas can be satisfied.
    - Tag (only if user requested a tagged release): `git tag -l` to avoid clobber → `git tag -a v{X.Y.Z} -m "{summary}"` → `git push origin v{X.Y.Z}`.
+   - Before upgrading the installed plugin on this machine: `pgrep -fl codex`. The upgrade
+     deletes the old cache directory under a live session's feet and every hook in that
+     session exits 127 until it restarts. Name the live sessions in the handoff and say
+     they need a restart; never report "upgraded" as if it covered them
+     (docs/upgrading.md, 2026-08-27).
 
 6. **Human pass** *(any user-facing release: app build, deploy, anything a person will touch)*
    - Load `skills/human-pass/SKILL.md` and write the guide for THIS build: literal

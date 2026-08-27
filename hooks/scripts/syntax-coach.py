@@ -108,9 +108,9 @@ def main():
         data = json.load(sys.stdin)
     except Exception:
         return
-    if data.get("tool_name") not in (None, "Bash"):
-        return
     if not isinstance(data, dict):
+        return
+    if data.get("tool_name") not in (None, "Bash"):
         return
     ti = data.get("tool_input")
     command = (ti.get("command") if isinstance(ti, dict) else None) or ""
@@ -128,7 +128,10 @@ def main():
             if re.search(pat, outp):
                 notes.append(fix)
 
-    for m in re.finditer(r"(?:command not found: |not found: |: command not found)\s*([A-Za-z0-9_.-]+)|^(?:zsh|bash|sh): ([A-Za-z0-9_.-]+): command not found", outp, re.M):
+    # Whole-line shapes only. Unanchored, `not found: curl` inside quoted text (an issue body, a
+    # transcript excerpt) coached a curl that was never run (kernel #226).
+    for m in re.finditer(r"^\s*(?:[A-Za-z0-9_./-]+:(?: ?(?:line )?\d+:)? ?)?(?:command not found: |not found: )([A-Za-z0-9_.-]+)\s*$"
+                         r"|^\s*(?:[A-Za-z0-9_./-]+:(?: ?(?:line )?\d+:)? ?)?([A-Za-z0-9_.-]+): (?:command )?not found\s*$", outp, re.M):
         name = m.group(1) or m.group(2)
         if not name:
             continue

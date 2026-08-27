@@ -2,6 +2,33 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.1] - 2026-08-27
+
+A note that is not probed outlives the fix that made it false.
+
+The day after `install-agent-compat.sh` shimmed `grep -P` on the operator's Mac, the autocorrect
+hook was still telling the model "macOS grep has no -P". The model believed it and rewrote a
+working script with awk (#226). Three smaller noise sources rode along.
+
+### Fixed
+- `autocorrect-bash` R6 probes `grep -P` on the host before speaking, like R7 already did with
+  `have()`. Silent where a shim, GNU grep, or ugrep makes it work.
+- `autocorrect-bash` R2b no longer reads `2>/dev/null`, `&>x`, or the target of `cat > file`
+  as a missing path, and expands `~` before joining with cwd.
+- `syntax-coach` only coaches `command not found` from a whole output line; the phrase inside
+  quoted text (an issue body, a transcript) no longer coaches a curl that never ran.
+
+### Added
+- `autocorrect-bash` R14: under a zsh tool shell, top-level `${PIPESTATUS[n]}` becomes
+  `${pipestatus[n+1]}` (zsh is lowercase and 1-indexed; `PIPESTATUS` expands to nothing there).
+  Heredoc bodies are untouched: they run under bash. Four tests.
+
+### Changed
+- `docs/upgrading.md` and the ship skill: upgrading the plugin deletes the old cache directory
+  while sessions started before the upgrade still resolve hook paths into it, so every hook
+  in those sessions exits 127 until they restart. Check `pgrep -fl codex` first and say who
+  needs a restart.
+
 ## [9.6.0] - 2026-08-27
 
 A skill is only as strong as the one measurement it refuses to let the model skip.

@@ -37,6 +37,8 @@ def main():
         data = json.load(sys.stdin)
     except Exception:
         return
+    if not isinstance(data, dict):
+        return
     tool = data.get("tool_name") or ""
     ti = data.get("tool_input") or {}
     if not isinstance(ti, dict):

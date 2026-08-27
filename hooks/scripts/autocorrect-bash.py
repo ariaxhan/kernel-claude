@@ -34,9 +34,16 @@ Rules (each one names the evidence that earned it):
   R5  `sed -i 's/...'` GNU in-place form on BSD sed                     -> `sed -i '' 's/...'`
       (2 occurrences: `invalid command code`)
   R6  `grep -P` on BSD grep: NOT rewritten (ERE and PCRE differ), note only, points at `rg -P`.
+      Probed, not assumed: silent when `grep -P` works on this host (a shim, GNU grep, ugrep).
+      A static note outlived the shim that fixed it and taught a model to rewrite working code
+      (kernel #226, 2026-08-27).
   R7  `timeout N`, `shuf`, `tac` missing: NOT rewritten, note only, points at coreutils/gtimeout.
       (42 blocks; the vault fix is `brew install coreutils` + shims, this note is for other hosts)
+  R14 `${PIPESTATUS[n]}` at top level when the tool shell is zsh          -> `${pipestatus[n+1]}`
+      (zsh spells it lowercase and indexes from 1; `PIPESTATUS` expands to nothing there, so the
+      exit code printed blank and a working script got blamed, kernel #226)
 """
+import subprocess
 import json
 import os
 import re
@@ -79,6 +86,20 @@ def have(cmd):
     return shutil.which(cmd) is not None
 
 
+def grep_has_P():
+    """True when `grep -P` works on this host (GNU grep, ugrep, or a shim over rg). Probed,
+    because the answer changed under the old static note the day a shim was installed."""
+    try:
+        r = subprocess.run(["grep", "-P", "a"], input=b"a\n", capture_output=True, timeout=2)
+        return r.returncode == 0 and r.stdout.strip() == b"a"
+    except Exception:
+        return False
+
+
+def tool_shell_is_zsh():
+    return os.path.basename(os.environ.get("SHELL", "")) == "zsh"
+
+
 def is_macos():
     return sys.platform == "darwin"
 
@@ -92,9 +113,9 @@ def first_line_segments(command):
             if line.strip() == in_doc:
                 in_doc = None
             continue
-        m = re.search(r"<<-?\s*'?([A-Za-z_][A-Za-z0-9_]*)'?", line)
+        m = re.search(r"<<-?\s*(?:'([A-Za-z_][A-Za-z0-9_]*)'|\"([A-Za-z_][A-Za-z0-9_]*)\"|\\?([A-Za-z_][A-Za-z0-9_]*))", line)
         if m:
-            in_doc = m.group(1)
+            in_doc = m.group(1) or m.group(2) or m.group(3)
         yield i, line
 
 
@@ -285,19 +306,34 @@ def rule_read_paths(command, cwd, project_dir, notes):
     87 'file guessed wrong' failures in 14 days; most were a wrong directory for a real file."""
     lines = command.split("\n")
     changed = False
+    # A file this same command creates (`... > out.txt; wc -l out.txt`) does not exist yet at
+    # hook time and must not be reported missing.
+    created = set(m.group(1).strip("\"'") for m in re.finditer(r"(?:^|[^<>])>{1,2}\s*([^\s;&|]+)", command))
+    created |= set(m.group(1).strip("\"'") for m in re.finditer(r"(?:^|[|;&(]\s*|\s)tee\s+(?:-[a-z]+\s+)*([^\s;&|]+)", command))
     for i, line in first_line_segments(command):
         for seg in re.split(r"\s*(?:&&|\|\||;|\|)\s*", line):
             toks = seg.strip().split()
             if not toks or os.path.basename(toks[0]) not in READ_CMDS:
                 continue
+            skip_next = False
             for tok in toks[1:]:
+                if skip_next:
+                    skip_next = False
+                    continue  # the target of a bare `>` / `>>` / `<`: a write target is never a read path
+                if tok in (">", ">>", "<"):
+                    skip_next = True
+                    continue
                 if tok.startswith("-") or "$" in tok or "*" in tok or "{" in tok or tok in ("|", ">", ">>"):
                     continue
+                if re.match(r"^[0-9&]*[<>]", tok):
+                    continue  # a redirection (`2>/dev/null`, `>out`, `&>x`), not a path
                 if not ("/" in tok or tok.endswith((".md", ".py", ".ts", ".js", ".json", ".sh", ".txt", ".yaml", ".yml", ".toml"))):
                     continue
-                p = tok.strip("\"'")
-                full = p if p.startswith("/") else os.path.join(cwd, p)
-                if os.path.exists(os.path.expanduser(full)):
+                p = os.path.expanduser(tok.strip("\"'"))
+                if tok.strip("\"'") in created:
+                    continue
+                full = p if os.path.isabs(p) else os.path.join(cwd, p)
+                if os.path.exists(full):
                     continue
                 hits = find_by_basename(p, project_dir)
                 if len(hits) == 1:
@@ -307,7 +343,7 @@ def rule_read_paths(command, cwd, project_dir, notes):
                 elif hits:
                     notes.append(f"R2b `{p}` does not exist. Same name elsewhere: {', '.join(hits[:4])}. Not rewritten.")
                 else:
-                    parent = os.path.dirname(os.path.expanduser(full))
+                    parent = os.path.dirname(full)
                     sib = sorted(os.listdir(parent))[:8] if os.path.isdir(parent) else []
                     notes.append(f"R2b `{p}` does not exist" + (f"; {parent} holds: {', '.join(sib)}" if sib else f" and neither does {parent}") + ". Not rewritten.")
     return "\n".join(lines) if changed else command
@@ -355,10 +391,57 @@ def rule_shell_shape_notes(command, notes):
         notes.append("R13 `${x:-{}}` closes at the first `}` and corrupts the payload; assign the default first (`x=${x:-'{}'}`).")
 
 
+def rule_pipestatus_zsh(command, notes):
+    """R14: the Bash tool runs the login shell. Under zsh `PIPESTATUS` expands to nothing and the
+    array is `pipestatus`, indexed from 1. Literal indexes shift by one; `[@]` and `[*]` pass
+    through; a non-literal index gets a note, never a guess. Top-level lines only: a heredoc
+    body is a script that will run under bash."""
+    if not tool_shell_is_zsh():
+        return command
+    lines = command.split("\n")
+    changed = False
+    noted = False
+    # A string handed to another interpreter runs THERE, not in the tool shell: bash -c, sh -c,
+    # ssh, sudo, env, xargs, script. Leave the whole line alone (the blind verifier's bash -c
+    # reproducer printed rc= instead of rc=1 after a rewrite).
+    other_shell = re.compile(r"(^|[|;&(]\s*|\s)(bash|sh|zsh|dash|ksh|ssh|sudo|env|xargs|script|nohup|caffeinate)(\s|$)")
+    for i, line in first_line_segments(command):
+        if other_shell.search(line):
+            if "${PIPESTATUS[" in line:
+                noted = True
+            continue
+        def fix(m):
+            nonlocal changed, noted
+            idx = m.group(1)
+            if idx in ("@", "*"):
+                changed = True
+                return "${pipestatus[" + idx + "]"
+            if idx.isdigit():
+                changed = True
+                return "${pipestatus[" + str(int(idx) + 1) + "]"
+            noted = True
+            return m.group(0)
+        # Single-quoted spans are literal text in every shell; rewrite only outside them.
+        parts = re.split(r"('[^']*')", line)
+        for k in range(0, len(parts), 2):
+            parts[k] = re.sub(r"\$\{PIPESTATUS\[([^\]]+)\]", fix, parts[k])
+        new = "".join(parts)
+        if new != line:
+            lines[i] = new
+    if changed:
+        notes.append("R14 rewrote `${PIPESTATUS[n]}` -> `${pipestatus[n+1]}`: this tool shell is zsh, where the "
+                     "array is lowercase and 1-indexed and `PIPESTATUS` expands to nothing. Inside a script run "
+                     "by bash, keep `PIPESTATUS` (0-indexed) or use `set -o pipefail`.")
+    if noted:
+        notes.append("R14 `${PIPESTATUS[...]}` left alone (non-literal index, or the line hands a string to another shell such as bash -c / ssh, where PIPESTATUS is correct). In this zsh tool shell the array is `pipestatus`, 1-indexed.")
+    return "\n".join(lines) if changed else command
+
+
 def rule_notes_only(command, notes):
     """R6/R7: things we will not rewrite, but the model should hear about BEFORE the call fails."""
-    if is_macos() and re.search(r"(^|[|;&(]\s*|\s)grep\s+-[a-zA-Z]*P", command):
-        notes.append("R6 macOS grep has no -P (PCRE). Use `rg -P '<pattern>'`, or `grep -E` for an ERE pattern.")
+    if is_macos() and re.search(r"(^|[|;&(]\s*|\s)grep\s+(-[a-zA-Z]*P|--perl-regexp)", command) and not grep_has_P():
+        notes.append("R6 grep on this host has no -P (PCRE) and no shim is installed. Use `rg -P '<pattern>'`, "
+                     "or `grep -E` for an ERE pattern.")
     for tool, alt in (("timeout", "gtimeout (brew install coreutils) or the Bash tool's own `timeout` parameter"),
                       ("shuf", "gshuf (brew install coreutils) or `sort -R`"),
                       ("tac", "gtac (brew install coreutils) or `tail -r`")):
@@ -373,9 +456,11 @@ def main():
         data = json.load(sys.stdin)
     except Exception:
         return
+    if not isinstance(data, dict):
+        return
     if data.get("tool_name") not in (None, "Bash"):
         return
-    ti = data.get("tool_input") if isinstance(data, dict) else None
+    ti = data.get("tool_input")
     if not isinstance(ti, dict):
         return
     command = ti.get("command")
@@ -396,6 +481,7 @@ def main():
     new = rule_backticks_in_text_args(new, notes)
     new = rule_house_forms(new, notes)
     new = rule_read_paths(new, cwd, project_dir, notes)
+    new = rule_pipestatus_zsh(new, notes)
     rule_shell_shape_notes(new, notes)
     rule_notes_only(new, notes)
 

@@ -74,6 +74,15 @@ codex plugin marketplace upgrade kernel-marketplace
 Restart Codex after the upgrade. Current Codex refreshes the installed plugin cache as part
 of the marketplace upgrade; there is no `codex plugin update` command.
 
+Restart every Codex session that was open during the upgrade, not just new ones. The upgrade
+deletes the previous version's cache directory
+(`~/.codex/plugins/cache/kernel-marketplace/kernel/<old>/`), and a session that started
+before the upgrade has already resolved its hook paths into that directory. Every hook in
+that session then fails with `hook exited with code 127` (path not found) until it restarts.
+Check first: `pgrep -fl codex` lists what is live. Seen 2026-08-27 on the 9.5.4 to 9.6.0
+upgrade: three UserPromptSubmit failures per prompt in every pre-upgrade session, while the
+same scripts ran clean from the new directory.
+
 Start a new session if Claude Code says a component or monitor could not reload. VS Code may
 show a restart banner.
 
