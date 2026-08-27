@@ -7,15 +7,17 @@ created: 2026-08-27
 # ⛔ KERNEL on Codex: the secret scanner was reading a key Codex never sends
 
 Audit of kernel-claude 9.6.1 against codex-cli 0.150.1, 2026-08-27.
-Eight findings. Two were exploitable holes. Both are fixed and regression-tested.
+Eight findings. Three were live safety holes: a secret scanner reading the wrong key, every
+headless lane running with its guards untrusted, and Codex unable to write in the Vaults at all.
+All three fixed and verified.
 One thing everyone assumes is broken turns out to be fine.
 
 | # | Finding | Consequence | State |
 |---|---|---|---|
 | 1 | `tool_input.patch` is not what Codex sends | Secret scanner and write allowlist scanned nothing on Codex | ✅ fixed |
-| 2 | Codex reads `hooks/hooks.json`, not the root `hooks.json` | The Codex-tuned manifest has never taken effect | 📋 recorded, needs a refactor |
+| 2 | Codex reads `hooks/hooks.json`, not the root `hooks.json` | The Codex-tuned manifest has never taken effect | 📋 recorded, needs its own change |
 | 3 | `writable_roots` pointed at a symlink | Every sandboxed Codex write in the Vaults failed | ✅ fixed |
-| 4 | Hooks do not run under `~/.codex-cli` | Every codex-lane runs with no guards at all | ⛔ unexplained |
+| 4 | 11 plugin hooks untrusted under `~/.codex-cli` | Every codex-lane ran with no destructive-command guard and no secret scanner | ✅ fixed |
 | 5 | `agents/*.md` is a Claude-only surface | All 10 kernel agents absent on Codex | ✅ documented |
 | 6 | Project hooks need per-hook trust; edits revoke it | Silent, and a headless run cannot re-grant it | ✅ documented |
 | 7 | `[features] hooks = true` is required, off by default | A default Codex install runs zero guards, silently | ✅ documented |
@@ -139,23 +141,52 @@ refuses symlinked writable roots. Every sandboxed Codex write in the Vaults has 
 
 Repointed to the real path. A lane that failed on this before the change created its file after it.
 
-## 4. Hooks do not run under `~/.codex-cli` ⛔ unexplained
+## 4. Every headless Codex lane ran with the guards switched off ✅ fixed
 
-Same command, same repo, same prompt, only `CODEX_HOME` differs:
+Same command, same repo, only `CODEX_HOME` differs:
 
 | CODEX_HOME | hooks ran |
 |---|---|
-| `~/.codex` | **yes** — `hook: SessionStart` printed, `log-write` row appended |
-| `~/.codex-cli` | **no** — instrumented `log-write.sh` and `guard-bash.sh` produced nothing across three runs |
+| `~/.codex` | yes |
+| `~/.codex-cli` | no, across three instrumented runs |
 
-Both homes have `[features] hooks = true`, both list `kernel@kernel-marketplace` as
-`installed, enabled` at 9.6.1, and the `~/.codex-cli` run still printed the SessionEnd clamp
-warning, so the manifest is parsed there and simply not executed.
+Not a mystery once finding 6 is applied to plugins as well as projects. Plugin hooks are trusted
+individually too, keyed by plugin rather than by path:
 
-**This is the one to chase next.** `codex-lane.sh` forces `CODEX_HOME=~/.codex-cli` on every
-headless lane, so all delegated Codex work currently runs with no destructive-command guard, no
-secret scanner and no budget check. The instrumentation method that found it is written up in
-finding 1 and takes about two minutes to repeat.
+```toml
+[hooks.state."kernel@kernel-marketplace:hooks/hooks.json:pre_tool_use:2:1"]
+```
+
+(That key is also independent proof of finding 2: Codex names `hooks/hooks.json`, never the root
+manifest.)
+
+`~/.codex` had 29 of Kernel's hooks trusted. `~/.codex-cli` had 18. The 11 it had never been asked
+about, and therefore silently skipped:
+
+| key | hook |
+|---|---|
+| `pre_tool_use:0:1` | **guard-bash.sh** — the destructive-command fence |
+| `pre_tool_use:2:1` | **detect-secrets.sh** — the secret scanner |
+| `pre_tool_use:2:2` | validate-structure.sh |
+| `pre_tool_use:2:3` | warn-hardcoded.sh |
+| `pre_tool_use:2:4` | verdict-gate.sh |
+| `pre_tool_use:3:0` | guard-context.sh |
+| `post_tool_use:2:0` | log-write.sh |
+| `post_tool_use:2:1` | validate-json-schema.sh |
+| `user_prompt_submit:0:1` | route-request.sh |
+| `user_prompt_submit:0:2` | post-compact-restore.sh |
+
+`codex-lane.sh` forces `CODEX_HOME=~/.codex-cli` on every headless lane, and a headless run can
+never grant the approval it is missing. So all delegated Codex work has been running with no
+destructive-command guard and no secret scanner, and the mechanism guaranteed it could never
+fix itself.
+
+**Fix.** The trusted_hash is over hook content, and both homes carry the identical plugin at the
+identical version, so the 11 entries transfer. Copied from `~/.codex`, backup at
+`~/.codex-cli/config.toml.bak-20260827`.
+
+Verified live, after the copy: a `codex exec` under `~/.codex-cli` printed `hook: PreToolUse
+Completed` and appended a log-write row, where three runs before the copy produced neither.
 
 ## 5. Kernel's agents do not exist on Codex ✅ documented
 
@@ -240,10 +271,32 @@ The mechanism is unexplained. Do not "fix" the matchers without measuring first.
 | `docs/kernel-9/HOST-CAPABILITIES.md` | regenerated |
 | `~/.codex-cli/config.toml` | `writable_roots` repointed off the symlink |
 
+## The ambient budget test, diagnosed but not fixed
+
+`test_contributor_ambient_within_budget` is red, and was red before this work. Both ratchets are
+over: plugin 4975 against 4800, contributor 12157 against 11000.
+
+It is not actionable as written, because it is not deterministic. `measure_ambient.hook_cost`
+executes `hooks/scripts/session-start.sh` with `cwd` set to **this live repo** and counts the
+bytes it prints. That output carries the branch, the uncommitted file count, recent commit
+subjects, the agentdb learning count, the active contract, blockers, pending review and the code
+map. Three consecutive runs measured 8036, 8005 and 8005 bytes; the number moves when the tree
+gets dirty or a learning is written.
+
+So the gate charges plugin users for *this repo's accumulated state*. That is the same error its
+own docstring documents and pins a test against, committed a second time in a different place:
+last time it was CLAUDE.md charged to plugin users, this time it is our git log and our agentdb.
+
+The honest fix is to measure the hook against a fixed fixture repo so the number means something,
+then re-derive the ratchet from that. That is a measurement-design change with its own review, so
+it is written down here rather than done in passing. **The budgets were not raised.**
+
 ## Next
 
-1. **Finding 4.** Why `~/.codex-cli` parses hooks but never runs them. Everything headless is
-   unguarded until this is answered.
-2. **Finding 2.** Collapse to one manifest at `hooks/hooks.json`; delete the root file, update the
-   generator and the tests that reference it.
-3. Re-approve `.codex/hooks.json` in an interactive Codex session so today's guards arm.
+1. **Finding 2.** Collapse to one manifest at `hooks/hooks.json`; delete the root file, update the
+   generator and the ~15 tests that reference it.
+2. Re-approve `.codex/hooks.json` in an interactive Codex session so today's Vaults guards arm.
+   The plugin-side equivalent was fixable by copying hashes; the project-side one needs a human.
+3. Make the ambient measurement deterministic, then set the ratchet from the new number.
+4. Ship a release so the finding 1 fix reaches the installed plugin. Until then the caches at
+   `~/.codex/plugins` and `~/.codex-cli/plugins` still carry the broken parse.
