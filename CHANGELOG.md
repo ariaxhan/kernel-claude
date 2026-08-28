@@ -2,6 +2,40 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.2] - 2026-08-27
+
+The secret scanner read `tool_input.patch`. Codex sends `tool_input.command`.
+
+One key name, and every content- and path-gated hook saw an empty string on that host from
+2026-07-14 until today. The scanner scanned nothing; the write allowlist guarded nothing. The
+symptom was 744 rows in a log with an empty `file` field, and two tests that built the payload
+in a shape codex-cli has never sent and therefore passed.
+
+### Fixed
+- `detect-secrets.sh`, `guard-config.sh` and `common.sh` read the patch from
+  `tool_input.command`, captured live from codex-cli 0.150.1. `.command` counts only when it
+  opens with the apply_patch header, because a shell tool puts a command line in the same key.
+  `.patch` is still read as a fallback. Fails-before/passes-after on the real shape: an AWS key
+  and a `.git/hooks/pre-commit` write both went rc=0 to rc=2, clean writes unaffected.
+- Five regression tests on the captured shape, plus one asserting a shell command in that key is
+  not parsed as a patch. The `guard-config` and `detect-secrets` hash pins move with the reason
+  recorded beside them.
+
+### Changed
+- `governance/hosts.json` corrects five claims about Codex, each now backed by a measurement
+  rather than a reading: Codex reads `hooks/hooks.json` and never the root `hooks.json`, proved
+  twice over; declaring a `hooks` path in `.codex-plugin/plugin.json` suppresses PostToolUse
+  rather than supplementing discovery, so do not add it; hooks require `[features] hooks = true`,
+  off by default and silent when missing; project and plugin hooks both carry per-hook
+  `trusted_hash` entries an edit invalidates in silence; `PostCompact`, `SubagentStart` and
+  `Interrupt` are supported and were missing from the list.
+- `agents/*.md` has no Codex equivalent, so all ten KERNEL agents are Claude-only and the tier-3
+  contract → surgeon → adversary flow has no Codex implementation. Stated rather than implied.
+- `HOST-CAPABILITIES.md` now renders the operator-facing facts a path alone cannot carry: what
+  the host actually reads, what flag it needs, and what it will silently decline to run.
+
+Audit, evidence and repro steps: `_meta/reports/codex-parity-audit-2026-08-27.md` (#230).
+
 ## [9.6.1] - 2026-08-27
 
 A note that is not probed outlives the fix that made it false.
