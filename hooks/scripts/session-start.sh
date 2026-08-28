@@ -298,6 +298,33 @@ if command -v graphify >/dev/null 2>&1; then
 fi
 # --- end auto-orientation ---
 
+# --- compression policy (always emitted, first thing the model reads) ---
+cat <<'COMPRESSION'
+## compression — mandatory
+
+minimum text. zero meaningful loss.
+
+* delete anything removable.
+* merge anything redundant.
+* shorten anything compressible.
+* prefer structure over prose.
+* preserve all meaning that affects correctness, clarity, decisions, evidence, uncertainty, or action.
+* length follows information. never pad; never truncate for brevity.
+
+before emitting:
+
+1. perform a deletion pass.
+2. remove every word, sentence, bullet, section, preamble, recap, transition, or explanation whose removal does not materially reduce meaning.
+3. repeat until no further lossless deletion is possible.
+
+do not emit while removable text remains.
+
+verbosity is a defect.
+omission is also a defect.
+COMPRESSION
+echo ""
+# --- end compression policy ---
+
 # Emit session start event
 "$AGENTDB" emit session "session:start" "" "{\"branch\":\"$(git branch --show-current 2>/dev/null || echo none)\",\"profile\":\"$PROFILE\",\"project\":\"$PROJECT_ROOT\"}" "" "$KERNEL_SESSION_ID" 2>/dev/null &
 _kernel_hook_end "session-start" 0
