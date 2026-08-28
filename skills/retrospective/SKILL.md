@@ -85,10 +85,13 @@ sentence in a doc is honor-system; an artifact fires on its own.
    Write `_meta/reports/retrospective-{date}.json` per
    schemas/kernel.retrospective-result.v1.schema.json:
    - analyzed: learnings/clusters/merged/archived/contradictions_resolved counts
-   - mutations[]: every artifact created/modified/removed/promoted —
-     {op, artifact_type: hook|agent|skill|prose|learning, path, reason, evidence,
+   - identity: {created: ISO 8601, session, scope} — REQUIRED, and there is no top-level `date`
+   - mutations[]: every artifact touched —
+     {op: create|modify|remove|promote (imperative, not past tense),
+     artifact_type: hook|agent|skill|prose|learning, path, reason, evidence,
      reinforced, status: applied|scaffolded|proposed|rejected}
-   - project_fit: missing[] and dormant[] (prune candidates need explicit approval)
+   - project_fit: missing[] and dormant[], both arrays of STRINGS, not objects
+     (prune candidates need explicit approval)
    Then validate:
    ```bash
    "${CLAUDE_PLUGIN_ROOT:-.}/orchestration/manifest/kernel-manifest" validate _meta/reports/retrospective-{date}.json
