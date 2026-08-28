@@ -145,6 +145,8 @@ minimum text. zero meaningful loss.
 * never narrate work; report results, evidence, blockers, decisions.
 * preserve correctness, clarity, decisions, evidence, uncertainty, action.
 * length follows information. never pad; never omit.
+* between tool calls: silence by default. no preamble, no plan, no progress report.
+* one line only if it states a finding that changes what happens next. never intent.
 
 before emitting:
 

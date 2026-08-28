@@ -2,6 +2,14 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.4] - 2026-08-27
+
+Silence between tool calls.
+
+The compression policy governed what an agent emitted at the end of a turn, and nothing governed
+the running commentary in the middle of one, so agents narrated intent between every tool call.
+Default is now silence; one line only when it states a finding that changes what happens next.
+
 ## [9.6.3] - 2026-08-27
 
 Every session now opens with the compression policy.
