@@ -44,6 +44,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -53,11 +54,12 @@ BYTES_PER_TOKEN = 4.0
 # blocks indefinitely waiting on a read, which is defect D2 in the inventory;
 # measuring with a proper payload is also simply the honest configuration,
 # because it is what the host actually sends.
-HOOK_PAYLOAD = {
-    "hook_event_name": "SessionStart",
-    "source": "startup",
-    "cwd": REPO,
-}
+def _hook_payload(project_dir: str) -> dict:
+    return {
+        "hook_event_name": "SessionStart",
+        "source": "startup",
+        "cwd": project_dir,
+    }
 
 
 def approx_tokens(n_bytes: int) -> int:
@@ -72,28 +74,81 @@ def file_cost(rel: str) -> dict:
     return {"path": rel, "present": True, "bytes": n, "approx_tokens": approx_tokens(n)}
 
 
+def _fixture_project(tmp: str) -> str:
+    """A pinned, empty project for the hook to report on.
+
+    WHY THIS IS NOT MEASURED IN THIS REPO. session-start.sh reports live state: the
+    branch, the uncommitted file count, recent commit subjects, the agentdb learning
+    count, the active contract, blockers, pending review and the code map. Run here,
+    it charged plugin users for OUR git log and OUR agentdb. Three consecutive runs
+    measured 8036, 8005 and 8005 bytes, so the ratchet moved with how dirty the tree
+    happened to be and it disagreed between a developer's machine and clean CI.
+
+    That is the same error this module's docstring already documents and pins a test
+    against, committed a second time in a different place: last time it was CLAUDE.md
+    charged to plugin users, then it was our accumulated repo state. Pinning the
+    specific past mistake did not prevent the general one.
+
+    So the hook is measured against a fresh single-commit repo with no agentdb, no
+    contracts and no graph. That is KERNEL's own contribution to a session, which is
+    the only part KERNEL can reduce. A user's accumulated state is theirs, it is not
+    a plugin cost, and it must not move this gate.
+    """
+    proj = os.path.join(tmp, "fixture")
+    os.makedirs(proj)
+    with open(os.path.join(proj, "README.md"), "w") as fh:
+        fh.write("fixture\n")
+    git = ["git", "-c", "user.email=fixture@example.com", "-c", "user.name=fixture"]
+    subprocess.run(git + ["init", "-q", "-b", "main", proj], check=True,
+                   capture_output=True)
+    subprocess.run(git + ["-C", proj, "add", "README.md"], check=True,
+                   capture_output=True)
+    subprocess.run(git + ["-C", proj, "commit", "-q", "-m", "fixture"], check=True,
+                   capture_output=True)
+    return proj
+
+
 def hook_cost(rel: str, timeout: int = 120) -> dict:
     path = os.path.join(REPO, rel)
     if not os.path.exists(path):
         return {"path": rel, "present": False, "bytes": 0, "approx_tokens": 0}
 
-    try:
-        proc = subprocess.run(
-            ["bash", path],
-            input=json.dumps(HOOK_PAYLOAD),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=REPO,
-        )
-    except subprocess.TimeoutExpired:
-        return {
-            "path": rel,
-            "present": True,
-            "bytes": 0,
-            "approx_tokens": 0,
-            "error": f"hook did not terminate within {timeout}s",
-        }
+    with tempfile.TemporaryDirectory() as tmp:
+        try:
+            proj = _fixture_project(tmp)
+        except (subprocess.CalledProcessError, OSError) as exc:
+            return {
+                "path": rel,
+                "present": True,
+                "bytes": 0,
+                "approx_tokens": 0,
+                "error": f"could not build the measurement fixture: {exc}",
+            }
+
+        env = dict(os.environ)
+        env["CLAUDE_PROJECT_DIR"] = proj
+        env["CLAUDE_PLUGIN_ROOT"] = REPO
+        # Deterministic by construction: no inherited agentdb, no voice, no network.
+        env.pop("AGENTDB_EMBED_PYTHON", None)
+
+        try:
+            proc = subprocess.run(
+                ["bash", path],
+                input=json.dumps(_hook_payload(proj)),
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=proj,
+                env=env,
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "path": rel,
+                "present": True,
+                "bytes": 0,
+                "approx_tokens": 0,
+                "error": f"hook did not terminate within {timeout}s",
+            }
 
     n = len(proc.stdout.encode("utf-8"))
     out = {
@@ -102,6 +157,7 @@ def hook_cost(rel: str, timeout: int = 120) -> dict:
         "bytes": n,
         "approx_tokens": approx_tokens(n),
         "exit_code": proc.returncode,
+        "measured_against": "pinned single-commit fixture repo, not this one",
     }
     if proc.returncode != 0:
         out["error"] = f"hook exited {proc.returncode}"

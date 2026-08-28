@@ -24,9 +24,21 @@ import unittest
 import measure_ambient
 
 
-# Ratchets. Measured 2026-08-05: plugin 4596, contributor 10380.
-PLUGIN_AMBIENT_BUDGET = 4800
-CONTRIBUTOR_AMBIENT_BUDGET = 11000
+# Ratchets, re-derived 2026-08-27 after the measurement was corrected. Measured
+# now: plugin 3845, contributor 11027.
+#
+# These are NOT raised budgets. The instrument changed underneath them. It used to
+# run session-start.sh against this repo and count output carrying our branch, our
+# commit log, our agentdb learnings, our active contract and our code map, so the
+# hook read 8036 / 8005 / 8005 bytes across three runs and the gate disagreed
+# between a dirty working copy and clean CI. It now reports on a pinned
+# single-commit fixture and reads 3516 bytes every time. The old numbers measured a
+# different thing and cannot be compared to these.
+#
+# Headroom matches the previous convention: a little over the measured value, so
+# ordinary editing does not trip the gate but real growth does.
+PLUGIN_AMBIENT_BUDGET = 4000
+CONTRIBUTOR_AMBIENT_BUDGET = 11400
 
 
 class AmbientBudgetTest(unittest.TestCase):
@@ -50,6 +62,30 @@ class AmbientBudgetTest(unittest.TestCase):
             actual,
             CONTRIBUTOR_AMBIENT_BUDGET,
             f"contributor ambient {actual} tok exceeds the {CONTRIBUTOR_AMBIENT_BUDGET} tok ratchet.",
+        )
+
+    def test_measurement_is_deterministic(self):
+        """The gate has to mean the same thing twice, or it cannot be acted on.
+
+        The previous version measured the hook against this live repo, so the number
+        moved with tree dirtiness and agentdb growth: it failed locally and passed in
+        CI on the same commit, which is how it sat red and unactioned. If someone
+        points the measurement back at real state, this fails before the ratchet does
+        and says why.
+        """
+        second = measure_ambient.measure()
+        self.assertEqual(
+            self.m["hooks"][0]["bytes"],
+            second["hooks"][0]["bytes"],
+            "session-start.sh cost changed between two consecutive measurements. The "
+            "hook is being measured against live state again (branch, commit log, "
+            "agentdb, contracts, code map) instead of the pinned fixture. A ratchet "
+            "that moves with the tree cannot be acted on.",
+        )
+        self.assertEqual(
+            self.m["plugin_ambient_tokens"],
+            second["plugin_ambient_tokens"],
+            "plugin ambient is not reproducible across two runs in one process",
         )
 
     def test_plugin_ambient_excludes_instruction_file(self):
