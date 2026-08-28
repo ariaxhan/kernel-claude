@@ -3,18 +3,20 @@
 
 minimum text. zero meaningful loss.
 
+* default: bullets + fragments.
+* prose only when structure would lose meaning.
 * delete anything removable.
 * merge anything redundant.
 * shorten anything compressible.
-* prefer structure over prose.
-* preserve all meaning that affects correctness, clarity, decisions, evidence, uncertainty, or action.
-* length follows information. never pad; never truncate for brevity.
+* never narrate work; report results, evidence, blockers, decisions.
+* preserve correctness, clarity, decisions, evidence, uncertainty, action.
+* length follows information. never pad; never omit.
 
 before emitting:
 
-1. perform a deletion pass.
-2. remove every word, sentence, bullet, section, preamble, recap, transition, or explanation whose removal does not materially reduce meaning.
-3. repeat until no further lossless deletion is possible.
+1. convert prose → bullets/fragments wherever lossless.
+2. delete every removable word, sentence, bullet, section, preamble, recap, transition, or explanation.
+3. repeat until further compression would lose meaning.
 
 do not emit while removable text remains.
 
