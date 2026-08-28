@@ -1,6 +1,6 @@
 {
   "name": "kernel-marketplace",
-  "description": "Safety guardrails, hooks, and agentdb memory for Claude Code and Codex in auto mode, with independent verification",
+  "description": "Safety guardrails, cross-host hooks, and agentdb memory for Claude Code and Codex in auto mode",
   "owner": {
     "name": "Aria Han"
   },
@@ -8,8 +8,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Safety guardrails, hooks, and agentdb memory for Claude Code and Codex in auto mode, with independent verification",
-      "version": "9.6.4"
+      "description": "Safety guardrails, cross-host hooks, and agentdb memory for Claude Code and Codex in auto mode",
+      "version": "9.6.5"
     }
   ]
 }

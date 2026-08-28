@@ -236,15 +236,16 @@ def read_status(path: str, thread_id: str, now: dt.datetime) -> Dict[str, Any]:
 
 
 def render_hook(status: Dict[str, Any]) -> str:
+    # Codex treats output beginning with `[` or `{` as structured hook JSON.
     if status["used_percent"] is None:
-        return "[context] %s" % status["state"]
-    line = "[context] %s %.1f%% used, %d tokens remain, window %d" % (
+        return "context: %s" % status["state"]
+    line = "context: %s %.1f%% used, %d tokens remain, window %d" % (
         status["state"],
         status["used_percent"],
         status["remaining_tokens"],
         status["window_number"],
     )
-    return line if len(line) <= 240 else "[context] %s" % status["state"]
+    return line if len(line) <= 240 else "context: %s" % status["state"]
 
 
 def main() -> int:

@@ -1,6 +1,6 @@
 ---
 name: debug
-description: "Systematic debugging methodology based on Zeller's scientific method. Reproduce, hypothesize, predict, test, isolate via binary search, fix root cause. Every fix gets a regression test. Triggers: bug, error, fix, broken, not working, fails, crashed, unexpected, stack trace, regression, exception."
+description: "Scientific debugging: reproduce, hypothesize, predict, isolate, fix root cause; every fix gets a regression test. Triggers: bug, error, fix, broken, not working, fails, crashed, unexpected, stack trace, regression, exception."
 allowed-tools: Read, Bash, Grep, Glob
 kernel:
   kind: methodology

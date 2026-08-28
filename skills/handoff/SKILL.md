@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: "Compile session state into an authoritative kernel.handoff/v1 JSON manifest for bounded resume. Saves provenance, decisions, workflow phases, context policy, next steps. Triggers: handoff, save, pause, context, continue later."
+description: "Save provenance, decisions, phases, context policy, and next steps as kernel.handoff/v1. Triggers: handoff, save, pause, context, continue later."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob, Write
 kernel:

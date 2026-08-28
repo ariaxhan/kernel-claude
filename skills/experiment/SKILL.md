@@ -1,6 +1,6 @@
 ---
 name: experiment
-description: "Autonomous experimentation engine + scientific method for development rules. Every rule is a hypothesis; nothing is proven until tested. Seeds from CLAUDE.md, designs falsifiable experiments, runs them, updates confidence, graduates or kills rules. Triggers: experiment, hypothesis, prove, test rule, validate methodology, scientific, evidence."
+description: "Experiment engine for development rules. Treats rules as hypotheses, designs falsifiable tests, updates confidence, and graduates or kills rules. Triggers: experiment, hypothesis, prove, test rule, validate methodology, scientific, evidence."
 user-invocable: true
 disable-model-invocation: true
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, WebSearch, WebFetch

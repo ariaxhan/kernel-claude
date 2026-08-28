@@ -1,6 +1,6 @@
 ---
 name: forge
-description: "Autonomous development engine with experimental self-correction. Heats solutions, hammers through iteration, quenches with quality gates, experiments on its own output. Runs until antifragile or reports why it can't be."
+description: "Autonomous development with experimental self-correction. Iterates through quality gates until antifragile or blocked."
 user-invocable: true
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, WebSearch, WebFetch
 disable-model-invocation: true

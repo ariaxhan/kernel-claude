@@ -1,6 +1,6 @@
 ---
 name: ingest
-description: "Unified entry point for new AND resumed work. Research → classify → scope → execute for new tasks; manifest validate → divergence check → bounded context compile → resume for kernel.handoff/v1 / kernel.checkpoint/v1 manifests. Triggers: start, begin, do, implement, build, fix, create, resume, continue."
+description: "Entry point for new or resumed work. Researches and scopes new tasks; validates and resumes handoff/checkpoint manifests. Triggers: start, begin, do, implement, build, fix, create, resume, continue."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob, Task, WebSearch, WebFetch
 kernel:

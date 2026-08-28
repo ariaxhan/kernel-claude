@@ -360,7 +360,13 @@ class ContextUsageContract(unittest.TestCase):
         proc = self.h.run("thread-a", json_mode=False)
         lines = proc.stdout.splitlines()
         self.assertEqual(len(lines), 1)
+        self.assertTrue(lines[0])
         self.assertLessEqual(len(lines[0]), 240)
+        self.assertNotIn(
+            lines[0][0],
+            "[{",
+            "Codex treats stdout beginning with a JSON sigil as structured hook output",
+        )
         self.assertIn("green", lines[0])
         self.assertNotIn(CANARY, proc.stdout)
         self.assertNotIn(CANARY, proc.stderr)

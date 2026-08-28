@@ -1,6 +1,6 @@
 ---
 name: human-pass
-description: "Write the guided acceptance pass a human runs against a real build: literal taps, real inputs, expected outcome per step, worst case first, bundled to cost one sitting. Triggers: testflight, human pass, acceptance test, before we ship, hand it to the user, what should I test, release checklist, device test."
+description: "Guide real-build acceptance: literal taps, real inputs, expected outcomes, worst case first, one sitting. Triggers: testflight, human pass, acceptance test, before we ship, hand it to the user, what should I test, release checklist, device test."
 allowed-tools: Read, Bash, Grep, Glob, Write, Edit
 kernel:
   kind: methodology

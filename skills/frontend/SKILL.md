@@ -1,6 +1,6 @@
 ---
 name: frontend
-description: "Context-led frontend design and UI implementation. Derives art direction from the product, audience, brand, content, and existing design system; prevents generic AI defaults without imposing a Kernel house style. Triggers: frontend, ui, styling, css, visual, theme, component, layout, responsive, accessibility, design system, aesthetic, animation, motion, abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal, kinetic-type, haunted-machine, cursor-field, real-weight, one-surface, liquid-material, held-breath, grand-tour."
+description: "Context-led frontend design. Derives art direction from product, audience, brand, content, and the existing system; avoids generic defaults. Triggers: frontend, UI, CSS, styling, visual, theme, component, layout, responsive, accessibility, design system, aesthetic, animation, motion, abyss, spatial, verdant, substrate, ember, arctic, void, patina, signal, kinetic-type, haunted-machine, cursor-field, real-weight, one-surface, liquid-material, held-breath, grand-tour."
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob
 kernel:
   kind: methodology

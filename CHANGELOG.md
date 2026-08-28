@@ -2,6 +2,23 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.5] - 2026-08-28
+
+Square brackets are syntax in Codex hook output, not decoration.
+
+### Fixed
+- The context-usage hook now emits `context: ...` instead of `[context] ...`. Codex treats
+  output beginning with `[` or `{` as structured JSON, so the old plain label produced
+  `hook returned invalid user prompt submit JSON output` on every prompt.
+- A regression test admits the default output only when it remains one bounded, non-JSON-looking
+  line. It failed on the 9.6.4 output before passing with this fix.
+
+### Changed
+- Oversized skill descriptions were compressed without dropping any routing term. This
+  restores the ambient-context release gate instead of raising its 4000-token ratchet.
+- The mandatory compression protocol is now pinned by a seeded regression across its canonical
+  template and the live SessionStart hook. Removing its silence rule fails the test.
+
 ## [9.6.4] - 2026-08-27
 
 Silence between tool calls.

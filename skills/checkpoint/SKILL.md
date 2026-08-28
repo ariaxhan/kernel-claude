@@ -1,6 +1,6 @@
 ---
 name: checkpoint
-description: "Persist bounded mid-task progress as a kernel.checkpoint/v1 JSON manifest so a fresh session or context reset can resume at the exact position without a full handoff. Triggers: checkpoint, save progress, context reset, compact soon, long task."
+description: "Save bounded progress as kernel.checkpoint/v1 for exact resume after reset. Triggers: checkpoint, save progress, context reset, compact soon, long task."
 user-invocable: true
 allowed-tools: Read, Bash, Grep, Glob, Write
 kernel:

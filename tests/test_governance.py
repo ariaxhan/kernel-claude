@@ -101,6 +101,24 @@ class GeneratorTests(unittest.TestCase):
         result = run(sys.executable, str(GEN), "--check")
         self.assertEqual(0, result.returncode, result.stderr)
 
+    def test_compression_protocol_reaches_source_and_live_ambient_hook(self):
+        required = (
+            "## compression — mandatory",
+            "minimum text. zero meaningful loss.",
+            "between tool calls: silence by default",
+            "do not emit while removable text remains.",
+            "omission is also a defect.",
+        )
+        surfaces = (
+            "governance/kernel.md.tmpl",
+            "hooks/scripts/session-start.sh",
+        )
+        for relative in surfaces:
+            text = (ROOT / relative).read_text()
+            for fragment in required:
+                with self.subTest(surface=relative, fragment=fragment):
+                    self.assertIn(fragment, text)
+
     def test_routing_policy_is_truthful_and_not_prestige_pinned(self):
         source = (ROOT / "governance/kernel.md.tmpl").read_text()
         orchestration = (ROOT / "skills/orchestration/SKILL.md").read_text()
