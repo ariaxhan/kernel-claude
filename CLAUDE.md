@@ -1,7 +1,30 @@
+
+## compression — mandatory
+
+minimum text. zero meaningful loss.
+
+* delete anything removable.
+* merge anything redundant.
+* shorten anything compressible.
+* prefer structure over prose.
+* preserve all meaning that affects correctness, clarity, decisions, evidence, uncertainty, or action.
+* length follows information. never pad; never truncate for brevity.
+
+before emitting:
+
+1. perform a deletion pass.
+2. remove every word, sentence, bullet, section, preamble, recap, transition, or explanation whose removal does not materially reduce meaning.
+3. repeat until no further lossless deletion is possible.
+
+do not emit while removable text remains.
+
+verbosity is a defect.
+omission is also a defect.
+
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
+
      source-sha256: ce05c64af2e12ec0147774edd9c9166dcbc7fec2e63f241ecc9afdc894b206b3; adapter: claude -->
 <kernel version="9.6.2">
-
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->
