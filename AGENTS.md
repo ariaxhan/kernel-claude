@@ -1,37 +1,7 @@
-
----
-type: note
-status: active
-created: 2026-08-27
----
-
-## compression — mandatory
-
-minimum text. zero meaningful loss.
-
-* default: bullets + fragments.
-* prose only when structure would lose meaning.
-* delete anything removable.
-* merge anything redundant.
-* shorten anything compressible.
-* never narrate work; report results, evidence, blockers, decisions.
-* preserve correctness, clarity, decisions, evidence, uncertainty, action.
-* length follows information. never pad; never omit.
-
-before emitting:
-
-1. convert prose → bullets/fragments wherever lossless.
-2. delete every removable word, sentence, bullet, section, preamble, recap, transition, or explanation.
-3. repeat until further compression would lose meaning.
-
-do not emit while removable text remains.
-
-verbosity is a defect.
-omission is also a defect.
-
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: ce05c64af2e12ec0147774edd9c9166dcbc7fec2e63f241ecc9afdc894b206b3; adapter: codex -->
-<kernel version="9.6.2">
+     source-sha256: 6f3938beb3863d58ffbc3beb60dc8862b7bb77ff06f7392c95e817d38eaf3817; adapter: codex -->
+<kernel version="9.6.3">
+
 
 <!-- ============================================ -->
 <!-- CONTEXT DELIVERY: READ THIS FIRST            -->

@@ -50,6 +50,10 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 BYTES_PER_TOKEN = 4.0
 
+# Pinned so the fixture commit, and the SHA session-start.sh prints, are the same
+# on every run and every machine.
+FIXTURE_DATE = "2026-01-01T00:00:00+00:00"
+
 # The hook is fed a real SessionStart payload on stdin. Without it the script
 # blocks indefinitely waiting on a read, which is defect D2 in the inventory;
 # measuring with a proper payload is also simply the honest configuration,
@@ -98,13 +102,26 @@ def _fixture_project(tmp: str) -> str:
     os.makedirs(proj)
     with open(os.path.join(proj, "README.md"), "w") as fh:
         fh.write("fixture\n")
-    git = ["git", "-c", "user.email=fixture@example.com", "-c", "user.name=fixture"]
+    # Pinned identity AND pinned dates. session-start.sh prints recent commit
+    # subjects with their abbreviated SHA, so an unpinned commit gives the fixture
+    # a new SHA on every build and the measurement is not reproducible after all.
+    # A fixed author/committer date makes the commit, and therefore the SHA,
+    # byte-identical on every run and on every machine.
+    git = [
+        "git",
+        "-c", "user.email=fixture@example.com",
+        "-c", "user.name=fixture",
+        "-c", "commit.gpgsign=false",
+    ]
+    env = dict(os.environ)
+    env["GIT_AUTHOR_DATE"] = FIXTURE_DATE
+    env["GIT_COMMITTER_DATE"] = FIXTURE_DATE
     subprocess.run(git + ["init", "-q", "-b", "main", proj], check=True,
-                   capture_output=True)
+                   capture_output=True, env=env)
     subprocess.run(git + ["-C", proj, "add", "README.md"], check=True,
-                   capture_output=True)
+                   capture_output=True, env=env)
     subprocess.run(git + ["-C", proj, "commit", "-q", "-m", "fixture"], check=True,
-                   capture_output=True)
+                   capture_output=True, env=env)
     return proj
 
 
@@ -128,8 +145,21 @@ def hook_cost(rel: str, timeout: int = 120) -> dict:
         env = dict(os.environ)
         env["CLAUDE_PROJECT_DIR"] = proj
         env["CLAUDE_PLUGIN_ROOT"] = REPO
-        # Deterministic by construction: no inherited agentdb, no voice, no network.
         env.pop("AGENTDB_EMBED_PYTHON", None)
+
+        # Its own runtime cache, for two reasons.
+        #
+        # Correctness: session-start.sh prints "KERNEL runtime selected: <v>" only
+        # when it re-links the `current` selector. Sharing the real cache with a
+        # live session on a different version made the two flip that symlink back
+        # and forth, so the line appeared in some measurements and not others and
+        # the byte count bounced between 3516 and 3547. That is what made the
+        # determinism test flaky after it had already been merged.
+        #
+        # Manners: measuring is a read. It was silently repointing the operator's
+        # runtime selector as a side effect, which a measurement has no business
+        # doing.
+        env["KERNEL_CACHE_DIR"] = os.path.join(tmp, "kernel-cache")
 
         try:
             proc = subprocess.run(

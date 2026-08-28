@@ -25,7 +25,13 @@ import measure_ambient
 
 
 # Ratchets, re-derived 2026-08-27 after the measurement was corrected. Measured
-# now: plugin 3845, contributor 11027.
+# now: plugin 3853, contributor 11035, stable across six consecutive runs.
+#
+# The first version of this fixture still shared the runtime cache with whatever
+# session happened to be running, so "KERNEL runtime selected: <v>" appeared in
+# some measurements and not others and the count bounced 3516 / 3547. The fixture
+# now gets its own KERNEL_CACHE_DIR, which also stops the measurement quietly
+# repointing the operator's runtime selector.
 #
 # These are NOT raised budgets. The instrument changed underneath them. It used to
 # run session-start.sh against this repo and count output carrying our branch, our

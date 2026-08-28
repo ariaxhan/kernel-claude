@@ -99,10 +99,17 @@ def plugin_root_var(host: dict) -> str:
 # --------------------------------------------------------------------------
 
 
-def build_hooks(host_key: str, host: dict) -> tuple[dict, list[str], list[tuple]]:
-    """Return (hooks document, dropped bindings, bindings capped by a host ceiling)."""
+def build_hooks(
+    host_key: str, host: dict, root_override: str | None = None
+) -> tuple[dict, list[str], list[tuple]]:
+    """Return (hooks document, dropped bindings, bindings capped by a host ceiling).
+
+    root_override pins the plugin-root variable when the document is shared between
+    hosts. Without it the same hook is emitted once per host spelling and every hook
+    in the shared file runs twice, which is what the first attempt at this did.
+    """
     supported = set(host["supported_lifecycle_events"])
-    root = plugin_root_var(host)
+    root = root_override or plugin_root_var(host)
 
     grouped: dict[str, list] = {}
     dropped: list[str] = []
@@ -142,6 +149,34 @@ def build_hooks(host_key: str, host: dict) -> tuple[dict, list[str], list[tuple]
             bucket.append({"matcher": binding["matcher"], "hooks": [entry]})
 
     return {"hooks": grouped}, dropped, capped
+
+
+def merge_hooks(target: dict, doc: dict) -> dict:
+    """Union one host's bindings into a shared manifest, keeping the larger timeout.
+
+    The larger value is correct because a ceiling is enforced by the host at
+    runtime, not by us: Codex clamps SessionEnd to 3s and says so, while Claude
+    Code needs the full 210s for the session-end batch commit. Emitting 3 to spare
+    one warning would silently truncate the other host's hook.
+    """
+    for event, groups in doc["hooks"].items():
+        bucket = target["hooks"].setdefault(event, [])
+        for group in groups:
+            for existing in bucket:
+                if existing["matcher"] == group["matcher"]:
+                    slot = existing
+                    break
+            else:
+                slot = {"matcher": group["matcher"], "hooks": []}
+                bucket.append(slot)
+            for entry in group["hooks"]:
+                for have in slot["hooks"]:
+                    if have["command"] == entry["command"]:
+                        have["timeout"] = max(have["timeout"], entry["timeout"])
+                        break
+                else:
+                    slot["hooks"].append(dict(entry))
+    return target
 
 
 def build_plugin_manifest(host_key: str, host: dict, spec: dict) -> dict:
@@ -309,15 +344,43 @@ def targets(spec: dict) -> dict[str, str]:
     """Map of relative path -> desired file content."""
     out: dict[str, str] = {}
 
+    # ONE hooks manifest, shared. Codex does not read a per-host file: it reads
+    # hooks/hooks.json, the same one Claude Code reads, and it says so itself in
+    # two places. Its startup warning names that path when it clamps a timeout,
+    # and its own trust store keys our hooks as
+    # `kernel@kernel-marketplace:hooks/hooks.json:<event>:<group>:<index>`.
+    #
+    # We shipped a second, Codex-tuned manifest at the repo root for months. It was
+    # never loaded, so its corrections never took effect: #199 fixed a SessionEnd
+    # timeout there and the warning it was meant to silence kept firing every
+    # session. Pointing Codex at it with a `hooks` key in .codex-plugin/plugin.json
+    # measurably makes things worse, not better -- with the key declared, a
+    # PostToolUse hook that fires without it stopped firing at all (A/B, rows per
+    # apply_patch went 1 -> 0 -> 0 -> 1 on removal).
+    #
+    # So hosts sharing a path share a document, built as the union of their
+    # bindings with the largest declared timeout. A host that does not implement an
+    # event ignores it (Codex has read PostToolUseFailure here all along), and a
+    # host with a ceiling clamps at runtime and says so. What each host will
+    # actually do with the shared file is reported in HOST-CAPABILITIES.md, which
+    # is where a per-host difference belongs: in the record, not in a file nobody
+    # reads.
+    shared_hooks: dict[str, dict] = {}
+
     for host_key, host in spec["hosts"].items():
-        hooks_doc, _dropped, _capped = build_hooks(host_key, host)
-        out[host["hooks_file"]] = json.dumps(hooks_doc, indent=2) + "\n"
+        hooks_doc, _dropped, _capped = build_hooks(
+            host_key, host, root_override="${%s}" % spec["shared_plugin_root_var"]
+        )
+        merge_hooks(shared_hooks.setdefault(host["hooks_file"], {"hooks": {}}), hooks_doc)
         out[host["plugin_manifest"]] = (
             json.dumps(build_plugin_manifest(host_key, host, spec), indent=2) + "\n"
         )
         out[host["marketplace_manifest"]] = (
             json.dumps(build_marketplace(host_key, host, spec), indent=2) + "\n"
         )
+
+    for path, doc in shared_hooks.items():
+        out[path] = json.dumps(doc, indent=2) + "\n"
 
     out[os.path.join("docs", "kernel-9", "HOST-CAPABILITIES.md")] = (
         build_capability_report(spec) + "\n"

@@ -179,10 +179,59 @@ class CodexAdapter(unittest.TestCase):
             self.assertIn(policy["authentication"], ("ON_INSTALL", "ON_USE"))
         self.assertEqual(policy["installation"], "AVAILABLE")
 
-    def test_hooks_live_at_the_repo_root(self):
-        """Codex reads hooks.json at the plugin root, not hooks/hooks.json."""
-        self.assertEqual(self.host["hooks_file"], "hooks.json")
-        self.assertTrue(os.path.isfile(os.path.join(REPO, "hooks.json")))
+    def test_codex_reads_the_shared_hooks_manifest(self):
+        """Codex reads hooks/hooks.json, and says so itself in two places.
+
+        This test used to assert the opposite, docstring included: "Codex reads
+        hooks.json at the plugin root, not hooks/hooks.json". It passed for months
+        because it only checked that the root file existed and that hosts.json
+        agreed with it, so it pinned a belief rather than a behaviour, and the
+        root manifest it defended was never loaded once.
+
+        The evidence for the correction, both from codex-cli 0.150.1:
+          - the startup warning names the file when it clamps a timeout:
+            `clamping SessionEnd hook timeout to 3s in <plugin>/hooks/hooks.json`,
+            and only that file declared the 210 being clamped;
+          - Codex's own trust store keys our hooks as
+            `kernel@kernel-marketplace:hooks/hooks.json:<event>:<group>:<index>`.
+        """
+        self.assertEqual(self.host["hooks_file"], os.path.join("hooks", "hooks.json"))
+        self.assertTrue(os.path.isfile(os.path.join(REPO, "hooks", "hooks.json")))
+        self.assertFalse(
+            os.path.exists(os.path.join(REPO, "hooks.json")),
+            "the root hooks.json is back. Codex never read it, so anything fixed "
+            "there is a fix that does not happen: #199 corrected a SessionEnd "
+            "timeout in that file and the warning kept firing every session.",
+        )
+
+    def test_the_shared_manifest_names_a_root_var_both_hosts_substitute(self):
+        """One file, so one variable, and it has to be one both hosts expand.
+
+        An unknown name expands to the empty string and every hook runs an absolute
+        path off / and exits 127, which is what CODEX_PLUGIN_ROOT did to every Codex
+        session until #191. Emitting each host's own spelling into a SHARED file has
+        a second failure mode found while writing this: the same hook appears twice,
+        once per spelling, and the whole chain runs twice.
+        """
+        doc = load(os.path.join("hooks", "hooks.json"))
+        shared = "${%s}" % spec()["shared_plugin_root_var"]
+        commands = [
+            hook["command"]
+            for groups in doc["hooks"].values()
+            for group in groups
+            for hook in group["hooks"]
+        ]
+        self.assertTrue(commands)
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertTrue(
+                    command.startswith(shared),
+                    f"hook command does not use the shared plugin-root variable {shared}",
+                )
+        self.assertEqual(
+            len(commands), len(set(commands)),
+            "a hook command is duplicated in the shared manifest, so it will run twice",
+        )
 
     def test_normal_requests_reach_the_adaptive_router(self):
         doc = load(self.host["hooks_file"])
@@ -227,14 +276,34 @@ class EveryHostBindsRealScripts(unittest.TestCase):
                 for hook in group["hooks"]:
                     yield event, hook["command"]
 
-    def test_every_binding_uses_the_root_var_the_host_declares(self):
+    def test_every_binding_uses_a_root_var_every_host_substitutes(self):
+        """One shared manifest means one variable, and every host must expand it.
+
+        This used to require each host's OWN declared spelling, which was right
+        while each host had its own file. With one shared file that rule is not
+        just wrong, it is actively harmful: emitting both spellings puts the same
+        hook in the file twice and the whole chain runs twice. Found by doing it.
+
+        The rule that survives is the one #191 paid for. A name the host does not
+        substitute expands to the empty string, so the hook runs an absolute path
+        off / and exits 127, silently, on every session.
+        """
+        shared = spec()["shared_plugin_root_var"]
+        self.assertIn(
+            shared, self.SUBSTITUTED,
+            f"the shared manifest names {shared!r}, which no host substitutes",
+        )
         for key, host in spec()["hosts"].items():
-            declared = "${%s}" % host["plugin_root_var"]
+            with self.subTest(host=key):
+                self.assertIn(
+                    shared, self.SUBSTITUTED,
+                    f"{key} does not substitute the shared root var {shared!r}",
+                )
             for event, cmd in self._bindings(host):
                 with self.subTest(host=key, event=event):
                     self.assertTrue(
-                        cmd.startswith(declared + "/"),
-                        f"{key} {event}: {cmd} does not use declared {declared}",
+                        cmd.startswith("${%s}/" % shared),
+                        f"{key} {event}: {cmd} does not use the shared {shared}",
                     )
 
     def test_declared_root_var_is_one_the_host_substitutes(self):
@@ -285,10 +354,23 @@ class HostEnforcedTimeoutCeilings(unittest.TestCase):
                 for group in groups:
                     for hook in group["hooks"]:
                         with self.subTest(host=key, event=event):
-                            self.assertLessEqual(
-                                hook["timeout"], limit,
+                            if hook["timeout"] <= limit:
+                                continue
+                            # A shared manifest cannot satisfy two different
+                            # ceilings. Codex clamps SessionEnd to 3s and SAYS SO on
+                            # every session; Claude Code needs the full 210s for the
+                            # session-end batch commit. Emitting 3 to spare one
+                            # warning would silently truncate the other host's hook,
+                            # which is the worse of the two failures.
+                            #
+                            # So an over-ceiling timeout is allowed only where the
+                            # host enforces the ceiling itself AND the evidence for
+                            # that enforcement is on the record.
+                            self.assertTrue(
+                                host.get("hook_timeout_ceiling_evidence", "").strip(),
                                 f"{key} {event} declares {hook['timeout']}s over a "
-                                f"{limit}s ceiling; the host silently overrules it",
+                                f"{limit}s ceiling with no evidence that the host "
+                                "enforces the ceiling itself",
                             )
 
     def test_every_declared_ceiling_carries_evidence(self):
@@ -318,23 +400,54 @@ class HostEnforcedTimeoutCeilings(unittest.TestCase):
 class TruthfulCapabilityReporting(unittest.TestCase):
     """Requirement 14. The heart of the honesty guarantee."""
 
-    def test_no_host_binds_an_event_it_does_not_support(self):
+    def test_every_event_a_host_cannot_run_is_written_down(self):
+        """A shared manifest means a host WILL see events it does not implement.
+
+        The old rule, "no host binds an event it does not support", assumed a file
+        per host. It cannot hold for a shared one: Claude Code needs
+        PostToolUseFailure and Codex does not implement it, and dropping the binding
+        to satisfy Codex would break the host that works.
+
+        What must hold instead is that the gap is recorded with a reason, so the
+        degradation is a decision someone can read rather than a surprise. An
+        undocumented event in the manifest still fails here.
+        """
         for key, host in spec()["hosts"].items():
             supported = set(host["supported_lifecycle_events"])
+            documented = host.get("unsupported_lifecycle_events", {})
             doc = load(host["hooks_file"])
             for event in doc["hooks"]:
+                if event in supported:
+                    continue
                 with self.subTest(host=key, event=event):
                     self.assertIn(
-                        event, supported,
-                        f"{key} binds {event}, which it does not implement: silent no-op",
+                        event, documented,
+                        f"{key} binds {event}, which it does not implement, and the "
+                        "gap is not recorded in unsupported_lifecycle_events",
+                    )
+                    self.assertTrue(
+                        documented[event].strip(),
+                        f"{key} records {event} as unsupported with no reason",
                     )
 
-    def test_codex_does_not_bind_post_tool_use_failure(self):
-        """The specific defect this slice fixes, pinned as a regression."""
-        doc = load("hooks.json")
+    def test_codex_declares_post_tool_use_failure_as_a_known_no_op(self):
+        """Reworked: the manifest is shared, so the gap lives in the record.
+
+        This used to assert PostToolUseFailure was absent from a Codex-only
+        manifest. That manifest was never loaded, and the shared file Codex does
+        read has carried the binding all along without harm: Codex ignores an event
+        it does not implement. Removing it would break Claude Code, which does.
+
+        What must stay true is that the gap is WRITTEN DOWN with its reason, so the
+        degraded error capture on this host is a recorded decision and not a
+        surprise.
+        """
+        gaps = spec()["hosts"]["codex"].get("unsupported_lifecycle_events", {})
+        self.assertIn("PostToolUseFailure", gaps)
+        self.assertTrue(gaps["PostToolUseFailure"].strip())
         self.assertNotIn(
-            "PostToolUseFailure", doc["hooks"],
-            "Codex 0.145.0 does not implement PostToolUseFailure",
+            "PostToolUseFailure",
+            set(spec()["hosts"]["codex"]["supported_lifecycle_events"]),
         )
 
     def test_claude_still_binds_post_tool_use_failure(self):
@@ -389,10 +502,16 @@ class TruthfulCapabilityReporting(unittest.TestCase):
 
 class HostSeparation(unittest.TestCase):
     def test_hosts_have_distinct_adapter_targets(self):
-        """Two hosts writing the same file would silently clobber each other."""
+        """Two hosts writing the same file would silently clobber each other.
+
+        hooks_file is deliberately excluded: it is shared, and the generator merges
+        into it rather than overwriting, which
+        test_the_shared_manifest_names_a_root_var_both_hosts_substitute checks by
+        asserting no command appears twice. Everything else is still per host.
+        """
         seen = {}
         for key, host in spec()["hosts"].items():
-            for field in ("plugin_manifest", "marketplace_manifest", "hooks_file",
+            for field in ("plugin_manifest", "marketplace_manifest",
                           "instruction_file"):
                 path = host[field]
                 with self.subTest(path=path):

@@ -2,6 +2,15 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.3] - 2026-08-27
+
+Every session now opens with the compression policy.
+
+Bullets and fragments are the default representation; prose must justify itself. Agents report
+results, evidence, blockers and decisions, and never narrate the work in progress. The policy
+lives in the ambient source block of `governance/kernel.md.tmpl`, so `session-start.sh` emits it
+on every host that loads KERNEL, Claude and Codex alike.
+
 ## [9.6.2] - 2026-08-27
 
 The secret scanner read `tool_input.patch`. Codex sends `tool_input.command`.

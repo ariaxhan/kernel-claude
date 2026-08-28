@@ -29,6 +29,8 @@
     "PreCompact",
     "PermissionRequest"
   ],
+  "shared_plugin_root_var": "CLAUDE_PLUGIN_ROOT",
+  "shared_plugin_root_var_evidence": "The hooks manifest is shared, so its commands must name a variable BOTH hosts substitute. Codex's hook command_runner substitutes exactly PLUGIN_ROOT, CLAUDE_PLUGIN_ROOT, PLUGIN_DATA and CLAUDE_PLUGIN_DATA; an unknown name expands to the empty string, so every hook runs an absolute path off / and exits 127, which is what CODEX_PLUGIN_ROOT did to every Codex session until #191. CLAUDE_PLUGIN_ROOT is the one both accept, and it is the spelling Codex has been running here in practice: on 2026-08-27 a Codex session on the shipped file had its apply_patch refused by detect-secrets.sh, which cannot happen unless the path resolved. Per-host plugin_root_var still governs anything NOT in the shared file.",
   "hosts": {
     "claude": {
       "display_name": "Claude Code",
@@ -62,7 +64,7 @@
       "invoke_prefix": "$kernel:",
       "plugin_manifest": ".codex-plugin/plugin.json",
       "marketplace_manifest": ".agents/plugins/marketplace.json",
-      "hooks_file": "hooks.json",
+      "hooks_file": "hooks/hooks.json",
       "skills_declaration": "explicit",
       "plugin_root_var": "PLUGIN_ROOT",
       "supported_lifecycle_events": [
@@ -88,7 +90,7 @@
       },
       "verified_by": "codex-cli 0.150.1, re-verified 2026-08-27 by live payload capture and controlled A/B runs, superseding the 0.146.0 static reading; symbol and doc extraction from the shipped binary; native manifest shape read from installed OpenAI plugins",
       "verified_on": "2026-08-27",
-      "hooks_file_note": "hooks_file is the path Kernel WRITES, not the path Codex READS. Measured on codex-cli 0.150.1, 2026-08-27: Codex reads hooks/hooks.json, the Claude manifest, and never reads this root hooks.json. Proof is the per-session warning `clamping SessionEnd hook timeout to 3s in <plugin>/hooks/hooks.json` -- only hooks/hooks.json declares 210, the root file already declares 3. So the root manifest's Codex-specific values (SessionEnd 3, PostToolUseFailure dropped) have never taken effect on any Codex session.",
+      "hooks_file_note": "Shared with Claude Code, deliberately. Codex reads hooks/hooks.json and says so twice: its startup warning names that path when it clamps a timeout, and its own trust store keys our hooks as kernel@kernel-marketplace:hooks/hooks.json:<event>:<group>:<index>. A separate Codex-tuned manifest lived at the repo root from the codex adapter's first release until 2026-08-27 and was never loaded once, so the SessionEnd timeout fix in #199 never took effect and the warning it targeted kept firing every session. The root file is now deleted. The two differences it existed to express are both handled at runtime by the host: Codex ignores PostToolUseFailure, which it has read here all along, and clamps SessionEnd to 3s with a warning while Claude Code uses the full 210s it needs for the session-end batch commit.",
       "hooks_declaration_note": "Do NOT add \"hooks\": \"./hooks.json\" to .codex-plugin/plugin.json. The plugin-json spec shipped inside the codex binary says path values are supplemented on top of default discovery, but the measured behaviour on 0.150.1 is the opposite and worse: with the key declared, a PostToolUse hook that fires without it stopped firing entirely (log-write rows per apply_patch went 1 -> 0, repeated twice, and back to 1 on removal). Fixing the split needs ONE manifest at hooks/hooks.json, not a declaration.",
       "lifecycle_events_evidence": "Full enum extracted from the codex-cli 0.150.1 binary, contiguous in one string: PreToolUse PermissionRequest PostToolUse PreCompact PostCompact SessionStart SessionEnd UserPromptSubmit SubagentStart SubagentStop Stop Interrupt. PostCompact, SubagentStart and Interrupt were absent from this list until 2026-08-27 and are still unbound by Kernel; PostCompact is the notable one, the Vaults host config already uses it.",
       "hooks_feature_flag": "Codex runs no hooks at all unless config.toml carries [features] hooks = true. It is off by default and fails silently: no error, no warning, every guard simply absent. Kernel's install path does not check for it.",

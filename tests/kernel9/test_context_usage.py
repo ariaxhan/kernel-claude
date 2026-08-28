@@ -29,7 +29,9 @@ import unittest
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 SCRIPT = os.path.join(REPO, "hooks", "scripts", "context-usage.py")
 GENERATOR = os.path.join(REPO, "scripts", "generate-adapters.py")
-HOOK_FILES = ("hooks.json", os.path.join("hooks", "hooks.json"))
+# One shared manifest since 2026-08-27. The root hooks.json was a second,
+# Codex-tuned copy that Codex never read, so it is gone.
+HOOK_FILES = (os.path.join("hooks", "hooks.json"),)
 NOW = "2026-08-06T12:00:00Z"
 CANARY = "context-meter-canary-NOT-A-REAL-SECRET-7f3a9c"
 
