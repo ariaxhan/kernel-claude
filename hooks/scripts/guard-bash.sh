@@ -146,8 +146,8 @@ fi
 # false positives in two weeks came from analysis scripts quoting the very commands this guard
 # watches. Bodies without an execution primitive are stripped like any other data heredoc.
 _heredoc_feeds_executor() {
-  printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash)[^|;&]*<<' && return 0
-  printf '%s' "$COMMAND" | grep -qE '(python[0-9.]*|perl|ruby|node)[^|;&]*<<' || return 1
+  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(bash|sh|zsh|ksh|dash)[[:space:]][^|;&]*<<' && return 0
+  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(python[0-9.]*|perl|ruby|node)[[:space:]][^|;&]*<<' || return 1
   printf '%s' "$COMMAND" | grep -qE 'subprocess|os\.system|os\.popen|os\.exec|shutil\.rmtree|child_process|execSync|spawnSync|spawn\(|exec\(|system\(|Open3|IO\.popen|`[^`]*(rm|git|curl)' && return 0
   return 1
 }
@@ -371,12 +371,38 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(curl|wget|nc|nca
   # (15 of 15 blocked calls in two weeks were exactly this: `K=$(security find-generic-password
   # -s <svc> -w) && curl -H "Authorization: Bearer $K" https://api.<vendor>/...`). Exfiltration
   # is the secret leaving as a BODY or an UPLOAD, or going to a plaintext / raw-socket target.
-  if printf '%s' "$LOW" | grep -qE 'security[[:space:]]+find-(generic|internet)-password'; then
+  # Require an executable shell boundary. A quoted search pattern containing both
+  # phrases is data, not a keychain read followed by egress.
+  if printf '%s' "$COMMAND_CODE" | grep -qE '(^|[;&(])[[:space:]]*security[[:space:]]+find-(generic|internet)-password'; then
+    _kc_vars=$(printf '%s' "$COMMAND_CODE" \
+      | grep -oE '(^|[;&(])[[:space:]]*(export[[:space:]]+)?[A-Za-z_][A-Za-z0-9_]*=[^;&|]*security[[:space:]]+find-(generic|internet)-password' \
+      | sed -E 's/^[;&(][[:space:]]*//; s/^export[[:space:]]+//; s/=.*//' \
+      | sort -u)
+    _kc_has_ref() {
+      printf '%s' "$1" | grep -qE '\$\{?'"$2"'\}?([^A-Za-z0-9_]|$)'
+    }
     _kc_exfil=0
     printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&(])(nc|ncat|sftp)([[:space:]]|$)' && _kc_exfil=1
     printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*http://' && ! printf '%s' "$LOW" | grep -qE 'http://(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])' && _kc_exfil=1
-    printf '%s' "$LOW" | grep -qE '(curl|wget)[^;|&]*(-d|--data|--data-binary|--data-raw|--data-urlencode|-f |--form|-t |--upload-file|--post-data|--post-file)[^;|&]*(\$|@-|@/dev/stdin)' && _kc_exfil=1
     printf '%s' "$LOW" | grep -qE 'security[[:space:]]+find-(generic|internet)-password[^;&]*\|[^;&]*(curl|wget|nc|ncat)' && _kc_exfil=1
+    # Track the simple staged-file shape: tainted variable redirected to a file,
+    # then that exact file consumed as request data or client config.
+    for _kc_var in $_kc_vars; do
+      while IFS= read -r _stage_seg; do
+        _kc_has_ref "$_stage_seg" "$_kc_var" || continue
+        _stage_path=$(printf '%s' "$_stage_seg" | sed -nE 's/.*>+[[:space:]]*["'"'"']?([^[:space:]"'"'"';|&]+).*/\1/p')
+        [ -n "$_stage_path" ] || continue
+        _stage_dir=$(dirname "$_stage_path")
+        while IFS= read -r _net_seg; do
+          printf '%s' "$_net_seg" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(curl|wget)([[:space:]"'"'"']|$)' || continue
+          if { printf '%s' "$_net_seg" | grep -Fq "$_stage_path" \
+               && printf '%s' "$_net_seg" | grep -qE -- '(^|[[:space:]])(--json|-K|--config|-d|--data[^[:space:]]*|-F|--form|-T|--upload-file|--post-data|--post-file)([=[:space:]]|$)'; } \
+             || printf '%s' "$_net_seg" | grep -Fq "CURL_HOME=$_stage_dir"; then
+            _kc_exfil=1
+          fi
+        done < <(printf '%s\n' "$COMMAND_CODE" | tr ';|&' '\n')
+      done < <(printf '%s\n' "$COMMAND_CODE" | tr ';|&' '\n')
+    done
     # POSITIVE allowlist, not a list of bad spellings. The 9.5.2 blind verifier walked past
     # every negative rule by respelling (URL in a variable, HTTPS://, hex IP, user@host). A
     # text guard can only defend a shape it can fully recognise, so a curl/wget segment that
@@ -384,9 +410,8 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(curl|wget|nc|nca
     #   * exactly one URL token, a lowercase literal https:// with a dotted alphabetic host
     #     (or localhost), optional port, path free of $ @ and quotes;
     #   * an -H "Authorization: ..." header is present;
-    #   * outside -H arguments the segment contains no $ at all (no variable URL, no
-    #     substitution, no smuggled value);
-    #   * no body/upload flag.
+    #   * outside -H arguments the segment contains no keychain-derived variable;
+    #   * body/upload flags may carry unrelated values, including generated files.
     # Anything else in that segment blocks. gh / env-only commands have no such segment.
     # Backslash-newline continuations are joined first so a multi-line curl is one segment.
     while IFS= read -r _seg; do
@@ -398,11 +423,13 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(curl|wget|nc|nca
       # Strip each -H argument as ONE shell word, including adjacent quoted pieces
       # (`-H 'Authorization: Bearer '"$K"` is one word to the shell).
       _noh=$(printf '%s' "$_seg" | sed -E 's/-H[[:space:]]+("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]"'"'"'])+//g')
-      printf '%s' "$_noh" | grep -q '\$' && { _kc_exfil=1; break; }
+      for _kc_var in $_kc_vars; do
+        _kc_has_ref "$_noh" "$_kc_var" && { _kc_exfil=1; break 2; }
+      done
       # The option set is an allowlist too (third blind pass: `--json @file`, `-K config` and
       # `CURL_HOME=` carried a staged secret out past a denylist of body flags). Quoted words
-      # collapse to one token; a quoted https URL keeps its text. Any token not on the list,
-      # any env assignment on the segment, any second bare word: block.
+      # collapse to one token; body flags consume one unrelated argument. Any other unknown
+      # token, env assignment, or second bare word blocks.
       _toks=$(printf '%s' "$_seg" | sed -E 's/"(https:\/\/[^"]*)"/\1/g; s/'"'"'(https:\/\/[^'"'"']*)'"'"'/\1/g; s/"[^"]*"/Q/g; s/'"'"'[^'"'"']*'"'"'/Q/g')
       _ok=1; _skip=0; _seen_cmd=0; _url_n=0
       for _t in $_toks; do
@@ -412,7 +439,8 @@ if printf '%s' "$LOW" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(curl|wget|nc|nca
           continue
         fi
         case "$_t" in
-          -H|--header|-o|--output|-w|--write-out|-X|--request|-m|--max-time|--retry|-A|--user-agent|--connect-timeout) _skip=1;;
+          -H|--header|-o|--output|-w|--write-out|-X|--request|-m|--max-time|--retry|-A|--user-agent|--connect-timeout|-d|--data|--data-binary|--data-raw|--data-urlencode|-F|--form|-T|--upload-file|--post-data|--post-file) _skip=1;;
+          -d?*|--data=*|--data-binary=*|--data-raw=*|--data-urlencode=*|-F?*|--form=*|-T?*|--upload-file=*|--post-data=*|--post-file=*) ;;
           -[sSfLiIN]*) case "$_t" in -[sSfLiIN]*[!sSfLiIN]*) _ok=0; break;; esac;;
           --silent|--show-error|--fail|--fail-with-body|--location|--include|--head|--no-progress-meter|--compressed) ;;
           https://*) _url_n=$((_url_n+1));;
