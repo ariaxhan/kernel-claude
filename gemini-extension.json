@@ -1,6 +1,6 @@
 {
   "name": "kernel",
-  "version": "9.6.5",
+  "version": "9.6.6",
   "description": "KERNEL's methodology layer for Gemini CLI: 27 software-engineering agent skills plus llms.txt as ambient context. Skills cover systematic debugging (reproduce, isolate, regression-test), generating competing approaches before implementing, pre-implementation critique, code review, bounded context handoff and resume, multi-agent orchestration, eval-driven development, release gating, and context-led frontend design. Gemini CLI gets the methodology only. KERNEL's enforcement layer does not run here: the PreToolUse hooks that block destructive commands and secret writes, the one-time human approval token for irreversible operations, and the agentdb SQLite memory recalled at session start are Claude Code and Codex only. `gemini extensions install` fetches a curated release bundle that carries just this manifest, llms.txt, and skills/, so no Claude-format hook or agent definition is loaded. Source, safety limits, and the host capability matrix: https://github.com/ariaxhan/kernel-claude",
   "contextFileName": "llms.txt"
 }

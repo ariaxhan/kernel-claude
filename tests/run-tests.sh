@@ -488,7 +488,7 @@ test_lifecycle_hooks_survive_a_repo_with_no_commits() {
 
 test_session_start_outputs_kernel() {
   local output
-  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
+  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>&1)
   assert_contains "$output" "# KERNEL"
   assert_contains "$output" "agentdb"
 }
@@ -499,7 +499,7 @@ test_session_start_creates_agent_file() {
   export KERNEL_VAULTS="$TEST_PROJECT"
   mkdir -p "$TEST_PROJECT/_meta/agentdb"
   touch "$TEST_PROJECT/_meta/agentdb/agent.db"  # Create marker file
-  "$PLUGIN_ROOT/hooks/scripts/session-start.sh" >/dev/null 2>&1
+  "$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null >/dev/null 2>&1
   local agent_files
   agent_files=$(ls "$TEST_PROJECT/_meta/agents/"*.json 2>/dev/null | wc -l)
   [ "$agent_files" -gt 0 ] || { echo "FAIL: no agent file created"; return 1; }
@@ -676,7 +676,7 @@ PY
 
 test_session_start_workflow_present() {
   local output
-  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
+  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>&1)
   # Compact static block: agentdb quick reference + tier rule
   assert_contains "$output" "agentdb recall"
   assert_contains "$output" "Tier by reversibility x blast radius"
@@ -684,7 +684,7 @@ test_session_start_workflow_present() {
 
 test_session_start_skill_routing() {
   local output
-  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
+  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>&1)
   # Skills fire ambiently; the hook points at /kernel:help instead of inlining an index
   assert_contains "$output" "/kernel:help"
 }
@@ -741,7 +741,7 @@ test_session_start_shows_checkpoint_after_compact() {
   stored=$(agentdb query "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
   assert_contains "$stored" "1"
   # Verify session-start runs without error (output varies by environment)
-  "$PLUGIN_ROOT/hooks/scripts/session-start.sh" >/dev/null 2>&1
+  "$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null >/dev/null 2>&1
   local exit_code=$?
   [ "$exit_code" -eq 0 ] || [ "$exit_code" -eq 1 ] || { echo "session-start failed with exit $exit_code"; return 1; }
 }
@@ -3510,7 +3510,7 @@ test_read_start_lean_is_minimal() {
 
 test_session_start_has_concrete_recall_recipe() {
   local output
-  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>&1)
+  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>&1)
   assert_contains "$output" '<feature> <subsystem> <files/symbols> <error/outcome>' || return 1
   assert_contains "$output" "Recall again after discovery" || return 1
   assert_contains "$output" "scope/hypothesis changes" || return 1
@@ -3822,6 +3822,20 @@ test_quality_has_big5_greps() {
     echo "FAIL: quality SKILL.md must not reintroduce r_factor/adsr"
     return 1
   fi
+}
+
+test_skill_path_references_resolve() {
+  # 8.1.2 deleted seven skills and left twenty skills/... loads pointing at them for six
+  # months; every /kernel:dream run printed "quality subskill missing". Every skills/<x>/
+  # path a skill or agent names must exist on disk.
+  local dead
+  dead=$(grep -rhoE 'skills/[a-z-]+/(reference/[a-z-]+\.md|SKILL\.md)' "$PLUGIN_ROOT/skills" "$PLUGIN_ROOT/agents" \
+    | sort -u | while read -r f; do [ -f "$PLUGIN_ROOT/$f" ] || echo "$f"; done)
+  [ -z "$dead" ] || {
+    echo "FAIL: skills/agents reference paths that do not exist:"
+    echo "$dead" | sed 's/^/  /'
+    return 1
+  }
 }
 
 test_claude_md_references_approval_learner() {
@@ -5574,6 +5588,7 @@ run_test_suite() {
       run_test "agents token budget" test_agents_token_budget
       run_test "critical content at edges" test_critical_content_at_edges
       run_test "no duplicate Big 5 definitions" test_no_duplicate_big5_definitions
+      run_test "skill path references resolve" test_skill_path_references_resolve
       run_test "progressive disclosure used" test_progressive_disclosure_used
       ;;
     portable)

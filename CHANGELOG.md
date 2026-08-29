@@ -2,6 +2,21 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.6] - 2026-08-28
+
+Every skill load resolves.
+
+### Fixed
+- The 8.1.2 de-bloat deleted seven skills (quality, api, backend, testing, security, git,
+  refactor) and left twenty loads across nine skills and agents pointing at them, so every
+  `/kernel:dream` run printed "quality subskill missing". `skills/quality/` (the Big 5
+  checklist) is back as a first-class skill; the other six return as reference docs with no
+  frontmatter under build, tearitapart and architecture, so plugin ambient stays under its
+  4000-token ratchet (3960). Scout's `skills/context` load, renamed context-mgmt in 7.0.2,
+  points at the right file again.
+- `test_skill_path_references_resolve` fails the suite when any `skills/...` path named in
+  skills/ or agents/ is missing on disk. It fails on a planted dead load before passing here.
+
 ## [9.6.5] - 2026-08-28
 
 Square brackets are syntax in Codex hook output, not decoration.
