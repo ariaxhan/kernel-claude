@@ -1459,6 +1459,17 @@ test_guard_bash_blocks_brace_shell_heredoc() {
   _gb "{bash<<'SH'\\ngit branch -D main\\nSH\\n}"
   assert_exit_code 2 "$?" "a shell heredoc opened right after a brace is still code"
 }
+test_guard_bash_executor_heredoc_prefix_sweep() {
+  # Every shell delimiter byte that can legally sit right before an executable. A byte
+  # missing from the prefix class in _heredoc_feeds_executor strips the body as data
+  # (2026-08-29: backtick and brace were missing, found by adversary, not by tests).
+  local pre fails=""
+  for pre in ';' '|' '&' '(' ')' '{' '}' '`' '\"' "'" '\\' '/' ' '; do  # \" keeps the helper JSON valid
+    _gb "echo x${pre}bash<<'SH'\\ngit branch -D main\\nSH"
+    [ "$?" = 2 ] || fails="$fails [$pre]"
+  done
+  [ -z "$fails" ] || { echo "prefix bytes that hide an executor heredoc:$fails"; return 1; }
+}
 test_guard_bash_rm_root_check_is_segment_scoped() {
   _gb "rm -rf \\\"\$SCRATCH\\\" && cat > n.md <<'EOF'\na / b\nEOF"
   assert_exit_code 0 "$?" "a bare / inside a data heredoc must not turn rm -rf \$SCRATCH into a root wipe"
@@ -5638,6 +5649,7 @@ run_test_suite() {
       run_test "guard-bash blocks unspaced shell heredoc" test_guard_bash_blocks_unspaced_shell_heredoc
       run_test "guard-bash blocks backtick shell heredoc" test_guard_bash_blocks_backtick_shell_heredoc
       run_test "guard-bash blocks brace shell heredoc" test_guard_bash_blocks_brace_shell_heredoc
+      run_test "guard-bash executor heredoc prefix sweep" test_guard_bash_executor_heredoc_prefix_sweep
       run_test "guard-bash 9.5.2 rm root check is segment scoped" test_guard_bash_rm_root_check_is_segment_scoped
       run_test "autocorrect-bash inserts && after cd" test_autocorrect_bash_cd_separator
       run_test "autocorrect-bash rewrites cat -A on macOS" test_autocorrect_bash_cat_A

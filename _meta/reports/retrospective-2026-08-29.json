@@ -1,0 +1,60 @@
+{
+ "schema": "kernel.retrospective-result/v1",
+ "identity": {
+  "created": "2026-08-29T08:38:05Z",
+  "session": "sess-20260829010801-38221",
+  "scope": "/Users/slowember/Developer/Vaults/CodingVault/kernel-claude"
+ },
+ "analyzed": {
+  "learnings": 60,
+  "clusters": 5,
+  "merged": 1,
+  "archived": 0,
+  "contradictions_resolved": 0
+ },
+ "mutations": [
+  {
+   "op": "modify",
+   "artifact_type": "hook",
+   "path": ".claude/hooks/release-guard.sh",
+   "reason": "The guard counted only node /opt/homebrew/bin/codex and codex app-server; an hcom-spawned Codex (hcom pty codex) was live and invisible, found by hcom list. Pattern extended.",
+   "evidence": "2026-08-29: veru (hcom pty codex, 2 days idle) live during 9.6.7 release prep; guard reported 0 then 1 for a different session.",
+   "reinforced": 1,
+   "status": "applied"
+  },
+  {
+   "op": "create",
+   "artifact_type": "hook",
+   "path": "tests/run-tests.sh#test_guard_bash_executor_heredoc_prefix_sweep",
+   "reason": "Two adversary rounds on PR 233 each found one byte missing from the executor prefix class (no-space, then backtick and brace). A sweep over all 13 shell delimiter bytes turns the next omission into a CI failure.",
+   "evidence": "Planted removal of {} from the class: sweep fails naming [{] [}]; restored: 137/137 security_hooks.",
+   "reinforced": 2,
+   "status": "applied"
+  },
+  {
+   "op": "create",
+   "artifact_type": "prose",
+   "path": "_meta/plans/guard-bash-piped-heredoc.md",
+   "reason": "Pre-existing bypass: heredoc body piped into or written to a file for an executor is never scanned; double-quoted delimiter false-blocks data. Guard change deserves its own cycle after a release, so proposed, not applied.",
+   "evidence": "Adversary round 2 on PR 233: cat<<EOF|bash old=0 new=0; cat <<\"EOF\" > x.md with destructive prose exit 2.",
+   "reinforced": 1,
+   "status": "proposed"
+  },
+  {
+   "op": "promote",
+   "artifact_type": "learning",
+   "path": "agentdb:LRN guard-bash prefix class",
+   "reason": "Merged the no-space and backtick/brace heredoc failures into one learning stating the invariant.",
+   "evidence": "LRN-20260829010502-85659-14097 + LRN-20260829011839-60312-11082 deleted, one merged row added.",
+   "reinforced": 2,
+   "status": "applied"
+  }
+ ],
+ "project_fit": {
+  "missing": [
+   "Executor prefix sweep test: landed as test_guard_bash_executor_heredoc_prefix_sweep",
+   "Piped or file-mediated heredoc executor scan: proposed in _meta/plans/guard-bash-piped-heredoc.md"
+  ],
+  "dormant": []
+ }
+}
