@@ -34,3 +34,13 @@ released (plugin cache still 9.6.5).
 
 **Open:** release 9.6.6 so the plugin cache picks this up; a test that every `skills/...`
 path mentioned in skills/ and agents/ exists would have caught this in 8.1.2.
+
+## Addendum: release 9.6.6 broke every live Codex session
+
+Tagged v9.6.6 (b859ddc) with eight Codex sessions open. Codex auto-installed 9.6.6, deleted
+the 9.6.5 cache dir, and every hook in those sessions exited 127. `docs/upgrading.md` and
+the ship skill both say to `pgrep -fl codex` first; skipped. Fix is a restart per session.
+Same afternoon the test suite hung 67 min (`session-start.sh` reading stdin from a socket)
+and repointed the Claude runtime selector at the dev checkout (bumped version outranks the
+installed cache). Both fixed in 6a40ae9: tests feed the hook `</dev/null` and export
+`KERNEL_CACHE_DIR` to a temp dir. No further bump or tag until Aria says no Codex is live.
