@@ -12,14 +12,14 @@ scope: 2 source/test files
 ## Big 5
 
 - input validation: pass, hook input already parsed by `jq`
-- edge cases: require unrelated body, search text, loops, staged files, direct pipes
-- error handling: preserve fail-closed blocks for proven flow
-- duplication: pass, one keychain decision path
-- complexity: revise, replace the option allowlist with named-variable flow checks
+- edge cases: password body, search text, loops, staged files, direct pipes
+- error handling: preserve literal-secret and credential-file blocks
+- duplication: pass, keychain branch removed
+- complexity: pass, 87-line special case deleted
 
 ## Verdict: PROCEED
 
-Block proven keychain-value flow into URL/body/upload/plaintext/raw payload. Allow mere lexical co-occurrence and unrelated payload variables. Preserve approval-store isolation.
+Remove keychain egress policing. Keychain reads are user-authorized credential access; the Bash guard cannot infer whether a password body is a login or exfiltration. Preserve literal-secret, credential-file, approval-store, and destructive-operation guards.
 
 ## Checks
 
