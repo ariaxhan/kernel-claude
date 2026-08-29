@@ -2,6 +2,19 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.7] - 2026-08-29
+
+Keychain data in a request body is authorization, not exfiltration.
+
+### Fixed
+- `guard-bash.sh` no longer refuses commands where a keychain lookup and a network call
+  merely co-occur. Supabase password grants and similar authorized flows that place a
+  keychain-backed password in a request body run again. Literal-secret, credential-file,
+  approval-store and destructive-operation refusals are unchanged.
+- Executor heredocs with no space before the redirection (`bash<<'SH'`) were stripped as
+  data and escaped the destructive scans. They are code again; a regression test fails on
+  the 9.6.6 guard before passing here.
+
 ## [9.6.6] - 2026-08-28
 
 Every skill load resolves.
