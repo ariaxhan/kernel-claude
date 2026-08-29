@@ -18,3 +18,7 @@ created: 2026-08-29
 - Independent review caught `bash<<EOF` escaping heredoc code scanning; repaired the executor regex and added a regression.
 
 **Open:** Restart active Codex sessions, bump 9.6.7, rerun gates, independent safety review, mark PR #233 ready.
+
+**Round 2 (same day)**
+- Adversary (opus, outcome axis) on 45a7aca: backtick or brace before the executor (`X=\`bash<<EOF\``) still stripped the body as data. Fixed 945cf39, two regressions added, security_hooks 136/136.
+- Pre-existing, not gated here: `cat <<EOF | bash` and write-then-execute heredocs bypass the executor regex; `<<"EOF"` data heredocs false-block. Tracked in agentdb.
