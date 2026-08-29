@@ -1,0 +1,69 @@
+{
+  "schema": "kernel.retrospective-result/v1",
+  "identity": {
+    "created": "2026-08-28T20:10:00Z",
+    "session": "sess-20260828195306-45171",
+    "scope": "/Users/slowember/Developer/Vaults/CodingVault/kernel-claude"
+  },
+  "analyzed": {
+    "learnings": 59,
+    "clusters": 6,
+    "merged": 2,
+    "archived": 0,
+    "contradictions_resolved": 0
+  },
+  "mutations": [
+    {
+      "op": "create",
+      "artifact_type": "hook",
+      "path": ".claude/hooks/release-guard.sh",
+      "reason": "A version bump or tag push auto-upgrades the Codex plugin cache and makes every hook in live Codex sessions exit 127. docs/upgrading.md and the ship skill already said to check pgrep first; the check was skipped on 9.6.0 (2026-08-27) and 9.6.6 (2026-08-28). Prose failed twice, so the property is now a PreToolUse deny on bump-version.sh <ver>, git tag <ver>, and tag pushes while Codex is live. KERNEL_RELEASE_OK=1 overrides.",
+      "evidence": "Eight Codex sessions showed 'hook exited with code 127' after v9.6.6; ~/.codex/plugins/cache/kernel-marketplace/kernel held only 9.6.6, created at the tag-push minute. Guard proven: five release commands exit 2, three non-release commands exit 0, override exits 0.",
+      "reinforced": 2,
+      "status": "applied"
+    },
+    {
+      "op": "create",
+      "artifact_type": "hook",
+      "path": ".claude/settings.json",
+      "reason": "Wire release-guard.sh as a PreToolUse Bash hook for this project; kernel-claude had no project-level settings.",
+      "evidence": "The hook fired on this session's own Bash calls immediately after the file was written.",
+      "reinforced": 2,
+      "status": "applied"
+    },
+    {
+      "op": "modify",
+      "artifact_type": "learning",
+      "path": "agentdb://learnings/exit-137-after-green-results",
+      "reason": "A failure row and its derived pattern row about exit 137 after a green Results line said one thing; merged into a single pattern. Both were over 30 days unrecalled, hit_count 1 and 2, not injection-protected.",
+      "evidence": "LRN-20260710215149-47326-7016 and LRN-20260710215149-47360-22462 deleted after the merged row was written; count check returned 0.",
+      "reinforced": 3,
+      "status": "applied"
+    },
+    {
+      "op": "modify",
+      "artifact_type": "learning",
+      "path": "agentdb://learnings/codex-json-sigil",
+      "reason": "Two rows written 80 minutes apart on 2026-08-28 stated the same Codex stdout sigil rule; merged into one gotcha.",
+      "evidence": "LRN-20260828004421-74125-30649 and LRN-20260828010620-66400-3946 deleted after the merged row was written.",
+      "reinforced": 2,
+      "status": "applied"
+    },
+    {
+      "op": "modify",
+      "artifact_type": "skill",
+      "path": "tests/run-tests.sh",
+      "reason": "Landed earlier this session, recorded for provenance: test_skill_path_references_resolve (dead skill loads survived six months after the 8.1.2 de-bloat), </dev/null on every session-start.sh invocation (67-minute hang on socket stdin), KERNEL_CACHE_DIR isolation (the suite repointed the machine runtime selector at the dev checkout).",
+      "evidence": "Commits b859ddc and 6a40ae9; 495/495; selector path identical before and after a full run.",
+      "reinforced": 1,
+      "status": "applied"
+    }
+  ],
+  "project_fit": {
+    "missing": [
+      "Test that skills/agents reference only existing skill paths: landed as test_skill_path_references_resolve in b859ddc",
+      "Release gate refusing bump or tag while Codex sessions are live: landed as .claude/hooks/release-guard.sh"
+    ],
+    "dormant": []
+  }
+}
