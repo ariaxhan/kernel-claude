@@ -146,8 +146,8 @@ fi
 # false positives in two weeks came from analysis scripts quoting the very commands this guard
 # watches. Bodies without an execution primitive are stripped like any other data heredoc.
 _heredoc_feeds_executor() {
-  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(bash|sh|zsh|ksh|dash)([[:space:]][^|;&]*)?<<' && return 0
-  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&("'"'"'\\]|/)(python[0-9.]*|perl|ruby|node)([[:space:]][^|;&]*)?<<' || return 1
+  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&(){}`"'"'"'\\]|/)(bash|sh|zsh|ksh|dash)([[:space:]][^|;&]*)?<<' && return 0
+  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&(){}`"'"'"'\\]|/)(python[0-9.]*|perl|ruby|node)([[:space:]][^|;&]*)?<<' || return 1
   printf '%s' "$COMMAND" | grep -qE 'subprocess|os\.system|os\.popen|os\.exec|shutil\.rmtree|child_process|execSync|spawnSync|spawn\(|exec\(|system\(|Open3|IO\.popen|`[^`]*(rm|git|curl)' && return 0
   return 1
 }

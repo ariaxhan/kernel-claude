@@ -1451,6 +1451,14 @@ test_guard_bash_blocks_unspaced_shell_heredoc() {
   _gb "bash<<'SH'\ngit branch -D main\nSH"
   assert_exit_code 2 "$?" "a shell heredoc remains code when redirection touches the executable"
 }
+test_guard_bash_blocks_backtick_shell_heredoc() {
+  _gb "X=\`bash<<'SH'\\ngit branch -D main\\nSH\\n\`"
+  assert_exit_code 2 "$?" "a shell heredoc inside backtick substitution is still code"
+}
+test_guard_bash_blocks_brace_shell_heredoc() {
+  _gb "{bash<<'SH'\\ngit branch -D main\\nSH\\n}"
+  assert_exit_code 2 "$?" "a shell heredoc opened right after a brace is still code"
+}
 test_guard_bash_rm_root_check_is_segment_scoped() {
   _gb "rm -rf \\\"\$SCRATCH\\\" && cat > n.md <<'EOF'\na / b\nEOF"
   assert_exit_code 0 "$?" "a bare / inside a data heredoc must not turn rm -rf \$SCRATCH into a root wipe"
@@ -2191,7 +2199,7 @@ test_critical_guard_scripts_unchanged_for_820() {
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-15872f858a0a0b395ff6994753e75ad3d10bb659ea567b855c22aed2f86295d3 guard-bash.sh
+67b4c85c11fb10a5984dcdc1e8b23c62ed0a8150cd3b3381dac6e8d3eafa9a1a guard-bash.sh
 ce20904682f9e53593328cc957c3039e99b7afe5eb9dc9cbea2f6dacbf650191 guard-config.sh
 c0afdb26d6794934e4e0758cdcd5e03aeb8abbd44a03daf781a7410fbb2e5ea9 detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
@@ -5628,6 +5636,8 @@ run_test_suite() {
       run_test "guard-bash 9.5.2 allows string literal in analysis heredoc" test_guard_bash_allows_string_literal_in_analysis_heredoc
       run_test "guard-bash 9.5.2 blocks heredoc with subprocess" test_guard_bash_blocks_heredoc_with_subprocess
       run_test "guard-bash blocks unspaced shell heredoc" test_guard_bash_blocks_unspaced_shell_heredoc
+      run_test "guard-bash blocks backtick shell heredoc" test_guard_bash_blocks_backtick_shell_heredoc
+      run_test "guard-bash blocks brace shell heredoc" test_guard_bash_blocks_brace_shell_heredoc
       run_test "guard-bash 9.5.2 rm root check is segment scoped" test_guard_bash_rm_root_check_is_segment_scoped
       run_test "autocorrect-bash inserts && after cd" test_autocorrect_bash_cd_separator
       run_test "autocorrect-bash rewrites cat -A on macOS" test_autocorrect_bash_cat_A
