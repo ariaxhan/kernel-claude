@@ -35,6 +35,11 @@ setup_test_env() {
   # Make agentdb available
   export PATH="$PLUGIN_ROOT/orchestration/agentdb:$PATH"
   export CLAUDE_PROJECT_DIR="$TEST_PROJECT"
+  # Never let the suite touch the machine's real runtime selector: a checkout carrying a
+  # bumped version outranks the installed cache, and one hook run repointed every live
+  # session's hooks at the dev tree (2026-08-28).
+  export KERNEL_CACHE_DIR="$TEST_DIR/kernel-cache"
+  mkdir -p "$KERNEL_CACHE_DIR"
 }
 
 teardown_test_env() {
@@ -856,6 +861,7 @@ runtime_fixture() {
   export HOME="$TEST_DIR/home with spaces"
   export KERNEL_VAULTS="$TEST_DIR/Vaults with spaces"
   local cache="$HOME/.claude/plugins/cache/kernel-marketplace/kernel"
+  export KERNEL_CACHE_DIR="$cache"
   mkdir -p "$cache" "$KERNEL_VAULTS/.local/bin" "$KERNEL_VAULTS/.claude/kernel"
   make_runtime_fixture "$cache/7.23.0" "7.23.0"
   make_runtime_fixture "$cache/8.0.0" "8.0.0"
