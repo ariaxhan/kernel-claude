@@ -11,9 +11,10 @@ created: 2026-08-29
 **Shipped**
 - Draft PR #233: keychain branch removed; focused allow/deny regressions retained.
 
-**Verified how:** full tests/run-tests.sh all: 495/495; branch state only.
+**Verified how:** full tests/run-tests.sh all: 495/495 before independent review; focused security_hooks: 134/134 after repair; branch state only.
 
 **Wrong or surprising**
 - First two regressions used invalid helper JSON and falsely passed; corrected tests then failed red before the fix.
+- Independent review caught `bash<<EOF` escaping heredoc code scanning; repaired the executor regex and added a regression.
 
 **Open:** Restart active Codex sessions, bump 9.6.7, rerun gates, independent safety review, mark PR #233 ready.
