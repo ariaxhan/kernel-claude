@@ -82,7 +82,9 @@ downstream work goes first, so a single reply can redirect everything after it.
 Per question:
 
 - A `header` of at most 12 characters. It is a chip, not a sentence.
-- 2-4 options, each mutually exclusive unless `multiSelect` is set.
+- 2-4 options, each mutually exclusive unless `multiSelect` is set. Every question is a multiple choice;
+  an open-ended free-text ask is allowed only when no option set can honestly be
+  enumerated, and the question says why. Same rule for the Codex `QUESTION:` block below.
 - Every option states its **consequence**, not just its name. "Ship to plugin users (needs a
   release + tests)" beats "kernel-claude".
 - The recommended option goes **first** and is labelled `(Recommended)`. Having an opinion is part
