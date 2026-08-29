@@ -1,5 +1,5 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: 89b15af2093d7a275380c75cb93f8fb3c9a9ccd7e78f34b983d8316918815c19; adapter: claude -->
+     source-sha256: ec8414c4307f0116dde1abdaf0f77494ec40d60aa3b7bebadf963210272a0279; adapter: claude -->
 <kernel version="9.6.5">
 
 
@@ -293,6 +293,8 @@ reviewed the claim.</rule>
 
   <!-- IMPLEMENTATION -->
   <skill id="build" triggers="new feature, implementation, coding">Solution exploration. Generate 2-3 approaches, pick simplest. Never implement first idea.</skill>
+
+  <skill id="quality" triggers="quality, big 5, ai code, review, validate">The Big 5: input validation, edge cases, error handling, duplication, complexity. Any violation = NOT READY. Data-correctness rules for numeric pipelines.</skill>
 
   <skill id="eval" triggers="eval, benchmark, pass@k">Eval-Driven Development. pass@k metrics, capability evals, regression evals, grader types.</skill>
 

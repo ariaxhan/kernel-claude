@@ -21,7 +21,7 @@ codex plugin marketplace add ariaxhan/kernel-claude
 codex plugin add kernel@kernel-marketplace
 ```
 
-Gemini CLI (methodology only: the 28 skills and `llms.txt` as ambient context; the hooks, the
+Gemini CLI (methodology only: the 29 skills and `llms.txt` as ambient context; the hooks, the
 approval token, and agentdb do not run on this host):
 
 ```bash
