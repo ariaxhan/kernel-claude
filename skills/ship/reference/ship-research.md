@@ -13,7 +13,7 @@ Each step has a fail-fast verdict; the chain stops on first failure.
 
 ## Skill relationships
 
-- skills/git/SKILL.md — commit mechanics
+- skills/build/reference/git.md — commit mechanics
 - skills/quality/SKILL.md — Big 5 self-review checklist
 - /kernel:validate — invokes validator agent (full 9-gate safety chain)
 - /kernel:review — invokes reviewer agent (>80% confidence threshold)

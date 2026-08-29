@@ -31,7 +31,7 @@ skills/experiment/reference/experiment-research.md
 </reference>
 
 <skill_load>
-always: skills/quality/SKILL.md, skills/testing/SKILL.md
+always: skills/quality/SKILL.md, skills/build/reference/testing.md
 </skill_load>
 
 <on_start>

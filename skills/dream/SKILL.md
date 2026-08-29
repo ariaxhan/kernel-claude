@@ -30,10 +30,10 @@ agentdb read-start   # prior dreams + learnings seed the perspectives; don't re-
 <skill_load>
 always: skills/quality/SKILL.md, skills/architecture/SKILL.md
 on_domain:
-  api:      skills/api/SKILL.md, skills/backend/SKILL.md
+  api:      skills/architecture/reference/api.md, skills/architecture/reference/backend.md
   frontend: skills/frontend/SKILL.md
-  backend:  skills/backend/SKILL.md
-  security: skills/security/SKILL.md
+  backend:  skills/architecture/reference/backend.md
+  security: skills/tearitapart/reference/security.md
 </skill_load>
 
 <!-- ============================================ -->

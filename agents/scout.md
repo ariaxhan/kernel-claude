@@ -34,8 +34,8 @@ agentdb read-start
 </on_start>
 
 <skill_load>
-MANDATORY before mapping: Read skills/context/SKILL.md, skills/architecture/SKILL.md.
-Reference when applicable: skills/context/reference/context-research.md, skills/architecture/reference/architecture-research.md.
+MANDATORY before mapping: Read skills/context-mgmt/SKILL.md, skills/architecture/SKILL.md.
+Reference when applicable: skills/context-mgmt/reference/context-mgmt-research.md, skills/architecture/reference/architecture-research.md.
 </skill_load>
 
 <startup_reads>

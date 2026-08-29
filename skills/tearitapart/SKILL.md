@@ -18,7 +18,7 @@ Goal: find real problems, not generic concerns.
 </purpose>
 
 <skill_load>
-Load: skills/quality/SKILL.md, skills/testing/SKILL.md, skills/security/SKILL.md
+Load: skills/quality/SKILL.md, skills/build/reference/testing.md, skills/tearitapart/reference/security.md
 Reference: skills/quality/reference/quality-research.md
 </skill_load>
 
@@ -54,7 +54,7 @@ Use quick_checks from quality skill for detection.
 </phase>
 
 <phase id="3_security">
-Load: skills/security/SKILL.md
+Load: skills/tearitapart/reference/security.md
 
 critical:
 - [ ] No hardcoded secrets
@@ -69,7 +69,7 @@ injection:
 </phase>
 
 <phase id="4_testing">
-Load: skills/testing/SKILL.md
+Load: skills/build/reference/testing.md
 
 verify:
 - Tests exist BEFORE implementation?

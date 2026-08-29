@@ -29,7 +29,7 @@ agentdb read-start
 </on_start>
 
 <skill_load>
-Load: skills/eval/SKILL.md, skills/testing/SKILL.md
+Load: skills/eval/SKILL.md, skills/build/reference/testing.md
 </skill_load>
 
 <input_contract>

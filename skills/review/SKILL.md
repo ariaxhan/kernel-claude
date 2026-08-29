@@ -16,7 +16,7 @@ kernel:
 Review code changes for quality, correctness, security.
 Only report issues with >80% confidence.
 
-Load: skills/testing/SKILL.md, skills/security/SKILL.md
+Load: skills/build/reference/testing.md, skills/tearitapart/reference/security.md
 Reference: _meta/research/ai-code-anti-patterns.md
 </purpose>
 

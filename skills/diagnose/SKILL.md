@@ -25,7 +25,7 @@ agentdb recall "<exact error> <subsystem> <test> <files/symbols>" --global
 </on_start>
 
 <skill_load>
-Load: skills/debug/SKILL.md, skills/testing/SKILL.md, skills/architecture/SKILL.md
+Load: skills/debug/SKILL.md, skills/build/reference/testing.md, skills/architecture/SKILL.md
 </skill_load>
 
 <modes>

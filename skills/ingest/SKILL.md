@@ -215,7 +215,7 @@ ambiguous: assume higher. File count is only a weak hint, never the trigger.
 
 <step id="4_tests" mandatory="true">
 <rule>Define success before coding. Tests first.</rule>
-skill_ref: skills/testing/SKILL.md
+skill_ref: skills/build/reference/testing.md
 
 done_when:
   - observable outcome 1

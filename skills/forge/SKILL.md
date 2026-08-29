@@ -30,15 +30,15 @@ Run this overnight. Come back to shipped code + experimental evidence + emergent
 </purpose>
 
 <skill_load>
-always: skills/quality/SKILL.md, skills/testing/SKILL.md, skills/git/SKILL.md, skills/build/SKILL.md
+always: skills/quality/SKILL.md, skills/build/reference/testing.md, skills/build/reference/git.md, skills/build/SKILL.md
 on_classify:
   bug:      skills/debug/SKILL.md
-  refactor: skills/refactor/SKILL.md
+  refactor: skills/build/reference/refactor.md
 on_domain:
-  api:      skills/api/SKILL.md, skills/backend/SKILL.md
-  auth:     skills/security/SKILL.md
+  api:      skills/architecture/reference/api.md, skills/architecture/reference/backend.md
+  auth:     skills/tearitapart/reference/security.md
   frontend: skills/frontend/SKILL.md
-  backend:  skills/backend/SKILL.md
+  backend:  skills/architecture/reference/backend.md
 on_tier:
   2+:       skills/orchestration/SKILL.md
 </skill_load>
