@@ -30,10 +30,6 @@ Deep patterns, SQL schema, domain design templates, confidence-scoring examples:
 skills/experiment/reference/experiment-research.md
 </reference>
 
-<skill_load>
-always: skills/quality/SKILL.md, skills/testing/SKILL.md
-</skill_load>
-
 <on_start>
 ```bash
 agentdb read-start

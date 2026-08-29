@@ -2704,6 +2704,20 @@ test_version_sync_all() {
   return $fail
 }
 
+test_skill_load_targets_exist() {
+  # Every path named inside a <skill_load> block must exist on disk. The 8.1.2 de-bloat
+  # deleted four skills and left tearitapart loading files that were no longer there (#221).
+  local fail=0 file target
+  for file in "$PLUGIN_ROOT"/skills/*/SKILL.md "$PLUGIN_ROOT"/agents/*.md; do
+    while IFS= read -r target; do
+      [ -n "$target" ] || continue
+      [ -e "$PLUGIN_ROOT/$target" ] || { echo "FAIL: ${file#"$PLUGIN_ROOT"/} loads missing $target"; fail=1; }
+    done < <(awk '/<skill_load>/{inb=1} inb{print} /<\/skill_load>/{inb=0}' "$file" \
+             | grep -oE '(skills|agents)/[A-Za-z0-9_./-]+\.md' | sort -u)
+  done
+  return $fail
+}
+
 test_release_docs_reject_stale_live_claims() {
   local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md AGENTS.md CLAUDE.md skills/help/SKILL.md skills/init/SKILL.md workflows/feature.md workflows/bugfix.md workflows/refactor.md)
   local pattern='Cursor shares|without the kernel: prefix|yaml-first|YAML is the canonical|All v7 invocations work unchanged|ln -sfn|push to main|no new tests needed|commands/\*\.md'
@@ -5897,6 +5911,7 @@ run_test_suite() {
       ;;
     version_sync)
       run_test "all canonical version declarations in sync" test_version_sync_all
+      run_test "every <skill_load> target exists" test_skill_load_targets_exist
       run_test "gemini-extension.json is valid and honest" test_gemini_manifest_is_valid
       run_test "gemini bundle excludes Claude-format agents and hooks" test_gemini_bundle_excludes_incompatible_host_files
       run_test "README and llms.txt document the Gemini install" test_release_docs_document_gemini_install
