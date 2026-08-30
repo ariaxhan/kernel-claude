@@ -2,6 +2,22 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.9] - 2026-08-30
+
+Hooks no longer orphan `.git/index.lock`.
+
+### Fixed
+- A read-only `git status` still takes `.git/index.lock` to write the refreshed index. Hooks
+  run in parallel and are killed on timeout, so a racing or killed hook left a zero-byte lock
+  behind and the next foreground `git commit` blocked on it. `GIT_OPTIONAL_LOCKS=0` is now
+  exported by the five hook scripts that run an index-touching git command: `chronicle-gate.sh`,
+  `pre-compact-commit.sh`, `route-request.sh`, `session-end.sh`, `session-start.sh`.
+- Reproduced deterministically before the fix (25 parallel hook git reads orphaned a lock every
+  run) and verified after (same burst, no orphan). `git add` and `git commit` still work under
+  the flag: real writes are not optional locks.
+- The four hash-pinned guards are deliberately untouched. None of them runs an index-touching
+  git command, so the tamper tripwire keeps its pins.
+
 ## [9.6.8] - 2026-08-30
 
 `git status` in a hook no longer walks every submodule.

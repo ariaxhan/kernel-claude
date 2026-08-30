@@ -1,4 +1,10 @@
 #!/bin/bash
+# Hooks run in parallel and are killed on timeout. A read-only `git status` still takes
+# .git/index.lock to write the refreshed index, so a killed or racing hook leaves a zero-byte
+# orphan behind and the next foreground `git commit` blocks on it. GIT_OPTIONAL_LOCKS=0 makes
+# git skip that optional index write; real writes (add/commit) still take the lock normally.
+# Reproduced 2026-08-30: 25 parallel hook git reads orphaned a lock; with this set, none did.
+export GIT_OPTIONAL_LOCKS=0
 # KERNEL 9: provider-neutral UserPromptSubmit activation.
 #
 # Classifies the current request against the active session's last route plus
