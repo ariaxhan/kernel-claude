@@ -2,6 +2,20 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.6.8] - 2026-08-30
+
+`git status` in a hook no longer walks every submodule.
+
+### Fixed
+- Eight bare `git status --porcelain` call sites in the hook scripts recursed into every
+  submodule of the working tree. Measured in a 103-repo superproject: 1222 ms per call,
+  paid on every prompt (`route-request.sh`), every turn (`chronicle-gate.sh`), twice per
+  session (`session-start.sh`, `session-end.sh`) and on every compact
+  (`pre-compact-commit.sh`). With `--ignore-submodules=dirty` the same call is 115 ms.
+- The signal the hooks actually read is unchanged: a submodule whose HEAD moved still
+  appears as a gitlink path change, and a superproject cannot commit submodule-internal
+  edits anyway. Work done inside a submodule is triaged by that submodule's own hooks.
+
 ## [9.6.7] - 2026-08-29
 
 Keychain data in a request body is authorization, not exfiltration.
