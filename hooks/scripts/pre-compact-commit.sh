@@ -106,7 +106,7 @@ REPO_NAME=$(basename "$PROJECT_ROOT")
 
 if [ -f "$AGENTDB_PATH" ]; then
     BRANCH=$(cd "$PROJECT_ROOT" && git branch --show-current 2>/dev/null || echo "unknown")
-    UNCOMMITTED=$(cd "$PROJECT_ROOT" && git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    UNCOMMITTED=$(cd "$PROJECT_ROOT" && git status --porcelain --ignore-submodules=dirty 2>/dev/null | wc -l | tr -d ' ')
 
     # Get active contract goal if exists
     ACTIVE_GOAL=$(sqlite3 "$AGENTDB_PATH" "SELECT json_extract(content, '$.goal') FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || echo "")
@@ -206,7 +206,7 @@ saved:
 recent_commits:
 $(cd "$PROJECT_ROOT" && git log --oneline -3 2>/dev/null | sed 's/^/  - /')
 
-$(REMAINING=$(cd "$PROJECT_ROOT" && git status --porcelain 2>/dev/null | head -5); [ -n "$REMAINING" ] && echo "uncommitted:" && echo "$REMAINING" | sed 's/^/  - /')
+$(REMAINING=$(cd "$PROJECT_ROOT" && git status --porcelain --ignore-submodules=dirty 2>/dev/null | head -5); [ -n "$REMAINING" ] && echo "uncommitted:" && echo "$REMAINING" | sed 's/^/  - /')
 
 restore: agentdb read-start
 resume: /kernel:ingest (continue from checkpoint)

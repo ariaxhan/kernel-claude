@@ -31,7 +31,7 @@ fi
 # === STEP 0: WRITE AGENTDB CHECKPOINT ===
 if [ -f "$VAULTS/_meta/agentdb/agent.db" ]; then
     BRANCH=$(git branch --show-current 2>/dev/null || echo "none")
-    FILES_CHANGED=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    FILES_CHANGED=$(git status --porcelain --ignore-submodules=dirty 2>/dev/null | wc -l | tr -d ' ')
     "$AGENTDB" write-end "{\"agent\":\"$AGENT\",\"event\":\"session-end\",\"branch\":\"$BRANCH\",\"uncommitted_files\":$FILES_CHANGED}" 2>/dev/null || true
 fi
 
@@ -99,13 +99,13 @@ done
 # uncommitted work.
 cd "$PROJECT_ROOT" 2>/dev/null || exit 0
 
-UNCOMMITTED=$(git status --porcelain 2>/dev/null | grep -c . || true)
+UNCOMMITTED=$(git status --porcelain --ignore-submodules=dirty 2>/dev/null | grep -c . || true)
 [ "${UNCOMMITTED:-0}" -gt 0 ] || exit 0
 
 # Record the suite verdict (NO commit — just writes _meta/.test-status) so SessionStart can
 # flag a red suite next time. Only when real source changed — skip pure log/agentdb churn so
 # doc-free sessions stay fast. test-gate.sh writes PASS|FAIL|NONE and exits non-zero on red.
-CODE_CHANGED=$(git status --porcelain 2>/dev/null | awk '{print $NF}' \
+CODE_CHANGED=$(git status --porcelain --ignore-submodules=dirty 2>/dev/null | awk '{print $NF}' \
     | grep -vE '^_meta/(logs/|agentdb/|\.)' | head -1)
 if [ -n "$CODE_CHANGED" ] && [ -f "$(dirname "$0")/test-gate.sh" ]; then
     if bash "$(dirname "$0")/test-gate.sh" "$PROJECT_ROOT" >/dev/null 2>&1; then

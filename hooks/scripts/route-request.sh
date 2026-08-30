@@ -99,7 +99,7 @@ if [ -n "$PREVIOUS_FILE" ] &&
   command -v git >/dev/null 2>&1 &&
   git -C "$REQUEST_CWD" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   WORKING_TREE_CHANGES=$(
-    git -C "$REQUEST_CWD" status --porcelain --untracked-files=normal 2>/dev/null |
+    git -C "$REQUEST_CWD" status --porcelain --ignore-submodules=dirty --untracked-files=normal 2>/dev/null |
       awk 'END { print NR + 0 }'
   )
 fi

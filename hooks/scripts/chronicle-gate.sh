@@ -36,7 +36,7 @@ if ! git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 # --- what changed, uncommitted and committed, in this working tree ---
-CHANGED=$(git -C "$ROOT" status --porcelain 2>/dev/null | awk '{ $1=""; sub(/^ +/,""); print }')
+CHANGED=$(git -C "$ROOT" status --porcelain --ignore-submodules=dirty 2>/dev/null | awk '{ $1=""; sub(/^ +/,""); print }')
 [ -z "$CHANGED" ] && CHANGED=$(git -C "$ROOT" diff --name-only HEAD~1..HEAD 2>/dev/null)
 
 [ -z "$CHANGED" ] && exit 0  # nothing happened; nothing to record
