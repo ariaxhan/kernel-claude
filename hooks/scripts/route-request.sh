@@ -158,6 +158,44 @@ printf 'Shape: %s | safety: %s | domain: %s\n' "$SHAPE" "$SAFETY" "$DOMAIN"
 printf 'Evidence: %s\n' "$REASON"
 printf 'Load only %s/packs/%s/PACK.md for domain-specific method.\n' "$PLUGIN_ROOT" "$DOMAIN"
 
+# The skill line. One line, two at a genuine tie, and nothing at all when no
+# skill scored above the strong-signal floor -- silence is the common case and
+# the correct one. See classify_skills() in kernel_router.py for why this exists:
+# the router announced a pack 8,578 times while 12 of 26 skills had never been
+# invoked once, because nothing connected the two.
+# Imperative, matching the pack line above it. "Skill for this request:" is a
+# noun phrase, and a noun phrase next to "Load only ..." reads as trivia rather
+# than as routing. The audit's whole finding was that skills get ignored.
+SKILLS=$(printf '%s' "$CLASSIFICATION" | jq -r '
+  (.skills // []) | .[] | "  /kernel:\(.name) (\(.reasons[0] // "matches this request"))"
+' 2>/dev/null || true)
+SKILL_COUNT=$(printf '%s' "$CLASSIFICATION" | jq -r '(.skills // []) | length' 2>/dev/null || echo 0)
+if [ -n "$SKILLS" ]; then
+  if [ "$SKILL_COUNT" -gt 1 ]; then
+    printf 'Invoke the skill that fits; these two tied on evidence:\n%s\n' "$SKILLS"
+  else
+    printf 'Invoke this skill for the request:\n%s\n' "$SKILLS"
+  fi
+
+  # Adoption receipt. The audit could measure that skills were not being used,
+  # but not whether any intervention fixed it, because nothing recorded what was
+  # SUGGESTED -- only what was invoked. One suggestion without its counterfactual
+  # is not a measurement. This line is the counterfactual: joined against the
+  # Skill tool calls in the session transcript it yields an adoption rate, which
+  # is the only honest test of whether routing to skills was worth doing.
+  # Silent, best-effort, never blocks the hook.
+  SKILL_LOG="${KERNEL_SKILL_LOG:-$PLUGIN_ROOT/_meta/logs/skill-routing.jsonl}"
+  if mkdir -p "$(dirname "$SKILL_LOG")" 2>/dev/null; then
+    printf '%s' "$CLASSIFICATION" | jq -c \
+      --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      --arg session "${SESSION_ID:-unknown}" \
+      --arg cwd "$REQUEST_CWD" \
+      '{ts:$ts, session:$session, cwd:$cwd, domain:.domain, shape:.work_shape,
+        suggested:[.skills[].name], scores:[.skills[].score]}' \
+      >> "$SKILL_LOG" 2>/dev/null || true
+  fi
+fi
+
 case "$SHAPE" in
   gated)
     printf '%s\n' \

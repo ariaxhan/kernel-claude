@@ -418,6 +418,72 @@ DEESCALATE_DEFAULTS = {
 PROTECTED_ESCALATE = "verification cannot distinguish safe from unsafe outcome"
 
 
+# --------------------------------------------------------------------------
+# Skill routing
+# --------------------------------------------------------------------------
+#
+# WHY (2026-09-01 usage audit): across 9,642 Claude sessions and 1,180 Codex
+# sessions, 12 of 26 skills had never been invoked once and only 5 invocations
+# in all of history were typed by a human. Meanwhile this router announced a
+# domain pack 8,578 times. The routing mechanism worked; nothing connected it
+# to the skill library, which was left to the model matching 29 frontmatter
+# trigger lists that collide (build and ingest both claim "build/implement/
+# create"; context-mgmt claims the word "handoff"; review, quality and
+# tearitapart all claim "review"). Weighted evidence separates them; a shared
+# bare noun cannot.
+#
+# Fails OPEN by design. A missing or broken skill table must never take the
+# domain/shape/safety classification down with it: those three decide how work
+# is done, a skill suggestion only decides what gets read first.
+try:
+    from skill_signals import NEVER_SUGGEST, SKILL_DOMAINS, SKILL_SIGNALS
+
+    _SKILL_SIGNALS = {
+        name: [_sig(p, w, r) for p, w, r in sigs]
+        for name, sigs in SKILL_SIGNALS.items()
+    }
+    SKILL_NEVER_SUGGEST = set(NEVER_SUGGEST)
+except Exception:  # pragma: no cover - absence is a valid state, not an error
+    _SKILL_SIGNALS = {}
+    SKILL_DOMAINS = {}
+    SKILL_NEVER_SUGGEST = set()
+
+# A skill is worth a line only when the prompt carries at least one strong
+# signal for it. Weight 3 means "this phrasing all but names the skill", so 3 is
+# the floor: below it we would be guessing out loud, which is what the old
+# trigger-word matching already did badly.
+SKILL_FLOOR = 3
+
+# Two skills within this distance are a genuine tie, and the honest output names
+# both rather than picking one on a one-point margin.
+SKILL_TIE = 1
+
+
+def classify_skills(text: str, domain: str | None = None):
+    """Rank skills by weighted prompt evidence. Never raises; returns []."""
+    if not _SKILL_SIGNALS:
+        return []
+    scored = []
+    for name, signals in _SKILL_SIGNALS.items():
+        if name in SKILL_NEVER_SUGGEST:
+            continue
+        domains = SKILL_DOMAINS.get(name) or ()
+        if domain and domains and domain not in domains:
+            continue
+        total, reasons = _score(text, signals)
+        if total >= SKILL_FLOOR:
+            scored.append((total, name, reasons))
+    if not scored:
+        return []
+    scored.sort(key=lambda row: (-row[0], row[1]))
+    top = scored[0][0]
+    return [
+        {"name": name, "score": total, "reasons": reasons[:2]}
+        for total, name, reasons in scored
+        if top - total <= SKILL_TIE
+    ][:2]
+
+
 def build_classification(
     text: str,
     domain_hint=None,
@@ -451,6 +517,10 @@ def build_classification(
         "reasons": reasons,
         "packs": PACK_BY_DOMAIN.get(domain, [domain]),
     }
+
+    skills = classify_skills(text, domain)
+    if skills:
+        out["skills"] = skills
 
     if shape in ESCALATE_DEFAULTS:
         esc = list(ESCALATE_DEFAULTS[shape])
@@ -487,10 +557,16 @@ def build_classification(
     # "writing" changes nothing about how it gets done, so it is not worth a
     # sentence. Being unsure about shape or safety does change what happens, and
     # is surfaced.
+    # A confident skill match is a material behaviour change by the same test the
+    # other three clauses apply: it changes what the agent reads before acting.
+    # Without this, skill suggestions would only ever reach gated or protected
+    # work, and the ordinary direct request -- which is most of them, and the
+    # place a skill helps most -- would keep getting none.
     out["announced"] = bool(
         shape != "direct"
         or safety == "protected"
         or min(s_conf, f_conf) < LOW_CONFIDENCE_FLOOR
+        or skills
     )
 
     return out

@@ -2,6 +2,52 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.8.0] - 2026-09-01
+
+The router announced a pack 8,578 times while 12 of 26 skills had never been invoked once.
+Nothing connected the two.
+
+### Added
+- `orchestration/router/skill_signals.py`: 114 weighted signals mapping prompt evidence to all
+  29 skills, in the same shape as `DOMAIN_SIGNALS`. Plain tuples, no imports, standalone
+  testable.
+- `classify_skills()` in the router, and a `skills` field on the classification. A confident
+  skill match now sets `announced`, so ordinary direct requests get a suggestion too; previously
+  only gated or protected work was ever announced, which is the work least in need of a pointer.
+- `route-request.sh` prints one line naming the skill and the evidence, two at a genuine tie,
+  and nothing at all below the strong-signal floor.
+- `tests/kernel9/test_skill_routing.py`: a skill with no routing evidence fails the build, and
+  so does a routing entry for a skill that does not exist. Verified by seeding both defects and
+  confirming each is caught, not by trusting the assertion.
+- `CANONICAL_PROBES`: one realistic prompt per auto-invocable skill, asserted to reach that
+  skill. Coverage is cheap to fake -- a table can key all 29 skills and still reach none of them
+  if its regexes only match phrasings nobody uses, which is exactly how the frontmatter trigger
+  lists failed. The probes caught five skills (architecture, build, frontend, help,
+  retrospective) that were keyed but unreachable in the first draft of the table.
+- `NEVER_SUGGEST`: the five skills whose frontmatter sets `disable-model-invocation: true`
+  (forge, experiment, governance-sync, init, landing-page). Suggesting one is advice nobody in
+  the room can take. Held as data so the router does not stat five files per prompt, and
+  asserted against the actual frontmatter by test so it cannot drift.
+- `scripts/skill-adoption.py`: joins suggestions against invocations to print an adoption rate
+  per skill. The audit could measure that skills went unused but not whether a fix worked,
+  because only invocations were recorded and an ignored suggestion left no trace. There was no
+  denominator. This writes one.
+
+### Changed
+- Skill selection no longer rests on 29 frontmatter trigger lists that collide. `build` and
+  `ingest` both claimed "build", "implement" and "create" verbatim; `context-mgmt` claimed the
+  word "handoff"; `review`, `quality` and `tearitapart` all claimed "review". Weighted evidence
+  separates them and a shared bare noun cannot. All seven collision clusters are covered by a
+  test asserting the intended skill wins on a realistic prompt.
+
+### Fixed
+- Stopped tracking per-session runtime state: seven `_meta/.guard-state/` files, `.session_id`
+  and `.compact-keyterms`, one set per session that happened to run.
+
+Skill routing fails open. A missing or broken skill table cannot take domain, shape or safety
+down with it: those three decide how work is done, a skill suggestion only decides what gets
+read first. The degraded path is asserted by test rather than left to the try/except.
+
 ## [9.7.1] - 2026-09-01
 
 Complexity is a project gate, not a table the builder can omit.
