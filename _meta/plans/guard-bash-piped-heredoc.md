@@ -1,6 +1,6 @@
 ---
 type: plan
-status: proposed
+status: applied
 created: 2026-08-29
 ---
 

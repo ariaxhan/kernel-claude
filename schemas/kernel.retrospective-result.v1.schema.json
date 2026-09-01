@@ -88,7 +88,9 @@
               "create",
               "modify",
               "remove",
-              "promote"
+              "promote",
+              "weaken",
+              "retire"
             ],
             "x-kernel-enforced-by": "agent"
           },
@@ -99,7 +101,12 @@
               "agent",
               "skill",
               "prose",
-              "learning"
+              "learning",
+              "belief",
+              "pattern",
+              "anomaly",
+              "question",
+              "architecture"
             ],
             "x-kernel-enforced-by": "agent"
           },
@@ -154,6 +161,63 @@
           "x-kernel-enforced-by": "agent"
         }
       },
+      "x-kernel-enforced-by": "agent"
+    },
+    "intelligence": {
+      "type": "object",
+      "description": "The intelligence-extraction payload: what the run taught that was not the deliverable. Keys required, arrays may be empty.",
+      "properties": {
+        "surprises": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "agent"
+        },
+        "belief_updates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "agent"
+        },
+        "anomalies_preserved": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "agent"
+        },
+        "primitives_named": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "agent"
+        },
+        "recurrences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "agent"
+        },
+        "architecture_proposals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-kernel-enforced-by": "agent"
+        }
+      },
+      "required": [
+        "surprises",
+        "belief_updates",
+        "anomalies_preserved",
+        "primitives_named",
+        "recurrences",
+        "architecture_proposals"
+      ],
       "x-kernel-enforced-by": "agent"
     }
   }

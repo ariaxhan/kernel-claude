@@ -783,11 +783,15 @@ test_detect_vaults_default() {
 
 test_detect_vaults_env_override() {
   source "$PLUGIN_ROOT/hooks/scripts/common.sh"
-  export KERNEL_VAULTS="/custom/path"
+  # detect_vaults only honours an override that exists on disk, so a path that
+  # does not exist tests nothing: it falls through to the default and passes only
+  # while the assert is ungraded (#229).
+  mkdir -p "$TEST_DIR/custom-vaults"
+  export KERNEL_VAULTS="$TEST_DIR/custom-vaults"
   local result
   result=$(detect_vaults)
-  assert_equals "/custom/path" "$result" "KERNEL_VAULTS should override" || return 1
   unset KERNEL_VAULTS
+  assert_equals "$TEST_DIR/custom-vaults" "$result" "KERNEL_VAULTS should override" || return 1
 }
 
 test_detect_vaults_finds_primary() {
