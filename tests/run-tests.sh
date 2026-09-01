@@ -114,6 +114,13 @@ run_test() {
   local exit_code=0
   output=$($fn 2>&1) || exit_code=$?
 
+  # #229: assert_* helpers print "  FAIL: ..." on failure but a function that keeps
+  # executing after an ungraded assert only reports the LAST statement's exit code.
+  # Grade on any FAIL marker in the captured output too, so no assert call is dead.
+  if [ $exit_code -eq 0 ] && printf '%s\n' "$output" | grep -q '^  FAIL:'; then
+    exit_code=1
+  fi
+
   teardown_test_env
 
   if [ $exit_code -eq 0 ]; then
@@ -154,7 +161,7 @@ test_agentdb_learn_failure() {
   agentdb init >/dev/null
   local output
   output=$(agentdb learn failure "test failure" "evidence here")
-  assert_contains "$output" "Learned"
+  assert_contains "$output" "Learned" || return 1
   assert_contains "$output" "failure"
 }
 
@@ -191,7 +198,7 @@ test_agentdb_contract() {
   agentdb init >/dev/null
   local output
   output=$(agentdb contract '{"goal":"test","files":["a.ts"],"tier":1}')
-  assert_contains "$output" "Contract"
+  assert_contains "$output" "Contract" || return 1
   assert_contains "$output" "CR-"
 }
 
@@ -214,8 +221,8 @@ test_agentdb_read_start_empty() {
   local output
   output=$(agentdb read-start)
   # weighted-75 format (H078): structural headings always present, even empty.
-  assert_contains "$output" "AgentDB Context"
-  assert_contains "$output" "Recent Errors"
+  assert_contains "$output" "AgentDB Context" || return 1
+  assert_contains "$output" "Recent Errors" || return 1
   assert_contains "$output" "Active Contract"
 }
 
@@ -225,7 +232,7 @@ test_agentdb_read_start_with_data() {
   agentdb learn pattern "validate all inputs" "security best practice" >/dev/null
   local output
   output=$(agentdb read-start)
-  assert_contains "$output" "SQL injection"
+  assert_contains "$output" "SQL injection" || return 1
   assert_contains "$output" "validate all inputs"
 }
 
@@ -235,7 +242,7 @@ test_agentdb_status() {
   agentdb write-end '{"did":"test"}' >/dev/null
   local output
   output=$(agentdb status)
-  assert_contains "$output" "learnings:"
+  assert_contains "$output" "learnings:" || return 1
   assert_contains "$output" "checkpoints:"
 }
 
@@ -248,7 +255,7 @@ test_agentdb_prune() {
   # Prune to 5
   local output
   output=$(agentdb prune 5)
-  assert_contains "$output" "Pruned 10"
+  assert_contains "$output" "Pruned 10" || return 1
   assert_contains "$output" "Kept 5"
 }
 
@@ -295,7 +302,7 @@ test_agentdb_recent() {
   agentdb write-end '{"test":"recent2"}' >/dev/null
   local output
   output=$(agentdb recent 2)
-  assert_contains "$output" "recent1"
+  assert_contains "$output" "recent1" || return 1
   assert_contains "$output" "recent2"
 }
 
@@ -304,7 +311,7 @@ test_agentdb_error() {
   agentdb error "Edit" "file not found" "src/app.ts" >/dev/null
   local output
   output=$(agentdb read-start)
-  assert_contains "$output" "Edit"
+  assert_contains "$output" "Edit" || return 1
   assert_contains "$output" "file not found"
 }
 
@@ -313,14 +320,14 @@ test_agentdb_recall_defaults_to_pure_fts() {
   # hybrid is opt-in via AGENTDB_EMBED=1. Guards against a silent re-flip of the default.
   # 1) Source-level: the fusion gate must default OFF (opt-in), not ON.
   assert_contains "$(cat "$PLUGIN_ROOT/orchestration/agentdb/agentdb")" \
-    '[ "${AGENTDB_EMBED:-0}" = "1" ] || { printf '"'"'%s'"'"' "$raw"; return 0; }'
+    '[ "${AGENTDB_EMBED:-0}" = "1" ] || { printf '"'"'%s'"'"' "$raw"; return 0; }' || return 1
   # 2) Behavioral: recall works with NO backend and NO opt-in (pure FTS standalone),
   #    and setting AGENTDB_EMBED=1 without a backend still returns results (graceful).
   agentdb init >/dev/null
   agentdb learn pattern "rate limiter uses a token bucket" "src/limit.ts" >/dev/null
   local def opt
   def=$(agentdb recall "token bucket rate limiter")
-  assert_contains "$def" "token bucket"
+  assert_contains "$def" "token bucket" || return 1
   opt=$(AGENTDB_EMBED=1 agentdb recall "token bucket rate limiter")
   assert_contains "$opt" "token bucket"
 }
@@ -342,7 +349,7 @@ test_agentdb_recall_alias_expansion() {
   agentdb alias add swapped move >/dev/null
   agentdb alias add scheduler launchd >/dev/null
   after=$(agentdb recall "swapped laptops broke scheduler")
-  assert_contains "$after" "machine move" "alias expansion should reach the learning"
+  assert_contains "$after" "machine move" "alias expansion should reach the learning" || return 1
   off=$(AGENTDB_NO_ALIAS=1 agentdb recall "swapped laptops broke scheduler" 2>/dev/null || true)
   if [[ "$off" == *"machine move"* ]]; then
     echo "  FAIL: AGENTDB_NO_ALIAS=1 did not disable alias expansion"
@@ -359,7 +366,7 @@ test_agentdb_recall_sentinel_in_content() {
   agentdb learn gotcha "delimiter arrived as literal; fixed with printable @@US@@ sentinel marker" "commit abc123" >/dev/null
   local ids
   ids=$(agentdb recall "printable sentinel marker delimiter" --ids)
-  assert_contains "$ids" "LRN-" "--ids must return a learning id"
+  assert_contains "$ids" "LRN-" "--ids must return a learning id" || return 1
   if printf '%s\n' "$ids" | grep -qv '^LRN-'; then
     echo "  FAIL: --ids emitted a non-id line (sentinel-in-content field corruption)"
     printf '%s\n' "$ids"
@@ -381,14 +388,14 @@ test_agentdb_recall_relevance_floor() {
   # exempt (never silences a legitimately short query).
   # 1) Source-level: default value present and kill-switch gated (no silent re-flip).
   local src; src=$(cat "$PLUGIN_ROOT/orchestration/agentdb/agentdb")
-  assert_contains "$src" 'AGENTDB_RECALL_MIN_TERMS:-2'
-  assert_contains "$src" 'AGENTDB_NO_FLOOR:-0'
+  assert_contains "$src" 'AGENTDB_RECALL_MIN_TERMS:-2' || return 1
+  assert_contains "$src" 'AGENTDB_NO_FLOOR:-0' || return 1
   # 2) Behavioral: a real multi-term match survives the DEFAULT floor. --ids avoids the
   #    echoed query header, so we test surfaced rows, never the header line.
   agentdb init >/dev/null
   agentdb learn pattern "quokka zephyr nimbus obsidian lattice" "src/floor.ts" >/dev/null
   assert_contains "$(agentdb recall "quokka zephyr nimbus obsidian lattice" --ids)" "LRN-" \
-    "default floor must keep a genuine multi-term match"
+    "default floor must keep a genuine multi-term match" || return 1
   # 3) OR-noise: a multi-word query that shares only ONE incidental word with the corpus
   #    (count 1 < min 2) is silenced by default -> proves the floor is wired.
   local noise
@@ -400,10 +407,10 @@ test_agentdb_recall_relevance_floor() {
   fi
   # 4) Kill-switch restores the OR-noise hit (proves AGENTDB_NO_FLOOR=1 bypasses).
   assert_contains "$(AGENTDB_NO_FLOOR=1 agentdb recall "quokka salamander tornado helicopter" --ids)" "LRN-" \
-    "AGENTDB_NO_FLOOR=1 must bypass the floor"
+    "AGENTDB_NO_FLOOR=1 must bypass the floor" || return 1
   # 5) A legitimately SHORT (single-term) query is exempt — the floor never silences it.
   assert_contains "$(agentdb recall "quokka" --ids)" "LRN-" \
-    "a 1-term query must be exempt from the min-2-terms floor"
+    "a 1-term query must be exempt from the min-2-terms floor" || return 1
 }
 
 # === Edge Case Tests ===
@@ -494,7 +501,7 @@ test_lifecycle_hooks_survive_a_repo_with_no_commits() {
 test_session_start_outputs_kernel() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>&1)
-  assert_contains "$output" "# KERNEL"
+  assert_contains "$output" "# KERNEL" || return 1
   assert_contains "$output" "agentdb"
 }
 
@@ -566,8 +573,8 @@ test_agentdb_status_healthy() {
   agentdb init >/dev/null
   local output
   output=$(agentdb status)
-  assert_contains "$output" "DB:"
-  assert_contains "$output" "Size:"
+  assert_contains "$output" "DB:" || return 1
+  assert_contains "$output" "Size:" || return 1
   assert_contains "$output" "Counts:"
 }
 
@@ -576,7 +583,7 @@ test_agentdb_export_creates_file() {
   agentdb learn pattern "test export" >/dev/null
   local output
   output=$(agentdb export)
-  assert_contains "$output" "Exported to:"
+  assert_contains "$output" "Exported to:" || return 1
   # Verify file exists
   local export_file
   export_file=$(echo "$output" | grep -o '_meta/agentdb/learnings-export.*\.md')
@@ -683,7 +690,7 @@ test_session_start_workflow_present() {
   local output
   output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>&1)
   # Compact static block: agentdb quick reference + tier rule
-  assert_contains "$output" "agentdb recall"
+  assert_contains "$output" "agentdb recall" || return 1
   assert_contains "$output" "Tier by reversibility x blast radius"
 }
 
@@ -744,7 +751,7 @@ test_session_start_shows_checkpoint_after_compact() {
   # Verify checkpoint was stored (the core behavior we're testing)
   local stored
   stored=$(agentdb query "SELECT COUNT(*) FROM context WHERE type='checkpoint';")
-  assert_contains "$stored" "1"
+  assert_contains "$stored" "1" || return 1
   # Verify session-start runs without error (output varies by environment)
   "$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null >/dev/null 2>&1
   local exit_code=$?
@@ -779,7 +786,7 @@ test_detect_vaults_env_override() {
   export KERNEL_VAULTS="/custom/path"
   local result
   result=$(detect_vaults)
-  assert_equals "/custom/path" "$result" "KERNEL_VAULTS should override"
+  assert_equals "/custom/path" "$result" "KERNEL_VAULTS should override" || return 1
   unset KERNEL_VAULTS
 }
 
@@ -790,7 +797,7 @@ test_detect_vaults_finds_primary() {
   touch "$HOME/Vaults/_meta/agentdb/agent.db"
   local result
   result=$(detect_vaults)
-  assert_equals "$HOME/Vaults" "$result" "should find ~/Vaults"
+  assert_equals "$HOME/Vaults" "$result" "should find ~/Vaults" || return 1
   rm -rf "$HOME/Vaults/_meta" 2>/dev/null || true
   rmdir "$HOME/Vaults" 2>/dev/null || true
 }
@@ -897,9 +904,9 @@ test_runtime_upgrade_repairs_only_numbered_links() {
   local before; before=$(find "$KERNEL_VAULTS/_meta" -type f -exec shasum -a 256 {} \; | sort)
   source "$PLUGIN_ROOT/hooks/scripts/common.sh"
   KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
-  assert_equals "$cache/current/orchestration/agentdb/agentdb" "$(readlink "$KERNEL_VAULTS/.local/bin/agentdb")"
-  assert_equals "$cache/current/orchestration" "$(readlink "$KERNEL_VAULTS/.claude/kernel/orchestration")"
-  assert_equals "$cache/current/hooks" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
+  assert_equals "$cache/current/orchestration/agentdb/agentdb" "$(readlink "$KERNEL_VAULTS/.local/bin/agentdb")" || return 1
+  assert_equals "$cache/current/orchestration" "$(readlink "$KERNEL_VAULTS/.claude/kernel/orchestration")" || return 1
+  assert_equals "$cache/current/hooks" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")" || return 1
   assert_equals "$before" "$(find "$KERNEL_VAULTS/_meta" -type f -exec shasum -a 256 {} \; | sort)" "project data must not change"
 }
 
@@ -911,7 +918,7 @@ test_runtime_current_noop_and_missing_untouched() {
   local inode; inode=$(stat -f %i "$KERNEL_VAULTS/.claude/kernel/hooks" 2>/dev/null || stat -c %i "$KERNEL_VAULTS/.claude/kernel/hooks")
   source "$PLUGIN_ROOT/hooks/scripts/common.sh"
   KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS"
-  assert_equals "$inode" "$(stat -f %i "$KERNEL_VAULTS/.claude/kernel/hooks" 2>/dev/null || stat -c %i "$KERNEL_VAULTS/.claude/kernel/hooks")" "correct links must not churn"
+  assert_equals "$inode" "$(stat -f %i "$KERNEL_VAULTS/.claude/kernel/hooks" 2>/dev/null || stat -c %i "$KERNEL_VAULTS/.claude/kernel/hooks")" "correct links must not churn" || return 1
   [ ! -e "$KERNEL_VAULTS/.local/bin/agentdb" ] && [ ! -L "$KERNEL_VAULTS/.local/bin/agentdb" ]
 }
 
@@ -925,8 +932,8 @@ test_runtime_refuses_user_owned_destinations() {
   local output rc=0
   output=$(KERNEL_RUNTIME_ROOT="$cache/8.0.0" kernel_reconcile_runtime "$KERNEL_VAULTS" 2>&1) || rc=$?
   [ "$rc" -ne 0 ]
-  assert_contains "$output" "run /kernel:init"
-  assert_equals mine "$(cat "$KERNEL_VAULTS/.local/bin/agentdb")"
+  assert_contains "$output" "run /kernel:init" || return 1
+  assert_equals mine "$(cat "$KERNEL_VAULTS/.local/bin/agentdb")" || return 1
   [ -d "$KERNEL_VAULTS/.claude/kernel/orchestration" ]
   assert_equals "$TEST_DIR/unrelated" "$(readlink "$KERNEL_VAULTS/.claude/kernel/hooks")"
 }
@@ -960,7 +967,7 @@ test_runtime_authority_is_monotonic_but_override_can_rollback() {
   ln -s "$cache/8.0.0" "$cache/current"
   source "$PLUGIN_ROOT/hooks/scripts/common.sh"
   KERNEL_LOADED_ROOT="$cache/7.23.0" kernel_update_current
-  assert_equals "$cache/8.0.0" "$(readlink "$cache/current")" "old loaded session must not downgrade"
+  assert_equals "$cache/8.0.0" "$(readlink "$cache/current")" "old loaded session must not downgrade" || return 1
   KERNEL_RUNTIME_ROOT="$cache/7.23.0" kernel_update_current
   assert_equals "$cache/7.23.0" "$(readlink "$cache/current")" "explicit rollback must win"
 }
@@ -992,7 +999,7 @@ test_select_runtime_supports_explicit_local_rollback() {
   make_runtime_fixture "$local_root" 7.23.0
   local output
   output=$(KERNEL_CACHE_DIR="$cache" KERNEL_VAULTS="$KERNEL_VAULTS" "$PLUGIN_ROOT/scripts/select-runtime.sh" "$local_root")
-  assert_equals "$local_root" "$(readlink "$cache/current")"
+  assert_equals "$local_root" "$(readlink "$cache/current")" || return 1
   assert_contains "$output" "KERNEL runtime: 7.23.0"
 }
 
@@ -1089,7 +1096,7 @@ test_init_agentdb_targets_selected_vaults() {
   (cd "$elsewhere" && kernel_init_agentdb "$KERNEL_VAULTS" "$cache") || return 1
   [ -f "$KERNEL_VAULTS/_meta/agentdb/agent.db" ] || return 1
   [ ! -f "$elsewhere/_meta/agentdb/agent.db" ] || return 1
-  assert_equals "$before" "$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/agent.db")" "existing AgentDB unchanged"
+  assert_equals "$before" "$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/agent.db")" "existing AgentDB unchanged" || return 1
   assert_equals "$sentinel_before" "$(shasum -a 256 "$KERNEL_VAULTS/_meta/agentdb/sentinel")"
 }
 
@@ -1212,7 +1219,7 @@ test_hook_file_records_reads_codex_command_shape() {
   # shellcheck source=/dev/null
   . "$PLUGIN_ROOT/hooks/scripts/common.sh"
   out=$(kernel_hook_file_records "$json")
-  assert_contains "$out" '"path":"/abs/seed.txt"' "file records must extract the path from tool_input.command"
+  assert_contains "$out" '"path":"/abs/seed.txt"' "file records must extract the path from tool_input.command" || return 1
   assert_contains "$out" '"content":"PROBE"' "file records must extract added content from tool_input.command"
 }
 
@@ -1291,9 +1298,9 @@ test_session_start_includes_dual_loader_tier_rules() {
   local output
   output=$(HOME="$TEST_DIR/home" KERNEL_VAULTS="$TEST_PROJECT" \
     "$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>/dev/null)
-  assert_contains "$output" "Tier 2+: create an AgentDB contract"
-  assert_contains "$output" "surgeon"
-  assert_contains "$output" "adversary"
+  assert_contains "$output" "Tier 2+: create an AgentDB contract" || return 1
+  assert_contains "$output" "surgeon" || return 1
+  assert_contains "$output" "adversary" || return 1
   assert_contains "$output" "Codex"
 }
 
@@ -1425,7 +1432,7 @@ test_guard_bash_blocks_branch_D()     { _gb 'git branch -D feature/x';          
 # 9.5.2 precision: shapes that were refused in production without being destructive.
 test_guard_bash_allows_D_on_merged_branch() {
   local _b="kernel-test-merged-$$"
-  git -C "$PLUGIN_ROOT" branch -q "$_b" HEAD 2>/dev/null || { assert_equals 0 0 "skip"; return; }
+  git -C "$PLUGIN_ROOT" branch -q "$_b" HEAD 2>/dev/null || { assert_equals 0 0 "skip"; return; } || return 1
   ( cd "$PLUGIN_ROOT" && _gb "git branch -D $_b" ); local rc=$?
   git -C "$PLUGIN_ROOT" branch -q -d "$_b" 2>/dev/null
   assert_exit_code 0 "$rc" "branch -D on a branch merged into HEAD drops nothing and must pass"
@@ -1848,7 +1855,7 @@ test_session_start_creates_session() {
   _ensure_graph_migration
   local output
   output=$(agentdb session-start "feature" 1)
-  assert_contains "$output" "SES-"
+  assert_contains "$output" "SES-" || return 1
   # Verify record in DB (use sqlite3 directly to avoid header/pragma noise from agentdb query)
   local count
   count=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM context_sessions;")
@@ -1897,7 +1904,7 @@ test_graph_project_from_receipt() {
   sessions=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM context_sessions WHERE id LIKE 'RCP-%';")
   nodes=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM nodes;")
   edges=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM edges;")
-  assert_equals "1" "$sessions" "receipt should create one graph session"
+  assert_equals "1" "$sessions" "receipt should create one graph session" || return 1
   [ "$nodes" -gt 0 ] || { echo "FAIL: expected nodes from receipt projection"; return 1; }
   [ "$edges" -gt 0 ] || { echo "FAIL: expected co-load edges from receipt projection"; return 1; }
 }
@@ -1916,7 +1923,7 @@ test_graph_suggest_shadow_mode() {
   _ensure_graph_migration
   local output
   output=$(agentdb graph-suggest feature 2>&1)
-  assert_contains "$output" "shadow mode"
+  assert_contains "$output" "shadow mode" || return 1
   assert_contains "$output" "JSON manifests remain authoritative"
 }
 
@@ -1962,8 +1969,8 @@ test_migration_applies_cleanly() {
   has_sessions=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='context_sessions' LIMIT 1;")
   has_nodes=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='nodes' LIMIT 1;")
   has_edges=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='edges' LIMIT 1;")
-  assert_equals "1" "$has_sessions" "context_sessions table should exist"
-  assert_equals "1" "$has_nodes" "nodes table should exist"
+  assert_equals "1" "$has_sessions" "context_sessions table should exist" || return 1
+  assert_equals "1" "$has_nodes" "nodes table should exist" || return 1
   assert_equals "1" "$has_edges" "edges table should exist"
 }
 
@@ -2205,12 +2212,15 @@ test_critical_guard_scripts_unchanged_for_820() {
   # passing everything on that host since 2026-07-14.
   # The guard-bash pin moved 2026-08-29 when keychain egress policing was
   # removed and unspaced executor heredocs were kept inside destructive scans.
+  # The guard-bash pin moved again 2026-09-01: piped/file-then-exec heredoc
+  # bodies (`cat <<EOF | bash`, write-then-exec) are now caught, and quoted
+  # heredoc delimiters are treated as data uniformly with unquoted ones.
   local expected actual file
   while read -r expected file; do
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-67b4c85c11fb10a5984dcdc1e8b23c62ed0a8150cd3b3381dac6e8d3eafa9a1a guard-bash.sh
+280d2702a3907a09e04f9a560d71e1b0b676a1b068764e14525ef696aa9ce514 guard-bash.sh
 ce20904682f9e53593328cc957c3039e99b7afe5eb9dc9cbea2f6dacbf650191 guard-config.sh
 c0afdb26d6794934e4e0758cdcd5e03aeb8abbd44a03daf781a7410fbb2e5ea9 detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
@@ -2261,7 +2271,7 @@ test_ingest_command_has_research_step() {
   local cmd_file="$PLUGIN_ROOT/skills/ingest/SKILL.md"
   local content
   content=$(cat "$cmd_file")
-  assert_contains "$content" "RESEARCH"
+  assert_contains "$content" "RESEARCH" || return 1
   assert_contains "$content" "anti_patterns"
 }
 
@@ -2269,7 +2279,7 @@ test_forge_command_has_loop() {
   local cmd_file="$PLUGIN_ROOT/skills/forge/SKILL.md"
   local content
   content=$(cat "$cmd_file")
-  assert_contains "$content" "loop"
+  assert_contains "$content" "loop" || return 1
   assert_contains "$content" "max_iterations"
 }
 
@@ -2516,7 +2526,7 @@ test_agentdb_emit_with_duration() {
 test_agentdb_health_runs() {
   agentdb init >/dev/null
   OUTPUT=$(agentdb health 2>&1 || true)
-  assert_contains "$OUTPUT" "agentdb:"
+  assert_contains "$OUTPUT" "agentdb:" || return 1
   assert_contains "$OUTPUT" "Health:"
 }
 
@@ -2526,9 +2536,9 @@ test_agentdb_metrics_runs() {
   agentdb init >/dev/null
   local output
   output=$(agentdb metrics)
-  assert_contains "$output" "KERNEL Metrics"
-  assert_contains "$output" "Sessions"
-  assert_contains "$output" "Hooks"
+  assert_contains "$output" "KERNEL Metrics" || return 1
+  assert_contains "$output" "Sessions" || return 1
+  assert_contains "$output" "Hooks" || return 1
   assert_contains "$output" "Learnings"
 }
 
@@ -2564,7 +2574,7 @@ test_learning_dedup_reinforces() {
   agentdb learn pattern "sqlite busy_timeout prevents failures" "evidence1" >/dev/null
   agentdb learn pattern "sqlite busy_timeout prevents failures" "evidence2" >/dev/null
   COUNT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT COUNT(*) FROM learnings;")
-  assert_equals "1" "$COUNT" "should have 1 learning not 2"
+  assert_equals "1" "$COUNT" "should have 1 learning not 2" || return 1
   HIT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT hit_count FROM learnings LIMIT 1;")
   assert_equals "1" "$HIT" "hit_count should be 1 after reinforcement"
 }
@@ -2601,7 +2611,7 @@ test_preflight_restores_dropped_migration_table() {
   agentdb init >/dev/null
   # Drop the table but KEEP its migration marker, the drift state.
   sqlite3 "$db" "DROP TABLE events;"
-  assert_equals "1" "$(sqlite3 "$db" "SELECT COUNT(*) FROM _migrations WHERE name='003_telemetry';")" "003 marker must still be present (drift precondition)"
+  assert_equals "1" "$(sqlite3 "$db" "SELECT COUNT(*) FROM _migrations WHERE name='003_telemetry';")" "003 marker must still be present (drift precondition)" || return 1
   agentdb preflight >/dev/null 2>&1
   RESULT=$(sqlite3 "$db" "SELECT name FROM sqlite_master WHERE type='table' AND name='events';")
   assert_equals "events" "$RESULT" "preflight must recreate the dropped events table despite marker"
@@ -2628,8 +2638,8 @@ test_migration_010_preserves_unparseable_ts() {
   sqlite3 "$db" "INSERT INTO errors(ts,tool,error) VALUES ('garbage-ts','Bash','garbage');"
   # Re-run 010 directly (it is already applied on a fresh DB; re-reading is idempotent).
   sqlite3 "$db" ".read $PLUGIN_ROOT/orchestration/agentdb/migrations/010_normalize_timestamps.sql"
-  assert_equals "1" "$(sqlite3 "$db" "SELECT ts LIKE '%Z' FROM errors WHERE error='legacy-valid';")" "parseable legacy ts must normalize to ...Z"
-  assert_equals "1" "$(sqlite3 "$db" "SELECT ts IS NOT NULL FROM errors WHERE error='empty-ts';")" "empty ts must NOT be nulled"
+  assert_equals "1" "$(sqlite3 "$db" "SELECT ts LIKE '%Z' FROM errors WHERE error='legacy-valid';")" "parseable legacy ts must normalize to ...Z" || return 1
+  assert_equals "1" "$(sqlite3 "$db" "SELECT ts IS NOT NULL FROM errors WHERE error='empty-ts';")" "empty ts must NOT be nulled" || return 1
   assert_equals "1" "$(sqlite3 "$db" "SELECT ts IS NOT NULL FROM errors WHERE error='garbage';")" "garbage ts must NOT be nulled"
 }
 
@@ -2954,7 +2964,7 @@ test_compact_restore_outputs_marker() {
   echo "test-agent" > "$TEST_DIR/_meta/agents/.current"
   echo "**Branch:** main" > _meta/.compact-marker
   OUTPUT=$(KERNEL_VAULTS="$TEST_DIR" bash "$PLUGIN_ROOT/hooks/scripts/post-compact-restore.sh" 2>&1)
-  assert_contains "$OUTPUT" "Context Restored After Compaction"
+  assert_contains "$OUTPUT" "Context Restored After Compaction" || return 1
   assert_contains "$OUTPUT" "**Branch:** main"
 }
 
@@ -3315,7 +3325,7 @@ test_capture_error_logs_tool_correctly() {
   agentdb init >/dev/null 2>&1
   local INPUT='{"tool_name":"Edit","error":"file not found","tool_input":{}}'
   local TOOL=$(echo "$INPUT" | jq -r '.tool_name // .tool // "unknown"' 2>/dev/null)
-  assert_equals "Edit" "$TOOL" "tool_name should be extracted correctly"
+  assert_equals "Edit" "$TOOL" "tool_name should be extracted correctly" || return 1
   teardown_test_env
 }
 
@@ -3327,31 +3337,31 @@ test_session_start_creates_memory_dir() {
 
 test_surgeon_has_worktree_safety() {
   local file="$PLUGIN_ROOT/agents/surgeon.md"
-  assert_file_exists "$file"
+  assert_file_exists "$file" || return 1
   local content
   content=$(cat "$file")
-  assert_contains "$content" "worktree_safety" "surgeon.md should contain worktree_safety section"
-  assert_contains "$content" "constraints.files" "surgeon.md should reference constraints.files"
+  assert_contains "$content" "worktree_safety" "surgeon.md should contain worktree_safety section" || return 1
+  assert_contains "$content" "constraints.files" "surgeon.md should reference constraints.files" || return 1
   assert_contains "$content" "git diff --name-only" "surgeon.md should have diff validation"
 }
 
 test_orchestration_has_constraint_validation() {
   local file="$PLUGIN_ROOT/skills/orchestration/SKILL.md"
-  assert_file_exists "$file"
+  assert_file_exists "$file" || return 1
   local content
   content=$(cat "$file")
-  assert_contains "$content" "worktree_safety" "orchestration SKILL.md should contain worktree_safety"
-  assert_contains "$content" "constraints.files" "orchestration SKILL.md should reference constraints.files"
+  assert_contains "$content" "worktree_safety" "orchestration SKILL.md should contain worktree_safety" || return 1
+  assert_contains "$content" "constraints.files" "orchestration SKILL.md should reference constraints.files" || return 1
   assert_contains "$content" "Post-agent validation" "orchestration SKILL.md should have post-agent validation"
 }
 
 test_agentdb_contract_accepts_constraints() {
   local output
   output=$(agentdb contract '{"goal":"test","constraints":{"files":["a.sh","b.md"]},"tier":2}' 2>&1)
-  assert_contains "$output" "Contract: CR-"
+  assert_contains "$output" "Contract: CR-" || return 1
   local stored
   stored=$(agentdb query "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1" 2>&1)
-  assert_contains "$stored" "constraints"
+  assert_contains "$stored" "constraints" || return 1
   assert_contains "$stored" "a.sh"
 }
 
@@ -3785,7 +3795,7 @@ test_validator_has_9_gates() {
   local file="$PLUGIN_ROOT/agents/validator.md"
   local content
   content=$(cat "$file")
-  assert_contains "$content" "Gate 1:"
+  assert_contains "$content" "Gate 1:" || return 1
   assert_contains "$content" "Gate 9:"
 }
 
@@ -3793,7 +3803,7 @@ test_validator_has_9_gates() {
 
 test_approval_learner_exists_with_frontmatter() {
   local agent_file="$PLUGIN_ROOT/agents/approval-learner.md"
-  assert_file_exists "$agent_file"
+  assert_file_exists "$agent_file" || return 1
   head -1 "$agent_file" | grep -q "^---" || {
     echo "FAIL: approval-learner.md missing frontmatter"
     return 1
@@ -3878,21 +3888,21 @@ test_execution_traces_has_correct_columns() {
   agentdb init >/dev/null
   local cols
   cols=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT name FROM pragma_table_info('execution_traces') ORDER BY cid;" | tr '\n' ',')
-  assert_contains "$cols" "id,"
-  assert_contains "$cols" "goal,"
-  assert_contains "$cols" "exploration,"
-  assert_contains "$cols" "plan,"
-  assert_contains "$cols" "action,"
-  assert_contains "$cols" "outcome,"
-  assert_contains "$cols" "success,"
-  assert_contains "$cols" "tokens_used,"
+  assert_contains "$cols" "id," || return 1
+  assert_contains "$cols" "goal," || return 1
+  assert_contains "$cols" "exploration," || return 1
+  assert_contains "$cols" "plan," || return 1
+  assert_contains "$cols" "action," || return 1
+  assert_contains "$cols" "outcome," || return 1
+  assert_contains "$cols" "success," || return 1
+  assert_contains "$cols" "tokens_used," || return 1
   assert_contains "$cols" "domain,"
 }
 
 test_agentdb_trace_records() {
   agentdb init >/dev/null
   OUTPUT=$(agentdb trace '{"goal":"test goal","outcome":"success","success":1}' 2>&1)
-  assert_contains "$OUTPUT" "Trace: TR-"
+  assert_contains "$OUTPUT" "Trace: TR-" || return 1
   RESULT=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT goal FROM execution_traces LIMIT 1;")
   assert_equals "test goal" "$RESULT" "trace goal"
 }
@@ -3907,7 +3917,7 @@ test_agentdb_antibody_searches() {
   agentdb init >/dev/null
   agentdb learn pattern "always validate inputs" "test evidence" >/dev/null
   OUTPUT=$(agentdb antibody "validate" 2>&1)
-  assert_contains "$OUTPUT" "Pattern Antibodies"
+  assert_contains "$OUTPUT" "Pattern Antibodies" || return 1
   assert_contains "$OUTPUT" "validate inputs"
 }
 
@@ -3929,15 +3939,15 @@ test_analyzer_agent_has_model_opus() {
 test_orchestration_has_lane_contract() {
   local content
   content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
-  assert_contains "$content" "lane_contract" "orchestration should define the lane contract"
-  assert_contains "$content" "Forbidden list" "lane contract should include a forbidden list"
+  assert_contains "$content" "lane_contract" "orchestration should define the lane contract" || return 1
+  assert_contains "$content" "Forbidden list" "lane contract should include a forbidden list" || return 1
   assert_contains "$content" "Raw-data return format" "lane contract should demand raw-data returns"
 }
 
 test_orchestration_has_worker_model_doctrine() {
   local content
   content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
-  assert_contains "$content" "worker_model_doctrine" "orchestration should carry the worker-model doctrine"
+  assert_contains "$content" "worker_model_doctrine" "orchestration should carry the worker-model doctrine" || return 1
   assert_contains "$content" "use your judgment" "doctrine should name the judgment tell"
 }
 
@@ -4064,7 +4074,7 @@ test_template_has_output() {
 }
 
 test_validate_structure_exists() {
-  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" "validate-structure.sh should exist"
+  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" "validate-structure.sh should exist" || return 1
   local perms
   perms=$(ls -l "$PLUGIN_ROOT/hooks/scripts/validate-structure.sh" | cut -c4)
   assert_equals "x" "$perms" "validate-structure.sh should be executable"
@@ -4085,7 +4095,7 @@ test_validate_structure_sources_common() {
 # === Knowledge-graph (8.6.0) ===
 
 test_knowledge_graph_skill_exists() {
-  assert_file_exists "$PLUGIN_ROOT/skills/knowledge-graph/SKILL.md"
+  assert_file_exists "$PLUGIN_ROOT/skills/knowledge-graph/SKILL.md" || return 1
   local content; content=$(cat "$PLUGIN_ROOT/skills/knowledge-graph/SKILL.md")
   assert_contains "$content" "orientation" "skill should explain orientation-token cost" || return 1
   assert_contains "$content" "code-only" "skill should mandate --code-only for the code layer"
@@ -4150,14 +4160,14 @@ echo foreign' > "$TEST_PROJECT/.git/hooks/post-commit"; chmod +x "$TEST_PROJECT/
 # === Hooks v2 Tests ===
 
 test_validate_json_schema_exists() {
-  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/validate-json-schema.sh" "validate-json-schema.sh should exist"
+  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/validate-json-schema.sh" "validate-json-schema.sh should exist" || return 1
   local perms
   perms=$(ls -l "$PLUGIN_ROOT/hooks/scripts/validate-json-schema.sh" | cut -c4)
   assert_equals "x" "$perms" "validate-json-schema.sh should be executable"
 }
 
 test_warn_hardcoded_exists() {
-  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" "warn-hardcoded.sh should exist"
+  assert_file_exists "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" "warn-hardcoded.sh should exist" || return 1
   local perms
   perms=$(ls -l "$PLUGIN_ROOT/hooks/scripts/warn-hardcoded.sh" | cut -c4)
   assert_equals "x" "$perms" "warn-hardcoded.sh should be executable"
@@ -4222,8 +4232,8 @@ test_test_gate_detects_and_passes() {
   _tg_make_project "$d" pass
   bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
   local rc=$?
-  assert_exit_code 0 "$rc" "green suite should exit 0"
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "PASS"
+  assert_exit_code 0 "$rc" "green suite should exit 0" || return 1
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "PASS" || return 1
   rm -rf "$d"
 }
 
@@ -4232,8 +4242,8 @@ test_test_gate_detects_and_fails() {
   _tg_make_project "$d" fail
   bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
   local rc=$?
-  assert_exit_code 1 "$rc" "red suite should exit 1"
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "FAIL"
+  assert_exit_code 1 "$rc" "red suite should exit 1" || return 1
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "FAIL" || return 1
   rm -rf "$d"
 }
 
@@ -4241,8 +4251,8 @@ test_test_gate_no_suite_is_green() {
   local d; d=$(mktemp -d)
   mkdir -p "$d/_meta"
   bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  assert_exit_code 0 "$?" "no suite detected should not block (exit 0)"
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "NONE"
+  assert_exit_code 0 "$?" "no suite detected should not block (exit 0)" || return 1
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "NONE" || return 1
   rm -rf "$d"
 }
 
@@ -4251,10 +4261,10 @@ test_test_gate_status_recovers_to_pass() {
   local d; d=$(mktemp -d)
   _tg_make_project "$d" fail
   bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "FAIL"
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "FAIL" || return 1
   _tg_make_project "$d" pass
   bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "PASS"
+  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "PASS" || return 1
   rm -rf "$d"
 }
 
@@ -4263,7 +4273,7 @@ test_test_gate_honors_override_file() {
   mkdir -p "$d/_meta"
   echo "exit 0" > "$d/_meta/.test-cmd"
   bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  assert_exit_code 0 "$?" ".test-cmd override should be used"
+  assert_exit_code 0 "$?" ".test-cmd override should be used" || return 1
   rm -rf "$d"
 }
 
@@ -4273,7 +4283,7 @@ test_autopush_postcommit_is_disabled() {
   # that intent so nobody silently re-enables per-commit push. The red-gate now lives on
   # the paths that actually push (autopush.sh sweep), covered by test_autopush_sweep_has_red_gate.
   local hook; hook="$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")"
-  assert_contains "$hook" "AUTO-PUSH DISABLED"
+  assert_contains "$hook" "AUTO-PUSH DISABLED" || return 1
   assert_contains "$hook" "exit 0"
 }
 
@@ -4319,9 +4329,9 @@ test_lifecycle_hooks_guard_main_push() {
   precompact=$(cat "$PLUGIN_ROOT/hooks/scripts/pre-compact-commit.sh")
   postcommit=$(cat "$PLUGIN_ROOT/hooks/scripts/autopush-postcommit")
 
-  assert_contains "$session_end" "NEVER AUTO-COMMIT" "session-end should forbid auto-commit"
-  assert_contains "$session_end" "test-gate.sh" "session-end should run the test gate before reporting dirty work"
-  assert_contains "$precompact" "PreCompact must NEVER create a commit" "pre-compact should forbid auto-commit"
+  assert_contains "$session_end" "NEVER AUTO-COMMIT" "session-end should forbid auto-commit" || return 1
+  assert_contains "$session_end" "test-gate.sh" "session-end should run the test gate before reporting dirty work" || return 1
+  assert_contains "$precompact" "PreCompact must NEVER create a commit" "pre-compact should forbid auto-commit" || return 1
   assert_contains "$postcommit" "AUTO-PUSH DISABLED" "post-commit auto-push should stay disabled"
 }
 
@@ -5399,7 +5409,76 @@ test_migration_workflows_reference_skills() {
   assert_exit_code 0 "$bad" "workflow steps must use skill: labels"
 }
 
+# === Meta: test-suite self-integrity (#229) ===
+
+test_no_ungraded_asserts() {
+  # #229: bash grades a function by its LAST statement's exit status, so an
+  # assert_* call earlier in a multi-line function was silently ignored
+  # unless it was itself the last statement, already had `|| return`/`|| exit`,
+  # or fed an accumulator variable checked at the function's actual return.
+  # This meta-test greps run-tests.sh for that shape and fails if any exists,
+  # so the #229 class cannot regress silently.
+  python3 - "$PLUGIN_ROOT/tests/run-tests.sh" <<'PY'
+import re, sys
+
+path = sys.argv[1]
+with open(path) as f:
+    lines = f.readlines()
+
+ASSERT_RE = re.compile(r'\b(assert_equals|assert_contains|assert_file_exists|assert_exit_code)\b')
+FUNC_START_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*\(\)\s*\{\s*$')
+GUARD_RE = re.compile(r'\|\|\s*(return|exit|[A-Za-z_][A-Za-z0-9_]*=)')
+
+def is_blank_or_comment(line):
+    s = line.strip()
+    return s == '' or s.startswith('#')
+
+HEREDOC_START_RE = re.compile(r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
+
+n = len(lines)
+i = 0
+offenders = []
+while i < n:
+    line = lines[i]
+    if FUNC_START_RE.match(line):
+        j = i + 1
+        body_idx = []
+        in_heredoc = None
+        while j < n and not re.match(r'^\}\s*$', lines[j]):
+            if in_heredoc is not None:
+                if lines[j].rstrip('\n') == in_heredoc:
+                    in_heredoc = None
+                j += 1
+                continue
+            m = HEREDOC_START_RE.search(lines[j])
+            if m:
+                in_heredoc = m.group(1)
+            body_idx.append(j)
+            j += 1
+        last_stmt_idx = None
+        for k in body_idx:
+            if not is_blank_or_comment(lines[k]):
+                last_stmt_idx = k
+        for k in body_idx:
+            l = lines[k]
+            if ASSERT_RE.search(l) and k != last_stmt_idx and not GUARD_RE.search(l) \
+               and not l.rstrip().endswith('&&') and not l.rstrip().endswith('\\'):
+                offenders.append((k + 1, l.rstrip()))
+        i = j + 1
+        continue
+    i += 1
+
+if offenders:
+    print(f"  FAIL: {len(offenders)} ungraded assert(s) found (#229 class):")
+    for lineno, text in offenders[:20]:
+        print(f"    tests/run-tests.sh:{lineno}: {text}")
+    sys.exit(1)
+sys.exit(0)
+PY
+}
+
 run_test_suite() {
+
   local suite="$1"
   echo ""
   echo -e "${YELLOW}=== $suite ===${NC}"
@@ -5418,6 +5497,9 @@ run_test_suite() {
       run_test "installer preserves a foreign post-commit" test_knowledge_graph_installer_preserves_foreign_hook
       run_test "session-start injects auto-orientation (god-nodes)" test_knowledge_graph_session_start_auto_orientation
       run_test "auto-orientation self-gates on graph existence" test_knowledge_graph_auto_orientation_self_gates
+      ;;
+    meta)
+      run_test "no ungraded asserts (#229)" test_no_ungraded_asserts
       ;;
     manifest)
       run_test "schemas parse as JSON" test_manifest_schemas_parse_as_json
@@ -6070,6 +6152,7 @@ main() {
     run_test_suite "release_docs"
     run_test_suite "test_gate"
     run_test_suite "manifest"
+    run_test_suite "meta"
   else
     run_test_suite "$target"
   fi

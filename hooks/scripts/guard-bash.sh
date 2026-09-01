@@ -147,8 +147,15 @@ fi
 # watches. Bodies without an execution primitive are stripped like any other data heredoc.
 _heredoc_feeds_executor() {
   printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&(){}`"'"'"'\\]|/)(bash|sh|zsh|ksh|dash)([[:space:]][^|;&]*)?<<' && return 0
-  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&(){}`"'"'"'\\]|/)(python[0-9.]*|perl|ruby|node)([[:space:]][^|;&]*)?<<' || return 1
-  printf '%s' "$COMMAND" | grep -qE 'subprocess|os\.system|os\.popen|os\.exec|shutil\.rmtree|child_process|execSync|spawnSync|spawn\(|exec\(|system\(|Open3|IO\.popen|`[^`]*(rm|git|curl)' && return 0
+  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&(){}`"'"'"'\\]|/)(python[0-9.]*|perl|ruby|node)([[:space:]][^|;&]*)?<<' && \
+    { printf '%s' "$COMMAND" | grep -qE 'subprocess|os\.system|os\.popen|os\.exec|shutil\.rmtree|child_process|execSync|spawnSync|spawn\(|exec\(|system\(|Open3|IO\.popen|`[^`]*(rm|git|curl)' && return 0; }
+  # A heredoc body written to a pipe or a file, then executed later in the SAME
+  # command by an executor segment (split on |, ;, &&), also feeds an executor.
+  # e.g. `cat <<EOF | bash` or `cat <<EOF > s.sh; bash s.sh`.
+  if printf '%s' "$COMMAND" | grep -q '<<'; then
+    printf '%s' "$COMMAND" | sed -E 's/\|\||&&|[;|]/\n/g' \
+      | grep -qE '^[[:space:]]*(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node|xargs|eval|source|\.)([[:space:]]|$)' && return 0
+  fi
   return 1
 }
 if printf '%s' "$COMMAND" | grep -q '<<'; then
@@ -158,9 +165,9 @@ if printf '%s' "$COMMAND" | grep -q '<<'; then
       {
         if (in_doc) { if ($0 == term) { in_doc = 0 }; next }
         line = $0
-        if (match(line, /<<-?[[:space:]]*'"'"'?[A-Za-z_][A-Za-z0-9_]*'"'"'?/)) {
+        if (match(line, /<<-?[[:space:]]*["'"'"']?[A-Za-z_][A-Za-z0-9_]*["'"'"']?/)) {
           term = substr(line, RSTART, RLENGTH)
-          gsub(/<<-?[[:space:]]*/, "", term); gsub(/'"'"'/, "", term)
+          gsub(/<<-?[[:space:]]*/, "", term); gsub(/["'"'"']/, "", term)
           in_doc = 1
         }
         print line
