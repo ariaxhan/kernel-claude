@@ -34,6 +34,17 @@ Nothing connected the two.
   denominator. This writes one.
 
 ### Changed
+- Skill suggestion requires corroboration when the domain classification was a guess. With no
+  domain signal the router returns `software` at 0.30 confidence, and treating that guess as a
+  filter let one regex hitting an everyday word decide: an adversarial pass got "let's checkpoint
+  here and pick this up tomorrow at the gym" to suggest `app-dev`, because `gym` is a fastlane
+  lane. Unanchored, the floor rises from 3 to 5, which given a weight cap of 3 is the smallest
+  value no single signal can clear. Refusing outright was tried first and silenced 11 of the 24
+  probes; plenty of real requests name no domain.
+- The domain filter now applies only when the domain was observed. A guessed domain excluding a
+  skill is the same error as a guessed domain admitting one.
+- `app-dev` no longer matches the bare words `gym`, `deliver` or `supply`. They are fastlane lane
+  names and also ordinary English.
 - Skill selection no longer rests on 29 frontmatter trigger lists that collide. `build` and
   `ingest` both claimed "build", "implement" and "create" verbatim; `context-mgmt` claimed the
   word "handoff"; `review`, `quality` and `tearitapart` all claimed "review". Weighted evidence

@@ -24,7 +24,12 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
     # marketing-site/landing-page depending on other signals.
     "app-dev": [
         (r"\b(testflight|app store|play store|store submission)\b", 3, "names a mobile store submission"),
-        (r"\b(fastlane|gym|gradle|deliver|supply)\b", 3, "names the mobile build toolchain"),
+        # `gym`, `deliver` and `supply` are fastlane lane names AND ordinary
+        # English words. Alone they matched "pick this up tomorrow at the gym".
+        # fastlane and gradle are unambiguous; the rest need the toolchain named.
+        (r"\b(fastlane|gradle)\b", 3, "names the mobile build toolchain"),
+        (r"\bfastlane\b.{0,40}\b(gym|deliver|supply|match|pilot)\b", 3, "names a fastlane lane"),
+        (r"\b(gym|deliver|supply) lane\b", 2, "names a fastlane lane"),
         (r"\b(expo|react native|flutter|swift ?ui|android studio|xcode)\b", 3, "names a mobile app framework"),
         (r"\b(build|deploy) (the )?(ios|android|mobile) app\b", 3, "asks to build or deploy a mobile app"),
         (r"\bpre-?submission checklist\b", 2, "asks for a store submission checklist"),
@@ -118,6 +123,7 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
     ],
 
     "eval": [
+        (r"\b(eval|evals|eval harness|eval suite)\b", 2, "names an eval"),
         (r"\b(pass@k|eval-?driven|edd)\b", 3, "names eval-driven development terminology"),
         (r"\b(capability eval|regression eval|benchmark suite)\b", 3, "names a specific eval artifact"),
         (r"\bwrite evals? for\b", 3, "asks for evals to be written"),
@@ -161,6 +167,7 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
     ],
 
     "handoff": [
+        (r"\b(next session|another session|whoever picks this up)\b", 2, "names a later session as the reader"),
         # vs checkpoint/context-mgmt (see checkpoint comment). handoff is
         # provenance + decisions + next steps for someone else / a LATER
         # session, phrased as "before I go" / "pass this to the next agent".
@@ -173,6 +180,7 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
     "help": [
         (r"\b(kernel )?help\b", 2, "asks for kernel help"),
         (r"\bwhat (kernel )?skills (are there|are available|do you have|exist)\b", 3, "asks for the skill inventory"),
+        (r"\bkernel\b", 2, "names kernel itself"),
         (r"\b(list|show) (me )?(the )?(kernel )?(skills|commands)\b", 3, "asks to list the skills"),
         (r"\bhow does kernel work\b", 2, "asks how the kernel system works"),
     ],
@@ -248,6 +256,7 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
     ],
 
     "quality": [
+        (r"\b(input validation|edge cases?|error handling|duplication)\b", 2, "names a Big-5 quality dimension"),
         # vs review/tearitapart (rule 3 cluster 3): quality is the Big-5
         # CHECKLIST (input validation, edge cases, error handling,
         # duplication, complexity) run standalone during/after implementation
@@ -268,6 +277,7 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
     ],
 
     "review": [
+        (r"\b(pr|pull request|diff|patch)\b", 2, "names a change under review"),
         # vs quality/tearitapart (see quality comment). review is a
         # POST-HOC verdict on a PR or staged diff: APPROVE/REQUEST
         # CHANGES/COMMENT. Requires an existing diff/PR, not a plan.
@@ -312,7 +322,7 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
 
 SKILL_DOMAINS: dict[str, tuple[str, ...]] = {
     "app-dev": ("software", "operations"),
-    "architecture": ("software",),
+    "architecture": ("software", "design",),
     "build": ("software",),
     "checkpoint": ("software", "research", "writing", "design", "operations", "strategy"),
     "context-mgmt": ("software", "research", "writing", "design", "operations", "strategy"),

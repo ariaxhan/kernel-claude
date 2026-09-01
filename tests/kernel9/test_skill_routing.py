@@ -108,15 +108,64 @@ class SkillReachability(unittest.TestCase):
             "skills the model may not invoke must not carry a probe")
 
     def test_every_probe_reaches_its_own_skill(self):
+        """Through build_classification, NOT classify_skills directly.
+
+        The first version of this test called classify_skills(prompt) with no
+        domain, which defaults domain_confidence to 1.0 and so never exercised
+        the unanchored path the hook actually takes. It passed while 11 of the
+        24 probes were broken end to end. A test that does not use the real
+        entry point is testing a function nobody calls.
+        """
         for skill, prompt in sorted(self.probes.items()):
             with self.subTest(skill=skill):
-                names = [row["name"] for row in R.classify_skills(prompt)]
+                out = R.build_classification(prompt)
+                names = [row["name"] for row in out.get("skills", [])]
                 self.assertIn(
                     skill, names,
                     "%r reached %s, not %s. The skill is shipped but "
                     "unreachable: only a human typing the slash-command can get "
                     "to it, which the audit measured at 5 times in all of "
                     "history." % (prompt, names or "nothing", skill))
+
+
+class UnanchoredDomainFalsePositives(unittest.TestCase):
+    """Ordinary non-software sentences must not get a skill suggestion.
+
+    When no domain signal fires, classify_domain returns DEFAULT_DOMAIN at 0.30
+    with the reason "no domain signal detected; defaulted". Treating that guess
+    as a filter let a single weight-3 regex hitting an everyday English word
+    decide: an adversarial pass on 2026-09-01 got "let's checkpoint here and
+    pick this up tomorrow at the gym" to suggest /kernel:app-dev, because `gym`
+    is a fastlane lane and also a place people go.
+
+    Unanchored, the bar is a second independent signal. These are the exact five
+    prompts that pass found.
+    """
+
+    CASES = [
+        "let's checkpoint here and pick this up tomorrow at the gym",
+        "map the dependencies between chapters in my outline",
+        "what would break if I skip a leg day this week",
+        "what's the token budget for my grocery shopping this month",
+        "the coupling between these two plot threads feels weak",
+    ]
+
+    def setUp(self):
+        try:
+            import skill_signals  # noqa: F401
+        except ImportError:
+            self.skipTest("skill_signals.py absent")
+
+    def test_no_suggestion_on_an_unanchored_accidental_match(self):
+        for prompt in self.CASES:
+            with self.subTest(prompt=prompt):
+                out = R.build_classification(prompt)
+                self.assertEqual(
+                    [row["name"] for row in out.get("skills", [])], [],
+                    "a confidently wrong suggestion is worse than silence")
+
+    def test_the_unanchored_bar_is_actually_higher(self):
+        self.assertGreater(R.SKILL_FLOOR_UNANCHORED, R.SKILL_FLOOR)
 
 
 class SkillDisambiguation(unittest.TestCase):
