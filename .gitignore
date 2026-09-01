@@ -35,3 +35,13 @@ _meta/.test-status
 # Manifest runtime state (kernel-manifest activate/deactivate)
 _meta/.active-manifest.json
 _meta/.context-ledger
+
+# Per-session runtime state. Machine- and session-scoped: the churn guard's per-session edit
+# counters, the compaction key-term cache, the current session id, the guard install stamps.
+# Seven .guard-state files were tracked before 2026-09-01, one per session that happened to run,
+# an unbounded accumulation of files nothing ever reads back.
+_meta/.guard-state/
+_meta/.runtime/
+_meta/state/
+_meta/.session_id
+_meta/.compact-keyterms
