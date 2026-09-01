@@ -88,7 +88,9 @@
               "create",
               "modify",
               "remove",
-              "promote"
+              "promote",
+              "weaken",
+              "retire"
             ],
             "x-kernel-enforced-by": "agent"
           },
@@ -99,7 +101,12 @@
               "agent",
               "skill",
               "prose",
-              "learning"
+              "learning",
+              "belief",
+              "pattern",
+              "anomaly",
+              "question",
+              "architecture"
             ],
             "x-kernel-enforced-by": "agent"
           },
@@ -155,6 +162,56 @@
         }
       },
       "x-kernel-enforced-by": "agent"
+    },
+    "intelligence": {
+      "type": "object",
+      "description": "The intelligence-extraction payload: what the run taught that was not the deliverable. Keys required, arrays may be empty.",
+      "properties": {
+        "surprises": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "belief_updates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "anomalies_preserved": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "primitives_named": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recurrences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "architecture_proposals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "surprises",
+        "belief_updates",
+        "anomalies_preserved",
+        "primitives_named",
+        "recurrences",
+        "architecture_proposals"
+      ]
     }
   }
 }
