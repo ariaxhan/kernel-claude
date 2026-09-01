@@ -5481,6 +5481,167 @@ sys.exit(0)
 PY
 }
 
+# === Complexity gate tests ===
+
+make_fake_eslint_complexity_project() {
+  mkdir -p "$TEST_PROJECT/node_modules/.bin"
+  cat > "$TEST_PROJECT/eslint.config.mjs" <<'EOF'
+export default [];
+EOF
+  cat > "$TEST_PROJECT/sample.ts" <<'EOF'
+export const createKnowledgeRepo = () => ({
+  transition(value: number) {
+    if (value > 0) return value;
+    return 0;
+  },
+});
+EOF
+  cat > "$TEST_PROJECT/node_modules/.bin/eslint" <<'EOF'
+#!/bin/bash
+python3 - <<'PY'
+import json, os
+root = os.getcwd()
+if os.environ.get("FAKE_ESLINT_FATAL"):
+    messages = [{"fatal": True, "line": 1, "message": "Parsing error: Unexpected token ;"}]
+elif os.environ.get("FAKE_ESLINT_DUPLICATES"):
+    messages = [
+      {"ruleId": "complexity", "line": 2, "message": "Method 'run' has a complexity of 11. Maximum allowed is 0."},
+      {"ruleId": "complexity", "line": 3, "message": "Method 'run' has a complexity of 1. Maximum allowed is 0."},
+    ]
+else:
+    messages = [
+      {"ruleId": "complexity", "line": 1, "message": "Arrow function has a complexity of 1. Maximum allowed is 0."},
+      {"ruleId": "complexity", "line": 2, "message": "Method 'transition' has a complexity of 18. Maximum allowed is 0."},
+    ]
+print(json.dumps([{"filePath": root + "/sample.ts", "messages": messages}]))
+PY
+exit 1
+EOF
+  chmod +x "$TEST_PROJECT/node_modules/.bin/eslint"
+}
+
+test_complexity_uses_ast_object_methods() {
+  make_fake_eslint_complexity_project
+  local output
+  output=$("$PLUGIN_ROOT/scripts/complexity.sh" --all "$TEST_PROJECT" 2>&1) || return 1
+  assert_contains "$output" "complexity engine: eslint AST" || return 1
+  assert_contains "$output" $'sample.ts\t2\ttransition\t18\t0'
+}
+
+test_complexity_respects_function_budget() {
+  make_fake_eslint_complexity_project
+  cat > "$TEST_PROJECT/.ccnrc" <<'EOF'
+{"version":1,"default":15,"budgets":{"sample.ts:transition":20},"skip":{}}
+EOF
+  local output rc=0
+  output=$("$PLUGIN_ROOT/scripts/complexity.sh" "$TEST_PROJECT" 2>&1) || rc=$?
+  assert_exit_code 0 "$rc" "declared 20 budget should admit CCN 18" || return 1
+  if printf '%s\n' "$output" | grep -q $'sample.ts\t2\ttransition'; then
+    echo "  FAIL: budgeted function was reported as a violation"
+    return 1
+  fi
+}
+
+test_complexity_requires_skip_reason() {
+  make_fake_eslint_complexity_project
+  local output rc=0
+  output=$("$PLUGIN_ROOT/scripts/complexity.sh" --skip 'sample.ts:transition' "$TEST_PROJECT" 2>&1) || rc=$?
+  assert_exit_code 2 "$rc" "unreasoned skip must be invalid" || return 1
+  assert_contains "$output" "SELECTOR=REASON"
+}
+
+test_complexity_diff_reports_regressions() {
+  make_fake_eslint_complexity_project
+  cat > "$TEST_PROJECT/before.tsv" <<'EOF'
+sample.ts	1	createKnowledgeRepo	1	0
+sample.ts	2	transition	17	0
+EOF
+  local output rc=0
+  output=$("$PLUGIN_ROOT/scripts/complexity.sh" --diff "$TEST_PROJECT/before.tsv" "$TEST_PROJECT" 2>&1) || rc=$?
+  assert_exit_code 1 "$rc" "CCN 17 to 18 must fail the diff" || return 1
+  assert_contains "$output" $'SUMMARY\treduced=0\tunchanged=1\tregressed=1\tremoved=0'
+}
+
+test_complexity_diff_reports_reductions() {
+  make_fake_eslint_complexity_project
+  cat > "$TEST_PROJECT/.ccnrc" <<'EOF'
+{"version":1,"default":20,"budgets":{},"skip":{}}
+EOF
+  cat > "$TEST_PROJECT/before.tsv" <<'EOF'
+sample.ts	1	createKnowledgeRepo	1	0
+sample.ts	2	transition	20	0
+EOF
+  local output rc=0
+  output=$("$PLUGIN_ROOT/scripts/complexity.sh" --diff "$TEST_PROJECT/before.tsv" "$TEST_PROJECT" 2>&1) || rc=$?
+  assert_exit_code 0 "$rc" "CCN 20 to 18 should pass the diff" || return 1
+  assert_contains "$output" $'SUMMARY\treduced=1\tunchanged=1\tregressed=0\tremoved=0'
+}
+
+test_complexity_baseline_ratchets_debt() {
+  make_fake_eslint_complexity_project
+  cat > "$TEST_PROJECT/baseline.tsv" <<'EOF'
+sample.ts	2	transition	18	0
+EOF
+  local output rc=0
+  output=$("$PLUGIN_ROOT/scripts/complexity.sh" --check-baseline "$TEST_PROJECT/baseline.tsv" "$TEST_PROJECT" 2>&1) || rc=$?
+  assert_exit_code 0 "$rc" "unchanged debt should pass the baseline gate" || return 1
+  assert_contains "$output" $'SUMMARY\treduced=0\tunchanged=1\tregressed=0\tremoved=0\tadded=0' || return 1
+  cat > "$TEST_PROJECT/baseline.tsv" <<'EOF'
+sample.ts	2	transition	17	0
+EOF
+  rc=0
+  output=$("$PLUGIN_ROOT/scripts/complexity.sh" --check-baseline "$TEST_PROJECT/baseline.tsv" "$TEST_PROJECT" 2>&1) || rc=$?
+  assert_exit_code 1 "$rc" "a baseline increase must fail" || return 1
+  assert_contains "$output" "regressed=1"
+}
+
+test_complexity_blocks_eslint_parser_failure() {
+  make_fake_eslint_complexity_project
+  local output rc=0
+  output=$(FAKE_ESLINT_FATAL=1 "$PLUGIN_ROOT/scripts/complexity.sh" "$TEST_PROJECT" 2>&1) || rc=$?
+  assert_exit_code 2 "$rc" "fatal parser error must block" || return 1
+  assert_contains "$output" "eslint could not parse"
+}
+
+test_complexity_diff_keeps_duplicate_functions_distinct() {
+  make_fake_eslint_complexity_project
+  cat > "$TEST_PROJECT/.ccnrc" <<'EOF'
+{"version":1,"default":20,"budgets":{},"skip":{}}
+EOF
+  cat > "$TEST_PROJECT/before.tsv" <<'EOF'
+sample.ts	2	run	10	0
+sample.ts	3	run	1	0
+EOF
+  local output rc=0
+  output=$(FAKE_ESLINT_DUPLICATES=1 "$PLUGIN_ROOT/scripts/complexity.sh" --diff "$TEST_PROJECT/before.tsv" "$TEST_PROJECT" 2>&1) || rc=$?
+  assert_exit_code 1 "$rc" "first same-named function regression must not collide with second" || return 1
+  assert_contains "$output" $'SUMMARY\treduced=0\tunchanged=1\tregressed=1\tremoved=0'
+}
+
+test_complexity_runs_through_npm_verify() {
+  make_fake_eslint_complexity_project
+  cat > "$TEST_PROJECT/baseline.tsv" <<'EOF'
+sample.ts	2	transition	18	0
+EOF
+  cat > "$TEST_PROJECT/package.json" <<EOF
+{"scripts":{"complexity":"python3 $PLUGIN_ROOT/scripts/complexity.py --check-baseline baseline.tsv .","verify":"npm run complexity"}}
+EOF
+  npm run verify >/dev/null 2>&1 || { echo "  FAIL: clean npm verify gate should pass"; return 1; }
+  cat > "$TEST_PROJECT/baseline.tsv" <<'EOF'
+sample.ts	2	transition	17	0
+EOF
+  local rc=0
+  npm run verify >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || { echo "  FAIL: seeded regression passed npm run verify"; return 1; }
+}
+
+test_complexity_skills_require_armed_gate() {
+  grep -q 'npm run verify' "$PLUGIN_ROOT/skills/simplify/SKILL.md" || { echo "  FAIL: simplify does not name npm verify"; return 1; }
+  grep -q 'seeded over-budget fixture' "$PLUGIN_ROOT/skills/simplify/SKILL.md" || { echo "  FAIL: simplify does not seed-test the gate"; return 1; }
+  grep -q 'manual measurement is not a gate' "$PLUGIN_ROOT/skills/review/SKILL.md" || { echo "  FAIL: review accepts manual-only complexity"; return 1; }
+  grep -q 'eslint AST' "$PLUGIN_ROOT/skills/review/SKILL.md" || { echo "  FAIL: review does not require AST-aware JS/TS"; return 1; }
+}
+
 run_test_suite() {
 
   local suite="$1"
@@ -5683,6 +5844,18 @@ run_test_suite() {
       run_test "ingest has research step" test_ingest_command_has_research_step
       run_test "forge has loop control" test_forge_command_has_loop
       run_test "commands use structured format" test_commands_use_structured_format
+      ;;
+    complexity)
+      run_test "complexity sees object-literal methods" test_complexity_uses_ast_object_methods
+      run_test "complexity respects function budgets" test_complexity_respects_function_budget
+      run_test "complexity rejects unreasoned skips" test_complexity_requires_skip_reason
+      run_test "complexity diff reports regressions" test_complexity_diff_reports_regressions
+      run_test "complexity diff reports reductions" test_complexity_diff_reports_reductions
+      run_test "complexity baseline ratchets debt" test_complexity_baseline_ratchets_debt
+      run_test "complexity blocks parser failures" test_complexity_blocks_eslint_parser_failure
+      run_test "complexity keeps duplicate functions distinct" test_complexity_diff_keeps_duplicate_functions_distinct
+      run_test "complexity runs through npm verify" test_complexity_runs_through_npm_verify
+      run_test "complexity skills require armed gate" test_complexity_skills_require_armed_gate
       ;;
     tokens)
       run_test "CLAUDE.md token budget" test_claude_md_token_budget
@@ -6109,6 +6282,7 @@ main() {
     run_test_suite "security"
     run_test_suite "observe"
     run_test_suite "verify"
+    run_test_suite "complexity"
     run_test_suite "tokens"
     run_test_suite "portable"
     run_test_suite "security_hooks"
