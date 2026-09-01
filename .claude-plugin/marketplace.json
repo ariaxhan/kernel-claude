@@ -9,7 +9,7 @@
       "name": "kernel",
       "source": "./",
       "description": "Safety guardrails, cross-host hooks, and agentdb memory for Claude Code and Codex in auto mode",
-      "version": "9.7.0"
+      "version": "9.8.0"
     }
   ]
 }

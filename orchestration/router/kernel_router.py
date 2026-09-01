@@ -418,6 +418,112 @@ DEESCALATE_DEFAULTS = {
 PROTECTED_ESCALATE = "verification cannot distinguish safe from unsafe outcome"
 
 
+# --------------------------------------------------------------------------
+# Skill routing
+# --------------------------------------------------------------------------
+#
+# WHY (2026-09-01 usage audit): across 9,642 Claude sessions and 1,180 Codex
+# sessions, 12 of 26 skills had never been invoked once and only 5 invocations
+# in all of history were typed by a human. Meanwhile this router announced a
+# domain pack 8,578 times. The routing mechanism worked; nothing connected it
+# to the skill library, which was left to the model matching 29 frontmatter
+# trigger lists that collide (build and ingest both claim "build/implement/
+# create"; context-mgmt claims the word "handoff"; review, quality and
+# tearitapart all claim "review"). Weighted evidence separates them; a shared
+# bare noun cannot.
+#
+# Fails OPEN by design. A missing or broken skill table must never take the
+# domain/shape/safety classification down with it: those three decide how work
+# is done, a skill suggestion only decides what gets read first.
+try:
+    from skill_signals import NEVER_SUGGEST, SKILL_DOMAINS, SKILL_SIGNALS
+
+    _SKILL_SIGNALS = {
+        name: [_sig(p, w, r) for p, w, r in sigs]
+        for name, sigs in SKILL_SIGNALS.items()
+    }
+    SKILL_NEVER_SUGGEST = set(NEVER_SUGGEST)
+except Exception:  # pragma: no cover - absence is a valid state, not an error
+    _SKILL_SIGNALS = {}
+    SKILL_DOMAINS = {}
+    SKILL_NEVER_SUGGEST = set()
+
+# A skill is worth a line only when the prompt carries at least one strong
+# signal for it. Weight 3 means "this phrasing all but names the skill", so 3 is
+# the floor: below it we would be guessing out loud, which is what the old
+# trigger-word matching already did badly.
+SKILL_FLOOR = 3
+
+# The bar when the domain classification was a guess rather than evidence. One
+# strong signal is enough only when something else already said what kind of
+# work this is; unanchored, a single weight-3 regex hitting an ordinary English
+# word is exactly how "at the gym" reached the mobile build skill.
+#
+# 5 is not arbitrary: weights cap at 3, so this is the smallest value that makes
+# a single signal insufficient no matter how strong it is.
+SKILL_FLOOR_UNANCHORED = 5
+
+# Two skills within this distance are a genuine tie, and the honest output names
+# both rather than picking one on a one-point margin.
+SKILL_TIE = 1
+
+
+def classify_skills(text: str, domain: str | None = None, domain_confidence: float = 1.0):
+    """Rank skills by weighted prompt evidence. Never raises; returns [].
+
+    `domain_confidence` is not decoration. When no domain signal fires at all,
+    classify_domain returns DEFAULT_DOMAIN at 0.30 with the reason "no domain
+    signal detected; defaulted" -- a guess, not evidence. Using that guess as a
+    filter is worse than having no filter: it silently admits every
+    software-domain skill on a prompt that showed no sign of being about
+    software, so a stray word decides. An adversarial pass on 2026-09-01 got
+    "let's checkpoint here and pick this up tomorrow at the gym" to suggest
+    /kernel:app-dev, because `gym` is fastlane's build tool and also a place
+    people go. A confidently wrong suggestion is worse than silence, which is
+    the whole reason this has a floor at all.
+    """
+    if not _SKILL_SIGNALS:
+        return []
+
+    # When the domain is a guess, the domain filter is not a filter, so the
+    # evidence has to carry the whole weight. Raising the floor to 5 requires
+    # corroboration implicitly and exactly: signal weights cap at 3, so no
+    # single signal can clear it, and two must agree.
+    #
+    # Refusing outright when the domain is a guess was tried first and was too
+    # blunt: it silenced 11 of the 24 canonical probes, because plenty of
+    # legitimate requests ("save a checkpoint, we are about to hit a context
+    # reset") name no domain at all. An explicit min_signals counter was tried
+    # second and deleted as provably dead: given a cap of 3 and a floor of 5,
+    # it could never be the binding constraint.
+    anchored = domain is None or domain_confidence >= LOW_CONFIDENCE_FLOOR
+    floor = SKILL_FLOOR if anchored else SKILL_FLOOR_UNANCHORED
+    scored = []
+    for name, signals in _SKILL_SIGNALS.items():
+        if name in SKILL_NEVER_SUGGEST:
+            continue
+        # Only filter on domain when the domain was actually observed. A guessed
+        # domain excluding a skill is the same error as a guessed domain
+        # admitting one: "the modules are too coupled" carries two independent
+        # architecture signals and was being dropped because the guess landed on
+        # `design`, which architecture does not claim.
+        domains = SKILL_DOMAINS.get(name) or ()
+        if anchored and domain and domains and domain not in domains:
+            continue
+        total, reasons = _score(text, signals)
+        if total >= floor:
+            scored.append((total, name, reasons))
+    if not scored:
+        return []
+    scored.sort(key=lambda row: (-row[0], row[1]))
+    top = scored[0][0]
+    return [
+        {"name": name, "score": total, "reasons": reasons[:2]}
+        for total, name, reasons in scored
+        if top - total <= SKILL_TIE
+    ][:2]
+
+
 def build_classification(
     text: str,
     domain_hint=None,
@@ -451,6 +557,10 @@ def build_classification(
         "reasons": reasons,
         "packs": PACK_BY_DOMAIN.get(domain, [domain]),
     }
+
+    skills = classify_skills(text, domain, d_conf)
+    if skills:
+        out["skills"] = skills
 
     if shape in ESCALATE_DEFAULTS:
         esc = list(ESCALATE_DEFAULTS[shape])
@@ -487,10 +597,16 @@ def build_classification(
     # "writing" changes nothing about how it gets done, so it is not worth a
     # sentence. Being unsure about shape or safety does change what happens, and
     # is surfaced.
+    # A confident skill match is a material behaviour change by the same test the
+    # other three clauses apply: it changes what the agent reads before acting.
+    # Without this, skill suggestions would only ever reach gated or protected
+    # work, and the ordinary direct request -- which is most of them, and the
+    # place a skill helps most -- would keep getting none.
     out["announced"] = bool(
         shape != "direct"
         or safety == "protected"
         or min(s_conf, f_conf) < LOW_CONFIDENCE_FLOOR
+        or skills
     )
 
     return out
