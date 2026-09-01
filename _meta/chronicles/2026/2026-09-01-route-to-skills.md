@@ -65,14 +65,41 @@ test predated my change; the command hit its two-minute timeout and was killed b
 Recovered intact, but the runtime's own warning about stashing exists for exactly this, and the
 correct move was `git worktree`-free: read the test, or run it on a copy.
 
+## What the verifier caught that I could not
+
+An independent adversary, given the acceptance record but not my reasoning, found a real defect
+in a branch with 11 green tests and seeded-defect proof on both gates.
+
+`classify_skills` gated on the domain string and never read the confidence. With no domain signal
+the router returns `software` at 0.30 with the reason "no domain signal detected; defaulted", so
+a guess was treated as evidence and one regex on an everyday word decided the suggestion:
+`"let's checkpoint here and pick this up tomorrow at the gym"` suggested `/kernel:app-dev`,
+because `gym` is a fastlane lane. Four more of the same shape.
+
+My tests could not see it because they called `classify_skills` directly, which defaults
+`domain_confidence` to 1.0, while the hook calls `build_classification`. Green suite, 11 of 24
+probes broken through the path that actually runs.
+
+Fixed by raising the floor from 3 to 5 when unanchored (weights cap at 3, so no single signal can
+clear it), applying the domain filter only when the domain was observed, and narrowing `app-dev`
+off the bare words gym, deliver and supply. Every probe now runs through `build_classification`,
+and the five reported prompts are regression cases.
+
+The verifier also measured what I had only asserted: on 300 real prompts the announce rate moves
+89.0% to 89.3%, one prompt newly announcing, ~15-20 tokens.
+
+Merged as 9.8.0 after the fix.
+
 ## Deferred
 
 - Three kernel-claude branches (`fix/226-stale-r6-and-noise`,
   `fix/guard-precision-and-autocorrect`, `improve/retrospective-intelligence`) carry unmerged
   commits. `git branch -D` requires Aria's approval token by design; two are on origin so
   nothing is at risk.
-- 26 dirty submodules under `CodingVault/`, four of them live client repos under the PR-only
-  rule. Not touched; that is 26 decisions, not a cleanup.
+- The submodules are done. All 26 are clean and pushed, including the four TBS client repos,
+  where the fix was to REMOVE our working scratch (page-check dumps, agentdb, logs,
+  coordination state) rather than commit it. Our notes do not belong in his repos in either
+  direction; the two care review documents were moved into our own workspace instead.
 - The four highest-leverage audit fixes (trim `session-start.sh`, rewrite `chronicle-gate.sh`,
   teach `guard-bash.sh` that quoting is not running) are still recommendations.
 
