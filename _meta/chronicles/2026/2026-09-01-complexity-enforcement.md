@@ -1,6 +1,6 @@
 ---
 type: chronicle
-status: active
+status: complete
 created: 2026-09-01
 ---
 
@@ -24,4 +24,4 @@ portable test failure; it writes `~/Vaults` in the real home, loses to existing
 - A complete Matra AST snapshot is 7,336 functions/428 KB; the enforceable baseline needs only
   the 66 current over-budget rows. New over-budget functions are caught without a giant ledger.
 
-**Open:** merge/release state and independent verifier verdict are recorded on the PR/AgentDB.
+**Landed:** PR #237, merge `01f2d9e`; independent verifier PASS recorded in AgentDB.

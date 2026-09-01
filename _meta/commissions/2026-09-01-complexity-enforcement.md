@@ -1,6 +1,6 @@
 ---
 type: commission
-status: active
+status: complete
 created: 2026-09-01
 ---
 
