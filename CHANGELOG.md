@@ -2,6 +2,28 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.7.1] - 2026-09-01
+
+Complexity is a project gate, not a table the builder can omit.
+
+### Added
+- `.ccnrc` per-function budgets and justified selector skips. Unknown keys, invalid budgets,
+  and skips without reasons fail closed.
+- `complexity.sh --all`, `--diff`, and `--check-baseline`: fresh verifier diffs report
+  reduced/unchanged/regressed counts; duplicate function names remain distinct; the CI ratchet
+  rejects changed debt and new violations.
+
+### Changed
+- JS/TS complexity uses the project's ESLint AST when available, including methods inside
+  returned object literals. Lizard remains the polyglot fallback and now declares its JS/TS
+  blind spot instead of presenting a false function table as proof.
+- `simplify` requires the project-owned gate in `npm run verify`, Make/just verify, or the
+  existing pre-commit path, plus a seeded red/green probe. `review` treats manual-only checks
+  and non-AST object-method scans as `NOT CHECKED`.
+- Deterministic review reports analyzer failures as `NOT_CHECKED`; `.ccnrc` budgets replace
+  the old one-number complexity message. Fatal ESLint parser results block instead of becoming
+  an empty passing complexity report.
+
 ## [9.7.0] - 2026-09-01
 
 Retrospective extracts intelligence, not hygiene; every assert grades.
