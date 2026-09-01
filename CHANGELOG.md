@@ -2,6 +2,25 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.7.0] - 2026-09-01
+
+Retrospective extracts intelligence, not hygiene; every assert grades.
+
+### Changed
+- `retrospective` is a memory-update process: work evidence, surprises, belief updates,
+  patterns, preserved anomalies, reusable primitives, new questions, bounded architecture
+  mutations. Every lens ends in an `OUTPUT:` line naming the artifact it owes (ledger row,
+  `agentdb learn`, `questions.jsonl` entry, `intelligence.*` array); a lens with no artifact is
+  dropped, not padded. 388 to 337 lines.
+- Two skill descriptions trimmed to hold the 4000-token ambient ratchet (3985).
+
+### Fixed
+- Test harness grades every assert, not only a function's last statement (#229); a meta-test
+  refuses any future ungraded assert. Two asserts that only ever passed ungraded repaired.
+- `guard-bash` catches heredoc bodies piped or written to an executor.
+- `session-start` restores the Tier 2+ contract sentence the dual-loader test requires.
+- `intelligence` schema block carries `x-kernel-enforced-by`.
+
 ## [9.6.9] - 2026-08-30
 
 Hooks no longer orphan `.git/index.lock`.
