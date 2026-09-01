@@ -137,8 +137,34 @@ if [ -n "$HEALTH_WARNINGS" ]; then
   echo ""
 fi
 
+# The compression protocol is ALSO the opening of the CLAUDE.md/AGENTS.md this
+# plugin generates, because both come from one source (governance/kernel.md.tmpl).
+# Where the host already loaded such a file, printing it again is a second copy of
+# a rule the model is holding: a 2026-09-01 audit counted SEVEN copies reaching one
+# session, six from CLAUDE.md files and one from here.
+#
+# So: print it only when nothing else will. A user with no CLAUDE.md still gets the
+# whole thing, which is why the block cannot simply be deleted -- for any repo that
+# is not kernel-claude itself, this hook is the ONLY delivery of kernel doctrine.
+# The audit's own first recommendation was to cut it outright; that would have
+# silently disarmed the plugin everywhere.
+_compression_already_loaded() {
+  for f in "${CLAUDE_PROJECT_DIR:-$PWD}/CLAUDE.md" "${CLAUDE_PROJECT_DIR:-$PWD}/AGENTS.md" \
+           "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md" "$HOME/.claude/CLAUDE.md"; do
+    [ -f "$f" ] && grep -q '^## compression' "$f" 2>/dev/null && return 0
+  done
+  return 1
+}
 # BEGIN GENERATED KERNEL AMBIENT
-cat << 'KERNEL_CONTEXT'
+_compression_already_loaded() {
+  for f in "${CLAUDE_PROJECT_DIR:-$PWD}/CLAUDE.md" "${CLAUDE_PROJECT_DIR:-$PWD}/AGENTS.md" \
+           "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md" "$HOME/.claude/CLAUDE.md"; do
+    [ -f "$f" ] && grep -q '^## compression' "$f" 2>/dev/null && return 0
+  done
+  return 1
+}
+if ! _compression_already_loaded; then
+cat << 'KERNEL_COMPRESSION'
 ## compression — mandatory
 
 minimum text. zero meaningful loss.
@@ -165,6 +191,9 @@ do not emit while removable text remains.
 verbosity is a defect.
 omission is also a defect.
 
+KERNEL_COMPRESSION
+fi
+cat << 'KERNEL_CONTEXT'
 ## KERNEL quick reference
 
 ```

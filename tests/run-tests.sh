@@ -2219,14 +2219,33 @@ test_critical_guard_scripts_unchanged_for_820() {
   # The guard-bash pin moved again 2026-09-01: piped/file-then-exec heredoc
   # bodies (`cat <<EOF | bash`, write-then-exec) are now caught, and quoted
   # heredoc delimiters are treated as data uniformly with unquoted ones.
+  # It moved a second time the same day, after a usage audit found the guard
+  # blocking correct work three times in one session. Two narrowings and one
+  # widening, all reviewed: a file-then-exec heredoc run by an INTERPRETER is
+  # code only if its body can spawn a process (a shell body still always counts);
+  # a search pattern is data, because grep never executes what it looks for; and
+  # list-form argv is normalised before matching, closing a pre-existing hole
+  # where subprocess.run(["git","branch","-D","x"]) matched nothing at all.
+  # A fourth narrowing the same day: the interpreter one-liner rule read the whole
+  # rest of the line, and $LOW has newlines collapsed to spaces, so an explicit
+  # `rm -rf` on a LATER line was attributed to a `python3 -c "print(1)"` earlier in
+  # the command. It now reads the interpreter's quoted argument, which is the code
+  # the interpreter actually runs.
+  # The detect-secrets pin moved 2026-09-01 for MESSAGING only: the refusal now
+  # names the file, says how to install jq when the scanner cannot run, and tells
+  # a fixture author to shorten the value rather than assemble it at runtime.
+  # A "looks deliberately fake" exemption was written and then rejected: it broke
+  # the three detection tests below, because AKIAIOSFODNN7EXAMPLE is the canonical
+  # AWS example key. The strings that announce themselves as fake are exactly the
+  # ones a scanner must still catch.
   local expected actual file
   while read -r expected file; do
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-280d2702a3907a09e04f9a560d71e1b0b676a1b068764e14525ef696aa9ce514 guard-bash.sh
+a3f0b5ae72ed38f9843311de107e4d19bc0de2c6d0b632efcf38cb20034b400c guard-bash.sh
 ce20904682f9e53593328cc957c3039e99b7afe5eb9dc9cbea2f6dacbf650191 guard-config.sh
-c0afdb26d6794934e4e0758cdcd5e03aeb8abbd44a03daf781a7410fbb2e5ea9 detect-secrets.sh
+4860767389e605346ceec60a250493e8fe417cf3ecf4acf10ebd42a33c0ccbfe detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
 EOF
 }

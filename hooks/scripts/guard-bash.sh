@@ -107,6 +107,23 @@ LOW=$(printf '%s' "$COMMAND" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' 
 # needs case sensitivity and a rule that does not cannot disagree about what is code.
 COMMAND_CODE="$COMMAND"
 
+# (9.8.1) Normalise list-form argv so the keyword matcher can see it. A script that
+# calls subprocess.run(["git","branch","-D","x"]) or execFile("rm",["-rf","/"]) runs
+# exactly the command this guard exists to stop, but the shell string never appears,
+# so every pattern below missed it. Pre-existing hole, found while testing the
+# heredoc fix on 2026-09-01: the body was correctly KEPT as code and then matched
+# against nothing.
+#
+# Only bracketed runs of quoted words are touched, and only in COMMAND_CODE (the
+# matching copy), never in COMMAND itself, which stays exact for hashing and for the
+# approval token.
+if printf '%s' "$COMMAND_CODE" | grep -q '\['; then
+  COMMAND_CODE=$(printf '%s' "$COMMAND_CODE" | sed -E \
+    -e 's/\[[[:space:]]*("[^"]*"|'"'"'[^'"'"']*'"'"')([[:space:]]*,[[:space:]]*("[^"]*"|'"'"'[^'"'"']*'"'"'))*[[:space:]]*\]/ & /g' \
+    -e 's/["'"'"',]/ /g')
+  LOW=$(printf '%s' "$COMMAND_CODE" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
+fi
+
 # Heredoc bodies that are DATA, not code, are dropped before keyword matching. Writing a
 # chronicle that mentions a rewrite tool, or filing an issue that quotes a destructive
 # command, tripped this guard on prose describing the very rules it enforces.
@@ -130,10 +147,19 @@ _strip_text_arguments() {
       # Drop the quoted payload that follows a text-consuming flag, keeping the command
       # itself visible so the guard still sees what is being RUN.
       gsub(/(git[[:space:]]+(commit|tag)[^|;&]*-[a-zA-Z]*m|gh[[:space:]]+[a-z-]+[^|;&]*-[a-zA-Z]*(b|body)|agentdb[[:space:]]+(learn|contract|verdict|write-end)([[:space:]]+[a-z-]+)*)[[:space:]]+"[^"]*"([[:space:]]+"[^"]*")*/, " <text> ", line)
+      # (9.8.1) A SEARCH PATTERN IS DATA. grep and friends never execute their
+      # pattern, so a command that looks for a dangerous string is not a command
+      # that runs one. Confirmed live on 2026-09-01: a grep whose pattern quoted
+      # this hook OWN refusal message was blocked as though it were the
+      # force-delete it was searching for, while writing the report about it.
+      # \047 is an apostrophe: this awk program lives inside a single-quoted
+      # shell string, so a literal one would end the string.
+      gsub(/(grep|egrep|fgrep|rg|ag|ack)([[:space:]]+-[^[:space:]]+)*[[:space:]]+"[^"]*"/, " <pattern> ", line)
+      gsub(/(grep|egrep|fgrep|rg|ag|ack)([[:space:]]+-[^[:space:]]+)*[[:space:]]+\047[^\047]*\047/, " <pattern> ", line)
       print line
     }'
 }
-if printf '%s' "$COMMAND" | grep -qE '(git[[:space:]]+(commit|tag)|gh[[:space:]]+[a-z-]+|agentdb[[:space:]]+(learn|contract|verdict|write-end))'; then
+if printf '%s' "$COMMAND" | grep -qE '(git[[:space:]]+(commit|tag)|gh[[:space:]]+[a-z-]+|agentdb[[:space:]]+(learn|contract|verdict|write-end)|(grep|egrep|fgrep|rg|ag|ack)[[:space:]])'; then
   if ! printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node)[[:space:]]+-[ce]'; then
     COMMAND_CODE=$(_strip_text_arguments "$COMMAND_CODE")
     LOW=$(printf '%s' "$COMMAND_CODE" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
@@ -152,9 +178,29 @@ _heredoc_feeds_executor() {
   # A heredoc body written to a pipe or a file, then executed later in the SAME
   # command by an executor segment (split on |, ;, &&), also feeds an executor.
   # e.g. `cat <<EOF | bash` or `cat <<EOF > s.sh; bash s.sh`.
+  #
+  # (9.8.1) Split by executor KIND, the same distinction the direct-feed branch
+  # above already makes. A shell body is executable by definition: every line is a
+  # command, so a dangerous string in it is a dangerous command. An interpreter
+  # body is not. Python holding a force-delete in a string literal cannot run git
+  # unless it also reaches for subprocess, os.system, or a backtick.
+  #
+  # Without this split the guard blocked `cat > x.py <<'EOF' ... EOF; python3 x.py`
+  # on a script whose only crime was quoting a command it was writing into a
+  # markdown file. That happened three times in one session on 2026-09-01: once
+  # while writing the audit that reported the false positive, and once while
+  # writing THIS fix, whose comment quoted the pattern it was teaching the guard
+  # to ignore. Six earlier instances of the same class are in the 9.5.2 note above.
   if printf '%s' "$COMMAND" | grep -q '<<'; then
-    printf '%s' "$COMMAND" | sed -E 's/\|\||&&|[;|]/\n/g' \
-      | grep -qE '^[[:space:]]*(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node|xargs|eval|source|\.)([[:space:]]|$)' && return 0
+    _segments=$(printf '%s' "$COMMAND" | sed -E 's/\|\||&&|[;|]/\n/g')
+    # A shell (or eval/source/xargs) executor: always treat the body as code.
+    printf '%s' "$_segments" \
+      | grep -qE '^[[:space:]]*(bash|sh|zsh|ksh|dash|xargs|eval|source|\.)([[:space:]]|$)' && return 0
+    # An interpreter executor: code only if the body can spawn a process.
+    if printf '%s' "$_segments" \
+      | grep -qE '^[[:space:]]*(python[0-9.]*|perl|ruby|node)([[:space:]]|$)'; then
+      printf '%s' "$COMMAND" | grep -qE 'subprocess|os\.system|os\.popen|os\.exec|shutil\.rmtree|child_process|execSync|spawnSync|spawn\(|exec\(|system\(|Open3|IO\.popen|`[^`]*(rm|git|curl)' && return 0
+    fi
   fi
   return 1
 }
@@ -347,8 +393,26 @@ printf '%s' "$COMMAND" | grep -qE 'mv[[:space:]]+("?/([[:space:]]|$)|~([[:space:
 # in one string meant `rm -rf build && python3 -c "print(1)"` was refused as an indirect
 # recursive delete: two unrelated commands, one of them already explicit and reviewable,
 # which is precisely what this rule exists to prefer.
+# (9.8.1) Take the interpreter ARGUMENT, not the rest of the line. $LOW has had
+# newlines collapsed to spaces, so "everything after the interpreter" swallowed
+# every later command too: `python3 -c "print(1)"` followed on the NEXT LINE by an
+# explicit `rm -rf "$T"` was refused as an indirect recursive delete, which is the
+# exact case the comment above says this rule must not catch. The segment fix was
+# there; it just could not see segments any more once the newlines were gone.
+#
+# The quoted string after -c/-e is the code the interpreter actually runs. If the
+# body is unquoted (rare), fall back to the old tail-of-line read rather than
+# letting something through.
 _after_interpreter=$(printf '%s' "$LOW" | awk '
-  { if (match($0, /(python[0-9.]*|perl|ruby|node)[[:space:]]+(-e|-c)/)) print substr($0, RSTART) }')
+  {
+    if (match($0, /(python[0-9.]*|perl|ruby|node)[[:space:]]+(-e|-c)[[:space:]]*"[^"]*"/)) {
+      print substr($0, RSTART, RLENGTH); next
+    }
+    if (match($0, /(python[0-9.]*|perl|ruby|node)[[:space:]]+(-e|-c)[[:space:]]*\047[^\047]*\047/)) {
+      print substr($0, RSTART, RLENGTH); next
+    }
+    if (match($0, /(python[0-9.]*|perl|ruby|node)[[:space:]]+(-e|-c)/)) print substr($0, RSTART)
+  }')
 if [ -n "$_after_interpreter" ]; then
   printf '%s' "$_after_interpreter" | grep -qE 'rmtree|removedirs|rimraf|rmsync|rmdirsync|fs\.rm|rm[[:space:]]+-[a-z]*r[a-z]*f' \
     && block "interpreter one-liner performing recursive/tree deletion." "Refusing indirect recursive rm via python/perl/node/ruby; do it explicitly so it's reviewable."

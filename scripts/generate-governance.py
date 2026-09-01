@@ -152,7 +152,7 @@ def load(root):
     if len(ambient) != 1:
         fail("canonical source must contain exactly one ambient source block")
     ambient_text = ambient[0].rstrip() + "\n"
-    unsafe_lines = {"KERNEL_CONTEXT", SHELL_BEGIN, SHELL_END}
+    unsafe_lines = {"KERNEL_CONTEXT", "KERNEL_COMPRESSION", SHELL_BEGIN, SHELL_END}
     if "\x00" in ambient_text or "\r" in ambient_text or any(
             line in unsafe_lines for line in ambient_text.splitlines()):
         fail("ambient source contains an unsafe heredoc terminator or marker line")
@@ -193,7 +193,44 @@ def render_outputs(root):
     )
     if len(pattern.findall(shell_text)) != 1:
         fail("session-start.sh must contain exactly one generated ambient region")
-    block = f"{SHELL_BEGIN}\ncat << 'KERNEL_CONTEXT'\n{ambient}KERNEL_CONTEXT\n{SHELL_END}"
+    # The compression preamble is ALSO the opening of the generated CLAUDE.md and
+    # AGENTS.md, because both are rendered from this same source. Where the host
+    # already loaded one of those files, printing it again at session start is a
+    # second copy of a rule the model is already holding: a 2026-09-01 usage audit
+    # counted seven copies reaching one session, six from CLAUDE.md files and one
+    # from the hook.
+    #
+    # So the preamble is emitted conditionally and everything after it
+    # unconditionally. The split is not cosmetic: for any repo that is not
+    # kernel-claude itself, this hook is the ONLY delivery of kernel doctrine, and
+    # the operating rules below the preamble appear in no generated file at all.
+    # The audit's first recommendation was to cut the whole block; doing that would
+    # have silently disarmed the plugin everywhere it is installed.
+    marker = "## KERNEL quick reference"
+    if marker in ambient:
+        preamble, rest = ambient.split(marker, 1)
+        rest = marker + rest
+        block = (
+            f"{SHELL_BEGIN}\n"
+            "_compression_already_loaded() {\n"
+            '  for f in "${CLAUDE_PROJECT_DIR:-$PWD}/CLAUDE.md" "${CLAUDE_PROJECT_DIR:-$PWD}/AGENTS.md" \\\n'
+            '           "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md" "$HOME/.claude/CLAUDE.md"; do\n'
+            "    [ -f \"$f\" ] && grep -q '^## compression' \"$f\" 2>/dev/null && return 0\n"
+            "  done\n"
+            "  return 1\n"
+            "}\n"
+            "if ! _compression_already_loaded; then\n"
+            "cat << 'KERNEL_COMPRESSION'\n"
+            f"{preamble}"
+            "KERNEL_COMPRESSION\n"
+            "fi\n"
+            "cat << 'KERNEL_CONTEXT'\n"
+            f"{rest}"
+            "KERNEL_CONTEXT\n"
+            f"{SHELL_END}"
+        )
+    else:
+        block = f"{SHELL_BEGIN}\ncat << 'KERNEL_CONTEXT'\n{ambient}KERNEL_CONTEXT\n{SHELL_END}"
     rendered[shell] = pattern.sub(lambda _match: block, shell_text)
     return source_path, rendered
 
