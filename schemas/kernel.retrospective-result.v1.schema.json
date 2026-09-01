@@ -171,37 +171,43 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "belief_updates": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "anomalies_preserved": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "primitives_named": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "recurrences": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         },
         "architecture_proposals": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-kernel-enforced-by": "agent"
         }
       },
       "required": [
@@ -211,7 +217,8 @@
         "primitives_named",
         "recurrences",
         "architecture_proposals"
-      ]
+      ],
+      "x-kernel-enforced-by": "agent"
     }
   }
 }
