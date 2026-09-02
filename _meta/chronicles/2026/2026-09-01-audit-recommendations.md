@@ -78,3 +78,36 @@ expensive to lose. Two of five recommendations here were of exactly that shape. 
 was right in both cases; the conclusion was wrong in both cases. Rank by cost, but before
 executing a CUT, ask what breaks if it is gone, and check by removing it in a throwaway copy
 rather than by reasoning.
+
+## The verifier found a real regression, and it was in the fix for a false positive
+
+An independent adversary, given the acceptance record but not the reasoning, reported
+DO NOT MERGE on 9.8.1 with one blocking finding:
+
+```
+X=$(grep -o "<destructive literal>" file.txt); eval "$X"
+```
+
+main blocked it. My branch allowed it. The cause was change 3(b), "a search pattern is data":
+I replaced the quoted grep pattern with a placeholder before keyword matching, on the reasoning
+that grep never executes what it looks for. That reasoning is correct about grep and incomplete
+about the command line, because a later segment can run what the grep returned.
+
+This is worth stating plainly: the regression was introduced by a fix for a false positive that
+had blocked me three times in one session. Irritation is a bad reason to loosen a safety gate,
+and it produced exactly the failure the gate exists to prevent. The narrowing was still right;
+it just needed the other half.
+
+The exemption is now withdrawn whenever the command also holds `eval`, `source`, a bare `.`,
+`xargs`, or an interpreter `-c` reading a variable. Differential against main across six cases:
+grep-then-eval, grep-then-source and grep-then-xargs block on both sides again, the bare
+destructive command blocks on both, and the original false positive is still allowed.
+
+The verifier also confirmed, with numbers I had not produced: the compression conditional
+suppresses the preamble for 100% of projects under the vault and is correct in every case
+because the Claude global genuinely carries the rule; detect-secrets' `PATTERNS` array is
+byte-identical to main; all four guard hash pins match the shipped files; and the
+`detect_vaults` failure reproduces on main.
+
+Its one quarantined finding (a CLAUDE.md that shows the header inside a code fence would
+suppress the real preamble) was cheap enough to just fix rather than accept.
