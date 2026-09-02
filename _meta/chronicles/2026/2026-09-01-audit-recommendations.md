@@ -111,3 +111,47 @@ byte-identical to main; all four guard hash pins match the shipped files; and th
 
 Its one quarantined finding (a CLAUDE.md that shows the header inside a code fence would
 suppress the real preamble) was cheap enough to just fix rather than accept.
+
+## Three rounds on one exemption, and what settled it
+
+The search-pattern exemption took three adversarial rounds:
+
+1. Stripped the pattern unconditionally. A grep-then-eval walked through.
+2. Enumerated re-execution verbs (eval, source, xargs, bare dot, `-c` with a variable).
+   Eight more routes walked through: backticks, `$()` in command position, a here-string,
+   `printf | bash`, `zsh -s`, process substitution, and writing the match to a file and running
+   it by path, which involves no "re-execution verb" at all.
+3. Inverted to an allowlist. The exemption applies only when the whole command is recognisably
+   inert; anything unrecognised keeps the literal visible.
+
+The verifier confirmed round three holds and could not route captured grep output to an executor
+without also failing the inert test. Its own summary of why: "an allowlist of recognized-inert
+forms with unrecognized = stay visible as the fail-safe default is the right shape for this
+problem."
+
+Two shell bugs had been quietly defeating rounds one and two, and both are worth remembering
+independently of this feature:
+
+- **BSD sed does not expand `\n` in a replacement.** `sed -E 's/[;|]/\n/g'` produced a literal
+  `n`, not a newline, so splitting a command into segments yielded ONE segment on macOS and
+  every pipeline looked like its first command. This pattern appears elsewhere in the guard and
+  predates this change.
+- **`read` returns non-zero on a final line with no trailing newline**, so the LAST segment of a
+  split was silently dropped. `grep ... | zsh -s` survived two rounds on that alone: the loop
+  examined `grep`, called it inert, and never saw `zsh`.
+
+Both are the same class as the audit's own findings: a check that looks like it runs, reports
+success, and is examining nothing.
+
+**A second near-miss with the same cause as the earlier stash.** A seeded-defect run put the
+pre-fix guard into the working tree, and the command timed out before its restore line. The
+broken guard sat in the tree until the next check caught it. Twice in one session a timeout has
+stranded a file mid-experiment. The fix both times was the same and should have been the first
+move: run the experiment on a copy, never on the tree.
+
+## Deferred, filed separately
+
+The verifier found a pre-existing GTFOBins-class gap present identically on main and this
+branch: `sort --compress-program=` executes an arbitrary program, and `tail -f` hangs
+indefinitely, and neither is blocked standalone. Unrelated to this exemption, and not a reason
+to hold the merge.
