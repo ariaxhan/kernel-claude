@@ -159,7 +159,7 @@ _compression_already_loaded() {
 _compression_already_loaded() {
   for f in "${CLAUDE_PROJECT_DIR:-$PWD}/CLAUDE.md" "${CLAUDE_PROJECT_DIR:-$PWD}/AGENTS.md" \
            "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md" "$HOME/.claude/CLAUDE.md"; do
-    [ -f "$f" ] && grep -q '^## compression' "$f" 2>/dev/null && return 0
+    [ -f "$f" ] && awk '/^```/{f=!f;next} !f && /^## compression/{found=1} END{exit !found}' "$f" 2>/dev/null && return 0
   done
   return 1
 }

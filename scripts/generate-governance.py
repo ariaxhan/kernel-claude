@@ -215,7 +215,11 @@ def render_outputs(root):
             "_compression_already_loaded() {\n"
             '  for f in "${CLAUDE_PROJECT_DIR:-$PWD}/CLAUDE.md" "${CLAUDE_PROJECT_DIR:-$PWD}/AGENTS.md" \\\n'
             '           "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/CLAUDE.md" "$HOME/.claude/CLAUDE.md"; do\n'
-            "    [ -f \"$f\" ] && grep -q '^## compression' \"$f\" 2>/dev/null && return 0\n"
+            # A heading inside a fenced block is documentation ABOUT the rule, not
+            # the rule. awk tracks fence state so a file that merely shows the
+            # format does not suppress the real preamble. Flagged by an
+            # adversarial pass 2026-09-01 and cheap enough to just fix.
+            "    [ -f \"$f\" ] && awk '/^```/{f=!f;next} !f && /^## compression/{found=1} END{exit !found}' \"$f\" 2>/dev/null && return 0\n"
             "  done\n"
             "  return 1\n"
             "}\n"

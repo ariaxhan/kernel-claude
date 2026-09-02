@@ -2231,6 +2231,12 @@ test_critical_guard_scripts_unchanged_for_820() {
   # `rm -rf` on a LATER line was attributed to a `python3 -c "print(1)"` earlier in
   # the command. It now reads the interpreter's quoted argument, which is the code
   # the interpreter actually runs.
+  # A fifth move, same day, reversing part of the third: the search-pattern
+  # exemption is withdrawn whenever the command line also holds eval, source,
+  # xargs or an interpreter -c reading a variable. An adversarial pass showed a
+  # command could grep a destructive literal out of a file and eval it, and
+  # stripping the pattern first left that segment with nothing to match. Main
+  # blocked it, the branch allowed it, and the pin moved again to fix it.
   # The detect-secrets pin moved 2026-09-01 for MESSAGING only: the refusal now
   # names the file, says how to install jq when the scanner cannot run, and tells
   # a fixture author to shorten the value rather than assemble it at runtime.
@@ -2243,7 +2249,7 @@ test_critical_guard_scripts_unchanged_for_820() {
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-a3f0b5ae72ed38f9843311de107e4d19bc0de2c6d0b632efcf38cb20034b400c guard-bash.sh
+c3f7b7429864b5fe4221e88413416110574f2b17d39b2b79caf76a26f9a11c0e guard-bash.sh
 ce20904682f9e53593328cc957c3039e99b7afe5eb9dc9cbea2f6dacbf650191 guard-config.sh
 4860767389e605346ceec60a250493e8fe417cf3ecf4acf10ebd42a33c0ccbfe detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh

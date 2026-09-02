@@ -141,7 +141,7 @@ fi
 # `git commit -m`, `gh issue comment -b`, or `agentdb learn` is data. An argument to
 # `bash -c` or `python3 -c` is code, and those are matched in full, above and below.
 _strip_text_arguments() {
-  printf '%s' "$1" | awk '
+  printf '%s' "$1" | awk -v strip_patterns="${_strip_search_patterns:-1}" '
     {
       line = $0
       # Drop the quoted payload that follows a text-consuming flag, keeping the command
@@ -154,11 +154,32 @@ _strip_text_arguments() {
       # force-delete it was searching for, while writing the report about it.
       # \047 is an apostrophe: this awk program lives inside a single-quoted
       # shell string, so a literal one would end the string.
-      gsub(/(grep|egrep|fgrep|rg|ag|ack)([[:space:]]+-[^[:space:]]+)*[[:space:]]+"[^"]*"/, " <pattern> ", line)
-      gsub(/(grep|egrep|fgrep|rg|ag|ack)([[:space:]]+-[^[:space:]]+)*[[:space:]]+\047[^\047]*\047/, " <pattern> ", line)
+      if (strip_patterns == "1") {
+        gsub(/(grep|egrep|fgrep|rg|ag|ack)([[:space:]]+-[^[:space:]]+)*[[:space:]]+"[^"]*"/, " <pattern> ", line)
+        gsub(/(grep|egrep|fgrep|rg|ag|ack)([[:space:]]+-[^[:space:]]+)*[[:space:]]+\047[^\047]*\047/, " <pattern> ", line)
+      }
       print line
     }'
 }
+# A search pattern is data ONLY while nothing re-executes what the search returns.
+# A command can capture a destructive literal out of a file with `grep -o` and then
+# hand it to eval, and stripping the pattern first left that eval segment with
+# nothing to match. An adversarial pass on 2026-09-01 confirmed main blocked such a
+# command and this branch allowed it: a real regression, caught before merge.
+#
+# So the exemption is withdrawn the moment the command line also contains a
+# primitive that can run captured output. Conservative on purpose: the cost of not
+# stripping is one false positive on an unusual command, and the cost of stripping
+# wrongly is a destructive command running.
+_reexecutes_captured_output() {
+  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&(){}`])(eval|source|xargs)([[:space:]]|$)' && return 0
+  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&(){}])\.[[:space:]]' && return 0
+  printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node)[[:space:]]+-[ce][[:space:]]*"?\$' && return 0
+  return 1
+}
+_strip_search_patterns=1
+_reexecutes_captured_output && _strip_search_patterns=0
+
 if printf '%s' "$COMMAND" | grep -qE '(git[[:space:]]+(commit|tag)|gh[[:space:]]+[a-z-]+|agentdb[[:space:]]+(learn|contract|verdict|write-end)|(grep|egrep|fgrep|rg|ag|ack)[[:space:]])'; then
   if ! printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node)[[:space:]]+-[ce]'; then
     COMMAND_CODE=$(_strip_text_arguments "$COMMAND_CODE")
