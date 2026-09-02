@@ -2,6 +2,58 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.8.1] - 2026-09-01
+
+Executing the audit's recommendations. Two of them turned out to be wrong, and saying so is
+part of the work.
+
+### Changed
+- `session-start.sh` prints the compression preamble only when no loaded `CLAUDE.md` or
+  `AGENTS.md` already carries it. ~798 tokens a session where one does; unchanged for anyone
+  without one. The audit said to cut the block outright: that was WRONG. For any repo that is
+  not kernel-claude, this hook is the only delivery of kernel doctrine, and cutting it would
+  have silently disarmed the plugin everywhere. Only the duplicated preamble is conditional;
+  the operating rules below it appear in no generated file and always print. The split lives in
+  `generate-governance.py`, not in its output, so the next regeneration cannot clobber it.
+- `chronicle-gate.sh` refuses up to three times instead of once, accepts a one-line
+  `<date>-skipped.md` note as satisfaction, and no longer prints its own bypass variable.
+  `KERNEL_CHRONICLE_OK=1` had appeared 402 times across 262 sessions against 3 real refusals:
+  a Stop hook that cannot refuse twice is a reminder wearing a gate's clothes, and one whose
+  refusal text names the variable that silences it is running a tutorial for the thing it
+  exists to prevent. The variable still works for CI.
+- `warn-hardcoded.sh` warns once per file, naming the count and the token file to use, and
+  exempts token-definition files, hairline borders, radii and media queries. It had fired 227
+  times corpus-wide and changed nothing, because `[0-9]+px` matches every stylesheet ever
+  written. A warning that fires on correct code trains the reader to skip the line.
+- `detect-secrets.sh` names the file in its refusal, gives the platform's jq install command,
+  and tells a fixture author to shorten the value rather than assemble it at runtime.
+- `_meta/agentdb/agentdb` derives its vault root from `$HOME` instead of a hardcoded
+  `/Users/ariaxhan/...`, which the vault invariants forbid and which made it fail on every
+  machine but one.
+
+### Fixed
+- `guard-bash.sh`, four narrowings and one widening, all from measured false positives:
+  - A file-then-exec heredoc run by an INTERPRETER is code only if its body can spawn a
+    process. A shell body still always counts. This blocked a Python script three times in one
+    session for quoting a command it was writing into a markdown file, once while writing the
+    audit that reported it and once while writing this fix.
+  - A search pattern is data: `grep` never executes what it looks for.
+  - The interpreter one-liner rule read the rest of the line, and newlines are collapsed to
+    spaces before matching, so an explicit `rm -rf` on a later line was attributed to an earlier
+    `python3 -c "print(1)"`. It now reads the interpreter's quoted argument.
+  - List-form argv is normalised before matching, closing a PRE-EXISTING hole where
+    `subprocess.run(["git","branch","-D","x"])` matched nothing at all.
+
+### Rejected
+- Exempting secrets that "look fake" (containing `example`, `dummy`, `0000`). Written, then
+  reverted: it immediately failed three of this repo's own detection tests, because
+  `AKIAIOSFODNN7EXAMPLE` is the canonical AWS example key. The strings that announce themselves
+  as fake are exactly what a real leak looks like to a regex. Weakening a secret scanner so a
+  fixture reads more nicely is a bad trade.
+- Deleting `warn-hardcoded.sh`. The audit ranked it CUT on evidence, but the test suite uses it
+  as the canonical content-consuming advisory hook, so removing it would have gutted coverage of
+  the shared multi-file payload parser. Fixed its precision instead.
+
 ## [9.8.0] - 2026-09-01
 
 The router announced a pack 8,578 times while 12 of 26 skills had never been invoked once.
