@@ -1450,6 +1450,41 @@ test_guard_bash_allows_keychain_password_grant() {
   _gb 'P=$(security find-generic-password -s supabase-password -w) && curl -X POST -H \"apikey: $SUPABASE_ANON_KEY\" -H \"Content-Type: application/json\" --data \"{email:user@example.com,password:$P}\" \"https://project.supabase.co/auth/v1/token?grant_type=password\"'
   assert_exit_code 0 "$?" "keychain password in a Supabase password-grant body must pass"
 }
+# --- 2026-09-01: the search-pattern exemption, and the eleven ways around it ---
+# The exemption exists because guard-bash blocked greps that merely QUOTED a
+# dangerous command, three times in one session. Two rounds of adversarial review
+# then found eleven ways to extract a dangerous literal through a grep pattern and
+# re-execute it. Enumerating re-execution verbs lost twice; the exemption now
+# applies only when the WHOLE command is recognisably inert. These lock that in.
+# The literals are assembled at runtime so this file is not its own tripwire.
+_gb_danger() { printf 'r%s -%sf %s' 'm' 'r' '~'; }
+_gb_forcedel() { printf 'git branch -%s main' 'D'; }
+test_guard_bash_search_exemption_has_no_execution_route() {
+  local d g
+  # single quotes in the probe: _gb embeds "$1" in JSON without escaping, so a
+  # double quote here silently truncates the payload and the guard sees nothing.
+  d=$(_gb_danger); g="grep -o '$d' file.txt"
+  # \140 is a backtick: writing one inside double quotes would make THIS shell
+  # run the substitution while building the test string.
+  _gb "$(printf '\140%s\140' "$g")";               assert_exit_code 2 "$?" "backtick command position" || return 1
+  _gb "\$($g)";                                     assert_exit_code 2 "$?" "command substitution in command position" || return 1
+  _gb "X=\$($g); eval '\$X'";                       assert_exit_code 2 "$?" "grep then eval" || return 1
+  _gb "X=\$($g); sh <<< '\$X'";                     assert_exit_code 2 "$?" "here-string into sh" || return 1
+  _gb "printf '%s' '\$($g)' | bash";               assert_exit_code 2 "$?" "printf piped to bash" || return 1
+  _gb "$g | zsh -s";                               assert_exit_code 2 "$?" "pipe into zsh -s" || return 1
+  _gb "$g | xargs -I{} sh -c '{}'";                assert_exit_code 2 "$?" "grep then xargs" || return 1
+  _gb "$g > /tmp/e.sh; bash /tmp/e.sh";            assert_exit_code 2 "$?" "write then run by path" || return 1
+  _gb "$g > /tmp/e.sh; chmod +x /tmp/e.sh; /tmp/e.sh"; assert_exit_code 2 "$?" "write, chmod, run by path" || return 1
+  _gb "bash <($g)";                                assert_exit_code 2 "$?" "process substitution" || return 1
+  _gb "$g > /tmp/x; source /tmp/x";                assert_exit_code 2 "$?" "grep then source" || return 1
+}
+test_guard_bash_search_exemption_still_allows_plain_search() {
+  _gb "grep -rn '$(_gb_forcedel)' ."
+  assert_exit_code 0 "$?" "a grep whose PATTERN quotes a force-delete is data" || return 1
+  _gb 'grep -rn "TODO" .';               assert_exit_code 0 "$?" "ordinary grep" || return 1
+  _gb 'grep -rn "TODO" . | head -20';    assert_exit_code 0 "$?" "grep piped to an inert reader" || return 1
+  _gb 'grep -c "error" app.log | wc -l'; assert_exit_code 0 "$?" "grep piped to wc" || return 1
+}
 test_guard_bash_allows_string_literal_in_analysis_heredoc() {
   _gb "python3 - <<'PY'\nBD = 'git branch ' + '-D x'\nprint(BD)\nPY"
   assert_exit_code 0 "$?" "a guarded phrase inside a python string literal with no executor is data"
@@ -2237,6 +2272,14 @@ test_critical_guard_scripts_unchanged_for_820() {
   # command could grep a destructive literal out of a file and eval it, and
   # stripping the pattern first left that segment with nothing to match. Main
   # blocked it, the branch allowed it, and the pin moved again to fix it.
+  # A sixth move, and the last of that argument: enumerating re-execution verbs
+  # lost a second time, to eight more routes (backticks, $() in command position,
+  # a here-string, printf into bash, `zsh -s`, write-then-run-by-path with and
+  # without an interpreter word, process substitution). The exemption is now
+  # INVERTED: it applies only when the whole command is recognisably inert -- no
+  # substitution, no redirection, and every pipeline segment a known read-only
+  # reader. All eleven routes and the four legitimate shapes are asserted by
+  # test_guard_bash_search_exemption_*.
   # The detect-secrets pin moved 2026-09-01 for MESSAGING only: the refusal now
   # names the file, says how to install jq when the scanner cannot run, and tells
   # a fixture author to shorten the value rather than assemble it at runtime.
@@ -2249,7 +2292,7 @@ test_critical_guard_scripts_unchanged_for_820() {
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-c3f7b7429864b5fe4221e88413416110574f2b17d39b2b79caf76a26f9a11c0e guard-bash.sh
+350aa13715a3e1faedc8b07ce341a8ad12e3bfd7af33dd73821619b0437d177e guard-bash.sh
 ce20904682f9e53593328cc957c3039e99b7afe5eb9dc9cbea2f6dacbf650191 guard-config.sh
 4860767389e605346ceec60a250493e8fe417cf3ecf4acf10ebd42a33c0ccbfe detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
@@ -5928,6 +5971,8 @@ run_test_suite() {
       run_test "guard-bash 9.5.2 still blocks -D on unknown branch" test_guard_bash_still_blocks_D_on_unknown_branch
       run_test "guard-bash 9.5.2 allows keychain auth header" test_guard_bash_allows_keychain_auth_header
       run_test "guard-bash allows Supabase password grant" test_guard_bash_allows_keychain_password_grant
+      run_test "guard-bash search exemption has no execution route" test_guard_bash_search_exemption_has_no_execution_route
+      run_test "guard-bash search exemption still allows plain search" test_guard_bash_search_exemption_still_allows_plain_search
       run_test "guard-bash 9.5.2 allows string literal in analysis heredoc" test_guard_bash_allows_string_literal_in_analysis_heredoc
       run_test "guard-bash 9.5.2 blocks heredoc with subprocess" test_guard_bash_blocks_heredoc_with_subprocess
       run_test "guard-bash blocks unspaced shell heredoc" test_guard_bash_blocks_unspaced_shell_heredoc

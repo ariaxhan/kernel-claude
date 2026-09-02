@@ -161,24 +161,48 @@ _strip_text_arguments() {
       print line
     }'
 }
-# A search pattern is data ONLY while nothing re-executes what the search returns.
-# A command can capture a destructive literal out of a file with `grep -o` and then
-# hand it to eval, and stripping the pattern first left that eval segment with
-# nothing to match. An adversarial pass on 2026-09-01 confirmed main blocked such a
-# command and this branch allowed it: a real regression, caught before merge.
+# A search pattern is data ONLY while the command as a whole cannot carry it
+# anywhere that runs. Two rounds of adversarial review taught the shape of this:
+# the first pass stripped the pattern unconditionally and a grep-then-eval walked
+# through; the second pass enumerated re-execution verbs (eval, source, xargs, a
+# bare dot, -c reading a variable) and EIGHT more routes walked through, among
+# them backticks, $(...) in command position, a here-string, a pipe into `zsh -s`,
+# process substitution, and simply writing the match to a file and running the
+# file by path -- which is not a "re-execution verb" at all, just an ordinary
+# interpreter call on a path nothing can connect back to the grep.
 #
-# So the exemption is withdrawn the moment the command line also contains a
-# primitive that can run captured output. Conservative on purpose: the cost of not
-# stripping is one false positive on an unusual command, and the cost of stripping
-# wrongly is a destructive command running.
-_reexecutes_captured_output() {
-  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&(){}`])(eval|source|xargs)([[:space:]]|$)' && return 0
-  printf '%s' "$COMMAND" | grep -qE '(^|[[:space:];|&(){}])\.[[:space:]]' && return 0
-  printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node)[[:space:]]+-[ce][[:space:]]*"?\$' && return 0
-  return 1
+# Enumerating dangerous verbs cannot win against shell grammar. So this is
+# inverted: the exemption applies only to a command whose every part is
+# recognisably INERT. Anything unrecognised keeps the literal visible, which is
+# the safe direction. The cost is a false positive on an exotic-but-harmless
+# pipeline; the cost of the other default is a destructive command running.
+#
+# Inert means: no substitution of any kind that could put the match in command
+# position, no redirection that could park it in a file, and every pipeline
+# segment a known read-only consumer.
+_search_output_is_inert() {
+  # Any substitution can place captured text where a command is expected.
+  case "$COMMAND" in
+    *'`'*|*'$('*|*'<('*|*'>'*|*'<<'*) return 1 ;;
+  esac
+  # Every segment must be a search or a known-inert reader. An unrecognised
+  # command word is treated as capable of executing, because it might be.
+  # tr, not sed: BSD sed does not expand \n in a replacement, so `sed 's/[;|]/\n/'`
+  # silently produced ONE segment on macOS and every pipeline looked like its first
+  # command. That is how `grep ... | zsh -s` survived the first version of this
+  # check. tr replaces character-for-character and needs no escape handling.
+  # `|| [ -n "$seg" ]` because the LAST segment has no trailing newline, so a plain
+  # `read` returns non-zero and drops it. That is how `grep ... | zsh -s` survived
+  # a second time: the loop examined `grep`, found it inert, and never saw `zsh`.
+  printf '%s' "$COMMAND" | tr ';|&' '\n\n\n' | while IFS= read -r seg || [ -n "$seg" ]; do
+    seg=$(printf '%s' "$seg" | sed -E 's/^[[:space:]]+//')
+    [ -z "$seg" ] && continue
+    printf '%s' "$seg" | grep -qE '^(grep|egrep|fgrep|rg|ag|ack|head|tail|wc|sort|uniq|cut|nl|column|cat|less|more|tr|comm)([[:space:]]|$)' \
+      || exit 1
+  done
 }
 _strip_search_patterns=1
-_reexecutes_captured_output && _strip_search_patterns=0
+_search_output_is_inert || _strip_search_patterns=0
 
 if printf '%s' "$COMMAND" | grep -qE '(git[[:space:]]+(commit|tag)|gh[[:space:]]+[a-z-]+|agentdb[[:space:]]+(learn|contract|verdict|write-end)|(grep|egrep|fgrep|rg|ag|ack)[[:space:]])'; then
   if ! printf '%s' "$COMMAND" | grep -qE '(bash|sh|zsh|ksh|dash|python[0-9.]*|perl|ruby|node)[[:space:]]+-[ce]'; then
