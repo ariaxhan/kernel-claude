@@ -35,7 +35,7 @@ LEDGER="$ROOT/_meta/.context-ledger"
 INPUT=$(cat)
 
 # --- 8.2.0: the approval-token store is unreadable to the agent, always ---
-# (KERNEL_APPROVE codes are for the HUMAN to read out-of-band; see guard-bash.sh.)
+# (KERNEL_APPROVE codes are for the HUMAN to read out-of-band.)
 # Raw substring match on the hook JSON covers file_path, pattern, and glob inputs.
 _deny_approvals_read() {
   echo "BLOCKED: read of the kernel approval-token store. Approval codes are minted for the HUMAN to read and relay -- the agent never reads them." >&2

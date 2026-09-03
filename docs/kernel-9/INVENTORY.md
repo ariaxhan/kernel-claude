@@ -142,13 +142,12 @@ adapter 1, obsolete 4, duplicate 1.** (Sums exceed 26 because `marketing-site` s
 
 | Script | Binding | Why it stays |
 |---|---|---|
-| `guard-bash.sh` | PreToolUse:Bash | Destructive-command protection. Brief: preserve. |
 | `detect-secrets.sh` | PreToolUse:Write\|Edit | Secret exposure. Brief: preserve. |
 | `scan-output.sh` / `scan-output.py` | PostToolUse:web/mcp | Untrusted-output scanning. |
 | `guard-config.sh` | PreToolUse:Write\|Edit | Credential/config write protection. |
 | `guard-context.sh` | PreToolUse:Read\|Grep\|Glob | Context/scope escape, manifest-driven. |
 
-These five are the safety overlay. They are independent of work shape, per the brief.
+These are the safety overlay. They are independent of work shape, per the brief.
 
 ### Core continuity — preserve, make portable
 

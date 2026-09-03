@@ -18,7 +18,7 @@ scope (commission schema was cut); #173 gained the checks-watch-lies corpus entr
 | # | unit | type | status of spec |
 |---|---|---|---|
 | 173 | fence liveness: gate registry, violation-corpus CI harness, degraded-mode declarations, done-verb hook, codex-dialect + absence-of-CI-run + per-mode + checks-watch corpus entries | build, foundation | complete (4 amendment comments folded) |
-| 175 | guard-bash false positives (branch -d as -D; prose-mention matching) | build, small | complete (5+ repros across 3 sessions) |
+| 175 | bash guard false positives (branch -d as -D; prose-mention matching) | build, small | complete (5+ repros across 3 sessions) |
 | 174 | migration-map: ONE append-only retirement ledger + orphaned-caller CI check; first entry retires dead root hooks.json | build, small | complete |
 | 169 | GitHub layer re-wire: 3 orphaned posting functions, issue-per-commission, state-change receipts as comments, docs/chronicles carve-out | build | complete |
 | 170 | chronicle Stop-gate, minimal: one small file per session, gate-enforced; scaffolding tripwire in same PR | build + gate | complete |
@@ -32,7 +32,7 @@ before the harness exists, and merging it would couple a one-hour fix to the big
 ## The DAG
 
 ```
-#173 fence liveness ──────┬─▶ #175 guard-bash fixes   (corpus entries prove the fix)
+#173 fence liveness ──────┬─▶ #175 bash guard fixes   (corpus entries prove the fix)
   (registry + corpus       ├─▶ #170 chronicle Stop-gate (new gate → born-broken + corpus)
    harness + done-verb)    └─▶ #179 ship-path verdict gate (gate half)
 #174 migration ledger ─────── independent (its CI check is plain, not corpus-dependent)

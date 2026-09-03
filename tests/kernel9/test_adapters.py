@@ -120,18 +120,6 @@ class ClaudeAdapter(unittest.TestCase):
         for key in ("interface", "skills", "apps", "mcpServers"):
             self.assertNotIn(key, m, f"Claude manifest carries Codex-only key {key!r}")
 
-    def test_normal_requests_reach_the_adaptive_router(self):
-        doc = load(self.host["hooks_file"])
-        commands = [
-            hook["command"]
-            for group in doc["hooks"]["UserPromptSubmit"]
-            for hook in group["hooks"]
-        ]
-        self.assertTrue(
-            any(command.endswith("/hooks/scripts/route-request.sh") for command in commands),
-            "Claude UserPromptSubmit does not reach the Kernel 9 router",
-        )
-
 
 class CodexAdapter(unittest.TestCase):
     """Requirement 13."""
@@ -231,18 +219,6 @@ class CodexAdapter(unittest.TestCase):
         self.assertEqual(
             len(commands), len(set(commands)),
             "a hook command is duplicated in the shared manifest, so it will run twice",
-        )
-
-    def test_normal_requests_reach_the_adaptive_router(self):
-        doc = load(self.host["hooks_file"])
-        commands = [
-            hook["command"]
-            for group in doc["hooks"]["UserPromptSubmit"]
-            for hook in group["hooks"]
-        ]
-        self.assertTrue(
-            any(command.endswith("/hooks/scripts/route-request.sh") for command in commands),
-            "Codex UserPromptSubmit does not reach the Kernel 9 router",
         )
 
 

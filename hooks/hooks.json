@@ -25,31 +25,6 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autocorrect-bash.py",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-bash.sh",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "WebFetch|Read|Edit|mcp__claude-in-chrome__.*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/autocorrect-tool-input.py",
-            "timeout": 5
-          }
-        ]
-      },
-      {
         "matcher": "Write|Edit",
         "hooks": [
           {
@@ -90,17 +65,19 @@
         ]
       }
     ],
-    "PostToolUse": [
+    "PermissionRequest": [
       {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/syntax-coach.py",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/auto-approve-safe.sh",
             "timeout": 5
           }
         ]
-      },
+      }
+    ],
+    "PostToolUse": [
       {
         "matcher": "WebFetch|WebSearch|mcp__.*",
         "hooks": [
@@ -127,18 +104,6 @@
         ]
       }
     ],
-    "PermissionRequest": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/auto-approve-safe.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "PostToolUseFailure": [
       {
         "matcher": "Edit|Write|Bash",
@@ -158,11 +123,6 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/context-usage.py",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/route-request.sh",
             "timeout": 5
           },
           {

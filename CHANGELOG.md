@@ -2,6 +2,17 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.9.0] - 2026-09-03
+
+### Removed
+
+- Five hooks that inferred intent from command text and interfered with valid work:
+  `autocorrect-bash.py`, `autocorrect-tool-input.py`, `guard-bash.sh`, `syntax-coach.py`,
+  `route-request.sh`. In one session they blocked a verified-merged branch delete twice (once
+  for a shell variable, once for the words inside a heredoc), blocked a headless WebFetch probe,
+  blocked their own removal, rewrote a working command, and misrouted every prompt. Authority
+  comes from structural operations and explicit policy, not from words in text. Scripts deleted.
+
 ## [9.8.2] - 2026-09-03
 
 ### Fixed

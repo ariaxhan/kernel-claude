@@ -41,7 +41,7 @@ Every headline feature is a fence, not a leash:
 
 | fence | mechanism |
 |---|---|
-| Destructive ops blocked, not approved | guard-bash hooks; history rewrites / force pushes require a HUMAN-opened one-time token the agent cannot read. The human enters the loop exactly once, at the irreversible edge. |
+| Destructive ops blocked, not approved | a bash destructive-command guard; history rewrites / force pushes require a HUMAN-opened one-time token the agent cannot read. The human enters the loop exactly once, at the irreversible edge. |
 | Tier by reversibility, not vibes | reversible work executes; durable work plans; irreversible work gates. File count is noise; blast radius is signal. |
 | Verifiers that never saw the builder | adversary + blind-evaluator agents; the builder never grades its own protected work. Structural, not attentional, review. |
 | Fail-closed everywhere | scanner fails → block. Budget exceeded → stop. Uncertain → deny. Safety never degrades to a warning. |

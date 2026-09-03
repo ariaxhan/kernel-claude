@@ -76,7 +76,7 @@ to let you commit is a corpus nobody maintains.
 
 On its first run the harness failed, correctly, on real defects:
 
-- **`guard-bash` fails dark.** The destructive-command guard warned and exited 0
+- **The bash destructive-command guard fails dark.** It warned and exited 0
   when `jq` was missing, so with one binary absent the most important fence in
   KERNEL allowed everything. Verified by hand before fixing: a recursive-delete
   payload returned rc=0 under a PATH missing only `jq`. Now fails closed, with an
@@ -88,6 +88,6 @@ On its first run the harness failed, correctly, on real defects:
   `fail-abstain` modes. The gates were right; the model was too crude.
 
 Then the harness itself was broken on purpose in a throwaway copy: an unregistered
-script appeared on disk (divergence caught it) and the `guard-bash` fix was
+script appeared on disk (divergence caught it) and the guard fix above was
 reverted (liveness caught it). Both failed as they should; the live tree stayed
 green.

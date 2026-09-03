@@ -25,8 +25,6 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 ROUTER_REL = os.path.join("orchestration", "router", "kernel_router.py")
 TESTS_REL = os.path.join("tests", "kernel9", "test_router.py")
-ACTIVATION_TESTS_REL = os.path.join("tests", "kernel9", "test_activation.py")
-HOOK_REL = os.path.join("hooks", "scripts", "route-request.sh")
 SCHEMA_REL = os.path.join("schemas", "kernel.classification.v1.json")
 
 
@@ -131,66 +129,12 @@ MUTATIONS = [
         "test_trajectory_names_its_own_exit",
         "trajectory is a gear, not the permanent operating system",
     ),
-    Mutation(
-        "read-only-clears-protection",
-        "router",
-        r'    _sig(r"\b(read.only|don.t change|no changes|do not (edit|write|modify)|strictly read)\b", 3, "imposes a no-write boundary"),',
-        r'    _sig(r"\b(never-match-read-only)\b", 3, "imposes a no-write boundary"),',
-        "test_read_only_is_an_independent_protected_boundary",
-        "read-only is a safety constraint, never a lighter work shape",
-        suite="test_activation.UserPromptSubmitActivation",
-    ),
-    Mutation(
-        "reassessment-ignores-live-state",
-        "router",
-        '    previous_shape = state.get("previous_work_shape")',
-        '    previous_shape = None',
-        "test_ambiguous_cleanup_reassesses_when_live_state_expands",
-        "meaningful revision must reclassify from current live-run state",
-        suite="test_activation.UserPromptSubmitActivation",
-    ),
-    Mutation(
-        "trajectory-activation-goes-silent",
-        "hook",
-        'ANNOUNCED=$(printf \'%s\' "$CLASSIFICATION" | jq -r \'.announced // false\')',
-        'ANNOUNCED=false',
-        "test_state_heavy_feedback_work_activates_trajectory",
-        "a non-direct route must reach the host context, not only a unit-test return value",
-        suite="test_activation.UserPromptSubmitActivation",
-    ),
-    Mutation(
-        "status-overwrites-active-route",
-        "hook",
-        'if [ "$TRANSIENT" != "true" ] && [ -n "$STATE_FILE" ]; then',
-        'if [ -n "$STATE_FILE" ]; then',
-        "test_status_does_not_replace_the_active_route",
-        "a transient status lookup must not replace the route that continue resumes",
-        suite="test_activation.UserPromptSubmitActivation",
-    ),
-    Mutation(
-        "missing-router-fails-open",
-        "hook",
-        '[ -f "$ROUTER" ] || { emit_fallback "router unavailable"; exit 0; }',
-        '[ -f "$ROUTER" ] || exit 0',
-        "test_missing_router_fails_closed_with_receipt",
-        "activation prerequisite loss must emit the conservative fallback and a receipt",
-        suite="test_activation.UserPromptSubmitActivation",
-    ),
-    Mutation(
-        "transient-status-clears-safety",
-        "router",
-        '        and out["safety"] == "normal"\n        and not SAFETY_BOUNDARY_RELEASE.search(text)',
-        '        and out["safety"] == "normal"\n        and not transient_status\n        and not SAFETY_BOUNDARY_RELEASE.search(text)',
-        "test_status_retains_safety_without_replacing_the_active_route",
-        "transient work shape must not bypass an active safety boundary",
-        suite="test_activation.UserPromptSubmitActivation",
-    ),
 ]
 
 
 def build_sandbox(tmp):
     """Copy only what the suite needs into an isolated tree."""
-    for rel in (ROUTER_REL, TESTS_REL, ACTIVATION_TESTS_REL, HOOK_REL, SCHEMA_REL):
+    for rel in (ROUTER_REL, TESTS_REL, SCHEMA_REL):
         dst = os.path.join(tmp, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(os.path.join(REPO, rel), dst)
@@ -213,7 +157,6 @@ def apply_mutation(tmp, mut):
     rel = {
         "router": ROUTER_REL,
         "schema": SCHEMA_REL,
-        "hook": HOOK_REL,
     }[mut.target]
     path = os.path.join(tmp, rel)
     with open(path) as fh:
