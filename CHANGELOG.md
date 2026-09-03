@@ -2,6 +2,22 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.8.2] - 2026-09-03
+
+### Fixed
+- `autocorrect-bash.py` R2 and R2b now track the effective directory through a command
+  (`cd X` joined by `&&`, `;`, `||`, or a newline) instead of resolving every relative path
+  against the tool cwd. `cd /a/b; tail _meta/x.jsonl` was being rewritten to
+  `/a/b//a/b/_meta/x.jsonl`, and files that existed after the `cd` were reported missing. A path
+  that resolves where the command actually runs is now left untouched and silent, and a path
+  following an unresolvable `cd` is never rewritten at all.
+- `guard-bash.sh` no longer blocks `git branch -D` on a SQUASH-merged branch. Squashing writes a
+  new commit, so the branch is an ancestor of nothing and both existing merge tests called it
+  unmerged forever; 12 branches GitHub reported as MERGED were undeletable across five repos.
+  A time-boxed `gh pr list --state merged --head <branch>` settles it. Every failure route (no
+  `gh`, no origin, offline, unparseable remote, no merged PR) falls through to the block, so
+  CLOSED-unmerged branches and branches with no PR are still refused.
+
 ## [9.8.1] - 2026-09-01
 
 Executing the audit's recommendations. Two of them turned out to be wrong, and saying so is
