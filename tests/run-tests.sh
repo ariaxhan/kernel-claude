@@ -1442,6 +1442,46 @@ test_guard_bash_allows_D_on_merged_branch() {
   assert_exit_code 0 "$rc" "branch -D on a branch merged into HEAD drops nothing and must pass"
 }
 test_guard_bash_still_blocks_D_on_unknown_branch() { _gb 'git branch -D no-such-branch-zz'; assert_exit_code 2 "$?" "branch -D on an unknown branch stays blocked"; }
+# 9.8.2: a squash-merged branch is an ancestor of nothing, so --merged and merge-base both say
+# "unmerged" forever. 12 merged branches were undeletable across five repos before this.
+_squash_repo() {  # a repo whose branch `feat` is squash-merged into main (not an ancestor of it)
+  local r="$TEST_DIR/squash-repo"
+  rm -rf "$r"; mkdir -p "$r"
+  git -C "$r" init -q -b main
+  git -C "$r" config user.email t@t; git -C "$r" config user.name t
+  echo a > "$r/a"; git -C "$r" add -A; git -C "$r" commit -qm base
+  git -C "$r" checkout -q -b feat; echo b > "$r/b"; git -C "$r" add -A; git -C "$r" commit -qm work
+  git -C "$r" checkout -q main; git -C "$r" merge -q --squash feat >/dev/null 2>&1
+  git -C "$r" add -A; git -C "$r" commit -qm 'squashed feat'
+  git -C "$r" remote add origin git@github.com:acme/widget.git
+  printf '%s' "$r"
+}
+_fake_gh() {  # a gh stub on PATH that answers `pr list` with $1 and nothing else
+  local d="$TEST_DIR/fakebin"; mkdir -p "$d"
+  { echo '#!/bin/sh'; echo "printf '%s' '$1'"; } > "$d/gh"; chmod +x "$d/gh"
+  printf '%s' "$d"
+}
+test_guard_bash_allows_D_on_squash_merged_branch() {
+  local r; r=$(_squash_repo)
+  # sanity: the pre-9.8.2 tests genuinely both fail here, or this test proves nothing
+  git -C "$r" branch --merged HEAD | sed 's/^[* +] *//' | grep -qx feat \
+    && { echo "  FAIL: fixture is not a squash merge (feat is --merged)"; return 1; }
+  local bin; bin=$(_fake_gh '[{"number":1}]')
+  ( cd "$r" && PATH="$bin:$PATH" _gb 'git branch -D feat' ); local rc=$?
+  assert_exit_code 0 "$rc" "branch -D on a branch whose PR GitHub reports MERGED must pass"
+}
+test_guard_bash_blocks_D_when_no_merged_pr() {
+  local r; r=$(_squash_repo)
+  local bin; bin=$(_fake_gh '[]')
+  ( cd "$r" && PATH="$bin:$PATH" _gb 'git branch -D feat' ); local rc=$?
+  assert_exit_code 2 "$rc" "no merged PR (closed-unmerged or none) keeps the block"
+}
+test_guard_bash_blocks_D_when_gh_absent() {
+  local r; r=$(_squash_repo)
+  local bin="$TEST_DIR/emptybin"; mkdir -p "$bin"
+  ( cd "$r" && PATH="$bin:/usr/bin:/bin" _gb 'git branch -D feat' ); local rc=$?
+  assert_exit_code 2 "$rc" "with no gh on PATH the guard falls through to the block"
+}
 test_guard_bash_allows_keychain_auth_header() {
   _gb 'K=$(security find-generic-password -s svc -w) && curl -s -H \"Authorization: Bearer $K\" https://api.example.com/v1/me'
   assert_exit_code 0 "$?" "keychain value in an https Authorization header is authentication, not exfiltration"
@@ -1552,6 +1592,36 @@ test_autocorrect_bash_bare_recall() {
 test_autocorrect_bash_read_path_resolves() {
   local out; out=$(_hook autocorrect-bash.py "{\"tool_name\":\"Bash\",\"cwd\":\"$PLUGIN_ROOT\",\"tool_input\":{\"command\":\"cat hooks/guard-bash.sh | head -3\"}}")
   assert_contains "$out" 'hooks/scripts/guard-bash.sh' "a wrong directory for a real file is resolved to the real file"
+}
+# 9.8.2: R2/R2b must resolve against the directory the command actually runs in. Before this,
+# `cd /a/b; tail _meta/x` was rewritten to `/a/b//a/b/_meta/x` and a file that existed after the
+# cd was reported missing. cwd is deliberately "/" in each case: only the cd makes the path valid.
+test_autocorrect_bash_cd_aware_read_path() {
+  local out
+  out=$(_hook autocorrect-bash.py "{\"tool_name\":\"Bash\",\"cwd\":\"/\",\"tool_input\":{\"command\":\"cd $PLUGIN_ROOT && tail -1 hooks/scripts/guard-bash.sh\"}}")
+  assert_equals "" "$out" "a path valid after the cd must be left alone and unannounced (&&)" || return 1
+  out=$(_hook autocorrect-bash.py "{\"tool_name\":\"Bash\",\"cwd\":\"/\",\"tool_input\":{\"command\":\"cd $PLUGIN_ROOT; cat CHANGELOG.md | head -3\"}}")
+  assert_equals "" "$out" "same for a ';' separator and a piped read" || return 1
+  out=$(_hook autocorrect-bash.py "{\"tool_name\":\"Bash\",\"cwd\":\"/\",\"tool_input\":{\"command\":\"cd $PLUGIN_ROOT\\ncat CHANGELOG.md\"}}")
+  assert_equals "" "$out" "same across a newline" || return 1
+  out=$(_hook autocorrect-bash.py "{\"tool_name\":\"Bash\",\"cwd\":\"/\",\"tool_input\":{\"command\":\"cd $PLUGIN_ROOT && cd hooks && cat scripts/guard-bash.sh\"}}")
+  assert_equals "" "$out" "chained cds resolve against the previous effective dir" || return 1
+  # A path that is missing everywhere is still reported, and the note names the RIGHT parent.
+  out=$(_hook autocorrect-bash.py "{\"tool_name\":\"Bash\",\"cwd\":\"/\",\"tool_input\":{\"command\":\"cd $PLUGIN_ROOT && cat no-such-file-zz.md\"}}")
+  assert_contains "$out" "$PLUGIN_ROOT" "a genuinely missing path is still noted, against the effective dir" || return 1
+  # An unresolvable cd means the base is unknown: never guess, never rewrite, say nothing.
+  out=$(_hook autocorrect-bash.py '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"cd $SOMEWHERE && cat notes.md"}}')
+  assert_equals "" "$out" "a path after an unresolvable cd is left completely alone"
+}
+test_autocorrect_bash_cd_relative_chains() {
+  local out
+  # `cd <abs> && cd hooks` must NOT be rewritten: hooks exists under the first cd's target.
+  out=$(_hook autocorrect-bash.py "{\"tool_name\":\"Bash\",\"cwd\":\"/\",\"tool_input\":{\"command\":\"cd $PLUGIN_ROOT && cd hooks && ls\"}}")
+  assert_equals "" "$out" "R2 must not rewrite a relative cd that exists under the previous cd" || return 1
+  # ...and a cd that is NOT the first on its line is seen at all. The old regex was anchored to
+  # the start of the line, so every cd after a separator was invisible to R2.
+  out=$(_hook autocorrect-bash.py '{"tool_name":"Bash","cwd":"/","tool_input":{"command":"cd /tmp; cd scripts && ls"}}')
+  assert_contains "$out" "R2 " "a cd after a separator must be seen by R2, not skipped"
 }
 test_autocorrect_read_missing_path_lists_neighbours() {
   local out; out=$(_hook autocorrect-tool-input.py "{\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$PLUGIN_ROOT/hooks/scripts/does-not-exist.py\"}}")
@@ -2287,12 +2357,18 @@ test_critical_guard_scripts_unchanged_for_820() {
   # the three detection tests below, because AKIAIOSFODNN7EXAMPLE is the canonical
   # AWS example key. The strings that announce themselves as fake are exactly the
   # ones a scanner must still catch.
+  # The guard-bash pin moved 2026-09-03, one narrowing: a SQUASH-merged branch is an
+  # ancestor of nothing, so `branch --merged` and `merge-base --is-ancestor` both call it
+  # unmerged forever and 12 branches GitHub reported as MERGED were undeletable across five
+  # repos. `gh pr list --state merged --head <b>` now settles it, time-boxed, with every
+  # failure route (no gh, no origin, offline, unparseable remote, empty result) falling
+  # through to the existing block. Asserted by test_guard_bash_9_8_2_* below.
   local expected actual file
   while read -r expected file; do
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-350aa13715a3e1faedc8b07ce341a8ad12e3bfd7af33dd73821619b0437d177e guard-bash.sh
+9bf97f5279cf23794125509f67f1ccb4c60799daf0e5f694cc581f9f0aac9e54 guard-bash.sh
 ce20904682f9e53593328cc957c3039e99b7afe5eb9dc9cbea2f6dacbf650191 guard-config.sh
 4860767389e605346ceec60a250493e8fe417cf3ecf4acf10ebd42a33c0ccbfe detect-secrets.sh
 e1c4940def589dce982695d7e79f22e11cb767f6260608a738801f6c4167afbc guard-context.sh
@@ -5969,6 +6045,11 @@ run_test_suite() {
       run_test "guard-bash blocks branch -D" test_guard_bash_blocks_branch_D
       run_test "guard-bash 9.5.2 allows -D on merged branch" test_guard_bash_allows_D_on_merged_branch
       run_test "guard-bash 9.5.2 still blocks -D on unknown branch" test_guard_bash_still_blocks_D_on_unknown_branch
+      run_test "guard-bash 9.8.2 allows -D on a squash-merged branch" test_guard_bash_allows_D_on_squash_merged_branch
+      run_test "guard-bash 9.8.2 blocks -D with no merged PR" test_guard_bash_blocks_D_when_no_merged_pr
+      run_test "guard-bash 9.8.2 blocks -D when gh is absent" test_guard_bash_blocks_D_when_gh_absent
+      run_test "autocorrect-bash 9.8.2 R2b resolves against the cd'd dir" test_autocorrect_bash_cd_aware_read_path
+      run_test "autocorrect-bash 9.8.2 R2 honours chained cds" test_autocorrect_bash_cd_relative_chains
       run_test "guard-bash 9.5.2 allows keychain auth header" test_guard_bash_allows_keychain_auth_header
       run_test "guard-bash allows Supabase password grant" test_guard_bash_allows_keychain_password_grant
       run_test "guard-bash search exemption has no execution route" test_guard_bash_search_exemption_has_no_execution_route
