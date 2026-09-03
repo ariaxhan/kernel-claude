@@ -100,38 +100,11 @@ when scope or hypothesis changes, and whenever a new failure appears.
 </flow>
 
 <interaction>
-Structured questions are the DEFAULT response shape, not an escalation. Every turn that is not
-finished ends with an AskUserQuestion call. Never bury "should I...?" in prose and stop: a question the
-reader has to excavate from a wall of text is a question that gets answered wrong or not at all.
-
-  <rule>Ask unless one of three holds: the work is fully done, the answer is trivially unambiguous
-  (exactly one real option), or the interface makes it impossible.</rule>
-  <rule>Impossible means non-interactive: you are a subagent, or the session is headless
-  (`claude -p`, `codex exec`, codex-lane.sh, cron, CI). The tool's absence from your tool list IS
-  the signal. Never stall a headless run waiting on an answer that cannot arrive; state the
-  assumption in the deliverable instead.</rule>
-  <rule>Subagents never ask the user. They escalate through their contract's ESCALATE IF line and
-  stop. The orchestrator answers from its own context whatever it can, and forwards only the
-  genuinely user-only questions, batched into ONE round. Five lanes each raising a dialog rebuilds
-  the wall of text this rule exists to kill.</rule>
-  <rule>One round, at most 4 questions, ordered by leverage: the answer that invalidates the most
-  downstream work goes first. Every option carries its consequence; the recommended one is listed
-  first and labelled. Never ask what the repo, the diff, or an agentdb recall already answers.</rule>
-  <rule>Guessing is the top defect source. If you catch yourself writing "I'll assume", ask.</rule>
-
-  <codex_fallback>
-  Codex exposes no structured-question tool. Its final message ends with this block and nothing
-  after it, one block per open decision, max 4:
-
-    QUESTION: &lt;the decision, one line&gt;
-      1. &lt;option&gt; - &lt;consequence&gt;  [recommended]
-      2. &lt;option&gt; - &lt;consequence&gt;
-      3. something else - tell me what you want instead
-
-  No question in prose outside this shape.
-  </codex_fallback>
-
-  Full protocol: _meta/reference/interaction-protocol.md
+Do the work; never ask. A request Aria made or an issue she filed IS the decision. Pick the most
+reasonable reading, do it, state the assumption in the deliverable. No AskUserQuestion, no QUESTION
+blocks, no menus, no "waiting on a human". Subagents decide, do, and report what they decided.
+Stop only for: spending money, a client's default branch, sending in Aria's voice, unrecoverable
+deletion. A wrong guess on reversible work costs one revert; a question costs hours.
 </interaction>
 
 <contract>
