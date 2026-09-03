@@ -54,20 +54,6 @@
       "degraded_mode": "fail-open-loud"
     },
     {
-      "id": "chronicle-gate",
-      "script": "hooks/scripts/chronicle-gate.sh",
-      "class": "gate",
-      "events": [
-        "Stop"
-      ],
-      "matcher": "",
-      "external_deps": [
-        "git"
-      ],
-      "degraded_mode": "fail-open-loud",
-      "rationale": "Requires an honest account from a session that changed source. Refuses once and names an escape hatch, because a gate you cannot satisfy is worse than none: people disable the whole chain. Without git it cannot tell whether source changed, and blocking the end of a session on that would trap it."
-    },
-    {
       "id": "circuit-breaker",
       "script": "hooks/scripts/circuit-breaker.sh",
       "class": "library",

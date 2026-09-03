@@ -2,6 +2,13 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.9.1] - 2026-09-03
+
+### Removed
+
+- `chronicle-gate.sh` Stop hook. It blocked a Codex session that had only read a file,
+  demanding a chronicle for a session that changed nothing. Persistence is a rule, not a gate.
+
 ## [9.9.0] - 2026-09-03
 
 ### Removed
