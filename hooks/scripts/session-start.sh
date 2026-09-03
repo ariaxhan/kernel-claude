@@ -205,12 +205,8 @@ agentdb wtf                                        # confused? full ref: agentdb
 
 Recall with concrete nouns, not prose. Recall again after discovery, when scope/hypothesis changes, or on a new failure.
 
-Optimize for the fastest correct, robust path. Tier by reversibility x blast radius, NOT file count. Gate hard only where an op is irreversible. T1 execute, T2 plan+verify, T3 confirm. Tier 2+: create an AgentDB contract before touching files, delegate heavy file-disjoint slices to a surgeon, verify with an adversary.
-Inline for single-file, single-step work. Delegate by default when any of these hold: the work splits into file-disjoint slices, a read would dump more than a few hundred lines into your context (transcripts, logs, corpora), a verification must be blind to your reasoning, or two independent questions can be answered at once. Fan out in ONE message with several Agent calls; serial spawns cost wall-clock for nothing. Never spawn for independence alone. When work is genuinely high-blast-radius or delegated, contract it, then verify with an adversary.
-Route model and effort by task shape and measured evidence, never prestige. Preserve the exact request; never silently substitute. Receipts keep `requested_model` and `requested_effort` separate from `observed_model` and `observed_effort`, and use `unavailable` when the runtime does not expose a value.
-Protected receipts require distinct `builder_identity` and `verifier_identity`; the builder never grades its own protected work.
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
-Do the work; never ask. A request Aria made or an issue she filed IS the decision: pick the most reasonable reading, do it, state the assumption in the deliverable. No AskUserQuestion, no QUESTION blocks, no menus, no "waiting on a human". Stop only for money, a client default branch, sending in her voice, or unrecoverable deletion.
+Decompose large work into pieces that cannot be done wrong, then do them in order, each landed on the default branch. No worktrees, no branches for agent work, no reviewer fan-out. Load /kernel:simplify before and after writing code. Verify on the live surface; run tests once before merge at most. Do the work; never ask. A request Aria made or an issue she filed IS the decision: pick the most reasonable reading, do it, state the assumption in the deliverable. No AskUserQuestion, no QUESTION blocks, no menus, no "waiting on a human". Stop only for money, a client default branch, sending in her voice, or unrecoverable deletion.
 Subagents never ask and never escalate a choice; they decide, do, and report what they decided.
 KERNEL_CONTEXT
 # END GENERATED KERNEL AMBIENT
