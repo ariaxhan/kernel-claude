@@ -334,6 +334,30 @@ printf '%s' "$LOW" | grep -qE 'git +clean +-[a-z]*f' \
 # that is what 17 of 17 blocked -D calls in two weeks were: post-merge cleanup, each retried
 # with -d. Branches that git would refuse to -d are still blocked. Names are checked against
 # the repo the command runs in (a `cd X &&` / `git -C X` prefix is honoured).
+# (9.8.2) A SQUASH-merged PR branch is an ancestor of nothing: squashing writes a new commit, so
+# both the --merged and the merge-base tests below fail forever on a branch GitHub itself reports
+# as merged. That left 12 merged branches undeletable across five repos in one day. When `gh` can
+# answer, its answer settles it; when it cannot (no gh, no origin, offline, timeout, a repo it
+# cannot see) we fall through to the block exactly as before. A CLOSED-unmerged branch and a
+# branch with no PR are still blocked: --state merged returns nothing for either.
+# `timeout` is GNU coreutils and absent on a stock macOS; run bare rather than not at all.
+_with_timeout() {
+  local _s="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$_s" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then gtimeout "$_s" "$@"
+  else "$@"; fi
+}
+_gh_pr_is_merged() {
+  local _r="$1" _b="$2" _url _slug _json
+  command -v gh >/dev/null 2>&1 || return 1
+  _url=$(git -C "$_r" remote get-url origin 2>/dev/null) || return 1
+  [ -n "$_url" ] || return 1
+  # git@host:owner/name.git | https://host/owner/name.git | ssh://host/owner/name -> owner/name
+  _slug=$(printf '%s' "$_url" | sed -E 's#^[a-z+]+://##; s#^[^@/]*@##; s#^[^/:]*[:/]##; s#\.git$##; s#/$##')
+  printf '%s' "$_slug" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$' || return 1
+  _json=$(_with_timeout 10 gh pr list --repo "$_slug" --head "$_b" --state merged --json number --limit 1 2>/dev/null) || return 1
+  printf '%s' "$_json" | grep -q '"number"'
+}
 _branch_D_unmerged() {
   local _seg _dir _names _n _repo
   while IFS= read -r _seg; do
@@ -348,6 +372,7 @@ _branch_D_unmerged() {
       git -C "$_repo" branch --merged HEAD 2>/dev/null | sed 's/^[* +] *//' | grep -qx "$_n" && continue
       _up=$(git -C "$_repo" rev-parse --abbrev-ref "$_n@{upstream}" 2>/dev/null)
       [ -n "$_up" ] && git -C "$_repo" merge-base --is-ancestor "$_n" "$_up" 2>/dev/null && continue
+      _gh_pr_is_merged "$_repo" "$_n" && continue   # squash-merged: an ancestor of nothing, still merged
       return 0
     done
   done < <(printf '%s\n' "$COMMAND_CODE" | tr ';|&' '\n')

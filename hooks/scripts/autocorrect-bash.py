@@ -119,6 +119,58 @@ def first_line_segments(command):
         yield i, line
 
 
+# --- Effective directory tracking (the cd-aware base for R2 and R2b) -----------------
+# Before 9.8.2 both path rules resolved every relative path against the tool cwd from the hook
+# payload, ignoring any `cd` earlier in the SAME command. So
+#   `cd /a/b; tail -3 _meta/x.jsonl`
+# was "corrected" into `/a/b//a/b/_meta/x.jsonl` and failed, and `cat findings/x.md` after a `cd`
+# into the directory holding it was reported missing. The same flaw once wrote a release script
+# into the wrong clone. A command is a sequence of segments and the directory is state that moves
+# through them: track it, or do not resolve paths at all.
+
+SEP_SPLIT = re.compile(r"(\s*(?:&&|\|\||;|\|)\s*)")
+CD_ARG = re.compile(r"^\s*cd(?:\s+(?:-[a-zA-Z]+\s+)?(\"[^\"]*\"|'[^']*'|[^\s;&|]+))?\s*$")
+
+
+def split_segments(line):
+    """Split one shell line into a parts list: even indexes are segments, odd are separators.
+    Rejoining with ''.join(parts) reproduces the line exactly, so a segment can be rewritten
+    in place."""
+    return SEP_SPLIT.split(line)
+
+
+def cd_argument(seg):
+    """The raw argument of a segment that is exactly a `cd`, '~' for a bare `cd`, else None."""
+    m = CD_ARG.match(seg)
+    if not m:
+        return None
+    return m.group(1) if m.group(1) else "~"
+
+
+def resolve_cd(target, base):
+    """The directory `cd target` lands in, or None when that is not knowable (unresolvable
+    base, a variable, `cd -`, or a target that does not exist). None is never guessed past:
+    a path after an unresolved cd is left completely alone."""
+    if base is None:
+        return None
+    t = target.strip("\"'")
+    if not t or t == "-" or "$" in t or "`" in t or "*" in t:
+        return None
+    p = os.path.expanduser(t)
+    full = p if os.path.isabs(p) else os.path.normpath(os.path.join(base, p))
+    return full if os.path.isdir(full) else None
+
+
+def advance_dir(seg, sep_before, eff):
+    """The effective directory AFTER seg runs, given the separator that preceded it."""
+    if sep_before == "|":
+        return eff  # a pipeline stage runs in a subshell; its cd never reaches the parent
+    target = cd_argument(seg)
+    if target is None:
+        return eff
+    return resolve_cd(target, eff)
+
+
 def rule_cd_missing_separator(command, notes):
     """R1: `cd <dir> <known-command> ...` -> `cd <dir> && <known-command> ...`"""
     lines = command.split("\n")
@@ -177,28 +229,50 @@ def resolve_relative_dir(rel, cwd, project_dir):
 
 
 def rule_cd_relative(command, cwd, project_dir, notes):
-    """R2: rewrite a relative `cd X` that does not exist here but resolves uniquely under the project."""
+    """R2: rewrite a relative `cd X` that does not exist here but resolves uniquely under the
+    project. Chained cds are resolved against the directory the PREVIOUS cd landed in, so
+    `cd /a/b && cd sub` checks /a/b/sub, not <tool cwd>/sub."""
     lines = command.split("\n")
     changed = False
+    eff = cwd
     for i, line in first_line_segments(command):
-        m = re.match(r'^(\s*cd\s+)("[^"]+"|\'[^\']+\'|[^\s;&|]+)(.*)$', line)
-        if not m:
-            continue
-        target = m.group(2)
-        hits = resolve_relative_dir(target, cwd, project_dir)
-        if hits is None:
-            continue
-        if len(hits) == 1:
-            lines[i] = f"{m.group(1)}{hits[0]}{m.group(3)}"
-            notes.append(f"R2 `cd {target}` does not exist under the current cwd ({cwd}); rewrote to the one "
-                         f"matching directory {hits[0]}. Use absolute paths: the Bash tool's cwd does not persist.")
-            changed = True
-        elif len(hits) > 1:
-            notes.append(f"R2 `cd {target}` does not exist under {cwd} and is ambiguous under the project "
-                         f"({len(hits)} matches: {', '.join(hits[:4])}). Not rewritten; pick one by absolute path.")
-        else:
-            notes.append(f"R2 `cd {target}` does not exist under {cwd} or anywhere under the project root. "
-                         f"Not rewritten; `ls` the parent before guessing again.")
+        parts = split_segments(line)
+        touched = False
+        for j in range(0, len(parts), 2):
+            seg = parts[j]
+            sep_before = parts[j - 1].strip() if j else ""
+            if sep_before == "|":
+                continue
+            target = cd_argument(seg)
+            if target is None:
+                continue
+            if eff is None:
+                continue  # an earlier cd could not be resolved; never guess from an unknown base
+            landed = resolve_cd(target, eff)
+            if landed is not None:
+                eff = landed
+                continue
+            hits = resolve_relative_dir(target, eff, project_dir)
+            if hits is None:
+                eff = None
+                continue
+            if len(hits) == 1:
+                parts[j] = seg.replace(target, hits[0], 1)
+                notes.append(f"R2 `cd {target}` does not exist under {eff}; rewrote to the one "
+                             f"matching directory {hits[0]}. Use absolute paths: the Bash tool's cwd does not persist.")
+                touched = True
+                changed = True
+                eff = hits[0]
+            elif len(hits) > 1:
+                notes.append(f"R2 `cd {target}` does not exist under {eff} and is ambiguous under the project "
+                             f"({len(hits)} matches: {', '.join(hits[:4])}). Not rewritten; pick one by absolute path.")
+                eff = None
+            else:
+                notes.append(f"R2 `cd {target}` does not exist under {eff} or anywhere under the project root. "
+                             f"Not rewritten; `ls` the parent before guessing again.")
+                eff = None
+        if touched:
+            lines[i] = "".join(parts)
     return "\n".join(lines) if changed else command
 
 
@@ -303,15 +377,27 @@ def find_by_basename(path, project_dir):
 def rule_read_paths(command, cwd, project_dir, notes):
     """R2b: a path handed to a READ-ONLY command that does not exist. Unique basename match under
     the project -> rewrite; otherwise name the candidates so the next call is not a second guess.
-    87 'file guessed wrong' failures in 14 days; most were a wrong directory for a real file."""
+    87 'file guessed wrong' failures in 14 days; most were a wrong directory for a real file.
+
+    Every candidate is resolved against the EFFECTIVE directory at that point in the command, so a
+    path that exists where the command actually runs is left untouched and silent."""
     lines = command.split("\n")
     changed = False
     # A file this same command creates (`... > out.txt; wc -l out.txt`) does not exist yet at
     # hook time and must not be reported missing.
     created = set(m.group(1).strip("\"'") for m in re.finditer(r"(?:^|[^<>])>{1,2}\s*([^\s;&|]+)", command))
     created |= set(m.group(1).strip("\"'") for m in re.finditer(r"(?:^|[|;&(]\s*|\s)tee\s+(?:-[a-z]+\s+)*([^\s;&|]+)", command))
+    eff = cwd
     for i, line in first_line_segments(command):
-        for seg in re.split(r"\s*(?:&&|\|\||;|\|)\s*", line):
+        parts = split_segments(line)
+        touched = False
+        for j in range(0, len(parts), 2):
+            seg = parts[j]
+            sep_before = parts[j - 1].strip() if j else ""
+            here = eff
+            eff = advance_dir(seg, sep_before, eff)
+            if here is None:
+                continue  # an earlier cd was unresolvable: this path's base is unknown, say nothing
             toks = seg.strip().split()
             if not toks or os.path.basename(toks[0]) not in READ_CMDS:
                 continue
@@ -332,12 +418,13 @@ def rule_read_paths(command, cwd, project_dir, notes):
                 p = os.path.expanduser(tok.strip("\"'"))
                 if tok.strip("\"'") in created:
                     continue
-                full = p if os.path.isabs(p) else os.path.join(cwd, p)
+                full = p if os.path.isabs(p) else os.path.join(here, p)
                 if os.path.exists(full):
                     continue
                 hits = find_by_basename(p, project_dir)
                 if len(hits) == 1:
-                    lines[i] = lines[i].replace(tok, hits[0], 1)
+                    parts[j] = parts[j].replace(tok, hits[0], 1)
+                    touched = True
                     notes.append(f"R2b `{p}` does not exist; the only file with that name under the project is {hits[0]}, rewritten.")
                     changed = True
                 elif hits:
@@ -346,6 +433,8 @@ def rule_read_paths(command, cwd, project_dir, notes):
                     parent = os.path.dirname(full)
                     sib = sorted(os.listdir(parent))[:8] if os.path.isdir(parent) else []
                     notes.append(f"R2b `{p}` does not exist" + (f"; {parent} holds: {', '.join(sib)}" if sib else f" and neither does {parent}") + ". Not rewritten.")
+        if touched:
+            lines[i] = "".join(parts)
     return "\n".join(lines) if changed else command
 
 
