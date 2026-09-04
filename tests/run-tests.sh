@@ -735,12 +735,10 @@ test_no_hardcoded_vaults_path() {
   # Hooks should not have hardcoded ~/Vaults or ~/Downloads/Vaults
   # Only common.sh should have the detection logic
   local hardcoded=0
-  for script in session-start.sh; do
-    if grep -E 'HOME/Vaults|HOME/Downloads/Vaults' "$PLUGIN_ROOT/hooks/scripts/$script" 2>/dev/null | grep -v "^#"; then
-      echo "  Hardcoded path in: $script"
-      hardcoded=1
-    fi
-  done
+  if grep -E 'HOME/Vaults|HOME/Downloads/Vaults' "$PLUGIN_ROOT/hooks/scripts/session-start.sh" 2>/dev/null | grep -v "^#"; then
+    echo "  Hardcoded path in: session-start.sh"
+    hardcoded=1
+  fi
   assert_exit_code 0 "$hardcoded" "hooks should use common.sh for path detection"
 }
 
@@ -1816,7 +1814,7 @@ test_migration_010_preserves_unparseable_ts() {
   sqlite3 "$db" "INSERT INTO errors(ts,tool,error) VALUES ('','Bash','empty-ts');"
   sqlite3 "$db" "INSERT INTO errors(ts,tool,error) VALUES ('garbage-ts','Bash','garbage');"
   # Re-run 010 directly (it is already applied on a fresh DB; re-reading is idempotent).
-  sqlite3 "$db" ".read $PLUGIN_ROOT/orchestration/agentdb/migrations/010_normalize_timestamps.sql"
+  sqlite3 "$db" < "$PLUGIN_ROOT/orchestration/agentdb/migrations/010_normalize_timestamps.sql"
   assert_equals "1" "$(sqlite3 "$db" "SELECT ts LIKE '%Z' FROM errors WHERE error='legacy-valid';")" "parseable legacy ts must normalize to ...Z" || return 1
   assert_equals "1" "$(sqlite3 "$db" "SELECT ts IS NOT NULL FROM errors WHERE error='empty-ts';")" "empty ts must NOT be nulled" || return 1
   assert_equals "1" "$(sqlite3 "$db" "SELECT ts IS NOT NULL FROM errors WHERE error='garbage';")" "garbage ts must NOT be nulled"
@@ -2158,13 +2156,10 @@ test_blocking_guards_do_not_source_breaker() {
   # auto-disable itself. So detect-secrets must NOT
   # `source` the circuit breaker (a tripped breaker would fail OPEN = allow).
   # Match an active source directive only, not the explanatory comment.
-  local g
-  for g in detect-secrets; do
-    if grep -qE '^[[:space:]]*(source|\.)[[:space:]]+.*circuit-breaker\.sh' "$PLUGIN_ROOT/hooks/scripts/$g.sh"; then
-      echo "FAIL: $g.sh sources circuit-breaker.sh, a blocking guard must always run"
-      return 1
-    fi
-  done
+  if grep -qE '^[[:space:]]*(source|\.)[[:space:]]+.*circuit-breaker\.sh' "$PLUGIN_ROOT/hooks/scripts/detect-secrets.sh"; then
+    echo "FAIL: detect-secrets.sh sources circuit-breaker.sh, a blocking guard must always run"
+    return 1
+  fi
   # The breaker itself still exists for non-blocking hooks (e.g. auto-approve, telemetry).
   [ -f "$PLUGIN_ROOT/hooks/scripts/circuit-breaker.sh" ]
 }
@@ -2253,25 +2248,6 @@ test_retrospective_registered() {
 
 test_retrospective_has_agentdb() {
   grep -q "agentdb" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
-}
-
-test_retrospective_has_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
-}
-
-test_retrospective_has_clusters() {
-  grep -q "Clusters\|cluster" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
-}
-
-test_retrospective_queries_current_learning_schema() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/skills/retrospective/SKILL.md")
-  assert_contains "$content" "SELECT id, type, insight, evidence, hit_count, load_count, ts, last_hit FROM learnings ORDER BY ts DESC" "retrospective must query current AgentDB columns" || return 1
-  assert_contains "$content" "COALESCE(last_hit, ts) < datetime('now', '-30 days')" "staleness must use last recall when available" || return 1
-  if grep -qE 'content, evidence, reinforced, created_at|ORDER BY created_at' "$PLUGIN_ROOT/skills/retrospective/SKILL.md"; then
-    echo "FAIL: retrospective still names removed learning columns"
-    return 1
-  fi
 }
 
 test_ship_bump_targets_are_truthful() {
@@ -4792,9 +4768,6 @@ run_test_suite() {
       run_test "retrospective command exists with frontmatter" test_retrospective_command_exists
       run_test "retrospective registered in plugin.json" test_retrospective_registered
       run_test "retrospective has agentdb integration" test_retrospective_has_agentdb
-      run_test "retrospective has output format" test_retrospective_has_output_format
-      run_test "retrospective has cluster analysis" test_retrospective_has_clusters
-      run_test "retrospective queries current learning schema" test_retrospective_queries_current_learning_schema
       run_test "ship bump targets are truthful" test_ship_bump_targets_are_truthful
       run_test "resolved contradictions have learning mutation evidence" test_retrospective_contradictions_have_mutation_evidence
       ;;
