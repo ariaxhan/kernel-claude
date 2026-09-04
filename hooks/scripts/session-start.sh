@@ -14,6 +14,7 @@ _kernel_hook_start
 
 # Detect paths
 VAULTS=$(detect_vaults)
+export AGENTDB_ROOT="$VAULTS"
 AGENTDB=$(get_agentdb "$VAULTS")
 PROJECT_ROOT=$(get_project_root)
 VAULTS_CONTINUITY_ACTIVE=0

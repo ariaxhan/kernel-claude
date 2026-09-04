@@ -2,6 +2,14 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.10.3] - 2026-09-03
+
+### Fixed
+
+- Session-start now pins every AgentDB operation to the durable Vaults root. The prior fix moved
+  the session ID but a background telemetry write could still recreate `_meta/` inside a clean
+  checkout; Linux CI exposed the race.
+
 ## [9.10.2] - 2026-09-03
 
 ### Fixed
