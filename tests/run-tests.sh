@@ -508,6 +508,7 @@ test_session_start_outputs_kernel() {
 test_session_start_keeps_identity_outside_target() {
   local target="$TEST_DIR/disposable" vaults="$TEST_DIR/vaults" stderr_file="$TEST_DIR/stderr" rc=0 session_file
   mkdir -p "$target" "$vaults"
+  git -C "$target" init -q
 
   (cd "$target" && CLAUDE_PROJECT_DIR="$target" KERNEL_VAULTS="$vaults" \
     "$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null >/dev/null 2>"$stderr_file") || rc=$?

@@ -91,15 +91,6 @@ cd "$PROJECT_ROOT" 2>/dev/null || true
 if git rev-parse --git-dir >/dev/null 2>&1; then
   BRANCH=$(git branch --show-current 2>/dev/null)
   echo "**Branch:** $BRANCH"
-  # Where this session started, so session-end can post a receipt naming exactly
-  # what landed against which issue. Without this the receipt call is unreachable.
-  _KERNEL_RUNTIME_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}/_meta/.runtime"
-  # `|| true` is load-bearing: a repo with no commits has no HEAD, and under
-  # `set -eo pipefail` this line's failure killed the entire SessionStart hook
-  # with exit 128. A fresh repo got no context injection at all, which is
-  # exactly the session that needs it most.
-  mkdir -p "$_KERNEL_RUNTIME_DIR" 2>/dev/null && \
-    { git rev-parse HEAD > "$_KERNEL_RUNTIME_DIR/session-start-sha" 2>/dev/null || true; }
   CHANGES=$(git status --porcelain --ignore-submodules=dirty 2>/dev/null | wc -l | tr -d ' ')
   if [ "$CHANGES" -gt 0 ]; then
     echo "**Uncommitted:** $CHANGES file(s) on branch $BRANCH"
