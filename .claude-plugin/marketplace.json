@@ -1,6 +1,6 @@
 {
   "name": "kernel-marketplace",
-  "description": "Safety guardrails, cross-host hooks, and agentdb memory for Claude Code and Codex in auto mode",
+  "description": "Direct, decomposed execution with local memory and minimal cross-host hooks",
   "owner": {
     "name": "Aria Han"
   },
@@ -8,8 +8,8 @@
     {
       "name": "kernel",
       "source": "./",
-      "description": "Safety guardrails, cross-host hooks, and agentdb memory for Claude Code and Codex in auto mode",
-      "version": "9.10.1"
+      "description": "Direct, decomposed execution with local memory and minimal cross-host hooks",
+      "version": "9.10.2"
     }
   ]
 }

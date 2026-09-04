@@ -2,6 +2,21 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.10.2] - 2026-09-03
+
+### Fixed
+
+- Release installation now updates Claude's selected runtime and proves a fresh Claude process
+  loaded that exact version.
+- Hook manifests no longer bind 110 retired commands; all four retained commands resolve.
+- Session identity persists outside disposable project checkouts, so projects without `_meta/`
+  no longer fail at startup.
+
+### Removed
+
+- 1,528 lines of tests for intentionally retired runtime machinery. The remaining suite passes
+  336 checks with zero failures.
+
 ## [9.10.1] - 2026-09-03
 
 ### Fixed
