@@ -202,6 +202,13 @@ kernel_init_agentdb() {
 # Backward-compatible internal name used by existing checks.
 update_current_symlink() { kernel_update_current; }
 
+# Session identity belongs to KERNEL's durable state, not the target checkout.
+kernel_session_id_file() {
+  local vaults="$1" project_root="$2" project_key
+  project_key=$(printf '%s' "$project_root" | shasum -a 256 | awk '{print $1}') || return 1
+  printf '%s\n' "$vaults/_meta/agents/by-project/$project_key/session-id"
+}
+
 # Detect Vaults location - env var takes priority, then checks filesystem
 detect_vaults() {
   # Explicit override always wins (for testing + custom setups)
@@ -344,11 +351,13 @@ _kernel_hook_end() {
   vaults=$(detect_vaults)
   local agentdb
   agentdb=$(get_agentdb "$vaults")
-  # Read session_id from persisted file (written by session-start.sh)
+  # Read session_id from durable KERNEL state (written by session-start.sh).
   local session_id
   local project_root
   project_root=$(get_project_root)
-  session_id=$(cat "$project_root/_meta/.session_id" 2>/dev/null || echo "")
+  local session_id_file
+  session_id_file=$(kernel_session_id_file "$vaults" "$project_root") || session_id_file=""
+  session_id=$(cat "$session_id_file" 2>/dev/null || echo "")
   # Fire-and-forget: never block hook on telemetry
   "$agentdb" emit hook "$hook_name" "$duration_ms" "{\"exit_code\":$exit_code}" "" "$session_id" 2>/dev/null &
 }

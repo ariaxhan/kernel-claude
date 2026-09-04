@@ -26,9 +26,12 @@ if [ ! -f "$MEMORY_DIR/MEMORY.md" ]; then
   [ ! -f "$MEMORY_DIR/MEMORY.md" ] && echo "# Memory Index" > "$MEMORY_DIR/MEMORY.md" 2>/dev/null || true
 fi
 
-# Generate session ID and persist for other hooks
+# Generate session ID and persist for other hooks outside the target checkout.
 KERNEL_SESSION_ID="sess-$(date +%Y%m%d%H%M%S)-$$"
-echo "$KERNEL_SESSION_ID" > "$PROJECT_ROOT/_meta/.session_id" 2>/dev/null || true
+AGENTS_DIR="$VAULTS/_meta/agents"
+SESSION_ID_FILE=$(kernel_session_id_file "$VAULTS" "$PROJECT_ROOT")
+mkdir -p "$(dirname "$SESSION_ID_FILE")"
+printf '%s\n' "$KERNEL_SESSION_ID" > "$SESSION_ID_FILE"
 export KERNEL_SESSION_ID
 
 # Generate agent name and persist for other hooks.
@@ -36,7 +39,6 @@ export KERNEL_SESSION_ID
 # race under concurrent sessions, any parallel SessionStart overwrites it and any
 # SessionEnd deletes it, which is how ~43% of commits ended up tagged "unknown-*".
 AGENT_NAME="main-$$"
-AGENTS_DIR="$VAULTS/_meta/agents"
 mkdir -p "$AGENTS_DIR/by-session"
 if [ ! -t 0 ]; then
     CLAUDE_SESSION_ID=$(cat 2>/dev/null | jq -r '.session_id // empty' 2>/dev/null || true)

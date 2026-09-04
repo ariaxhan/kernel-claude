@@ -505,6 +505,21 @@ test_session_start_outputs_kernel() {
   assert_contains "$output" "agentdb"
 }
 
+test_session_start_keeps_identity_outside_target() {
+  local target="$TEST_DIR/disposable" vaults="$TEST_DIR/vaults" stderr_file="$TEST_DIR/stderr" rc=0 session_file
+  mkdir -p "$target" "$vaults"
+
+  (cd "$target" && CLAUDE_PROJECT_DIR="$target" KERNEL_VAULTS="$vaults" \
+    "$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null >/dev/null 2>"$stderr_file") || rc=$?
+
+  assert_equals "0" "$rc" "session-start exit" || return 1
+  assert_equals "" "$(cat "$stderr_file")" "session-start stderr" || return 1
+  [ ! -e "$target/_meta" ] || { echo "  FAIL: target checkout received runtime state"; return 1; }
+  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
+  session_file=$(kernel_session_id_file "$vaults" "$target") || return 1
+  assert_file_exists "$session_file" "session identity should live in durable KERNEL state"
+}
+
 test_session_start_creates_agent_file() {
   # Hook writes to VAULTS/_meta/agents (detected via common.sh)
   # In test env, we set KERNEL_VAULTS to test project
@@ -5412,6 +5427,7 @@ run_test_suite() {
     hooks)
       run_test "lifecycle hooks survive a repo with no commits" test_lifecycle_hooks_survive_a_repo_with_no_commits
       run_test "session-start outputs KERNEL" test_session_start_outputs_kernel
+      run_test "session-start keeps identity outside target" test_session_start_keeps_identity_outside_target
       run_test "session-start creates agent file" test_session_start_creates_agent_file
       run_test "detect-secrets clean file" test_detect_secrets_clean
       run_test "hooks.json has SessionStart" test_hooks_json_has_session_start
