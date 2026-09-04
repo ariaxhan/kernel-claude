@@ -67,6 +67,54 @@
         "jq"
       ],
       "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "circuit-breaker",
+      "script": "hooks/scripts/circuit-breaker.sh",
+      "class": "library",
+      "events": [],
+      "external_deps": [
+        "python3"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "common",
+      "script": "hooks/scripts/common.sh",
+      "class": "library",
+      "events": [],
+      "external_deps": [
+        "jq"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "github-integration",
+      "script": "hooks/scripts/github-integration.sh",
+      "class": "library",
+      "events": [],
+      "external_deps": [
+        "gh"
+      ],
+      "degraded_mode": "fail-open-loud"
+    },
+    {
+      "id": "scan-output-impl",
+      "script": "hooks/scripts/scan-output.py",
+      "class": "library",
+      "events": [],
+      "external_deps": [],
+      "degraded_mode": "not-applicable"
+    },
+    {
+      "id": "test-gate",
+      "script": "hooks/scripts/test-gate.sh",
+      "class": "library",
+      "events": [],
+      "external_deps": [
+        "git"
+      ],
+      "degraded_mode": "fail-open-loud"
     }
   ]
 }

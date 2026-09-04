@@ -36,6 +36,27 @@
       "state": "prose-wired",
       "tracked_by": "#169",
       "note": "Named in skills/ingest/SKILL.md (tier-2 contract as Issue), so it runs only when an agent follows that prose. #169 decides whether issue-per-commission becomes a real call site."
+    },
+    {
+      "function": "_gh_post_landing_receipts",
+      "script": "hooks/scripts/github-integration.sh",
+      "state": "candidate-for-retirement",
+      "tracked_by": "#244",
+      "note": "Its SessionEnd caller retired in 9.10.0; retained temporarily as a sourced library API."
+    },
+    {
+      "function": "_gh_post_session_summary",
+      "script": "hooks/scripts/github-integration.sh",
+      "state": "candidate-for-retirement",
+      "tracked_by": "#244",
+      "note": "Its SessionEnd caller retired in 9.10.0; retained temporarily as a sourced library API."
+    },
+    {
+      "function": "kernel_hook_error",
+      "script": "hooks/scripts/common.sh",
+      "state": "candidate-for-retirement",
+      "tracked_by": "#244",
+      "note": "Its capture-error caller retired in 9.10.0; retained temporarily as a sourced library API."
     }
   ]
 }
