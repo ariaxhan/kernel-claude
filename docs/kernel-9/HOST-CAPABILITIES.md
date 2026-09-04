@@ -19,7 +19,7 @@ What each host actually supports. Kernel does not claim parity it does not have.
 
 ### Codex
 
-- **SessionEnd** — capped at 3s. Kernel's binding wants 210s.
+- **SessionEnd** — capped at 3s.
 
 codex-cli 0.147.0 hard-clamps SessionEnd hook timeouts and says so on every session start: `clamping SessionEnd hook timeout to 3s in <plugin>/hooks.json`. The clamp string is extracted from the shipped binary and is SessionEnd-specific; no other lifecycle event carries one. A declared timeout above this ceiling is not honoured, it is overruled.
 

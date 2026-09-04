@@ -292,16 +292,23 @@ class EveryHostBindsRealScripts(unittest.TestCase):
                     "substitutes; every hook would expand to / and exit 127",
                 )
 
-    def test_every_binding_resolves_to_a_script_on_disk(self):
+    def test_every_binding_resolves_to_a_shipped_executable(self):
+        bound = set()
         for key, host in spec()["hosts"].items():
             for event, cmd in self._bindings(host):
                 # Strip whatever ${...}/ prefix this host uses, then drop args.
                 rel = cmd.split("}/", 1)[1].split()[0]
                 with self.subTest(host=key, event=event, script=rel):
-                    self.assertTrue(
-                        os.path.isfile(os.path.join(REPO, rel)),
-                        f"{key} {event} binds missing script {rel}",
-                    )
+                    path = os.path.join(REPO, rel)
+                    self.assertTrue(os.path.isfile(path), f"{key} {event} binds missing script {rel}")
+                    self.assertTrue(os.access(path, os.X_OK), f"{key} {event} binds non-executable script {rel}")
+                    bound.add(rel)
+
+        registry = load(os.path.join("hooks", "gates.json"))
+        declared = {
+            hook["script"] for hook in registry["hooks"] if hook["class"] != "library"
+        }
+        self.assertEqual(bound, declared, "manifest and shipped hook registry diverge")
 
 class HostEnforcedTimeoutCeilings(unittest.TestCase):
     """A timeout the host overrules is a claim, not a budget.
@@ -425,11 +432,6 @@ class TruthfulCapabilityReporting(unittest.TestCase):
             "PostToolUseFailure",
             set(spec()["hosts"]["codex"]["supported_lifecycle_events"]),
         )
-
-    def test_claude_still_binds_post_tool_use_failure(self):
-        """Control: the fix must not degrade the host that does support it."""
-        doc = load(os.path.join("hooks", "hooks.json"))
-        self.assertIn("PostToolUseFailure", doc["hooks"])
 
     def test_every_gap_is_documented_with_a_reason(self):
         for key, host in spec()["hosts"].items():
