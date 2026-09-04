@@ -1,6 +1,6 @@
 ---
 name: simplify
-description: "Lower cyclomatic complexity with AST-aware measurement, per-function budgets, regression diffs, and a project gate. Triggers: simplify, refactor, complexity, spaghetti."
+description: "Simplify code, plans, and systems without removing required outcomes or features; for code, lower cyclomatic complexity with AST-aware measurement and regression gates. Triggers: simplify, refactor, complexity, spaghetti, overengineered."
 user-invocable: true
 allowed-tools: Agent, Bash, Read, Edit, Grep, Glob
 kernel:
@@ -13,9 +13,12 @@ kernel:
 <skill id="simplify">
 
 <purpose>
-AI-written code works but branches like a jungle. This skill forces a measured per-function
-number, records its movement, and installs the same check in the project's normal verification.
-Prose about "cleaner code" is not accepted.
+Simplification makes the road easier; it does not change the destination. Preserve every required
+outcome, feature, behavior, and explicit constraint. Simplify only how they are delivered: fewer
+branches, concepts, components, dependencies, states, handoffs, and duplicated mechanisms.
+
+For code, this skill forces a measured per-function number, records its movement, and installs the
+same check in the project's normal verification. Prose about "cleaner code" is not accepted.
 
 Adapted from saurabhkumar8112/cyclomatic-complexity-skill (Apache-2.0). The refactoring model
 never signs its own result; a verifier re-measures and runs the armed project gate.
@@ -70,12 +73,18 @@ Ladder (default, project config outranks it):
 </measure>
 
 <workflow>
-1. Measure. Print the table before touching anything. Rank by CCN descending.
-2. Confirm tests exist and pass. None: say so, refactor conservatively, propose one test per
+1. Freeze the destination before editing: list every required outcome, feature, behavior, explicit
+   constraint, and acceptance condition from the request and current source of truth. This is the
+   preservation contract. Deferred is not preserved unless the source already defers it.
+2. Trace each contract item to a concrete part of the proposed result. If any item has no route,
+   the simplification is invalid. Never redefine product scope, success, or priority to make the
+   implementation smaller.
+3. Measure. Print the table before touching anything. Rank by CCN descending.
+4. Confirm tests exist and pass. None: say so, refactor conservatively, propose one test per
    extracted function.
-3. Save `--all` output as the before baseline. Refactor worst first, one function at a time.
-4. Re-measure with `--diff before.tsv`. Any `regressed` row is unresolved.
-5. Wire the project-owned gate before handoff:
+5. Save `--all` output as the before baseline. Refactor worst first, one function at a time.
+6. Re-measure with `--diff before.tsv`. Any `regressed` row is unresolved.
+7. Wire the project-owned gate before handoff:
    - add a `complexity` script/check using the project's checked-in runner or native analyzer;
    - seed `.complexity-baseline.tsv` with current over-budget rows only; the CI ratchet
      grandfathers those exact values, rejects increases/new violations, and requires a refreshed
@@ -83,7 +92,10 @@ Ladder (default, project config outranks it):
    - include it in `npm run verify`, Make/just verify, or the existing pre-commit gate;
    - run that exact parent command red against a seeded over-budget fixture, then green;
    - never point CI at a developer's plugin-cache path.
-6. Hand off to the verifier. Its fresh diff and armed-gate run are the record.
+8. Re-check every preservation-contract item against the result. A shorter plan, backlog, or code
+   path that drops, weakens, postpones, or makes optional any item is a regression, even if its
+   complexity score improves.
+9. Hand off to the verifier. Its fresh diff, preservation check, and armed-gate run are the record.
 </workflow>
 
 <tactics order="preference">
@@ -96,7 +108,14 @@ Ladder (default, project config outranks it):
 </tactics>
 
 <hard_rules>
+- Preserve the destination: every requested outcome and feature remains required and reachable.
+  Simplify architecture and execution, never the user's ambition or product scope.
 - Preserve behavior. Tests before and after. Same inputs, same outputs, same errors.
+- Removal is allowed only for duplication or machinery whose absence cannot change any preservation-
+  contract item. "Not now," "later," "manual for the pilot," and narrower audiences/products are
+  scope cuts when the source of truth did not already say them.
+- Do not use sequencing as deletion. Later phases must still name their delivery route and acceptance
+  condition; evidence gates may reorder work, but cannot cancel it.
 - Do not game the metric. A dense one-liner hiding six branches is worse than the honest
   if-chain it replaced. Complexity moves into named units; it never disappears into cleverness.
   A CCN drop with a rising token count per line is the tell.
@@ -113,10 +132,10 @@ Spawn a verifier that never saw this session's reasoning. It receives: the diff,
 table, the claimed after table, the test command, and this contract:
 
 ```
-ACCEPTANCE: no measured function regresses; budgets hold; the project's normal verify path runs the gate
-ACCEPT WHEN: fresh --diff says regressed=0; project verify passes; seeded over-budget fixture makes it fail; no exported signature changed
-CHECK: ${CLAUDE_PLUGIN_ROOT}/scripts/complexity.sh --diff <before.tsv> <repo>; <project verify command>; <seeded failure probe>; git diff <base-ref> -- <files> | grep -E '^[-+](def |export |func |pub fn )'
-ESCALATE IF: AST-aware JS/TS parsing is unavailable for object-literal methods, any row regresses, a skip lacks a concrete parser limitation, or a one-liner replaced a branch without a name
+ACCEPTANCE: every preservation-contract item has an equally strong delivery route; no measured function regresses; budgets hold; the project's normal verify path runs the gate
+ACCEPT WHEN: item-by-item destination comparison has zero removed, weakened, newly deferred, or optional outcomes; fresh --diff says regressed=0; project verify passes; seeded over-budget fixture makes it fail; no exported signature changed
+CHECK: compare the source-of-truth outcomes/features/constraints against the result item by item; ${CLAUDE_PLUGIN_ROOT}/scripts/complexity.sh --diff <before.tsv> <repo>; <project verify command>; <seeded failure probe>; git diff <base-ref> -- <files> | grep -E '^[-+](def |export |func |pub fn )'
+ESCALATE IF: any preservation-contract item lacks a route or became weaker/later/optional; AST-aware JS/TS parsing is unavailable for object-literal methods; any row regresses; a skip lacks a concrete parser limitation; or a one-liner replaced a branch without a name
 DISCOVERY AXIS: invariant
 ```
 Builder and verifier identities go on the receipt. The builder never fills in "behavior verified".
@@ -127,6 +146,7 @@ End with, and nothing after it:
 ```
 ## Complexity report
 Reduced: N · unchanged: N · regressed: 0 · removed: N
+Destination: N/N outcomes and features preserved · weakened/deferred/removed: 0
 Budgets: <config path>; exceptions: <none | selectors + reasons>
 Gate: <project verify command> (seeded red -> clean green)
 Verified by: <verifier identity>
