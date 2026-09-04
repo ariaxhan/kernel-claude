@@ -241,7 +241,7 @@ run_pending_migrations() {
       applied=$(db_exec "SELECT 1 FROM _migrations WHERE name='$name' LIMIT 1;" 2>/dev/null || echo "")
       [ -n "$applied" ] && continue
     fi
-    if sqlite3 "$DB" ".timeout 5000" ".read $migration" 2>/dev/null; then
+    if sqlite3 -cmd ".timeout 5000" "$DB" < "$migration" 2>/dev/null; then
       if [ "$force" != "force" ]; then
         echo "$label: $name"
         MIGRATIONS_APPLIED=$((MIGRATIONS_APPLIED + 1))
@@ -270,7 +270,7 @@ cmd_init() {
   if [ ! -f "$DB" ]; then
     created_new=true
     if [ -f "$SCHEMA_DIR/schema.sql" ]; then
-      sqlite3 "$DB" "PRAGMA busy_timeout=5000;" ".read $SCHEMA_DIR/schema.sql"
+      sqlite3 -cmd ".timeout 5000" "$DB" < "$SCHEMA_DIR/schema.sql"
     else
       echo "Error: schema.sql not found at $SCHEMA_DIR/schema.sql" >&2
       echo "Cannot initialize database without schema definition." >&2
@@ -309,7 +309,7 @@ cmd_preflight() {
       echo "preflight:missing_table — $table not found, applying schema"
       # Re-apply schema (all CREATE TABLE IF NOT EXISTS, safe to re-run)
       if [ -f "$SCHEMA_DIR/schema.sql" ]; then
-        sqlite3 "$DB" ".timeout 5000" ".read $SCHEMA_DIR/schema.sql" >/dev/null 2>&1 || true
+        sqlite3 -cmd ".timeout 5000" "$DB" < "$SCHEMA_DIR/schema.sql" >/dev/null 2>&1 || true
       fi
       # Re-run migrations only if _migrations table exists (avoid circular dep)
       local has_migrations
