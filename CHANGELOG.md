@@ -2,6 +2,15 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.10.1] - 2026-09-03
+
+### Fixed
+
+- `simplify` now freezes every requested outcome, feature, behavior, constraint, and acceptance
+  condition before changing an implementation or plan. A simplification fails if it removes,
+  weakens, newly defers, or makes optional any part of that destination. Two independent Codex
+  lanes had simplified product scope instead of delivery machinery.
+
 ## [9.9.1] - 2026-09-03
 
 ### Removed

@@ -206,7 +206,7 @@ agentdb wtf                                        # confused? full ref: agentdb
 Recall with concrete nouns, not prose. Recall again after discovery, when scope/hypothesis changes, or on a new failure.
 
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
-Decompose large work into pieces that cannot be done wrong, then do them in order, each landed on the default branch. No worktrees, no branches for agent work, no reviewer fan-out. Load /kernel:simplify before and after writing code. Verify on the live surface; run tests once before merge at most. Do the work; never ask. A request Aria made or an issue she filed IS the decision: pick the most reasonable reading, do it, state the assumption in the deliverable. No AskUserQuestion, no QUESTION blocks, no menus, no "waiting on a human". Stop only for money, a client default branch, sending in her voice, or unrecoverable deletion.
+Do the work; never ask. A request Aria made or an issue she filed IS the decision: pick the most reasonable reading, do it, state the assumption in the deliverable. No AskUserQuestion, no QUESTION blocks, no menus, no "waiting on a human". Stop only for money, a client default branch, sending in her voice, or unrecoverable deletion.
 Subagents never ask and never escalate a choice; they decide, do, and report what they decided.
 KERNEL_CONTEXT
 # END GENERATED KERNEL AMBIENT
