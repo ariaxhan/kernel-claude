@@ -77,8 +77,8 @@ PATTERNS=(
 # test file whose `sk-` fixtures were obviously invented, and the agent worked
 # around it by assembling the string at runtime, leaving a permanently uglier
 # test. The exemption was written, and it immediately failed three of this
-# repo own detection tests: `AKIAIOSFODNN7EXAMPLE` is the canonical AWS example
-# key and contains the word EXAMPLE, `ghp_` fixtures run on 1234567, and so on.
+# repo own detection tests: the canonical AWS documentation example key contains
+# the word EXAMPLE, `ghp_` fixtures run on 1234567, and so on.
 # The strings that announce themselves as fake are exactly the strings a scanner
 # must still catch, because they are what a real leak looks like to a regex.
 #

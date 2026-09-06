@@ -23,4 +23,20 @@ jobs:
           min_score: 80
           fail_on_severity: high
           format: sarif
-          upload_sarif: true
+          output: ai-plugin-scanner.sarif
+          upload_sarif: false
+      # The composite action skips its own upload when its severity gate fails.
+      # Keep that failure and publish the evidence from the calling workflow.
+      - name: Preserve scanner report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ai-plugin-scanner-report
+          path: ai-plugin-scanner.sarif
+          if-no-files-found: error
+      - name: Publish scanner findings
+        if: always() && hashFiles('ai-plugin-scanner.sarif') != ''
+        uses: github/codeql-action/upload-sarif@e46ed2cbd01164d986452f91f178727624ae40d7 # v3
+        with:
+          sarif_file: ai-plugin-scanner.sarif
+          category: ai-plugin-scanner

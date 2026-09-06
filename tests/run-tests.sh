@@ -1439,7 +1439,7 @@ test_critical_guard_scripts_unchanged_for_820() {
     actual=$(shasum -a 256 "$PLUGIN_ROOT/hooks/scripts/$file" | awk '{print $1}')
     assert_equals "$expected" "$actual" "$file must remain unchanged" || return 1
   done <<'EOF'
-4860767389e605346ceec60a250493e8fe417cf3ecf4acf10ebd42a33c0ccbfe detect-secrets.sh
+2051cbfa974a268b82d3a9de3e790e63798dffa5de42fd0cff5c3eddb9b7db46 detect-secrets.sh
 EOF
 }
 
@@ -2263,8 +2263,8 @@ test_ship_bump_targets_are_truthful() {
 }
 
 test_methodology_carries_cross_loader_release_lessons() {
-  grep -q "one real payload fixture per loader" "$PLUGIN_ROOT/skills/testing/SKILL.md" &&
-    grep -q "NORMALIZE BEFORE ALLOWLISTS" "$PLUGIN_ROOT/skills/security/SKILL.md" &&
+  grep -q "one real payload fixture per loader" "$PLUGIN_ROOT/skills/build/reference/testing.md" &&
+    grep -q "NORMALIZE BEFORE ALLOWLISTS" "$PLUGIN_ROOT/skills/tearitapart/reference/security.md" &&
     grep -q "disposable plugin/cache copy" "$PLUGIN_ROOT/skills/ship/SKILL.md" &&
     grep -q "native manifest validator rejects required safety metadata" "$PLUGIN_ROOT/skills/ship/SKILL.md" &&
     grep -q "resource ceiling" "$PLUGIN_ROOT/skills/ship/SKILL.md"
@@ -2973,14 +2973,7 @@ test_skill_path_references_resolve() {
   # 8.1.2 deleted seven skills and left twenty skills/... loads pointing at them for six
   # months; every /kernel:dream run printed "quality subskill missing". Every skills/<x>/
   # path a skill or agent names must exist on disk.
-  local dead
-  dead=$(grep -rhoE 'skills/[a-z-]+/(reference/[a-z-]+\.md|SKILL\.md)' "$PLUGIN_ROOT/skills" "$PLUGIN_ROOT/agents" \
-    | sort -u | while read -r f; do [ -f "$PLUGIN_ROOT/$f" ] || echo "$f"; done)
-  [ -z "$dead" ] || {
-    echo "FAIL: skills/agents reference paths that do not exist:"
-    echo "$dead" | sed 's/^/  /'
-    return 1
-  }
+  python3 "$PLUGIN_ROOT/tests/kernel9/test_skill_dependencies.py"
 }
 
 test_claude_md_references_approval_learner() {
@@ -4634,6 +4627,7 @@ run_test_suite() {
       run_test "ingest has research step" test_ingest_command_has_research_step
       run_test "forge has loop control" test_forge_command_has_loop
       run_test "commands use structured format" test_commands_use_structured_format
+      run_test "methodology preserves cross-loader release lessons" test_methodology_carries_cross_loader_release_lessons
       ;;
     complexity)
       run_test "complexity sees object-literal methods" test_complexity_uses_ast_object_methods
