@@ -1,5 +1,5 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: 3951f9727b2c45e1b22fea41dc764506ad611fbf8206e7d448ee0e1cf40bfe89; adapter: claude -->
+     source-sha256: 1069644d6c2bb2cf3585a6b2bdfa351e5218439d0690c16d6ab4848b3034be2c; adapter: claude -->
 <kernel version="9.10.3">
 
 
@@ -187,7 +187,9 @@ reviewed the claim.</rule>
     exit status is not a verdict, and trusting one merged a PR with a failing required check.
     The ABSENCE of a CI run is a red state, not a pending one: a stacked PR whose base moved
     can go CONFLICTING and silently produce no runs at all, where pushes and reruns do
-    nothing.
+    nothing. A remote SHA read before its fetch COMPLETED is a local read wearing a remote
+    name: `ls-remote` against an unrefreshed object database, or a snapshot taken while
+    `git fetch` still runs, pins the old commit and every downstream receipt inherits it.
   </done>
   <receipts>
     Receipts fire on state changes -- cycle verdict, QA verdict, merge, live proof -- and
