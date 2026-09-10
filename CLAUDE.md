@@ -1,5 +1,5 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: ba9fe6f831838ef8474b63af7f9a64b270531da4f0d933e2d63d277a1af5a89e; adapter: claude -->
+     source-sha256: 7d2e479d36975dbc6b4c50e0d0ce05480a9715c874ced6d5a4833e94047e0c0b; adapter: claude -->
 <kernel version="9.10.3">
 
 
@@ -312,6 +312,30 @@ reviewed the claim.</rule>
   <block action="verify_sub_computation_only">A green sub-computation is not a green control flow. Drive the armed path end-to-end (wired hook, registered handler, fresh runtime); echo-test every wrapper param once (silently dropped params run defaults while reporting your value); name the live call site that reaches new code, built-but-unreachable is not shipped.</block>
   <block action="promote_learning_to_prose">A pattern reinforced 2+ (or once, if the failure is quiet/expensive) becomes an artifact: hook if enforceable, agent if it's a role, skill if it's methodology. CLAUDE.md prose is the last resort, not the default. Project-specific artifacts scaffold into the host project, not the plugin.</block>
 </anti_patterns>
+
+<speed>
+  <!-- Measured 2026-09-10 over 2100 sessions since 09-01: 40.1h of model think-time across
+       14,713 tool-call gaps (mean 9.8s) against 21.4h of actual tool execution. Latency is
+       the round trip, not the command. Every merged call is ~10s back. -->
+  <rule>Batch independent calls. Reads, greps, status checks and unrelated probes that do not
+    feed each other go in ONE message, or one Bash invocation joined by `;`. Serial round trips
+    for independent facts are the single largest recoverable cost in the log.</rule>
+  <rule>Never foreground a command that historically takes over a minute. Test suites, builds,
+    deploys, clones and installs start in the background, then wait on a CONDITION
+    (`until <check>; do sleep 5; done`), never a fixed loop. Measured: a 30-iteration poll burned
+    591s waiting on a service that was ready in 40, and foregrounded deploys blocked 300-600s
+    each while nothing else advanced.</rule>
+  <rule>A guard that blocked you is a routing failure, not a retry. When the hook names the
+    deterministic fix, RUN THAT FIX. Re-issuing the same command, or hand-editing what a script
+    would rewrite, spends a full turn to relearn what the hook already told you. ~1,100 blocked
+    calls in two weeks came from three guards that each printed their own remedy.</rule>
+  <rule>Do not re-run a command whose answer has not changed. `git status` ran 82 times and
+    identical Bash calls repeated 209 times inside single sessions. Session start already
+    prints branch, dirty count and recent commits; read it instead of re-deriving it.</rule>
+  <rule>Blocking on a human is the most expensive move available: 42 questions cost 1.6h of
+    dead wall clock, averaging 136s each, in a runtime whose first rule is to decide and act.
+    Decide, state the assumption, keep moving.</rule>
+</speed>
 
 <!-- ============================================ -->
 <!-- INVARIANTS (mirrored from NEXUS layer)       -->
