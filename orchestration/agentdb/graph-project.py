@@ -128,53 +128,61 @@ def classify_node(path: str) -> str:
     return "code"
 
 
-def collect_nodes(receipt: dict[str, Any], manifest: dict[str, Any] | None) -> dict[str, str]:
-    nodes: dict[str, str] = {}
+def _skill_names(entries: Any) -> list[str]:
+    """Skill entries arrive as either {"name": x} or a bare string, in two fields."""
+    names = []
+    for entry in entries or []:
+        if isinstance(entry, dict) and entry.get("name"):
+            names.append(str(entry["name"]))
+        elif isinstance(entry, str):
+            names.append(entry)
+    return names
 
-    def add(path: str, ntype: str | None = None) -> None:
-        path = path.strip()
-        if not path or path.startswith("frontend/*"):
-            return
-        nodes[path] = ntype or classify_node(path)
 
-    add("CLAUDE.md", "config")
+def _dict_paths(entries: Any) -> list[str]:
+    return [str(e["path"]) for e in entries or [] if isinstance(e, dict) and e.get("path")]
 
-    if manifest:
-        ctx = manifest.get("context") or {}
-        for group in ("required", "optional"):
-            for sel in ctx.get(group) or []:
-                if isinstance(sel, dict) and sel.get("path"):
-                    add(str(sel["path"]))
-        runtime = manifest.get("runtime") or {}
-        for entry in runtime.get("required_skills") or []:
-            if isinstance(entry, dict) and entry.get("name"):
-                add(skill_path(str(entry["name"])), "skill")
-            elif isinstance(entry, str):
-                add(skill_path(entry), "skill")
-        for entry in runtime.get("optional_skills") or []:
-            if isinstance(entry, dict) and entry.get("name"):
-                add(skill_path(str(entry["name"])), "skill")
-            elif isinstance(entry, str):
-                add(skill_path(entry), "skill")
 
-    for name in ALWAYS_SKILLS:
-        add(skill_path(name), "skill")
+def _manifest_nodes(manifest: dict[str, Any] | None) -> list[tuple[str, str | None]]:
+    if not manifest:
+        return []
+    found: list[tuple[str, str | None]] = []
+    ctx = manifest.get("context") or {}
+    for group in ("required", "optional"):
+        found += [(path, None) for path in _dict_paths(ctx.get(group))]
+    runtime = manifest.get("runtime") or {}
+    for field in ("required_skills", "optional_skills"):
+        found += [(skill_path(name), "skill") for name in _skill_names(runtime.get(field))]
+    return found
 
+
+def _receipt_nodes(receipt: dict[str, Any]) -> list[tuple[str, str | None]]:
+    found: list[tuple[str, str | None]] = []
     for sel in receipt.get("selections") or []:
         if not isinstance(sel, dict):
             continue
         parsed = parse_selector_path(str(sel.get("selector") or ""))
         if parsed:
-            add(parsed)
-
-    for entry in receipt.get("loads_beyond_manifest") or []:
-        if isinstance(entry, dict) and entry.get("path"):
-            add(str(entry["path"]))
-
+            found.append((parsed, None))
+    found += [(path, None) for path in _dict_paths(receipt.get("loads_beyond_manifest"))]
     manifest_ref = str(receipt.get("manifest") or "")
     if manifest_ref:
-        add(manifest_ref, "config")
+        found.append((manifest_ref, "config"))
+    return found
 
+
+def collect_nodes(receipt: dict[str, Any], manifest: dict[str, Any] | None) -> dict[str, str]:
+    found: list[tuple[str, str | None]] = [("CLAUDE.md", "config")]
+    found += _manifest_nodes(manifest)
+    found += [(skill_path(name), "skill") for name in ALWAYS_SKILLS]
+    found += _receipt_nodes(receipt)
+
+    nodes: dict[str, str] = {}
+    for path, ntype in found:
+        path = path.strip()
+        if not path or path.startswith("frontend/*"):
+            continue
+        nodes[path] = ntype or classify_node(path)
     return nodes
 
 

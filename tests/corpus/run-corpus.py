@@ -312,6 +312,69 @@ def check_cases(registry: dict, corpus: dict) -> None:
 
 
 # --------------------------------------------------------------- 3b. liveness
+def _degraded_probe(entry: dict, probes: list[dict]) -> dict | None:
+    """The case to replay with the gate's dependencies removed."""
+    if entry["degraded_mode"] == "fail-closed-when-armed":
+        return next((c for c in probes if c.get("arms")), None)
+    blocking = next((c for c in probes if c["expect"] == "block"), None)
+    return blocking or (probes[0] if probes else None)
+
+
+def _run_degraded(entry: dict, probe: dict, fixtures: dict):
+    """Replay one probe with the declared deps off PATH. None means it timed out."""
+    payload = assemble(probe["input"], fixtures)
+    repo = arm_fixture(probe["arms"]) if probe.get("arms") else None
+    deps = tuple(entry.get("external_deps", []))
+    try:
+        return run_hook(entry["script"], payload, env_path=path_without(deps), cwd=repo), repo
+    except subprocess.TimeoutExpired:
+        fail(f"{entry['id']}: timed out with {', '.join(deps)} missing.")
+        return None, repo
+    finally:
+        if repo:
+            shutil.rmtree(repo, ignore_errors=True)
+
+
+def _judge_degraded(entry: dict, proc, armed: bool) -> None:
+    """Compare observed degraded behavior against the declared degraded_mode."""
+    mode = entry["degraded_mode"]
+    missing = ", ".join(entry.get("external_deps", []))
+    did_block = blocked(proc)
+
+    if mode in ("fail-closed", "fail-closed-when-armed"):
+        if not did_block:
+            fail(
+                f"LIVENESS: {entry['id']} declares {mode} but ALLOWED its own block "
+                f"case{' (armed)' if armed else ''} with {missing} missing "
+                f"(rc={proc.returncode}). This is a fence that fails dark."
+            )
+        return
+
+    if mode == "fail-open-loud":
+        if did_block:
+            notes.append(
+                f"{entry['id']}: declares fail-open-loud but refused with {missing} "
+                "missing. Stricter than declared; update the declaration or the code."
+            )
+        elif not proc.stderr.strip():
+            fail(
+                f"LIVENESS: {entry['id']} declares fail-open-loud but degraded SILENTLY "
+                f"with {missing} missing (no stderr). A silent fail-open is "
+                "indistinguishable from a passing check."
+            )
+        return
+
+    if mode == "fail-abstain":
+        approved = "allow" in proc.stdout and "permissionDecision" in proc.stdout.replace(
+            "decision", "permissionDecision"
+        )
+        if approved:
+            fail(
+                f"LIVENESS: {entry['id']} declares fail-abstain but emitted an APPROVING "
+                f"decision with {missing} missing. Uncertainty became consent."
+            )
+
+
 def check_degraded_modes(registry: dict, corpus: dict) -> None:
     fixtures = corpus.get("fixtures", {})
     cases_by_gate: dict[str, list[dict]] = {}
@@ -319,67 +382,14 @@ def check_degraded_modes(registry: dict, corpus: dict) -> None:
         cases_by_gate.setdefault(case["gate"], []).append(case)
 
     for entry in registry["hooks"]:
-        if entry["class"] != "gate":
+        if entry["class"] != "gate" or not entry.get("external_deps"):
             continue
-        deps = tuple(entry.get("external_deps", []))
-        if not deps:
-            continue
-        probes = cases_by_gate.get(entry["id"], [])
-        mode = entry["degraded_mode"]
-
-        if mode == "fail-closed-when-armed":
-            probe = next((c for c in probes if c.get("arms")), None)
-        else:
-            probe = next((c for c in probes if c["expect"] == "block"), None) or (
-                probes[0] if probes else None
-            )
+        probe = _degraded_probe(entry, cases_by_gate.get(entry["id"], []))
         if probe is None:
             continue
-
-        payload = assemble(probe["input"], fixtures)
-        stripped = path_without(deps)
-        repo = arm_fixture(probe["arms"]) if probe.get("arms") else None
-        try:
-            proc = run_hook(entry["script"], payload, env_path=stripped, cwd=repo)
-        except subprocess.TimeoutExpired:
-            fail(f"{entry['id']}: timed out with {', '.join(deps)} missing.")
-            continue
-        finally:
-            if repo:
-                shutil.rmtree(repo, ignore_errors=True)
-
-        did_block = blocked(proc)
-        loud = bool(proc.stderr.strip())
-        approved = "allow" in proc.stdout and "permissionDecision" in proc.stdout.replace(
-            "decision", "permissionDecision"
-        )
-
-        if mode in ("fail-closed", "fail-closed-when-armed"):
-            if not did_block:
-                armed = " (armed)" if repo else ""
-                fail(
-                    f"LIVENESS: {entry['id']} declares {mode} but ALLOWED its own block "
-                    f"case{armed} with {', '.join(deps)} missing (rc={proc.returncode}). "
-                    "This is a fence that fails dark."
-                )
-        elif mode == "fail-open-loud":
-            if did_block:
-                notes.append(
-                    f"{entry['id']}: declares fail-open-loud but refused with {', '.join(deps)} "
-                    "missing. Stricter than declared; update the declaration or the code."
-                )
-            elif not loud:
-                fail(
-                    f"LIVENESS: {entry['id']} declares fail-open-loud but degraded SILENTLY "
-                    f"with {', '.join(deps)} missing (no stderr). A silent fail-open is "
-                    "indistinguishable from a passing check."
-                )
-        elif mode == "fail-abstain":
-            if approved:
-                fail(
-                    f"LIVENESS: {entry['id']} declares fail-abstain but emitted an APPROVING "
-                    f"decision with {', '.join(deps)} missing. Uncertainty became consent."
-                )
+        proc, repo = _run_degraded(entry, probe, fixtures)
+        if proc is not None:
+            _judge_degraded(entry, proc, armed=bool(repo))
 
 
 def main() -> int:

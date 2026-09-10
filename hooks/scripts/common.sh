@@ -32,8 +32,6 @@ kernel_cache_dir() {
   printf '%s\n' "$cache"
 }
 
-kernel_semver() { [[ "$1" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; }
-
 kernel_validate_runtime_root() {
   local root="$1" cache
   kernel_safe_path "$root" || return 1
@@ -199,9 +197,6 @@ kernel_init_agentdb() {
   AGENTDB_ROOT="$vaults" "$agentdb" init
 }
 
-# Backward-compatible internal name used by existing checks.
-update_current_symlink() { kernel_update_current; }
-
 # Session identity belongs to KERNEL's durable state, not the target checkout.
 kernel_session_id_file() {
   local vaults="$1" project_root="$2" project_key
@@ -295,22 +290,6 @@ kernel_hook_file_records() {
        content: (.tool_input.content // .tool_input.new_string // .content // .new_string // "")}
     end
   ' 2>/dev/null || true
-}
-
-kernel_hook_file_path() {
-  kernel_hook_file_records "$1" | head -1 | jq -r '.path // empty' 2>/dev/null || true
-}
-
-kernel_hook_content() {
-  kernel_hook_file_records "$1" | head -1 | jq -r '.content // empty' 2>/dev/null || true
-}
-
-kernel_hook_error() {
-  printf '%s' "$1" | jq -r '
-    (if (.error | type) == "string" then .error
-     elif (.error.message | type) == "string" then .error.message
-     else .message // .tool_error // "unknown error" end)
-  ' 2>/dev/null || printf '%s\n' 'unknown error'
 }
 
 # The shared Vaults continuity service owns compaction only for a session whose

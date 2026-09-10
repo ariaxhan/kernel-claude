@@ -1,0 +1,10 @@
+tests/kernel9/test_router.py	53	validate	23	38
+scripts/generate-governance.py	109	load	21	47
+tests/corpus/run-corpus.py	58	check_divergence	21	48
+scripts/generate-adapters.py	218	build_capability_report	20	82
+orchestration/agentdb/graph-project.py	451	main	19	57
+scripts/governance-sync.py	363	nested_scopes	17	21
+scripts/governance-sync.py	496	adopt	17	56
+scripts/check-orphans.py	114	main	16	40
+scripts/governance-sync.py	52	safe_repo_path	16	23
+scripts/governance-sync.py	187	discover	16	32

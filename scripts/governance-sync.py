@@ -222,45 +222,57 @@ def discover(root):
     return sorted(repos), sorted(errors, key=lambda item: (item["path"], item["errno"] or -1, item["error"]))
 
 
-def render_kernel_reference(repo):
-    config_path = repo / "governance/adapters.json"
-    template_path = repo / "governance/kernel.md.tmpl"
-    if not config_path.exists() and not template_path.exists():
-        return None
-    for path in (config_path, template_path):
-        if path.is_symlink() or not path.is_file() or path.stat(follow_symlinks=False).st_nlink != 1:
-            raise ValueError(f"unsafe KERNEL reference input: {path}")
-    config = json.loads(config_path.read_text())
-    if config.get("outputs") != KERNEL_OUTPUTS or not isinstance(config.get("tokens"), dict):
-        raise ValueError("invalid KERNEL adapter config")
-    source = template_path.read_text()
+def _require_unshared_file(path, label):
+    """Generation reads and writes these: a symlink or extra hard link is an escape hatch."""
+    if path.is_symlink() or not path.is_file() or path.stat(follow_symlinks=False).st_nlink != 1:
+        raise ValueError(f"unsafe KERNEL {label}: {path}")
+
+
+def _kernel_tokens(repo, config, source):
+    """Adapter tokens, plus VERSION derived from the canonical manifest when referenced."""
     tokens = dict(config["tokens"])
-    # VERSION is derived from the canonical manifest (plugin.json), not adapters.json —
-    # single source of truth. Injected only when the template references {{VERSION}}, kept
-    # in lockstep with scripts/generate-governance.py (the two renderers must agree).
+    # VERSION comes from plugin.json, not adapters.json - single source of truth. Kept in
+    # lockstep with scripts/generate-governance.py; the two renderers must agree.
     if "{{VERSION}}" in source:
         try:
             version = json.loads((repo / ".claude-plugin/plugin.json").read_text())["version"]
         except (OSError, json.JSONDecodeError, KeyError, TypeError) as exc:
             raise ValueError(f"cannot read version from .claude-plugin/plugin.json: {exc}")
         tokens["VERSION"] = {client: version for client in KERNEL_OUTPUTS}
-    found = set(KERNEL_TOKEN_RE.findall(source))
-    if found != set(tokens):
+
+    if set(KERNEL_TOKEN_RE.findall(source)) != set(tokens):
         raise ValueError("KERNEL template token drift")
     for values in tokens.values():
         if not isinstance(values, dict) or set(values) != set(KERNEL_OUTPUTS):
             raise ValueError("invalid KERNEL token adapter")
         if not all(isinstance(value, str) and value for value in values.values()):
             raise ValueError("empty KERNEL token adapter")
+    return tokens
+
+
+def render_kernel_reference(repo):
+    config_path = repo / "governance/adapters.json"
+    template_path = repo / "governance/kernel.md.tmpl"
+    if not config_path.exists() and not template_path.exists():
+        return None
+    for path in (config_path, template_path):
+        _require_unshared_file(path, "reference input")
+
+    config = json.loads(config_path.read_text())
+    if config.get("outputs") != KERNEL_OUTPUTS or not isinstance(config.get("tokens"), dict):
+        raise ValueError("invalid KERNEL adapter config")
+
+    source = template_path.read_text()
+    tokens = _kernel_tokens(repo, config, source)
     if len(KERNEL_AMBIENT_RE.findall(source)) != 1:
         raise ValueError("invalid KERNEL ambient source")
     body = KERNEL_AMBIENT_RE.sub("", source)
     source_hash = digest(source.encode())
+
     rendered = {}
     for client, output_name in KERNEL_OUTPUTS.items():
         output = repo / output_name
-        if output.is_symlink() or not output.is_file() or output.stat(follow_symlinks=False).st_nlink != 1:
-            raise ValueError(f"unsafe KERNEL output: {output}")
+        _require_unshared_file(output, "output")
         header = (
             "<!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run "
             "scripts/generate-governance.py.\n"
@@ -272,53 +284,79 @@ def render_kernel_reference(repo):
     return rendered
 
 
-def classify(repo):
-    claude = repo / "CLAUDE.md"
-    codex = repo / "AGENTS.md"
-    scoped = repo / ".claude/CLAUDE.md"
-    manifest = manifest_path(repo)
+def _kernel_verdict(repo):
+    """KERNEL's own repo: CLAUDE.md and AGENTS.md are generated from the template."""
     try:
-        kernel_rendered = render_kernel_reference(repo)
+        rendered = render_kernel_reference(repo)
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
         return "generated_stale"
-    if kernel_rendered is not None:
-        return ("generated_current" if all(
-            read_bytes(repo / name) == expected for name, expected in kernel_rendered.items()
-        ) else "generated_stale")
-    if manifest.is_file() and not manifest.is_symlink():
-        try:
-            data = json.loads(manifest.read_text())
-            source_name, output_name = data["source"], data["output"]
-            if source_name not in SOURCES or output_name not in {"CLAUDE.md", "AGENTS.md"}:
-                return "conflict"
-            source, output = repo / source_name, repo / output_name
-            if source.is_symlink() or output.is_symlink() or not source.is_file() or not output.is_file():
-                return "generated_stale"
-            source_content, output_content = read_bytes(source), read_bytes(output)
-            current = (digest(source_content) == data.get("source_sha256")
-                       and digest(output_content) == data.get("output_sha256")
-                       and output_content == render_adapter(source_name, source_content))
-            return "generated_current" if current else "generated_stale"
-        except (OSError, KeyError, TypeError, json.JSONDecodeError):
+    if rendered is None:
+        return None
+    fresh = all(read_bytes(repo / name) == expected for name, expected in rendered.items())
+    return "generated_current" if fresh else "generated_stale"
+
+
+def _manifest_verdict(repo):
+    """A sync manifest claims source -> output. Verify the claim against the bytes."""
+    manifest = manifest_path(repo)
+    if not manifest.is_file() or manifest.is_symlink():
+        return "conflict" if (manifest.exists() or manifest.is_symlink()) else None
+    try:
+        data = json.loads(manifest.read_text())
+        source_name, output_name = data["source"], data["output"]
+        if source_name not in SOURCES or output_name not in {"CLAUDE.md", "AGENTS.md"}:
             return "conflict"
-    if manifest.exists() or manifest.is_symlink():
+        source, output = repo / source_name, repo / output_name
+        if source.is_symlink() or output.is_symlink() or not source.is_file() or not output.is_file():
+            return "generated_stale"
+        source_content, output_content = read_bytes(source), read_bytes(output)
+        current = (digest(source_content) == data.get("source_sha256")
+                   and digest(output_content) == data.get("output_sha256")
+                   and output_content == render_adapter(source_name, source_content))
+        return "generated_current" if current else "generated_stale"
+    except (OSError, KeyError, TypeError, json.JSONDecodeError):
         return "conflict"
-    incomplete_pairs = (("CLAUDE.md", claude, codex), ("AGENTS.md", codex, claude),
-                        (".claude/CLAUDE.md", scoped, codex))
-    for source_name, source, output in incomplete_pairs:
-        if source.is_file() and output.is_file() and not source.is_symlink() and not output.is_symlink():
-            if read_bytes(output) == render_adapter(source_name, read_bytes(source)):
-                return "incomplete"
+
+
+def _adopted_verdict(repo):
+    """Output already renders from a source, but no manifest records the adoption."""
+    pairs = (("CLAUDE.md", repo / "CLAUDE.md", repo / "AGENTS.md"),
+             ("AGENTS.md", repo / "AGENTS.md", repo / "CLAUDE.md"),
+             (".claude/CLAUDE.md", repo / ".claude/CLAUDE.md", repo / "AGENTS.md"))
+    for source_name, source, output in pairs:
+        if not (source.is_file() and output.is_file()):
+            continue
+        if source.is_symlink() or output.is_symlink():
+            continue
+        if read_bytes(output) == render_adapter(source_name, read_bytes(source)):
+            return "incomplete"
+    return None
+
+
+def _bare_files_verdict(repo):
+    """No manifest, no rendering relationship: classify by which files simply exist."""
+    claude, codex = repo / "CLAUDE.md", repo / "AGENTS.md"
+    scoped = repo / ".claude/CLAUDE.md"
     if claude.is_file() and codex.is_file():
         return "both_identical" if read_bytes(claude) == read_bytes(codex) else "conflict"
     if claude.is_file():
         return "claude_only"
-    if codex.is_file() and scoped.is_file():
-        return "scoped_conflict"
     if codex.is_file():
-        return "agents_only"
+        return "scoped_conflict" if scoped.is_file() else "agents_only"
     if scoped.is_file():
         return "scoped_claude_only"
+    return "missing_both"
+
+
+# Order is the classification: the first stage that reaches a verdict owns the repo.
+CLASSIFIERS = (_kernel_verdict, _manifest_verdict, _adopted_verdict, _bare_files_verdict)
+
+
+def classify(repo):
+    for stage in CLASSIFIERS:
+        verdict = stage(repo)
+        if verdict is not None:
+            return verdict
     return "missing_both"
 
 

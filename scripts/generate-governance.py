@@ -239,30 +239,15 @@ def render_outputs(root):
     return source_path, rendered
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
-    parser.add_argument("--check", action="store_true")
-    args = parser.parse_args()
-    supplied_root = args.root.absolute()
-    if supplied_root.is_symlink() or not supplied_root.is_dir():
-        fail(f"plugin root must be a real directory, not a symlink: {supplied_root}")
-    root = supplied_root.resolve()
-    source = root / "governance/kernel.md.tmpl"
-    config = root / "governance/adapters.json"
-    _, outputs = render_outputs(root)
-    source_identity, config_identity = identity(source), identity(config)
-    target_identities = {path: identity(path) for path in outputs}
-    for path in outputs:
-        require_contained(root, path, "generated output")
-        require_regular(path, "generated output", missing_ok=path.name in {"CLAUDE.md", "AGENTS.md"})
-    stale = [path.relative_to(root).as_posix() for path, expected in outputs.items()
-             if not path.is_file() or path.read_text(encoding="utf-8") != expected]
-    if args.check:
-        if stale:
-            fail("stale generated file(s): " + ", ".join(stale))
-        print("governance current")
-        return
+def _resolved_root(supplied: Path) -> Path:
+    supplied = supplied.absolute()
+    if supplied.is_symlink() or not supplied.is_dir():
+        fail(f"plugin root must be a real directory, not a symlink: {supplied}")
+    return supplied.resolve()
+
+
+def _test_timings() -> tuple[int, int, int]:
+    """Fault-injection knobs the atomic-replace tests use. Never set in normal runs."""
     try:
         fail_after = int(os.environ.get("KERNEL_TEST_FAIL_AFTER_REPLACE", "0") or 0)
         hard_after = int(os.environ.get("KERNEL_TEST_HARD_KILL_AFTER_REPLACE", "0") or 0)
@@ -271,6 +256,54 @@ def main():
         fail("invalid test timing/failure value")
     if min(fail_after, hard_after, pause_ms) < 0 or pause_ms > 5000:
         fail("test timing/failure value out of range")
+    return fail_after, hard_after, pause_ms
+
+
+def _stale_outputs(root: Path, outputs: dict) -> list[str]:
+    for path in outputs:
+        require_contained(root, path, "generated output")
+        require_regular(path, "generated output",
+                        missing_ok=path.name in {"CLAUDE.md", "AGENTS.md"})
+    return [path.relative_to(root).as_posix() for path, expected in outputs.items()
+            if not path.is_file() or path.read_text(encoding="utf-8") != expected]
+
+
+def _write_outputs(root: Path, outputs: dict, stale: list[str], identities: dict,
+                   validate_inputs, fail_after: int, hard_after: int) -> None:
+    replaced = 0
+    for path, expected in outputs.items():
+        if path.relative_to(root).as_posix() not in stale:
+            continue
+        original_mode = (identities[path][-1] & 0o777) if identities[path] else None
+        mode = original_mode if original_mode is not None else (
+            0o755 if path.suffix == ".sh" else 0o644)
+        if atomic_replace(root, path, expected.encode(), identities[path], mode,
+                          validate_inputs, replaced + 1, fail_after, hard_after):
+            replaced += 1
+        identities[path] = identity(path)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+
+    root = _resolved_root(args.root)
+    source = root / "governance/kernel.md.tmpl"
+    config = root / "governance/adapters.json"
+    _, outputs = render_outputs(root)
+    source_identity, config_identity = identity(source), identity(config)
+    target_identities = {path: identity(path) for path in outputs}
+    stale = _stale_outputs(root, outputs)
+
+    if args.check:
+        if stale:
+            fail("stale generated file(s): " + ", ".join(stale))
+        print("governance current")
+        return
+
+    fail_after, hard_after, pause_ms = _test_timings()
     if pause_ms:
         time.sleep(pause_ms / 1000)
 
@@ -280,17 +313,8 @@ def main():
         if identity(source) != source_identity or identity(config) != config_identity:
             fail("canonical source or adapter config changed during generation")
 
-    replaced = 0
-    for path, expected in outputs.items():
-        if path.relative_to(root).as_posix() not in stale:
-            continue
-        original_mode = (target_identities[path][-1] & 0o777) if target_identities[path] else None
-        mode = original_mode if original_mode is not None else (0o755 if path.suffix == ".sh" else 0o644)
-        changed = atomic_replace(root, path, expected.encode(), target_identities[path], mode,
-                                 validate_inputs, replaced + 1, fail_after, hard_after)
-        if changed:
-            replaced += 1
-        target_identities[path] = identity(path)
+    _write_outputs(root, outputs, stale, target_identities, validate_inputs,
+                   fail_after, hard_after)
     print("generated: " + ", ".join(stale or ["no changes"]))
 
 

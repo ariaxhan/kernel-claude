@@ -226,40 +226,59 @@ def check_finality(doc):
     ]
 
 
+def _route_finding(finding, profile, settled, frozen):
+    """One finding -> (bucket, entry). Buckets: escalate, blocking, quarantine."""
+    entry = dict(finding)
+    if finding.get("validated") == "unverifiable":
+        # Neither reproduced nor refuted. It does not block by default and it does not vanish
+        # into a backlog either; the signer waives in writing or blocks. Silence is not an
+        # option, because that is how an interrupted check becomes a pass.
+        entry["routed"] = "escalate"
+        return "escalate", entry
+
+    blocks, reasons = evaluate(finding, profile)
+    if blocks and str(finding.get("summary", "")).strip().lower() in settled:
+        blocks = False
+        reasons = ["already a known non-blocker in the acceptance record for this commit"]
+    if blocks and frozen:
+        blocks = False
+        reasons = ["commit is frozen by a recorded acceptance; no recognised reopen event"]
+
+    if blocks:
+        entry["routed"] = "blocking"
+        return "blocking", entry
+    entry["routed"] = "quarantine"
+    entry["not_blocking_because"] = reasons
+    return "quarantine", entry
+
+
+def _settled_summaries(doc):
+    return {
+        str(f.get("summary", "")).strip().lower()
+        for f in ((doc.get("acceptance") or {}).get("known_non_blockers") or [])
+    }
+
+
+def _missing_evidence(doc, profile):
+    if not profile:
+        return []
+    supplied = {str(e).strip().lower() for e in (doc.get("evidence") or [])}
+    return [e for e in (profile.get("required_evidence") or [])
+            if str(e).strip().lower() not in supplied]
+
+
 def adjudicate(doc):
     findings = doc.get("findings") or []
     profile = doc.get("profile")
     cannot_falsify = [c for c in (doc.get("cannot_falsify") or []) if str(c).strip()]
     frozen, finality_notes = check_finality(doc)
-    settled = {
-        str(f.get("summary", "")).strip().lower()
-        for f in ((doc.get("acceptance") or {}).get("known_non_blockers") or [])
-    }
+    settled = _settled_summaries(doc)
 
-    blocking, quarantined, escalate = [], [], []
+    routed = {"blocking": [], "quarantine": [], "escalate": []}
     for finding in findings:
-        entry = dict(finding)
-        if finding.get("validated") == "unverifiable":
-            # Neither reproduced nor refuted. It does not block by default and it does not vanish
-            # into a backlog either; the signer waives in writing or blocks. Silence is not an
-            # option, because that is how an interrupted check becomes a pass.
-            entry["routed"] = "escalate"
-            escalate.append(entry)
-            continue
-        blocks, reasons = evaluate(finding, profile)
-        if blocks and str(finding.get("summary", "")).strip().lower() in settled:
-            blocks = False
-            reasons = ["already a known non-blocker in the acceptance record for this commit"]
-        if blocks and frozen:
-            blocks = False
-            reasons = ["commit is frozen by a recorded acceptance; no recognised reopen event"]
-        if blocks:
-            entry["routed"] = "blocking"
-            blocking.append(entry)
-        else:
-            entry["routed"] = "quarantine"
-            entry["not_blocking_because"] = reasons
-            quarantined.append(entry)
+        bucket, entry = _route_finding(finding, profile, settled, frozen)
+        routed[bucket].append(entry)
+    blocking, quarantined, escalate = routed["blocking"], routed["quarantine"], routed["escalate"]
 
     errors = []
     if not cannot_falsify:
@@ -270,13 +289,7 @@ def adjudicate(doc):
             "or the verdict is not a verdict."
         )
 
-    missing_evidence = []
-    if profile:
-        supplied = {str(e).strip().lower() for e in (doc.get("evidence") or [])}
-        missing_evidence = [
-            e for e in (profile.get("required_evidence") or [])
-            if str(e).strip().lower() not in supplied
-        ]
+    missing_evidence = _missing_evidence(doc, profile)
 
     verdict = "FAIL" if blocking else "PASS"
     if errors:

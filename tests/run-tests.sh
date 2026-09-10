@@ -751,21 +751,18 @@ test_get_agentdb_fallback() {
   assert_contains "$result" "orchestration/agentdb/agentdb"
 }
 
-test_update_current_symlink_exists() {
-  # Function should exist in common.sh
-  source "$PLUGIN_ROOT/hooks/scripts/common.sh"
-  type update_current_symlink >/dev/null 2>&1 || {
-    echo "FAIL: update_current_symlink function not found"
-    return 1
-  }
-}
-
-test_session_start_calls_update_symlink() {
-  # update_current_symlink should be called in common.sh _kernel_hook_start (runs on every hook, including session-start)
-  grep -q "update_current_symlink" "$PLUGIN_ROOT/hooks/scripts/common.sh" || {
-    echo "FAIL: common.sh should call update_current_symlink"
-    return 1
-  }
+test_hook_start_reconciles_the_runtime() {
+  # The old pair of tests asserted that a one-line backward-compat shim existed and that
+  # common.sh mentioned its name -- which its own definition satisfied. Both passed while
+  # the shim had no caller. Assert the wiring instead: the real updater runs from the path
+  # every hook takes.
+  grep -q 'kernel_update_current' "$PLUGIN_ROOT/hooks/scripts/common.sh" || {
+    echo "  FAIL: kernel_update_current is gone"; return 1; }
+  grep -q 'kernel_reconcile_runtime' "$PLUGIN_ROOT/hooks/scripts/common.sh" || {
+    echo "  FAIL: _kernel_hook_start no longer reconciles the runtime"; return 1; }
+  awk '/^kernel_reconcile_runtime\(\)/,/^}/' "$PLUGIN_ROOT/hooks/scripts/common.sh" \
+    | grep -q 'kernel_update_current' || {
+    echo "  FAIL: kernel_reconcile_runtime does not call kernel_update_current"; return 1; }
 }
 
 # === KERNEL 8 runtime upgrade tests ===
@@ -1120,6 +1117,13 @@ test_detect_secrets_ignores_shell_command_key() {
 }
 
 
+
+
+
+
+
+
+
 test_hook_file_records_reads_codex_command_shape() {
   local patch json out
   patch=$(printf '*** Begin Patch\n*** Add File: /abs/seed.txt\n+PROBE\n*** End Patch')
@@ -1130,12 +1134,6 @@ test_hook_file_records_reads_codex_command_shape() {
   assert_contains "$out" '"path":"/abs/seed.txt"' "file records must extract the path from tool_input.command" || return 1
   assert_contains "$out" '"content":"PROBE"' "file records must extract added content from tool_input.command"
 }
-
-
-
-
-
-
 
 test_detect_secrets_fails_closed_on_malformed_json() {
   local ec=0
@@ -4246,6 +4244,15 @@ test_migration_workflows_reference_skills() {
 
 # === Meta: test-suite self-integrity (#229) ===
 
+test_complexity_ratchet_holds() {
+  # The gate lives in the project's normal verify path, not in a command someone remembers
+  # to run. .complexity-baseline.tsv grandfathers today's over-budget debt exactly; a new
+  # violation or a worse number fails, and a reduction requires refreshing the baseline.
+  local out rc=0
+  out=$("$PLUGIN_ROOT/scripts/complexity.sh" --check-baseline "$PLUGIN_ROOT/.complexity-baseline.tsv" "$PLUGIN_ROOT" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || { echo "$out" | head -8; return 1; }
+}
+
 test_no_ungraded_asserts() {
   # #229: bash grades a function by its LAST statement's exit status, so an
   # assert_* call earlier in a multi-line function was silently ignored
@@ -4489,6 +4496,7 @@ run_test_suite() {
       run_test "generated governance lists knowledge-graph" test_claude_md_references_knowledge_graph
       ;;
     meta)
+      run_test "complexity ratchet holds" test_complexity_ratchet_holds
       run_test "no ungraded asserts (#229)" test_no_ungraded_asserts
       ;;
     manifest)
@@ -4665,8 +4673,7 @@ run_test_suite() {
       run_test "session-start sources common.sh" test_session_start_sources_common
       run_test "no hardcoded Vaults path" test_no_hardcoded_vaults_path
       run_test "get_agentdb fallback" test_get_agentdb_fallback
-      run_test "update_current_symlink exists" test_update_current_symlink_exists
-      run_test "session-start calls symlink update" test_session_start_calls_update_symlink
+      run_test "hook start reconciles the runtime" test_hook_start_reconciles_the_runtime
       ;;
     security_hooks)
       run_test "detect-secrets blocks AWS key" test_detect_secrets_blocks_aws_key

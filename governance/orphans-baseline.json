@@ -3,34 +3,6 @@
   "taken": "2026-08-08",
   "orphans": [
     {
-      "function": "kernel_hook_content",
-      "script": "hooks/scripts/common.sh",
-      "state": "candidate-for-retirement",
-      "tracked_by": "#174",
-      "note": "Hook-payload accessor superseded by per-hook jq extraction. Retire with a verdict once confirmed no host adapter needs it."
-    },
-    {
-      "function": "kernel_hook_file_path",
-      "script": "hooks/scripts/common.sh",
-      "state": "candidate-for-retirement",
-      "tracked_by": "#174",
-      "note": "Same family as kernel_hook_content."
-    },
-    {
-      "function": "kernel_semver",
-      "script": "hooks/scripts/common.sh",
-      "state": "candidate-for-retirement",
-      "tracked_by": "#174",
-      "note": "Version comparison helper; the runtime selector does its own comparison. Retire together with kernel_version_lt if that one also loses its caller."
-    },
-    {
-      "function": "update_current_symlink",
-      "script": "hooks/scripts/common.sh",
-      "state": "candidate-for-retirement",
-      "tracked_by": "#174",
-      "note": "Runtime-selection helper superseded by select-runtime.sh. Named only in the changelog and an old review, i.e. history, not wiring."
-    },
-    {
       "function": "_gh_create_issue",
       "script": "hooks/scripts/github-integration.sh",
       "state": "prose-wired",
@@ -52,11 +24,11 @@
       "note": "Its SessionEnd caller retired in 9.10.0; retained temporarily as a sourced library API."
     },
     {
-      "function": "kernel_hook_error",
+      "function": "kernel_hook_file_records",
       "script": "hooks/scripts/common.sh",
-      "state": "candidate-for-retirement",
-      "tracked_by": "#244",
-      "note": "Its capture-error caller retired in 9.10.0; retained temporarily as a sourced library API."
+      "state": "deferred",
+      "tracked_by": "#174",
+      "note": "KEPT DELIBERATELY. Its two callers (kernel_hook_content, kernel_hook_file_path) were retired 2026-09-10, but this is the only place that encodes the captured Codex apply_patch payload shape, with the live codex-cli 0.150.1 capture and the 744-fire evidence in its comment. Reading .patch instead of .command silently disabled every path- and content-gated hook on Codex once already. It stays tested on that shape and is the natural parser if normalize-write ever handles Codex writes."
     }
   ]
 }
