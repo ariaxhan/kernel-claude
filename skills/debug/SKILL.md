@@ -1,6 +1,6 @@
 ---
 name: debug
-description: "Scientific debugging: reproduce, hypothesize, predict, isolate, fix root cause; every fix gets a regression test. Triggers: bug, error, fix, broken, not working, fails, crashed, unexpected, stack trace, regression, exception."
+description: "Scientific debugging: reproduce, hypothesize, isolate, fix root cause, add a regression test. Triggers: bug, error, fix, broken, not working, fails, crashed, stack trace, regression, exception."
 allowed-tools: Read, Bash, Grep, Glob
 kernel:
   kind: methodology

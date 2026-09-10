@@ -1,6 +1,6 @@
 ---
 name: diagnose
-description: "Systematic debugging and refactor analysis. Diagnosis before prescription. Bug mode: reproduce, trace, isolate, hypothesize, diagnose. Refactor mode: map, trace deps, measure coupling, risks, diagnose."
+description: "Diagnosis before prescription. Bug mode: reproduce, trace, isolate, hypothesize. Refactor mode: map, trace deps, measure coupling, name risks."
 user-invocable: true
 allowed-tools: Agent, Bash, Read, Write, Grep, Glob
 kernel:

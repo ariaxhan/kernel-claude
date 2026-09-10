@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
+import tempfile
 import sys
 from dataclasses import dataclass
 
@@ -49,8 +50,8 @@ class Record:
         return f"{self.file}:{self.function}"
 
 
-def run(cmd: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=False)
+def run(cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, cwd=cwd, text=True, capture_output=True, check=False, env=env)
 
 
 def git_lines(repo: Path, args: list[str]) -> list[str]:
@@ -208,10 +209,30 @@ def lizard_command() -> list[str] | None:
     return None
 
 
+def uv_env() -> dict[str, str]:
+    """uvx dies when the default ~/.cache/uv is unwritable (sandboxed workspaces).
+    Redirect it instead of failing the whole measurement."""
+    env = dict(os.environ)
+    if env.get("UV_CACHE_DIR"):
+        return env
+    default = Path(env.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "uv"
+    try:
+        default.mkdir(parents=True, exist_ok=True)
+        probe = default / ".complexity-write-probe"
+        probe.touch()
+        probe.unlink()
+    except OSError:
+        fallback = Path(tempfile.gettempdir()) / "kernel-uv-cache"
+        fallback.mkdir(parents=True, exist_ok=True)
+        env["UV_CACHE_DIR"] = str(fallback)
+        print(f"complexity: uv cache redirected to {fallback}", file=sys.stderr)
+    return env
+
+
 def analyze_lizard(repo: Path, files: list[str], command: list[str]) -> list[Record]:
     if not files:
         return []
-    proc = run([*command, "-w", "-C", "0", *files], repo)
+    proc = run([*command, "-w", "-C", "0", *files], repo, env=uv_env() if command[0] == "uvx" else None)
     if proc.returncode not in {0, 1}:
         raise GateError(f"lizard analysis failed: {proc.stderr.strip() or proc.stdout.strip()}")
     records: list[Record] = []

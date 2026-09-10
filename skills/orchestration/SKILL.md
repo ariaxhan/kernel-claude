@@ -1,6 +1,6 @@
 ---
 name: orchestration
-description: "Multi-agent orchestration. Lane contracts, worker-model doctrine, fault tolerance, worktree isolation. Triggers: orchestrate, coordinate, agents, parallel, spawn, contract, tier 2, tier 3."
+description: "Multi-agent orchestration: lane contracts, worker-model doctrine, fault tolerance. Triggers: orchestrate, coordinate, agents, parallel, spawn, contract, tier 2, tier 3."
 allowed-tools: Task, Bash, Read
 kernel:
   kind: methodology
