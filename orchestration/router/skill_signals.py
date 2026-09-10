@@ -36,9 +36,9 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
     ],
 
     "architecture": [
-        # vs simplify/diagnose (rule 3 cluster 7): architecture is about
+        # vs simplify/debug (rule 3 cluster 7): architecture is about
         # module boundaries and dependency direction as a design question,
-        # not a defect to fix (diagnose) or a complexity number to lower
+        # not a defect to fix (debug) or a complexity number to lower
         # (simplify).
         (r"\b(system|module|service) (architecture|design|boundar\w+)\b", 3, "names a structural design question"),
         (r"\b(coupling|cohesion|dependency (graph|direction|management))\b", 3, "names a dependency-structure concern"),
@@ -89,25 +89,16 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
     ],
 
     "debug": [
-        # vs diagnose (rule 3 cluster 2): debug is a LIVE defect with a
-        # repro/error in hand; diagnose ADDS refactor-mode (map deps, measure
-        # coupling) and is invoked before deciding whether to even start
-        # fixing. Disambiguator: debug fires on concrete failure evidence
-        # (stack trace, crash, "broken"); diagnose fires on "should I refactor
-        # this" / dependency-mapping phrasing with no concrete failure.
+        # Absorbed diagnose (9.11.0). Two shapes, one skill: a LIVE defect with a
+        # repro/error in hand, and the pre-prescription question -- "is this
+        # actually a bug and where", "should this be refactored, what would
+        # break". vs simplify/architecture (rule 3 cluster 7): debug maps the
+        # blast radius and stops; simplify executes the restructure.
         (r"\b(stack ?trace|traceback|exception|crash(ed)?)\b", 3, "reports a concrete crash or exception"),
         (r"\b(reproduce|repro) (the )?(bug|issue|crash|failure)\b", 3, "has a reproducible failure in hand"),
         (r"\b(fails?|failing|broken|not working) (when|on|with|because)\b", 2, "reports a specific failure condition"),
         (r"\bwhy (is|does) \w+ (fail|crash|throw|break)\b", 3, "asks for the root cause of a live failure"),
         (r"\bregression test\b", 2, "asks for a regression test tied to a fix"),
-    ],
-
-    "diagnose": [
-        # vs debug (see above) and vs simplify/architecture (rule 3 cluster
-        # 7): diagnose is invoked BEFORE prescribing a fix -- either "is this
-        # actually a bug and where" (bug mode, no concrete repro yet) or
-        # "should this be refactored, what would break" (refactor mode,
-        # dependency mapping without committing to a rewrite).
         (r"\bshould (this|we) refactor\b", 3, "asks whether a refactor is warranted, not committed to it"),
         (r"\bmap (the )?depend\w+\b", 3, "asks for a dependency map before deciding"),
         (r"\bwhat would break if\b", 3, "asks for blast-radius analysis before a decision"),
@@ -297,11 +288,11 @@ SKILL_SIGNALS: dict[str, list[tuple[str, int, str]]] = {
     ],
 
     "simplify": [
-        # vs architecture/diagnose (rule 3 cluster 7): simplify is a
+        # vs architecture/debug (rule 3 cluster 7): simplify is a
         # MEASURED complexity-reduction pass (lizard/cyclomatic-complexity
         # numbers, per-function budget) with a verifier re-measuring --
         # narrower and more mechanical than architecture's structural
-        # judgment or diagnose's refactor-mode analysis.
+        # judgment or debug's refactor-mode analysis.
         (r"\b(cyclomatic complexity|lizard|complexity budget)\b", 3, "names a measured complexity metric"),
         (r"\bthis (function|file) is (too )?(spaghetti|a jungle|too complex)\b", 3, "reports unmeasured complexity needing reduction"),
         (r"\blower (the )?complexity\b", 3, "asks to reduce measured complexity"),
@@ -327,7 +318,6 @@ SKILL_DOMAINS: dict[str, tuple[str, ...]] = {
     "checkpoint": ("software", "research", "writing", "design", "operations", "strategy"),
     "context-mgmt": ("software", "research", "writing", "design", "operations", "strategy"),
     "debug": ("software",),
-    "diagnose": ("software",),
     "dream": ("software", "research", "writing", "design", "strategy"),
     "eval": ("software",),
     "experiment": ("software", "strategy"),
@@ -392,7 +382,6 @@ CANONICAL_PROBES: dict[str, str] = {
     "checkpoint": "save a checkpoint, we are about to hit a context reset",
     "context-mgmt": "why is context degrading, what compaction strategy should we use",
     "debug": "the login endpoint crashes with a stack trace on a null token",
-    "diagnose": "map the dependencies in the payments module before we restructure it",
     "dream": "explore competing approaches to this and stress test them",
     "eval": "set up pass@k capability evals for this ai workflow",
     "frontend": "the css layout breaks at 375px and the theme looks generic",

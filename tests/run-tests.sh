@@ -1503,7 +1503,7 @@ test_commands_use_structured_format() {
   # Workflow skills (former commands) use XML structure or YAML blocks
   local structured_count=0
   local total=0
-  for s in ingest forge handoff retrospective diagnose dream experiment; do
+  for s in ingest forge handoff retrospective dream experiment; do
     ((total++))
     if grep -qE '<skill id=|```yaml' "$PLUGIN_ROOT/skills/$s/SKILL.md" 2>/dev/null; then
       ((structured_count++))
@@ -2208,31 +2208,25 @@ test_breaker_resets() {
   [ $((NOW - TRIP_TIME)) -ge 600 ]  # verify cooldown expired
 }
 
-# === Diagnose Tests ===
+# === Debug Tests (diagnose merged in, 9.11.0) ===
 
-test_diagnose_command_exists() {
-  [ -f "$PLUGIN_ROOT/skills/diagnose/SKILL.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/skills/diagnose/SKILL.md" | grep -q "^---"
+test_debug_refactor_mode() {
+  grep -q '<refactor_mode>' "$PLUGIN_ROOT/skills/debug/SKILL.md"
 }
 
-test_diagnose_registered() {
-  [ -f "$PLUGIN_ROOT/skills/diagnose/SKILL.md" ]
+test_debug_diagnosis_output() {
+  grep -q '<diagnosis_output>' "$PLUGIN_ROOT/skills/debug/SKILL.md"
 }
 
-test_diagnose_bug_mode() {
-  grep -q 'mode id="bug"' "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
+test_debug_user_invocable() {
+  grep -q '^user-invocable: true' "$PLUGIN_ROOT/skills/debug/SKILL.md"
 }
 
-test_diagnose_refactor_mode() {
-  grep -q 'mode id="refactor"' "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
-}
-
-test_diagnose_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
-}
-
-test_diagnose_loads_debug() {
-  grep -q "debug" "$PLUGIN_ROOT/skills/diagnose/SKILL.md"
+test_diagnose_fully_removed() {
+  [ ! -e "$PLUGIN_ROOT/skills/diagnose" ] || { echo "  FAIL: skills/diagnose still exists"; return 1; }
+  ! grep -rq 'kernel:diagnose\|skills/diagnose' "$PLUGIN_ROOT/governance" "$PLUGIN_ROOT/skills" \
+      "$PLUGIN_ROOT/llms.txt" "$PLUGIN_ROOT/docs" 2>/dev/null \
+    || { echo "  FAIL: dangling diagnose reference"; return 1; }
 }
 
 # === Retrospective Tests ===
@@ -4104,7 +4098,7 @@ test_migration_every_command_has_destination() {
   # contract table section 3: every former command name resolves to a skill dir
   local missing=0
   for name in ingest forge tearitapart review handoff retrospective \
-              diagnose dream metrics init help experiment landing-page checkpoint; do
+              dream metrics init help experiment landing-page checkpoint; do
     [ -f "$PLUGIN_ROOT/skills/$name/SKILL.md" ] || { echo "  no destination: $name"; missing=1; }
   done
   assert_exit_code 0 "$missing" "every former command needs a skill destination"
@@ -4750,15 +4744,13 @@ run_test_suite() {
       run_test "breaker trips after 3 failures" test_breaker_trips
       run_test "breaker resets after cooldown" test_breaker_resets
       ;;
-    diagnose)
-      run_test "diagnose command exists with frontmatter" test_diagnose_command_exists
-      run_test "diagnose registered in plugin.json" test_diagnose_registered
-      run_test "diagnose has bug mode" test_diagnose_bug_mode
-      run_test "diagnose has refactor mode" test_diagnose_refactor_mode
-      run_test "diagnose has output format" test_diagnose_output_format
-      run_test "diagnose loads debug skill" test_diagnose_loads_debug
+    debug)
+      run_test "debug has refactor mode" test_debug_refactor_mode
+      run_test "debug has diagnosis output" test_debug_diagnosis_output
+      run_test "debug is user-invocable" test_debug_user_invocable
+      run_test "diagnose fully removed" test_diagnose_fully_removed
       ;;
-    retrospective)
+   retrospective)
       run_test "retrospective command exists with frontmatter" test_retrospective_command_exists
       run_test "retrospective registered in plugin.json" test_retrospective_registered
       run_test "retrospective has agentdb integration" test_retrospective_has_agentdb
@@ -4943,7 +4935,7 @@ main() {
 
     run_test_suite "compaction_restore"
     run_test_suite "circuit_breaker"
-    run_test_suite "diagnose"
+    run_test_suite "debug"
     run_test_suite "retrospective"
     run_test_suite "github_integration"
     run_test_suite "profile"

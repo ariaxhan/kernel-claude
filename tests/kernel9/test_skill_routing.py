@@ -178,7 +178,7 @@ class SkillDisambiguation(unittest.TestCase):
 
     CASES = [
         ("the tests fail with a TypeError on line 40, here is the traceback", "debug"),
-        ("map the dependencies in the payments module before we restructure it", "diagnose"),
+        ("map the dependencies in the payments module before we restructure it", "debug"),
         ("review this PR and tell me if it is mergeable", "review"),
         ("tear apart this plan before I start implementing it", "tearitapart"),
         ("save progress, we are about to hit a context reset", "checkpoint"),

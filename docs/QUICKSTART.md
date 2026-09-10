@@ -59,7 +59,7 @@ Common skills below use Claude Code syntax. In Codex, replace the leading `/` wi
 
 Common skills:
 
-- Work: `/kernel:ingest`, `/kernel:diagnose`, `/kernel:dream`
+- Work: `/kernel:ingest`, `/kernel:debug`, `/kernel:dream`
 - Checks: `/kernel:validate`, `/kernel:review`, `/kernel:tearitapart`
 - State: `/kernel:checkpoint`, `/kernel:handoff`, `/kernel:retrospective`
 - Setup/reference: `/kernel:init`, `/kernel:help`
@@ -119,7 +119,7 @@ was removed.
 
 ## Codex behavior boundaries
 
-Codex loads all 29 KERNEL skills, with explicit calls written as `$kernel:<name>`.
+Codex loads all 28 KERNEL skills, with explicit calls written as `$kernel:<name>`.
 Use `$kernel:governance-sync` (or Claude's `/kernel:governance-sync`) to audit native
 instruction coverage. Writes require explicit confirmation and a backup directory.
 Explicit-only skills (5): `experiment`, `forge`, `governance-sync`, `init`,

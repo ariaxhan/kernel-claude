@@ -259,7 +259,6 @@ reviewed the claim.</rule>
   <skill id="ingest" kind="workflow" file="skills/ingest/SKILL.md">Unified entry for new AND resumed work. New: research → classify → scope → execute (human confirms phases). Resume: manifest validate → divergence → bounded context compile + receipt → resume at phase. Authority: live repo state > user instruction > manifest > chronicle > inferred history.</skill>
   <skill id="forge" kind="workflow" no-ambient="true" file="skills/forge/SKILL.md">Autonomous engine. Heat/hammer/quench/temper/anneal until antifragile. Requires max_budget_usd. Explicit invocation only.</skill>
   <skill id="dream" kind="workflow" file="skills/dream/SKILL.md">Creative exploration. 3 perspectives + 4-persona stress test. Integrity-scored.</skill>
-  <skill id="diagnose" kind="workflow" file="skills/diagnose/SKILL.md">Systematic debugging + refactor analysis. Diagnosis before prescription.</skill>
   <skill id="metrics" kind="workflow" file="skills/metrics/SKILL.md">Observability dashboard. Sessions, agents, hooks, learnings.</skill>
   <skill id="experiment" kind="workflow" no-ambient="true" file="skills/experiment/SKILL.md">Autonomous experimentation engine + methodology (merged v8). Every rule is a hypothesis: seed, test, graduate, kill.</skill>
 
@@ -313,7 +312,7 @@ reviewed the claim.</rule>
 
   <skill id="eval" triggers="eval, benchmark, pass@k">Eval-Driven Development. pass@k metrics, capability evals, regression evals, grader types.</skill>
 
-  <skill id="debug" triggers="bug, error, broken, not working">Systematic debugging. Reproduce → hypothesize → isolate → fix. Binary search isolation.</skill>
+  <skill id="debug" triggers="bug, error, broken, not working, refactor, coupling">Diagnosis before prescription. Bug mode: reproduce, hypothesize, isolate, fix root cause. Refactor mode: map deps, measure coupling, name the blast radius, hand off.</skill>
 
   <!-- ARCHITECTURE -->
   <skill id="architecture" triggers="system design, structure, modules">Modular design, interface stability, dependency management, coupling analysis.</skill>

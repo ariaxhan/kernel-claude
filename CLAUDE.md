@@ -1,5 +1,5 @@
 <!-- GENERATED FILE. Edit governance/kernel.md.tmpl, then run scripts/generate-governance.py.
-     source-sha256: 1069644d6c2bb2cf3585a6b2bdfa351e5218439d0690c16d6ab4848b3034be2c; adapter: claude -->
+     source-sha256: ba9fe6f831838ef8474b63af7f9a64b270531da4f0d933e2d63d277a1af5a89e; adapter: claude -->
 <kernel version="9.10.3">
 
 
@@ -219,7 +219,6 @@ reviewed the claim.</rule>
   <skill id="ingest" kind="workflow" file="skills/ingest/SKILL.md">Unified entry for new AND resumed work. New: research → classify → scope → execute (human confirms phases). Resume: manifest validate → divergence → bounded context compile + receipt → resume at phase. Authority: live repo state > user instruction > manifest > chronicle > inferred history.</skill>
   <skill id="forge" kind="workflow" no-ambient="true" file="skills/forge/SKILL.md">Autonomous engine. Heat/hammer/quench/temper/anneal until antifragile. Requires max_budget_usd. Explicit invocation only.</skill>
   <skill id="dream" kind="workflow" file="skills/dream/SKILL.md">Creative exploration. 3 perspectives + 4-persona stress test. Integrity-scored.</skill>
-  <skill id="diagnose" kind="workflow" file="skills/diagnose/SKILL.md">Systematic debugging + refactor analysis. Diagnosis before prescription.</skill>
   <skill id="metrics" kind="workflow" file="skills/metrics/SKILL.md">Observability dashboard. Sessions, agents, hooks, learnings.</skill>
   <skill id="experiment" kind="workflow" no-ambient="true" file="skills/experiment/SKILL.md">Autonomous experimentation engine + methodology (merged v8). Every rule is a hypothesis: seed, test, graduate, kill.</skill>
 
@@ -273,7 +272,7 @@ reviewed the claim.</rule>
 
   <skill id="eval" triggers="eval, benchmark, pass@k">Eval-Driven Development. pass@k metrics, capability evals, regression evals, grader types.</skill>
 
-  <skill id="debug" triggers="bug, error, broken, not working">Systematic debugging. Reproduce → hypothesize → isolate → fix. Binary search isolation.</skill>
+  <skill id="debug" triggers="bug, error, broken, not working, refactor, coupling">Diagnosis before prescription. Bug mode: reproduce, hypothesize, isolate, fix root cause. Refactor mode: map deps, measure coupling, name the blast radius, hand off.</skill>
 
   <!-- ARCHITECTURE -->
   <skill id="architecture" triggers="system design, structure, modules">Modular design, interface stability, dependency management, coupling analysis.</skill>
