@@ -25,7 +25,11 @@
       "matcher": "Write|Edit",
       "external_deps": [],
       "degraded_mode": "fail-open-silent-by-design",
-      "rationale": "Makes the write correct instead of refusing it. It can only ever repair content, never block, so a silent pass-through is the safe direction: the worst case is the write lands exactly as the model wrote it."
+      "rationale": "Makes the write correct instead of refusing it. It can only ever repair content, never block, so a silent pass-through is the safe direction: the worst case is the write lands exactly as the model wrote it.",
+      "host_shapes": [
+        "claude",
+        "codex"
+      ]
     },
     {
       "id": "auto-approve-safe",
@@ -39,7 +43,11 @@
         "jq"
       ],
       "degraded_mode": "fail-abstain",
-      "rationale": "Auto-approves demonstrably safe commands. Its dangerous direction is YES, so when it cannot evaluate it emits no decision and the human is asked."
+      "rationale": "Auto-approves demonstrably safe commands. Its dangerous direction is YES, so when it cannot evaluate it emits no decision and the human is asked.",
+      "host_shapes": [
+        "claude",
+        "codex"
+      ]
     },
     {
       "id": "detect-secrets",
@@ -53,7 +61,11 @@
         "jq"
       ],
       "degraded_mode": "fail-closed",
-      "rationale": "Secret scanner. Deliberately does not source circuit-breaker.sh: a security gate must never auto-disable itself."
+      "rationale": "Secret scanner. Deliberately does not source circuit-breaker.sh: a security gate must never auto-disable itself.",
+      "host_shapes": [
+        "claude",
+        "codex"
+      ]
     },
     {
       "id": "post-compact-restore",
@@ -112,5 +124,6 @@
       ],
       "degraded_mode": "fail-open-loud"
     }
-  ]
+  ],
+  "$host_shapes_note": "Every hook bound to a tool event receives a DIFFERENT payload shape per host: Claude sends tool_input.content / new_string / command, Codex sends tool_input.command carrying an apply_patch body. host_shapes lists the shapes the hook has been PROVEN against with a corpus case. A hook written against one shape and shipped to both hosts is the #230 defect: detect-secrets read tool_input.patch, Codex sends tool_input.command, and the scanner waved every Codex write through while the suite stayed green."
 }

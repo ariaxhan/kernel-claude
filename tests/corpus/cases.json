@@ -4,7 +4,8 @@
     "AWS_KEY_LINE": [
       "AWS_SECRET_ACCESS_KEY=AKIA",
       "IOSFODNN7EXAMPLE"
-    ]
+    ],
+    "CODEX_SECRET_PATCH": "*** Begin Patch\n*** Add File: config.ts\n+const key = \"{{AWS_KEY_LINE}}\";\n*** End Patch"
   },
   "cases": [
     {
@@ -18,7 +19,8 @@
           "file_path": "config/app.env",
           "content": "{{AWS_KEY_LINE}}"
         }
-      }
+      },
+      "host": "claude"
     },
     {
       "id": "detect-secrets/allows-ordinary-source-write",
@@ -31,7 +33,8 @@
           "file_path": "src/util.js",
           "content": "export function keyFor(row) { return row.id; }\n"
         }
-      }
+      },
+      "host": "claude"
     },
     {
       "id": "auto-approve-safe/declines-to-approve-mutating-command",
@@ -43,7 +46,8 @@
         "tool_input": {
           "command": "git push --force origin main"
         }
-      }
+      },
+      "host": "claude"
     },
     {
       "id": "normalize-write/repairs-prose-em-dash",
@@ -56,7 +60,8 @@
           "file_path": "docs/note.md",
           "content": "one - two\n"
         }
-      }
+      },
+      "host": "claude"
     },
     {
       "id": "normalize-write/leaves-code-alone",
@@ -68,6 +73,59 @@
         "tool_input": {
           "file_path": "src/app.ts",
           "content": "const a = 1;\n"
+        }
+      },
+      "host": "claude"
+    },
+    {
+      "id": "detect-secrets/blocks-codex-apply-patch",
+      "gate": "detect-secrets",
+      "host": "codex",
+      "expect": "block",
+      "why": "Codex sends tool_input.command carrying the patch. Reading the wrong field here waved every Codex write through for weeks (#230).",
+      "input": {
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: config.ts\n+const key = \"{{AWS_KEY_LINE}}\";\n*** End Patch"
+        }
+      }
+    },
+    {
+      "id": "detect-secrets/allows-clean-codex-apply-patch",
+      "gate": "detect-secrets",
+      "host": "codex",
+      "expect": "allow",
+      "why": "A clean Codex patch must pass, or the scanner refuses the whole host.",
+      "input": {
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: hello.ts\n+console.log(\"hi\");\n*** End Patch"
+        }
+      }
+    },
+    {
+      "id": "auto-approve-safe/abstains-on-codex-shape",
+      "gate": "auto-approve-safe",
+      "host": "codex",
+      "expect": "allow",
+      "why": "Auto-approval must never fire on a shape it cannot read; abstaining sends the request to the human.",
+      "input": {
+        "tool_name": "shell",
+        "tool_input": {
+          "command": "rm -rf /tmp/whatever"
+        }
+      }
+    },
+    {
+      "id": "normalize-write/no-ops-on-codex-shape",
+      "gate": "normalize-write",
+      "host": "codex",
+      "expect": "allow",
+      "why": "No capture proves Codex honors updatedInput, so the normalizer stays silent on the apply_patch shape rather than inventing a host contract.",
+      "input": {
+        "tool_name": "apply_patch",
+        "tool_input": {
+          "command": "*** Begin Patch\n*** Add File: doc.md\n+a - b\n*** End Patch"
         }
       }
     }

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Violation-corpus harness: proof that KERNEL's gates can still refuse things.
 
-Three checks, in order of how badly their absence has burned us:
+Four checks, in order of how badly their absence has burned us:
 
 1. DIVERGENCE (bidirectional). hooks/gates.json, the scripts on disk, and the
    bindings in hooks/hooks.json must describe the same world. A gate added
@@ -12,13 +12,17 @@ Three checks, in order of how badly their absence has burned us:
    must ALLOW. Blocking-only coverage produces a gate that refuses everything;
    allowing-only coverage produces decor.
 
-3. LIVENESS. Every gate is run twice: once normally, and once with its declared
+3. HOST SHAPES. Every tool-event hook is proven against every host payload shape
+   it can receive. Claude and Codex disagree about where the content lives, and a
+   hook that reads only one host's field silently passes everything on the other.
+
+4. LIVENESS. Every gate is run twice: once normally, and once with its declared
    external dependencies removed from PATH. The second run must match the gate's
    declared degraded_mode. fail-closed must still refuse. fail-open-loud must
    allow AND say so on stderr -- a silent fail-open is the defect that let
    `rg: command not found` print PASS inside a green CI run.
 
-Exit 0 only when all three pass. Run: python3 tests/corpus/run-corpus.py
+Exit 0 only when all four pass. Run: python3 tests/corpus/run-corpus.py
 """
 
 from __future__ import annotations
@@ -108,6 +112,41 @@ def check_divergence(registry: dict) -> None:
 
 
 # ----------------------------------------------------------------- 2. coverage
+TOOL_EVENTS = {"PreToolUse", "PostToolUse", "PermissionRequest"}
+
+
+def check_host_shapes(registry: dict, corpus: dict) -> None:
+    """Every tool-event hook must be proven against every host shape it receives.
+
+    Hosts do not agree on the payload. Claude sends tool_input.content /
+    new_string / command; Codex sends tool_input.command carrying an apply_patch
+    body. A hook written against one shape and shipped to both is defect #230:
+    detect-secrets read tool_input.patch, Codex sends tool_input.command, and the
+    scanner waved every Codex write through for weeks while this suite stayed
+    green. The rule is structural so the next hook author meets it at authoring
+    time instead of in production.
+    """
+    by_hook: dict[str, set[str]] = {}
+    for case in corpus["cases"]:
+        by_hook.setdefault(case["gate"], set()).add(case.get("host", "claude"))
+
+    for hook in registry["hooks"]:
+        if not set(hook.get("events", [])) & TOOL_EVENTS:
+            continue
+        declared = set(hook.get("host_shapes", []))
+        if not declared:
+            fail(
+                f"HOST SHAPES: {hook['id']} is bound to a tool event but declares no "
+                "host_shapes. Name the hosts whose payload it was proven against."
+            )
+        covered = by_hook.get(hook["id"], set())
+        for host in sorted(declared - covered):
+            fail(
+                f"HOST SHAPES: {hook['id']} declares it handles the {host} payload but "
+                f"no corpus case sends one. An unproven shape is how Codex breaks."
+            )
+
+
 def check_coverage(registry: dict, corpus: dict) -> None:
     gates = [h for h in registry["hooks"] if h["class"] == "gate"]
     by_gate: dict[str, set[str]] = {}
@@ -349,6 +388,7 @@ def main() -> int:
 
     check_divergence(registry)
     check_coverage(registry, corpus)
+    check_host_shapes(registry, corpus)
     check_cases(registry, corpus)
     check_degraded_modes(registry, corpus)
 
@@ -366,6 +406,7 @@ def main() -> int:
         return 1
     print("  divergence: registry, disk, and bindings agree")
     print("  coverage:   every gate has a must-block and a must-allow case")
+    print("  hosts:      every tool-event hook is proven on every host shape it takes")
     print("  liveness:   every gate matched its declared degraded mode")
     return 0
 

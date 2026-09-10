@@ -56,7 +56,9 @@
       ],
       "verified_by": "Claude Code 2.1.220 plugin runtime; bindings exercised by tests/run-tests.sh lifecycle suite",
       "verified_on": "2026-07-29",
-      "agents_support": "agents/*.md at plugin root are discovered automatically and invoked through the Task tool."
+      "agents_support": "agents/*.md at plugin root are discovered automatically and invoked through the Task tool.",
+      "honors_pretooluse_updated_input": true,
+      "honors_pretooluse_updated_input_evidence": "code.claude.com/docs/en/hooks: a PreToolUse hook may return hookSpecificOutput.updatedInput to rewrite tool arguments before execution; when several hooks return one, the last to finish wins."
     },
     "codex": {
       "display_name": "Codex",
@@ -95,7 +97,9 @@
       "lifecycle_events_evidence": "Full enum extracted from the codex-cli 0.150.1 binary, contiguous in one string: PreToolUse PermissionRequest PostToolUse PreCompact PostCompact SessionStart SessionEnd UserPromptSubmit SubagentStart SubagentStop Stop Interrupt. PostCompact, SubagentStart and Interrupt were absent from this list until 2026-08-27 and are still unbound by Kernel; PostCompact is the notable one, the Vaults host config already uses it.",
       "hooks_feature_flag": "Codex runs no hooks at all unless config.toml carries [features] hooks = true. It is off by default and fails silently: no error, no warning, every guard simply absent. Kernel's install path does not check for it.",
       "project_hook_trust": "Project-level .codex/hooks.json hooks are trusted individually in config.toml under [hooks.state.\"<path>:<snake_case_event>:<group_index>:<hook_index>\"] with a trusted_hash. Editing a hook command or inserting one invalidates its hash and the hook silently stops running until a human re-approves it in an interactive session. A headless codex exec cannot grant that approval. Plugin-shipped hooks need no such entry.",
-      "agents_support": "Kernel's ten agents/*.md are a Claude Code plugin surface with no Codex equivalent. In a Codex plugin, agents/ means agents/openai.yaml, per-skill UI metadata and invocation policy, confirmed in the 0.150.1 binary alongside .codex-plugin/plugin.json in the same component-discovery string. Codex has native multi-agent spawn (spawn_agent, wait_agent, close_agent, assign_agent_task) but no plugin-level agent definitions to point it at. So surgeon, adversary, blind-evaluator, deep-diver, reviewer, researcher, scout, dreamer, lane-worker and transcript-archaeologist do not exist on this host, and the tier-3 contract -> surgeon -> adversary flow has no Codex implementation. Independent verification on Codex is a human or a second CLI, not a Kernel agent."
+      "agents_support": "Kernel's ten agents/*.md are a Claude Code plugin surface with no Codex equivalent. In a Codex plugin, agents/ means agents/openai.yaml, per-skill UI metadata and invocation policy, confirmed in the 0.150.1 binary alongside .codex-plugin/plugin.json in the same component-discovery string. Codex has native multi-agent spawn (spawn_agent, wait_agent, close_agent, assign_agent_task) but no plugin-level agent definitions to point it at. So surgeon, adversary, blind-evaluator, deep-diver, reviewer, researcher, scout, dreamer, lane-worker and transcript-archaeologist do not exist on this host, and the tier-3 contract -> surgeon -> adversary flow has no Codex implementation. Independent verification on Codex is a human or a second CLI, not a Kernel agent.",
+      "honors_pretooluse_updated_input": false,
+      "honors_pretooluse_updated_input_evidence": "UNVERIFIED, therefore false. No captured codex-cli run shows an updatedInput payload being applied, and Codex delivers file writes as apply_patch commands rather than content/new_string. normalize-write.py exits silently on that shape. Flipping this to true requires a live capture, not a reading."
     }
   },
   "interface": {

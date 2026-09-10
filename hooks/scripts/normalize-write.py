@@ -89,6 +89,16 @@ def main() -> int:
     except (ValueError, OSError):
         return 0
     tool_input = event.get("tool_input") or {}
+
+    # Codex delivers a file write as an apply_patch shell command, not as
+    # content/new_string, and no measurement in governance/hosts.json says Codex
+    # honors hookSpecificOutput.updatedInput. Rewriting a payload on a claim we
+    # have not captured is how CODEX_PLUGIN_ROOT killed every Codex hook, so this
+    # exits silently there instead: the write lands exactly as the model wrote it.
+    # Close it by capturing a live codex-cli run, then add the case to the corpus.
+    if "command" in tool_input and "content" not in tool_input:
+        return 0
+
     field = {"Write": "content", "Edit": "new_string"}.get(event.get("tool_name"))
     original = tool_input.get(field) if field else None
     raw = tool_input.get("file_path") or ""
