@@ -44,6 +44,32 @@
           "command": "git push --force origin main"
         }
       }
+    },
+    {
+      "id": "normalize-write/repairs-prose-em-dash",
+      "gate": "normalize-write",
+      "expect": "allow",
+      "why": "Doctrine forbids em dashes. Repairing the write beats refusing it and spending a turn.",
+      "input": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "docs/note.md",
+          "content": "one - two\n"
+        }
+      }
+    },
+    {
+      "id": "normalize-write/leaves-code-alone",
+      "gate": "normalize-write",
+      "expect": "allow",
+      "why": "A normalizer that rewrites source it does not understand is worse than the guard it replaced.",
+      "input": {
+        "tool_name": "Write",
+        "tool_input": {
+          "file_path": "src/app.ts",
+          "content": "const a = 1;\n"
+        }
+      }
     }
   ]
 }

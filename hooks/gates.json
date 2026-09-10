@@ -3,16 +3,30 @@
   "classes": {
     "gate": "Can refuse an action (exit 2 / deny / block). Requires corpus coverage: at least one case it must block and one it must allow.",
     "advisory": "Adds context or records state. Cannot refuse. No corpus coverage required, but its degraded mode is still declared.",
-    "library": "Sourced by other scripts; never bound to an event directly."
+    "library": "Sourced by other scripts; never bound to an event directly.",
+    "normalizer": "Rewrites the tool input so the action succeeds instead of being refused. Cannot block. Requires corpus coverage: at least one case it must repair and one it must leave alone."
   },
   "degraded_modes": {
     "fail-closed": "If the check cannot run (missing dependency, unreadable input), REFUSE the action. Correct for safety gates: a scanner that cannot scan must not wave things through.",
     "fail-open-loud": "If the check cannot run, allow the action but emit a visible warning to stderr. Correct for narrow or advisory checks where refusing everything would be worse than the risk. Silent fail-open is never a valid declaration.",
     "not-applicable": "No external dependency whose absence changes the verdict.",
     "fail-closed-when-armed": "Inert when its trigger state is absent (allow, quietly), and fail-closed once armed. Correct for gates that only govern an opted-in mode; requires a corpus case that arms the gate, or the armed path is never proven.",
-    "fail-abstain": "If the check cannot run, emit NO decision, falling through to normal handling. Correct where the gate's dangerous direction is YES (auto-approval): uncertainty must never become consent."
+    "fail-abstain": "If the check cannot run, emit NO decision, falling through to normal handling. Correct where the gate's dangerous direction is YES (auto-approval): uncertainty must never become consent.",
+    "fail-open-silent-by-design": "If the check cannot run, pass the input through untouched and say nothing. Valid ONLY for normalizers, which cannot refuse: their failure returns the pre-existing behavior, not an unguarded action."
   },
   "hooks": [
+    {
+      "id": "normalize-write",
+      "script": "hooks/scripts/normalize-write.py",
+      "class": "normalizer",
+      "events": [
+        "PreToolUse"
+      ],
+      "matcher": "Write|Edit",
+      "external_deps": [],
+      "degraded_mode": "fail-open-silent-by-design",
+      "rationale": "Makes the write correct instead of refusing it. It can only ever repair content, never block, so a silent pass-through is the safe direction: the worst case is the write lands exactly as the model wrote it."
+    },
     {
       "id": "auto-approve-safe",
       "script": "hooks/scripts/auto-approve-safe.sh",
@@ -95,24 +109,6 @@
       "events": [],
       "external_deps": [
         "gh"
-      ],
-      "degraded_mode": "fail-open-loud"
-    },
-    {
-      "id": "scan-output-impl",
-      "script": "hooks/scripts/scan-output.py",
-      "class": "library",
-      "events": [],
-      "external_deps": [],
-      "degraded_mode": "not-applicable"
-    },
-    {
-      "id": "test-gate",
-      "script": "hooks/scripts/test-gate.sh",
-      "class": "library",
-      "events": [],
-      "external_deps": [
-        "git"
       ],
       "degraded_mode": "fail-open-loud"
     }

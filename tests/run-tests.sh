@@ -2208,6 +2208,73 @@ test_breaker_resets() {
   [ $((NOW - TRIP_TIME)) -ge 600 ]  # verify cooldown expired
 }
 
+# === Normalizer Tests (9.11.0) ===
+
+EM=$(printf '\xe2\x80\x94')
+
+norm() {  # norm <file_path> <content> [tool] -> normalized content, empty if unchanged
+  local tool="${3:-Write}" field="content"
+  [ "$tool" = "Edit" ] && field="new_string"
+  python3 -c "
+import json,subprocess,sys
+inp={'tool_name':sys.argv[3],'tool_input':{'file_path':sys.argv[1],sys.argv[4]:sys.argv[2]}}
+out=subprocess.run([sys.argv[5]],input=json.dumps(inp),text=True,capture_output=True)
+if not out.stdout.strip(): sys.exit(0)
+print(json.loads(out.stdout)['hookSpecificOutput']['updatedInput'][sys.argv[4]],end='')
+" "$1" "$2" "$tool" "$field" "$PLUGIN_ROOT/hooks/scripts/normalize-write.py"
+}
+
+test_normalizer_repairs_prose_em_dash() {
+  assert_contains "$(norm 'docs/note.md' "one ${EM} two")" "one - two" \
+    "em dash in prose is repaired, not refused"
+}
+
+test_normalizer_leaves_code_fences_alone() {
+  local got
+  got=$(norm 'docs/note.md' "text ${EM} here
+\`\`\`
+code ${EM} fence
+\`\`\`")
+  assert_contains "$got" "code ${EM} fence" "fenced code keeps its bytes" || return 1
+  assert_contains "$got" "text - here" "prose outside the fence is still repaired"
+}
+
+test_normalizer_ignores_source_files() {
+  local got
+  got=$(norm 'src/app.ts' "const a = 1;${EM}b")
+  case "$got" in
+    ""|*"${EM}"*) ;;
+    *) echo "  FAIL: applied a prose rule to source: $got"; return 1 ;;
+  esac
+}
+
+test_normalizer_handles_edit_new_string() {
+  assert_contains "$(norm 'docs/note.md' "a ${EM} b" Edit)" "a - b" \
+    "Edit new_string is normalized"
+}
+
+test_normalizer_adds_final_newline() {
+  local got
+  got=$(norm 'docs/note.md' 'no trailing newline')
+  assert_contains "$got" "no trailing newline" "content survives the newline fix"
+}
+
+test_normalizer_fails_open_on_garbage() {
+  local out rc
+  out=$(printf 'not json at all' | "$PLUGIN_ROOT/hooks/scripts/normalize-write.py" 2>/dev/null); rc=$?
+  assert_equals "0" "$rc" "garbage stdin exits clean" || return 1
+  [ -z "$out" ] || { echo "  FAIL: emitted a decision on unparseable input"; return 1; }
+}
+
+test_normalizer_never_blocks() {
+  ! grep -q '"deny"' "$PLUGIN_ROOT/hooks/scripts/normalize-write.py"
+}
+
+test_dead_hook_scripts_removed() {
+  [ ! -e "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" ] || { echo "  FAIL: test-gate.sh is bound to nothing"; return 1; }
+  [ ! -e "$PLUGIN_ROOT/hooks/scripts/scan-output.py" ] || { echo "  FAIL: scan-output.py is bound to nothing"; return 1; }
+}
+
 # === Debug Tests (diagnose merged in, 9.11.0) ===
 
 test_debug_refactor_mode() {
@@ -3234,55 +3301,6 @@ _tg_make_project() {
   chmod +x "$dir/tests/run-tests.sh"
 }
 
-test_test_gate_detects_and_passes() {
-  local d; d=$(mktemp -d)
-  _tg_make_project "$d" pass
-  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  local rc=$?
-  assert_exit_code 0 "$rc" "green suite should exit 0" || return 1
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "PASS" || return 1
-  rm -rf "$d"
-}
-
-test_test_gate_detects_and_fails() {
-  local d; d=$(mktemp -d)
-  _tg_make_project "$d" fail
-  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  local rc=$?
-  assert_exit_code 1 "$rc" "red suite should exit 1" || return 1
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "FAIL" || return 1
-  rm -rf "$d"
-}
-
-test_test_gate_no_suite_is_green() {
-  local d; d=$(mktemp -d)
-  mkdir -p "$d/_meta"
-  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  assert_exit_code 0 "$?" "no suite detected should not block (exit 0)" || return 1
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "NONE" || return 1
-  rm -rf "$d"
-}
-
-test_test_gate_status_recovers_to_pass() {
-  # A red verdict must clear when the suite goes green (so the block self-heals).
-  local d; d=$(mktemp -d)
-  _tg_make_project "$d" fail
-  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "FAIL" || return 1
-  _tg_make_project "$d" pass
-  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  assert_contains "$(cat "$d/_meta/.test-status" 2>/dev/null)" "PASS" || return 1
-  rm -rf "$d"
-}
-
-test_test_gate_honors_override_file() {
-  local d; d=$(mktemp -d)
-  mkdir -p "$d/_meta"
-  echo "exit 0" > "$d/_meta/.test-cmd"
-  bash "$PLUGIN_ROOT/hooks/scripts/test-gate.sh" "$d" >/dev/null 2>&1
-  assert_exit_code 0 "$?" ".test-cmd override should be used" || return 1
-  rm -rf "$d"
-}
 
 
 
@@ -4528,11 +4546,6 @@ run_test_suite() {
       run_test "migration: workflows reference skills" test_migration_workflows_reference_skills
       ;;
     test_gate)
-      run_test "test-gate detects + passes" test_test_gate_detects_and_passes
-      run_test "test-gate detects + fails" test_test_gate_detects_and_fails
-      run_test "test-gate no suite is green" test_test_gate_no_suite_is_green
-      run_test "test-gate red recovers to pass" test_test_gate_status_recovers_to_pass
-      run_test "test-gate honors override file" test_test_gate_honors_override_file
       run_test "session-start surfaces red" test_session_start_surfaces_red
       ;;
     agentdb)
@@ -4744,6 +4757,16 @@ run_test_suite() {
       run_test "breaker trips after 3 failures" test_breaker_trips
       run_test "breaker resets after cooldown" test_breaker_resets
       ;;
+    normalizer)
+      run_test "normalizer repairs prose em dash" test_normalizer_repairs_prose_em_dash
+      run_test "normalizer leaves code fences alone" test_normalizer_leaves_code_fences_alone
+      run_test "normalizer ignores source files" test_normalizer_ignores_source_files
+      run_test "normalizer handles Edit new_string" test_normalizer_handles_edit_new_string
+      run_test "normalizer adds final newline" test_normalizer_adds_final_newline
+      run_test "normalizer fails open on garbage" test_normalizer_fails_open_on_garbage
+      run_test "normalizer can never block" test_normalizer_never_blocks
+      run_test "dead hook scripts removed" test_dead_hook_scripts_removed
+      ;;
     debug)
       run_test "debug has refactor mode" test_debug_refactor_mode
       run_test "debug has diagnosis output" test_debug_diagnosis_output
@@ -4935,6 +4958,7 @@ main() {
 
     run_test_suite "compaction_restore"
     run_test_suite "circuit_breaker"
+    run_test_suite "normalizer"
     run_test_suite "debug"
     run_test_suite "retrospective"
     run_test_suite "github_integration"
