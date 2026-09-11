@@ -2,6 +2,14 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.10.4] - 2026-09-11
+
+### Changed
+
+- kernel:simplify carries the deletion-over-repair doctrine, `system` mode, the preflight and
+  `.simplify-contract.md` verifier artifact, and trimmed skill descriptions (the 2026-09-10 audit).
+  9.10.3 shipped before that repair, so the installed plugin drifted from the repo for a day.
+
 ## [9.10.3] - 2026-09-03
 
 ### Fixed
