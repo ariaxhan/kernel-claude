@@ -14,27 +14,33 @@ def words(text):
     return {w.lower() for w in WORD.findall(text)}
 
 
+SKIP = ('<', '#', '[Request', '[Image', 'Stop hook', 'This session is being continued', 'Goal check-in')
+
+
+def prompt_text(line):
+    """The user-typed text in one Claude or Codex transcript line, or ''."""
+    try:
+        d = json.loads(line)
+    except ValueError:
+        return ''
+    msg = d.get('message') if d.get('type') == 'user' else d.get('payload')
+    if not isinstance(msg, dict) or msg.get('role') != 'user':
+        return ''
+    c = msg.get('content')
+    if isinstance(c, str):
+        return c.strip()
+    return ' '.join(x.get('text', '') for x in c or []
+                    if isinstance(x, dict) and x.get('type') in ('text', 'input_text')).strip()
+
+
 def user_prompts(path):
-    """Earlier user-typed prompts, oldest first, from a Claude or Codex transcript."""
+    """Earlier user-typed prompts, oldest first, consecutive duplicates collapsed."""
     out = []
     with open(path, encoding='utf8', errors='ignore') as f:
-        lines = f.readlines()
-    for line in lines:
-        if '"user"' not in line:
-            continue
-        try:
-            d = json.loads(line)
-        except ValueError:
-            continue
-        msg = d.get('message') if d.get('type') == 'user' else d.get('payload')
-        if not isinstance(msg, dict) or msg.get('role') != 'user':
-            continue
-        c = msg.get('content')
-        parts = [c] if isinstance(c, str) else [x.get('text', '') for x in c or [] if isinstance(x, dict)
-                                                 and x.get('type') in ('text', 'input_text')]
-        text = ' '.join(parts).strip()
-        if text and not text.startswith(('<', '#', '[Request', '[Image', 'Stop hook', 'This session is being continued', 'Goal check-in')) and (not out or out[-1] != text):
-            out.append(text)
+        for line in f:
+            text = prompt_text(line) if '"user"' in line else ''
+            if text and not text.startswith(SKIP) and (not out or out[-1] != text):
+                out.append(text)
     return out
 
 
