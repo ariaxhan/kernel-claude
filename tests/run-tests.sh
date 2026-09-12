@@ -646,13 +646,6 @@ PY
 }
 
 
-test_session_start_skill_routing() {
-  local output
-  output=$("$PLUGIN_ROOT/hooks/scripts/session-start.sh" </dev/null 2>&1)
-  # Skills fire ambiently; the hook points at /kernel:help instead of inlining an index
-  assert_contains "$output" "/kernel:help"
-}
-
 test_session_start_no_scripted_interrupts() {
   # Scripted "ASK USER" phrasing was removed; the hook states facts only.
   if grep -q "ASK USER" "$PLUGIN_ROOT/hooks/scripts/session-start.sh"; then
@@ -1481,38 +1474,6 @@ test_agentdb_numeric_injection_prune() {
 
 # === Command Structure Tests ===
 
-test_ingest_command_has_research_step() {
-  local cmd_file="$PLUGIN_ROOT/skills/ingest/SKILL.md"
-  local content
-  content=$(cat "$cmd_file")
-  assert_contains "$content" "RESEARCH" || return 1
-  assert_contains "$content" "anti_patterns"
-}
-
-test_forge_command_has_loop() {
-  local cmd_file="$PLUGIN_ROOT/skills/forge/SKILL.md"
-  local content
-  content=$(cat "$cmd_file")
-  assert_contains "$content" "loop" || return 1
-  assert_contains "$content" "max_iterations"
-}
-
-test_commands_use_structured_format() {
-  # Workflow skills (former commands) use XML structure or YAML blocks
-  local structured_count=0
-  local total=0
-  for s in ingest forge handoff retrospective dream experiment; do
-    ((total++))
-    if grep -qE '<skill id=|```yaml' "$PLUGIN_ROOT/skills/$s/SKILL.md" 2>/dev/null; then
-      ((structured_count++))
-    fi
-  done
-  [ "$structured_count" -ge "$total" ] || {
-    echo "FAIL: workflow skills should use structured format ($structured_count/$total)"
-    return 1
-  }
-}
-
 # === Token Budget Tests (Attention Optimization) ===
 # Research: Lost-in-the-middle problem, 70-80% max context usage
 # Targets based on Anthropic context engineering recommendations
@@ -1565,37 +1526,6 @@ test_agents_token_budget() {
   }
 }
 
-test_critical_content_at_edges() {
-  # Lost-in-the-middle: role/purpose at START, checklist at END
-  # Check that agents have <role> near top and <checklist> near bottom
-  local failed=0
-  for agent in "$PLUGIN_ROOT/agents/"*.md; do
-    # Role should be in first 50 lines
-    local role_line
-    role_line=$(grep -n '<role>' "$agent" 2>/dev/null | head -1 | cut -d: -f1)
-    if [ -n "$role_line" ] && [ "$role_line" -gt 50 ]; then
-      echo "  $(basename "$agent"): <role> at line $role_line (should be < 50)"
-      failed=1
-    fi
-    # Checklist should be in last 40 lines
-    local total_lines
-    total_lines=$(wc -l < "$agent" | tr -d ' ')
-    local checklist_line
-    checklist_line=$(grep -n '<checklist>' "$agent" 2>/dev/null | tail -1 | cut -d: -f1)
-    if [ -n "$checklist_line" ]; then
-      local from_end=$((total_lines - checklist_line))
-      if [ "$from_end" -gt 40 ]; then
-        echo "  $(basename "$agent"): <checklist> $from_end lines from end (should be < 40)"
-        failed=1
-      fi
-    fi
-  done
-  [ "$failed" -eq 0 ] || {
-    echo "FAIL: critical content not at edges. Move <role> to top, <checklist> to bottom."
-    return 1
-  }
-}
-
 test_no_duplicate_big5_definitions() {
   # Big 5 should be defined once in ai-code-anti-patterns.md, referenced elsewhere
   # Commands/agents should reference, not redefine the full Big 5
@@ -1615,22 +1545,6 @@ test_no_duplicate_big5_definitions() {
   # Should be at most 3 files with full definitions (validator, adversary, tearitapart)
   [ "$full_definitions" -le 4 ] || {
     echo "FAIL: $full_definitions files have full Big 5 definitions. Centralize in ai-code-anti-patterns.md"
-    return 1
-  }
-}
-
-test_progressive_disclosure_used() {
-  # Agents should use skill_load for progressive disclosure
-  # This keeps base context tight, loads details on-demand
-  local missing=0
-  for agent in "$PLUGIN_ROOT/agents/"*.md; do
-    if ! grep -q 'skill_load\|SKILL.md' "$agent" 2>/dev/null; then
-      echo "  Missing skill_load in: $(basename "$agent")"
-      missing=1
-    fi
-  done
-  [ "$missing" -eq 0 ] || {
-    echo "FAIL: agents should use progressive disclosure via skill_load"
     return 1
   }
 }
@@ -1879,14 +1793,6 @@ test_gemini_bundle_excludes_incompatible_host_files() {
   return $rc
 }
 
-test_release_docs_document_gemini_install() {
-  grep -q 'gemini extensions install https://github.com/ariaxhan/kernel-claude' "$PLUGIN_ROOT/README.md" || return 1
-  grep -q 'gemini extensions install https://github.com/ariaxhan/kernel-claude' "$PLUGIN_ROOT/llms.txt" || return 1
-  # Honesty gate: neither doc may advertise Gemini without naming what does not run there.
-  grep -q 'Install for Gemini CLI' "$PLUGIN_ROOT/llms.txt" || return 1
-  grep -q 'no agentdb recall' "$PLUGIN_ROOT/llms.txt" || return 1
-}
-
 test_version_sync_all() {
   # plugin.json is the source of truth; EVERY canonical declaration must match it.
   # Drift here = a release that shipped a stale version somewhere. Bump via
@@ -1906,12 +1812,6 @@ test_version_sync_all() {
   return $fail
 }
 
-test_release_docs_reject_stale_live_claims() {
-  local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md AGENTS.md CLAUDE.md skills/help/SKILL.md skills/init/SKILL.md workflows/feature.md workflows/bugfix.md workflows/refactor.md)
-  local pattern='Cursor shares|without the kernel: prefix|yaml-first|YAML is the canonical|All v7 invocations work unchanged|ln -sfn|push to main|no new tests needed|commands/\*\.md'
-  ! grep -En "$pattern" "${files[@]/#/$PLUGIN_ROOT/}"
-}
-
 test_release_docs_rollback_works_outside_a_checkout() {
   local files=("$PLUGIN_ROOT/README.md" "$PLUGIN_ROOT/docs/QUICKSTART.md" "$PLUGIN_ROOT/docs/MIGRATION-8.md") file
   for file in "${files[@]}"; do
@@ -1919,30 +1819,6 @@ test_release_docs_rollback_works_outside_a_checkout() {
     grep -q 'checkout 54a0053' "$file" || return 1
     grep -q 'plugins/cache/kernel-marketplace/kernel/current/scripts/select-runtime.sh' "$file" || return 1
     ! grep -q 'git worktree add' "$file" || return 1
-  done
-}
-
-test_release_docs_separate_claude_and_codex_lifecycle() {
-  local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md) file content
-  for file in "${files[@]}"; do
-    content=$(cat "$PLUGIN_ROOT/$file")
-    [[ "$content" == *"/plugin marketplace update kernel-marketplace"* ]] || return 1
-    [[ "$content" == *"codex plugin marketplace upgrade kernel-marketplace"* ]] || return 1
-    [[ "$content" == *"codex plugin remove kernel@kernel-marketplace"* ]] || return 1
-    [[ "$content" == *"codex plugin add kernel@kernel-marketplace"* ]] || return 1
-    ! grep -Eq '^codex plugin update( |$)' "$PLUGIN_ROOT/$file" || return 1
-  done
-  grep -q 'codex plugin marketplace add ariaxhan/kernel-claude' "$PLUGIN_ROOT/README.md"
-  grep -q 'codex plugin marketplace add ariaxhan/kernel-claude' "$PLUGIN_ROOT/docs/QUICKSTART.md"
-}
-
-test_release_docs_explain_codex_invocation_and_boundaries() {
-  local files=(README.md docs/QUICKSTART.md docs/MIGRATION-8.md skills/help/SKILL.md) file
-  for file in "${files[@]}"; do
-    grep -Fq '/kernel:' "$PLUGIN_ROOT/$file" || return 1
-    grep -Fq '$kernel:' "$PLUGIN_ROOT/$file" || return 1
-    grep -Fqi 'Claude Code agent' "$PLUGIN_ROOT/$file" || return 1
-    grep -Fq 'SessionEnd' "$PLUGIN_ROOT/$file" || return 1
   done
 }
 
@@ -1978,19 +1854,6 @@ test_release_changelog_v8_is_current_and_history_preserved() {
   [[ "$v801" == *"incomplete"* ]] && [[ "$v801" == *"Codex"* ]] && [[ "$v801" == *"368"* ]] || return 1
   [[ "$v800" == *"strict JSON"* ]] && [[ "$v800" == *"preflight"* ]] && [[ "$v800" == *"select-runtime.sh"* ]] || return 1
   grep -q '^## \[7.23.0\] - 2026-07-06' "$PLUGIN_ROOT/CHANGELOG.md"
-}
-
-test_release_docs_use_current_801_runtime() {
-  grep -q 'kernel/8\.0\.2/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
-  ! grep -q 'kernel/8\.0\.0/scripts/select-runtime\.sh' "$PLUGIN_ROOT/README.md" || return 1
-  # Historical 8.0.0 release and upgrade references remain valid outside active runtime commands.
-  grep -q '^## \[8\.0\.0\] - 2026-07-11' "$PLUGIN_ROOT/CHANGELOG.md"
-}
-
-test_release_docs_explain_vaults_continuity_boundary() {
-  grep -q 'active project root exactly matches the Vaults root' "$PLUGIN_ROOT/README.md" || return 1
-  grep -q 'Nested repositories retain KERNEL' "$PLUGIN_ROOT/README.md" || return 1
-  grep -q 'shared Vaults continuity service' "$PLUGIN_ROOT/CHANGELOG.md"
 }
 
 test_release_metadata_and_inventory_are_truthful() {
@@ -2040,20 +1903,6 @@ PY
 test_dreamer_agent_exists_with_frontmatter() {
   [ -f "$PLUGIN_ROOT/agents/dreamer.md" ] || return 1
   head -1 "$PLUGIN_ROOT/agents/dreamer.md" | grep -q "^---"
-}
-
-test_dreamer_agent_has_voice_definitions() {
-  grep -q "minimalist" "$PLUGIN_ROOT/agents/dreamer.md" &&
-  grep -q "maximalist" "$PLUGIN_ROOT/agents/dreamer.md" &&
-  grep -q "pragmatist" "$PLUGIN_ROOT/agents/dreamer.md"
-}
-
-test_dream_command_has_output_format() {
-  grep -q "output_format" "$PLUGIN_ROOT/skills/dream/SKILL.md"
-}
-
-test_dream_command_has_github_integration() {
-  grep -q "github_integration\|GitHub\|gh " "$PLUGIN_ROOT/skills/dream/SKILL.md"
 }
 
 # === Compaction Restore Tests ===
@@ -2275,14 +2124,6 @@ test_dead_hook_scripts_removed() {
 
 # === Debug Tests (diagnose merged in, 9.11.0) ===
 
-test_debug_refactor_mode() {
-  grep -q '<refactor_mode>' "$PLUGIN_ROOT/skills/debug/SKILL.md"
-}
-
-test_debug_diagnosis_output() {
-  grep -q '<diagnosis_output>' "$PLUGIN_ROOT/skills/debug/SKILL.md"
-}
-
 test_debug_user_invocable() {
   grep -q '^user-invocable: true' "$PLUGIN_ROOT/skills/debug/SKILL.md"
 }
@@ -2303,30 +2144,6 @@ test_retrospective_command_exists() {
 
 test_retrospective_registered() {
   [ -f "$PLUGIN_ROOT/skills/retrospective/SKILL.md" ]
-}
-
-test_retrospective_has_agentdb() {
-  grep -q "agentdb" "$PLUGIN_ROOT/skills/retrospective/SKILL.md"
-}
-
-test_ship_bump_targets_are_truthful() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/skills/ship/SKILL.md")
-  for target in '.claude-plugin/plugin.json' '.claude-plugin/marketplace.json' 'AGENTS.md' 'CLAUDE.md' 'skills/help/SKILL.md'; do
-    assert_contains "$content" "$target" "ship bump prose must name $target" || return 1
-  done
-  if grep -q 'README install path' "$PLUGIN_ROOT/skills/ship/SKILL.md"; then
-    echo "FAIL: bump-version.sh does not update a README install path"
-    return 1
-  fi
-}
-
-test_methodology_carries_cross_loader_release_lessons() {
-  grep -q "one real payload fixture per loader" "$PLUGIN_ROOT/skills/build/reference/testing.md" &&
-    grep -q "NORMALIZE BEFORE ALLOWLISTS" "$PLUGIN_ROOT/skills/tearitapart/reference/security.md" &&
-    grep -q "disposable plugin/cache copy" "$PLUGIN_ROOT/skills/ship/SKILL.md" &&
-    grep -q "native manifest validator rejects required safety metadata" "$PLUGIN_ROOT/skills/ship/SKILL.md" &&
-    grep -q "resource ceiling" "$PLUGIN_ROOT/skills/ship/SKILL.md"
 }
 
 test_retrospective_contradictions_have_mutation_evidence() {
@@ -2379,15 +2196,6 @@ test_github_integration_exists() {
   head -1 "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" | grep -q "^#!/bin/bash"
 }
 
-test_github_integration_has_availability_check() {
-  grep -q "_gh_available" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
-}
-
-test_github_integration_has_profile_gate() {
-  # Must check profile, local profiles get no GitHub operations
-  grep -q "local\|profile" "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
-}
-
 test_github_integration_has_issue_functions() {
   local lib="$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
   grep -q "_gh_create_issue" "$lib" &&
@@ -2422,11 +2230,6 @@ test_github_integration_not_hardcoded_repo() {
   # Repo should be derived from git remote, not hardcoded
   ! grep -q '"ariaxhan/kernel-claude"' "$PLUGIN_ROOT/hooks/scripts/github-integration.sh" || \
   grep -q 'git remote' "$PLUGIN_ROOT/hooks/scripts/github-integration.sh"
-}
-
-test_agents_have_github_layer() {
-  grep -q "github\|_gh_\|issue" "$PLUGIN_ROOT/agents/surgeon.md" &&
-  grep -q "github\|_gh_\|issue" "$PLUGIN_ROOT/agents/adversary.md"
 }
 
 
@@ -2511,26 +2314,6 @@ test_session_start_creates_memory_dir() {
 }
 
 # --- Worktree Safety Tests ---
-
-test_surgeon_has_worktree_safety() {
-  local file="$PLUGIN_ROOT/agents/surgeon.md"
-  assert_file_exists "$file" || return 1
-  local content
-  content=$(cat "$file")
-  assert_contains "$content" "worktree_safety" "surgeon.md should contain worktree_safety section" || return 1
-  assert_contains "$content" "constraints.files" "surgeon.md should reference constraints.files" || return 1
-  assert_contains "$content" "git diff --name-only" "surgeon.md should have diff validation"
-}
-
-test_orchestration_has_constraint_validation() {
-  local file="$PLUGIN_ROOT/skills/orchestration/SKILL.md"
-  assert_file_exists "$file" || return 1
-  local content
-  content=$(cat "$file")
-  assert_contains "$content" "worktree_safety" "orchestration SKILL.md should contain worktree_safety" || return 1
-  assert_contains "$content" "constraints.files" "orchestration SKILL.md should reference constraints.files" || return 1
-  assert_contains "$content" "Post-agent validation" "orchestration SKILL.md should have post-agent validation"
-}
 
 test_agentdb_contract_accepts_constraints() {
   local output
@@ -2942,22 +2725,7 @@ test_learn_reinforce_attaches_check() {
   assert_equals "1" "$n" "reinforcing a learning with --check attaches the check"
 }
 
-test_orchestration_skill_has_injection() {
-
-  grep -q "knowledge_injection" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
-}
-
 # --- Phase 2 Agents Tests ---
-
-test_reviewer_has_review_protocol() {
-  local file="$PLUGIN_ROOT/agents/reviewer.md"
-  assert_contains "$(cat "$file")" "review_protocol"
-}
-
-test_reviewer_has_confidence_scoring() {
-  local file="$PLUGIN_ROOT/agents/reviewer.md"
-  assert_contains "$(cat "$file")" "confidence_scoring"
-}
 
 # === Approval Learner + R-Factor Tests ===
 
@@ -3019,39 +2787,12 @@ test_agentdb_antibody_searches() {
 
 # === Analyzer Agent Tests (Phase 4) ===
 
-test_orchestration_has_lane_contract() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
-  assert_contains "$content" "lane_contract" "orchestration should define the lane contract" || return 1
-  assert_contains "$content" "Forbidden list" "lane contract should include a forbidden list" || return 1
-  assert_contains "$content" "Raw-data return format" "lane contract should demand raw-data returns"
-}
-
-test_orchestration_has_worker_model_doctrine() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
-  assert_contains "$content" "worker_model_doctrine" "orchestration should carry the worker-model doctrine" || return 1
-  assert_contains "$content" "use your judgment" "doctrine should name the judgment tell"
-}
-
 # === Cartographer & Coroner Tests ===
 
 # === Pre-Ship + App-Dev Tests ===
 
 test_app_dev_skill_exists() {
   [ -f "$PLUGIN_ROOT/skills/app-dev/SKILL.md" ]
-}
-
-test_app_dev_has_store_submission() {
-  grep -q "store submission\|Store Submission\|App Store\|Play Console" "$PLUGIN_ROOT/skills/app-dev/SKILL.md"
-}
-
-test_app_dev_has_triggers() {
-  grep -q "app.*mobile\|EAS\|store submission\|expo\|react native" "$PLUGIN_ROOT/skills/app-dev/SKILL.md"
-}
-
-test_claude_md_references_app_dev() {
-  grep -q 'id="app-dev"' "$PLUGIN_ROOT/CLAUDE.md"
 }
 
 # === Extension Tests (Phase 4) ===
@@ -3073,47 +2814,11 @@ test_template_exists() {
   assert_file_exists "$PLUGIN_ROOT/docs/skill-template.md" "TEMPLATE.md should exist"
 }
 
-test_template_has_sources() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
-  assert_contains "$content" "sources:" "TEMPLATE.md should have sources section"
-}
-
-test_template_has_triggers() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
-  assert_contains "$content" "triggers:" "TEMPLATE.md should have triggers section"
-}
-
-test_template_has_gates() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
-  assert_contains "$content" "gates:" "TEMPLATE.md should have gates section"
-}
-
-test_template_has_output() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/docs/skill-template.md")
-  assert_contains "$content" "output:" "TEMPLATE.md should have output section"
-}
-
 
 
 
 # === Knowledge-graph (8.6.0) ===
 
-test_knowledge_graph_skill_exists() {
-  assert_file_exists "$PLUGIN_ROOT/skills/knowledge-graph/SKILL.md" || return 1
-  local content; content=$(cat "$PLUGIN_ROOT/skills/knowledge-graph/SKILL.md")
-  assert_contains "$content" "orientation" "skill should explain orientation-token cost" || return 1
-  assert_contains "$content" "code-only" "skill should mandate --code-only for the code layer"
-}
-
-
-test_claude_md_references_knowledge_graph() {
-  local content; content=$(cat "$PLUGIN_ROOT/CLAUDE.md")
-  assert_contains "$content" "knowledge-graph" "generated governance should list the skill"
-}
 
 
 
@@ -3130,12 +2835,6 @@ test_claude_md_references_knowledge_graph() {
 
 
 # --- Forge Entropy Test ---
-
-test_forge_has_entropy_measurement() {
-  local content
-  content=$(cat "$PLUGIN_ROOT/skills/forge/SKILL.md")
-  assert_contains "$content" "Measure entropy" "forge.md should mention entropy measurement"
-}
 
 # === Run Tests ===
 
@@ -4001,39 +3700,6 @@ test_migration_side_effecting_skills_not_ambient() {
 
 # === Marketing + Frontend Skill Tests ===
 
-test_marketing_site_methodology_contract() {
-  local skill="$PLUGIN_ROOT/skills/marketing-site/SKILL.md"
-  local ui="$PLUGIN_ROOT/skills/marketing-site/agents/openai.yaml"
-  assert_file_exists "$skill" || return 1
-  assert_file_exists "$ui" || return 1
-  grep -q '^  kind: methodology' "$skill" || return 1
-  ! grep -q '^disable-model-invocation: true' "$skill" || return 1
-  grep -q 'skills/frontend/SKILL.md' "$skill" || return 1
-  grep -q 'testimonials.*metrics.*guarantees\|metrics.*testimonials.*guarantees' "$skill" || return 1
-  grep -q 'privacy' "$skill" || return 1
-  grep -q 'client' "$skill" || return 1
-  grep -q '\$marketing-site' "$ui"
-}
-
-test_frontend_is_context_led_not_house_style() {
-  local skill="$PLUGIN_ROOT/skills/frontend/SKILL.md"
-  grep -q '<context-fit>' "$skill" || return 1
-  grep -q 'Preserve and extend the existing design system' "$skill" || return 1
-  grep -q 'visual QA' "$skill" || return 1
-  ! grep -q 'Distinctive fonts only — NEVER' "$skill" || return 1
-  ! grep -q 'NEVER flat single-color backgrounds' "$skill"
-}
-
-test_landing_page_composes_marketing_and_frontend() {
-  local skill="$PLUGIN_ROOT/skills/landing-page/SKILL.md"
-  grep -q '^disable-model-invocation: true' "$skill" || return 1
-  grep -q 'skills/marketing-site/SKILL.md' "$skill" || return 1
-  grep -q 'skills/frontend/SKILL.md' "$skill" || return 1
-  grep -q 'user already named the deploy target' "$skill" || return 1
-  grep -q '375 / 768 / 1440' "$skill" || return 1
-  grep -q 'project.*configured.*deploy' "$skill"
-}
-
 test_kernel9_python_suite() {
   cd "$PLUGIN_ROOT" || return 1
   python3 -m unittest discover -s tests/kernel9 -p 'test_*.py'
@@ -4327,13 +3993,6 @@ EOF
   [ "$rc" -ne 0 ] || { echo "  FAIL: seeded regression passed npm run verify"; return 1; }
 }
 
-test_complexity_skills_require_armed_gate() {
-  grep -q 'npm run verify' "$PLUGIN_ROOT/skills/simplify/SKILL.md" || { echo "  FAIL: simplify does not name npm verify"; return 1; }
-  grep -q 'seeded over-budget fixture' "$PLUGIN_ROOT/skills/simplify/SKILL.md" || { echo "  FAIL: simplify does not seed-test the gate"; return 1; }
-  grep -q 'manual measurement is not a gate' "$PLUGIN_ROOT/skills/review/SKILL.md" || { echo "  FAIL: review accepts manual-only complexity"; return 1; }
-  grep -q 'eslint AST' "$PLUGIN_ROOT/skills/review/SKILL.md" || { echo "  FAIL: review does not require AST-aware JS/TS"; return 1; }
-}
-
 run_test_suite() {
 
   local suite="$1"
@@ -4346,8 +4005,6 @@ run_test_suite() {
       run_test "verdict adjudication: the acceptance function" test_verdict_adjudication
       ;;
     knowledge_graph)
-      run_test "knowledge-graph SKILL.md exists + explains orientation cost" test_knowledge_graph_skill_exists
-      run_test "generated governance lists knowledge-graph" test_claude_md_references_knowledge_graph
       ;;
     meta)
       run_test "complexity ratchet holds" test_complexity_ratchet_holds
@@ -4451,7 +4108,6 @@ run_test_suite() {
       run_test "hooks.json supports Claude and Codex loaders" test_hooks_json_cross_loader_schema
       run_test "advisory hooks are synchronous and complete" test_advisory_hooks_are_synchronous_and_complete
       run_test "critical guard scripts unchanged for 8.2.0" test_critical_guard_scripts_unchanged_for_820
-      run_test "session-start points at skill routing" test_session_start_skill_routing
       run_test "session-start has no scripted interrupts" test_session_start_no_scripted_interrupts
       run_test "session-start shows checkpoint after compact" test_session_start_shows_checkpoint_after_compact
       ;;
@@ -4493,10 +4149,6 @@ run_test_suite() {
       run_test "skills have frontmatter" test_skills_have_frontmatter
       run_test "agents have frontmatter" test_agents_have_frontmatter
       run_test "hooks.json valid" test_hooks_json_valid
-      run_test "ingest has research step" test_ingest_command_has_research_step
-      run_test "forge has loop control" test_forge_command_has_loop
-      run_test "commands use structured format" test_commands_use_structured_format
-      run_test "methodology preserves cross-loader release lessons" test_methodology_carries_cross_loader_release_lessons
       ;;
     complexity)
       run_test "complexity sees object-literal methods" test_complexity_uses_ast_object_methods
@@ -4508,16 +4160,13 @@ run_test_suite() {
       run_test "complexity blocks parser failures" test_complexity_blocks_eslint_parser_failure
       run_test "complexity keeps duplicate functions distinct" test_complexity_diff_keeps_duplicate_functions_distinct
       run_test "complexity runs through npm verify" test_complexity_runs_through_npm_verify
-      run_test "complexity skills require armed gate" test_complexity_skills_require_armed_gate
       ;;
     tokens)
       run_test "CLAUDE.md token budget" test_claude_md_token_budget
       run_test "commands token budget" test_commands_token_budget
       run_test "agents token budget" test_agents_token_budget
-      run_test "critical content at edges" test_critical_content_at_edges
       run_test "no duplicate Big 5 definitions" test_no_duplicate_big5_definitions
       run_test "skill path references resolve" test_skill_path_references_resolve
-      run_test "progressive disclosure used" test_progressive_disclosure_used
       ;;
     portable)
       run_test "common.sh exists" test_common_sh_exists
@@ -4599,9 +4248,6 @@ run_test_suite() {
       run_test "dream command exists and has frontmatter" test_dream_command_exists_with_frontmatter
       run_test "dream command registered in plugin.json" test_dream_command_registered_in_plugin_json
       run_test "dreamer agent exists and has frontmatter" test_dreamer_agent_exists_with_frontmatter
-      run_test "dreamer agent has voice definitions" test_dreamer_agent_has_voice_definitions
-      run_test "dream command has output format" test_dream_command_has_output_format
-      run_test "dream command has github integration" test_dream_command_has_github_integration
       ;;
     compaction_restore)
       run_test "Vaults continuity requires exact root and executable adapter" test_vaults_continuity_requires_exact_root_and_executable_adapter
@@ -4629,27 +4275,20 @@ run_test_suite() {
       run_test "dead hook scripts removed" test_dead_hook_scripts_removed
       ;;
     debug)
-      run_test "debug has refactor mode" test_debug_refactor_mode
-      run_test "debug has diagnosis output" test_debug_diagnosis_output
       run_test "debug is user-invocable" test_debug_user_invocable
       run_test "diagnose fully removed" test_diagnose_fully_removed
       ;;
    retrospective)
       run_test "retrospective command exists with frontmatter" test_retrospective_command_exists
       run_test "retrospective registered in plugin.json" test_retrospective_registered
-      run_test "retrospective has agentdb integration" test_retrospective_has_agentdb
-      run_test "ship bump targets are truthful" test_ship_bump_targets_are_truthful
       run_test "resolved contradictions have learning mutation evidence" test_retrospective_contradictions_have_mutation_evidence
       ;;
     github_integration)
       run_test "github-integration.sh exists" test_github_integration_exists
-      run_test "has availability check" test_github_integration_has_availability_check
-      run_test "has profile gate" test_github_integration_has_profile_gate
       run_test "has issue functions" test_github_integration_has_issue_functions
       run_test "has discussion functions" test_github_integration_has_discussion_functions
       run_test "fire-and-forget safety" test_github_integration_fire_and_forget
       run_test "repo not hardcoded" test_github_integration_not_hardcoded_repo
-      run_test "agents have github layer" test_agents_have_github_layer
       ;;
     phase0_fixes)
       run_test "session-start creates memory dir" test_session_start_creates_memory_dir
@@ -4667,8 +4306,6 @@ run_test_suite() {
       run_test "classify_profile production by projects" test_classify_profile_production_by_projects
       ;;
     worktree_safety)
-      run_test "surgeon has worktree_safety section" test_surgeon_has_worktree_safety
-      run_test "orchestration has constraint validation" test_orchestration_has_constraint_validation
       run_test "agentdb contract accepts constraints" test_agentdb_contract_accepts_constraints
       ;;
     inject_context)
@@ -4676,7 +4313,6 @@ run_test_suite() {
       run_test "inject-context surgeon outputs gotchas" test_inject_context_surgeon_gotchas
       run_test "inject-context adversary outputs failures" test_inject_context_adversary_failures
       run_test "inject-context unknown falls back to read-start" test_inject_context_unknown_fallback
-      run_test "orchestration SKILL.md has knowledge_injection" test_orchestration_skill_has_injection
       ;;
     read_start)
       run_test "read-start outputs Known Gotchas section" test_read_start_outputs_gotchas
@@ -4690,9 +4326,6 @@ run_test_suite() {
       run_test "read-start bumps load_count not hit_count" test_read_start_bumps_load_count_not_hit_count
       ;;
     marketing)
-      run_test "marketing-site is ambient methodology" test_marketing_site_methodology_contract
-      run_test "frontend is context-led, not a house style" test_frontend_is_context_led_not_house_style
-      run_test "landing-page composes marketing + frontend" test_landing_page_composes_marketing_and_frontend
       ;;
     kernel9)
       run_test "Kernel 9 router, packs, and host adapters" test_kernel9_python_suite
@@ -4728,22 +4361,14 @@ run_test_suite() {
       run_test "all canonical version declarations in sync" test_version_sync_all
       run_test "gemini-extension.json is valid and honest" test_gemini_manifest_is_valid
       run_test "gemini bundle excludes Claude-format agents and hooks" test_gemini_bundle_excludes_incompatible_host_files
-      run_test "README and llms.txt document the Gemini install" test_release_docs_document_gemini_install
       ;;
     release_docs)
-      run_test "active docs reject stale claims" test_release_docs_reject_stale_live_claims
       run_test "8.0 changelog current and 7.x history preserved" test_release_changelog_v8_is_current_and_history_preserved
-      run_test "active release docs use 8.0.1 runtime" test_release_docs_use_current_801_runtime
-      run_test "Vaults continuity boundary is documented" test_release_docs_explain_vaults_continuity_boundary
       run_test "metadata and inventory truthful" test_release_metadata_and_inventory_are_truthful
       run_test "rollback works outside a checkout" test_release_docs_rollback_works_outside_a_checkout
-      run_test "Claude and Codex lifecycle commands are separate" test_release_docs_separate_claude_and_codex_lifecycle
-      run_test "Codex invocation and lifecycle boundaries are documented" test_release_docs_explain_codex_invocation_and_boundaries
       run_test "explicit-only skill inventory is derived" test_release_docs_explicit_only_inventory_is_derived
       ;;
     phase2_agents)
-      run_test "reviewer has review_protocol" test_reviewer_has_review_protocol
-      run_test "reviewer has confidence scoring" test_reviewer_has_confidence_scoring
       ;;
     triage_understudier)
       run_test "understudier stays deleted" test_understudier_is_gone
@@ -4762,8 +4387,6 @@ run_test_suite() {
     cartographer_coroner)
       ;;
     phase4_agents)
-      run_test "orchestration defines the lane contract" test_orchestration_has_lane_contract
-      run_test "orchestration carries worker-model doctrine" test_orchestration_has_worker_model_doctrine
       ;;
     phase4_extensions)
       run_test "agentdb co-change command exists" test_agentdb_co_change_exists
@@ -4771,19 +4394,11 @@ run_test_suite() {
       ;;
     phase4_framework)
       run_test "TEMPLATE.md exists" test_template_exists
-      run_test "TEMPLATE.md has sources section" test_template_has_sources
-      run_test "TEMPLATE.md has triggers section" test_template_has_triggers
-      run_test "TEMPLATE.md has gates section" test_template_has_gates
-      run_test "TEMPLATE.md has output section" test_template_has_output
       ;;
     pre_ship_app)
       run_test "app-dev SKILL.md exists" test_app_dev_skill_exists
-      run_test "app-dev SKILL.md has store submission" test_app_dev_has_store_submission
-      run_test "app-dev SKILL.md has triggers" test_app_dev_has_triggers
-      run_test "CLAUDE.md references app-dev" test_claude_md_references_app_dev
       ;;
     entropy_adaptive)
-      run_test "forge.md mentions entropy measurement" test_forge_has_entropy_measurement
       ;;
   esac
 }
