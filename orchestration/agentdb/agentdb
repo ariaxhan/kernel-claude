@@ -139,6 +139,20 @@ _ensure_embedding_cols() {
   return 0
 }
 
+# Migration 018: executable regression check per learning. A lesson recorded as prose
+# is recalled by keyword and never fails when the behavior returns; check_cmd is the
+# command that fails if it does (exit 0 = still holds). check_cwd pins where it runs.
+_ensure_check_cols() {
+  [ -f "$DB" ] || return 0
+  local has
+  has=$(db_exec "SELECT 1 FROM pragma_table_info('learnings') WHERE name='check_cmd' LIMIT 1;" 2>/dev/null || echo "")
+  if [ -z "$has" ]; then
+    db_exec "ALTER TABLE learnings ADD COLUMN check_cmd TEXT;" 2>/dev/null || true
+    db_exec "ALTER TABLE learnings ADD COLUMN check_cwd TEXT;" 2>/dev/null || true
+  fi
+  return 0
+}
+
 # Migration 017: recall alias table, delegated to code (idempotent, self-heals
 # any DB that predates the migration). Curated query-side term -> corpus-side
 # alias mappings; inert until rows exist. See migrations/017_recall_aliases.sql.
@@ -678,12 +692,14 @@ cmd_write_end() {
 cmd_learn() {
   # Usage: agentdb learn <type> <insight> [evidence] [domain]
   #        agentdb learn <type> <insight> [evidence] [domain] --visibility <agent|human_only|operational> --sensitivity <low|medium|high>
-  local type="" insight="" evidence="" domain="" visibility="agent" sensitivity="low"
+  #        agentdb learn <type> <insight> --check '<cmd exiting 0 while the lesson holds>'
+  local type="" insight="" evidence="" domain="" visibility="agent" sensitivity="low" check=""
   local positional=()
 
   # Parse mixed positional + flag arguments
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --check) check="${2:-}"; shift 2 ;;
       --visibility) visibility="${2:-agent}"; shift 2 ;;
       --sensitivity) sensitivity="${2:-low}"; shift 2 ;;
       --domain) domain="${2:-}"; shift 2 ;;
@@ -709,6 +725,9 @@ cmd_learn() {
     exit 1
   }
   [ ! -f "$DB" ] && cmd_init >/dev/null
+  _ensure_check_cols
+  local check_set=""
+  [ -n "$check" ] && check_set=", check_cmd='$(sql_escape "$check")', check_cwd='$(sql_escape "$PWD")'"
 
   # Validate enums — warn on operational (never auto-surfaced; human-only)
   if [[ "$visibility" == "operational" ]]; then
@@ -733,7 +752,7 @@ cmd_learn() {
   local existing
   existing=$(db_exec "SELECT id FROM learnings WHERE insight LIKE '%${safe_substr}%' AND type='$safe_type' LIMIT 1;" 2>/dev/null || echo "")
   if [ -n "$existing" ]; then
-    db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id='$existing';"
+    db_exec "UPDATE learnings SET hit_count = hit_count + 1, last_hit = strftime('%Y-%m-%dT%H:%M:%fZ','now')$check_set WHERE id='$existing';"
     # Observation: a near-identical insight recurred and reinforced an existing row.
     emit_memory_event reinforced "$existing" "learn dedup: near-identical insight recurred" \
       "{\"type\":\"$(json_escape "$type")\",\"domain\":\"$(json_escape "$domain")\"}"
@@ -744,6 +763,7 @@ cmd_learn() {
   local id="LRN-$(date +%Y%m%d%H%M%S)-$$-$RANDOM"
   db_exec "INSERT INTO learnings (id, type, insight, evidence, domain, visibility, sensitivity)
     VALUES ('$id', '$safe_type', '$safe_insight', '$safe_evidence', '$safe_domain', '$safe_visibility', '$safe_sensitivity');"
+  [ -n "$check_set" ] && db_exec "UPDATE learnings SET ${check_set#, } WHERE id='$id';"
   # Observation: a new insight was recorded (origin event for this learning).
   emit_memory_event created "$id" "learn: new insight recorded" \
     "{\"type\":\"$(json_escape "$type")\",\"domain\":\"$(json_escape "$domain")\"}"
@@ -1813,6 +1833,34 @@ cmd_resurrect() {
   echo "Resurrected: $id"
 }
 
+# Run every live learning's regression check. A check exits 0 while the lesson still
+# holds; nonzero means the failure it records has returned. Exit 1 if any fail, so
+# gates and scheduled jobs can call it. Stored commands run only on this explicit call.
+cmd_checks() {
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  _ensure_softdelete_cols
+  _ensure_check_cols
+  local secs="${AGENTDB_CHECK_TIMEOUT:-60}" ids id cmd cwd insight fails=0 total=0
+  ids=$(db_exec "SELECT id FROM learnings WHERE check_cmd IS NOT NULL AND check_cmd != '' AND archived_at IS NULL ORDER BY ts;")
+  for id in $ids; do
+    cmd=$(db_exec "SELECT check_cmd FROM learnings WHERE id='$id';")
+    cwd=$(db_exec "SELECT check_cwd FROM learnings WHERE id='$id';")
+    insight=$(db_exec "SELECT substr(insight,1,100) FROM learnings WHERE id='$id';")
+    total=$((total + 1))
+    if (cd "${cwd:-$PWD}" 2>/dev/null && perl -e 'alarm shift; exec @ARGV' "$secs" bash -c "$cmd") >/dev/null 2>&1; then
+      echo "PASS $id  $insight"
+    else
+      echo "FAIL $id  $insight"
+      echo "     check: $cmd"
+      emit_memory_event check_failed "$id" "regression check failed: lesson's failure returned" \
+        "{\"cwd\":\"$(json_escape "$cwd")\"}"
+      fails=$((fails + 1))
+    fi
+  done
+  echo "checks: $((total - fails))/$total pass"
+  [ "$fails" -eq 0 ]
+}
+
 cmd_antibody() {
   local pattern="${1:-}"
   [ -z "$pattern" ] && { echo "Usage: agentdb antibody <search_text>"; exit 1; }
@@ -2689,6 +2737,7 @@ case "${1:-help}" in
   decay)       cmd_decay ;;
   resurrect)   shift; cmd_resurrect "$@" ;;
   antibody)    shift; cmd_antibody "$@" ;;
+  checks)      cmd_checks ;;
   recall)      shift; cmd_recall "$@" ;;
   alias)       shift; cmd_alias "$@" ;;
   embed-sync)  shift; _ensure_embedding_cols; _embed_run sync "$DB" ;;
@@ -2723,6 +2772,8 @@ case "${1:-help}" in
     echo "  read-start              Full generic context for audit/resume"
     echo "  write-end <json>        Checkpoint before stopping"
     echo "  learn <type> <insight>  Record learning (failure|pattern|gotcha|preference)"
+    echo "                          --check '<cmd>' attaches a regression check (exit 0 = lesson holds)"
+    echo "  checks                  Run every learning's check; exit 1 if a recorded failure returned"
     echo "  contract <json>         Create new contract"
     echo "  contract close [id|--stale]  Close contract(s)"
     echo "  contract list           List recent contracts"

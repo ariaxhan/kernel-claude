@@ -2947,7 +2947,28 @@ test_learn_auto_populates_domain() {
   [ -n "$domain" ] && [ "$domain" != "" ] || { echo "Expected non-empty domain, got '$domain'"; return 1; }
 }
 
+test_learn_check_passes_then_fails_on_return() {
+  agentdb init >/dev/null
+  touch fixed.flag
+  agentdb learn failure "flag file must exist" "evidence" --check 'test -f fixed.flag' >/dev/null
+  agentdb checks >/dev/null || { echo "check should pass while the lesson holds"; return 1; }
+  rm fixed.flag
+  local out
+  out=$(agentdb checks) && { echo "checks must exit nonzero once the failure returns"; return 1; }
+  assert_contains "$out" "FAIL"
+}
+
+test_learn_reinforce_attaches_check() {
+  agentdb init >/dev/null
+  agentdb learn gotcha "recurring gotcha without a test" >/dev/null
+  agentdb learn gotcha "recurring gotcha without a test" --check 'true' >/dev/null
+  local n
+  n=$(sqlite3 "$TEST_PROJECT/_meta/agentdb/agent.db" "SELECT count(*) FROM learnings WHERE check_cmd='true';")
+  assert_equals "1" "$n" "reinforcing a learning with --check attaches the check"
+}
+
 test_orchestration_skill_has_injection() {
+
   grep -q "knowledge_injection" "$PLUGIN_ROOT/skills/orchestration/SKILL.md"
 }
 
@@ -4867,6 +4888,8 @@ run_test_suite() {
       ;;
     learn)
       run_test "learn auto-populates domain from PWD" test_learn_auto_populates_domain
+      run_test "learn --check passes, then fails when the failure returns" test_learn_check_passes_then_fails_on_return
+      run_test "reinforcing a learning attaches --check" test_learn_reinforce_attaches_check
       ;;
     version_sync)
       run_test "all canonical version declarations in sync" test_version_sync_all
