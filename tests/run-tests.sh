@@ -3058,6 +3058,7 @@ test_manifest_divergence_detects_artifact_hash_mismatch() {
     ]
   },
   "objective": {"goal": "t", "success_conditions": ["x"]},
+  "contract": {"alternatives_rejected": []},
   "workflow": {"phases": [{"name": "p", "status": "required"}]},
   "context": {"policy": {"mode": "advisory"}},
   "execution": {"entry_phase": "p"},
@@ -3268,7 +3269,7 @@ test_manifest_divergence_json_invalidates_phases() {
   git init -q -b main . && git -c user.email=test@kernel -c user.name=kernel-test commit -q --allow-empty -m init
   local head; head=$(git rev-parse HEAD)
   cat > m.json <<MEOF
-{"schema":"kernel.handoff/v1","identity":{"name":"t","created":"2026-01-01T00:00:00Z"},"provenance":{"branch":"other","commit":"$head","dirty":true},"objective":{"goal":"t","success_conditions":["x"]},"workflow":{"phases":[{"name":"research","status":"inherited"}],"invalidation_rules":[{"when":{"event":"branch_diverged"},"invalidates":["research"]}]},"context":{"policy":{"mode":"advisory"}},"execution":{"entry_phase":"research"},"resume":{"prompt":"r"}}
+{"schema":"kernel.handoff/v1","identity":{"name":"t","created":"2026-01-01T00:00:00Z"},"provenance":{"branch":"other","commit":"$head","dirty":true},"objective":{"goal":"t","success_conditions":["x"]},"contract":{"alternatives_rejected":[]},"workflow":{"phases":[{"name":"research","status":"inherited"}],"invalidation_rules":[{"when":{"event":"branch_diverged"},"invalidates":["research"]}]},"context":{"policy":{"mode":"advisory"}},"execution":{"entry_phase":"research"},"resume":{"prompt":"r"}}
 MEOF
   local output ec=0; output=$("$KM" divergence m.json --json) || ec=$?
   assert_exit_code 1 "$ec" "structured divergence keeps hard exit" || return 1
