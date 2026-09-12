@@ -196,6 +196,7 @@ emit_memory_event() {
   # typo in a known verb is surfaced). Never a hard reject (design 2.2).
   case "$kind" in
     created|updated|imported|merged|retrieved|surfaced|used|ignored|reinforced|graduated|archived|resurrected|domain_changed|superseded) ;;
+    check_failed) ;;     # migration 018: a learning's regression check failed (cmd_checks)
     session_outcome) ;;  # phase-4 causal anchor (design 5.1 weak session association): a session's QA outcome, joined to surfaced events by actor
     *) echo "[agentdb] emit_memory_event: '$kind' is not a known memory verb (recording anyway; open vocabulary)" >&2 ;;
   esac
