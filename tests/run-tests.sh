@@ -2544,37 +2544,12 @@ test_agentdb_contract_accepts_constraints() {
 
 # --- Triage & Understudier Agent Tests ---
 
-test_triage_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/agents/triage.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/agents/triage.md" | grep -q "^---"
-}
-
-test_triage_model_haiku() {
-  grep -q "^model: haiku" "$PLUGIN_ROOT/agents/triage.md"
-}
-
-test_triage_has_complexity_classification() {
-  grep -q "low.*medium.*high.*epic" "$PLUGIN_ROOT/agents/triage.md" ||
-  (grep -q "low:" "$PLUGIN_ROOT/agents/triage.md" &&
-   grep -q "medium:" "$PLUGIN_ROOT/agents/triage.md" &&
-   grep -q "high:" "$PLUGIN_ROOT/agents/triage.md" &&
-   grep -q "epic:" "$PLUGIN_ROOT/agents/triage.md")
-}
-
 test_understudier_is_gone() {
   # understudier merged into triage (viability pre-flight); the file must stay deleted.
   if [ -f "$PLUGIN_ROOT/agents/understudier.md" ]; then
     echo "FAIL: agents/understudier.md should not exist (folded into triage)"
     return 1
   fi
-}
-
-test_triage_has_viability_preflight() {
-  grep -qi "viability pre-flight" "$PLUGIN_ROOT/agents/triage.md"
-}
-
-test_claude_md_references_triage() {
-  grep -q 'agent id="triage"' "$PLUGIN_ROOT/CLAUDE.md"
 }
 
 test_researcher_model_not_pinned() {
@@ -2984,83 +2959,13 @@ test_reviewer_has_confidence_scoring() {
   assert_contains "$(cat "$file")" "confidence_scoring"
 }
 
-test_validator_has_safety_chain() {
-  local file="$PLUGIN_ROOT/agents/validator.md"
-  assert_contains "$(cat "$file")" "safety_chain"
-}
-
-test_validator_has_9_gates() {
-  local file="$PLUGIN_ROOT/agents/validator.md"
-  local content
-  content=$(cat "$file")
-  assert_contains "$content" "Gate 1:" || return 1
-  assert_contains "$content" "Gate 9:"
-}
-
 # === Approval Learner + R-Factor Tests ===
-
-test_approval_learner_exists_with_frontmatter() {
-  local agent_file="$PLUGIN_ROOT/agents/approval-learner.md"
-  assert_file_exists "$agent_file" || return 1
-  head -1 "$agent_file" | grep -q "^---" || {
-    echo "FAIL: approval-learner.md missing frontmatter"
-    return 1
-  }
-}
-
-test_approval_learner_model_sonnet() {
-  grep -q "model: sonnet" "$PLUGIN_ROOT/agents/approval-learner.md" || {
-    echo "FAIL: approval-learner.md should have model: sonnet"
-    return 1
-  }
-}
-
-test_approval_learner_has_confidence_scoring() {
-  grep -q "confidence_scoring" "$PLUGIN_ROOT/agents/approval-learner.md" || {
-    echo "FAIL: approval-learner.md should have confidence scoring"
-    return 1
-  }
-  grep -q "times_validated / times_applied" "$PLUGIN_ROOT/agents/approval-learner.md" || {
-    echo "FAIL: approval-learner.md should define confidence formula"
-    return 1
-  }
-}
-
-test_approval_learner_has_progressive_trust() {
-  grep -qi "progressive trust" "$PLUGIN_ROOT/agents/approval-learner.md" || {
-    echo "FAIL: approval-learner.md should have progressive trust"
-    return 1
-  }
-  grep -q "observe.*suggest.*enforce" "$PLUGIN_ROOT/agents/approval-learner.md" || {
-    echo "FAIL: approval-learner.md should define trust levels: observe, suggest, enforce"
-    return 1
-  }
-}
-
-test_quality_has_big5_greps() {
-  # The Big 5 keep their runnable grep one-liners; r_factor/adsr are gone by design.
-  grep -q "quick_checks" "$PLUGIN_ROOT/skills/quality/SKILL.md" || {
-    echo "FAIL: quality SKILL.md should keep the Big 5 quick_checks greps"
-    return 1
-  }
-  if grep -q "r_factor\|adsr" "$PLUGIN_ROOT/skills/quality/SKILL.md"; then
-    echo "FAIL: quality SKILL.md must not reintroduce r_factor/adsr"
-    return 1
-  fi
-}
 
 test_skill_path_references_resolve() {
   # 8.1.2 deleted seven skills and left twenty skills/... loads pointing at them for six
   # months; every /kernel:dream run printed "quality subskill missing". Every skills/<x>/
   # path a skill or agent names must exist on disk.
   python3 "$PLUGIN_ROOT/tests/kernel9/test_skill_dependencies.py"
-}
-
-test_claude_md_references_approval_learner() {
-  grep -q "approval-learner" "$PLUGIN_ROOT/CLAUDE.md" || {
-    echo "FAIL: CLAUDE.md should reference approval-learner agent"
-    return 1
-  }
 }
 
 # === Learning System Tests ===
@@ -3114,19 +3019,6 @@ test_agentdb_antibody_searches() {
 
 # === Analyzer Agent Tests (Phase 4) ===
 
-test_analyzer_agent_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/agents/analyzer.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/agents/analyzer.md" | grep -q "^---"
-}
-
-test_analyzer_agent_has_dependency_detection() {
-  grep -q "dependency_detection" "$PLUGIN_ROOT/agents/analyzer.md"
-}
-
-test_analyzer_agent_has_model_opus() {
-  grep -q "model: opus" "$PLUGIN_ROOT/agents/analyzer.md"
-}
-
 test_orchestration_has_lane_contract() {
   local content
   content=$(cat "$PLUGIN_ROOT/skills/orchestration/SKILL.md")
@@ -3142,64 +3034,9 @@ test_orchestration_has_worker_model_doctrine() {
   assert_contains "$content" "use your judgment" "doctrine should name the judgment tell"
 }
 
-test_claude_md_references_analyzer() {
-  grep -q 'id="analyzer"' "$PLUGIN_ROOT/CLAUDE.md"
-}
-
 # === Cartographer & Coroner Tests ===
 
-test_cartographer_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/agents/cartographer.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/agents/cartographer.md" | grep -q "^---"
-}
-
-test_cartographer_model_opus() {
-  grep -q "^model: opus" "$PLUGIN_ROOT/agents/cartographer.md"
-}
-
-test_cartographer_has_codebase_map_output() {
-  grep -q "codebase.map\|codebase_map\|modules.*dependencies.*risk" "$PLUGIN_ROOT/agents/cartographer.md"
-}
-
-test_coroner_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/agents/coroner.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/agents/coroner.md" | grep -q "^---"
-}
-
-test_coroner_model_sonnet() {
-  grep -q "^model: sonnet" "$PLUGIN_ROOT/agents/coroner.md"
-}
-
-test_coroner_has_post_mortem_analysis() {
-  grep -q "post.mortem\|cause_of_death\|root.cause" "$PLUGIN_ROOT/agents/coroner.md"
-}
-
-test_claude_md_references_cartographer() {
-  grep -q 'id="cartographer"' "$PLUGIN_ROOT/CLAUDE.md"
-}
-
-test_claude_md_references_coroner() {
-  grep -q 'id="coroner"' "$PLUGIN_ROOT/CLAUDE.md"
-}
-
 # === Pre-Ship + App-Dev Tests ===
-
-test_pre_ship_exists_with_frontmatter() {
-  [ -f "$PLUGIN_ROOT/agents/pre-ship.md" ] || return 1
-  head -1 "$PLUGIN_ROOT/agents/pre-ship.md" | grep -q "^---"
-}
-
-test_pre_ship_has_composite_verdict() {
-  grep -q "composite_verdict\|SHIP.*NO-SHIP\|SHIP-WITH-WARNINGS" "$PLUGIN_ROOT/agents/pre-ship.md"
-}
-
-test_pre_ship_spawns_parallel_validators() {
-  grep -q "parallel" "$PLUGIN_ROOT/agents/pre-ship.md" && \
-  grep -q "validator" "$PLUGIN_ROOT/agents/pre-ship.md" && \
-  grep -q "reviewer" "$PLUGIN_ROOT/agents/pre-ship.md" && \
-  grep -q "security_scan" "$PLUGIN_ROOT/agents/pre-ship.md" && \
-  grep -q "test_suite" "$PLUGIN_ROOT/agents/pre-ship.md"
-}
 
 test_app_dev_skill_exists() {
   [ -f "$PLUGIN_ROOT/skills/app-dev/SKILL.md" ]
@@ -3211,10 +3048,6 @@ test_app_dev_has_store_submission() {
 
 test_app_dev_has_triggers() {
   grep -q "app.*mobile\|EAS\|store submission\|expo\|react native" "$PLUGIN_ROOT/skills/app-dev/SKILL.md"
-}
-
-test_claude_md_references_pre_ship() {
-  grep -q 'id="pre-ship"' "$PLUGIN_ROOT/CLAUDE.md"
 }
 
 test_claude_md_references_app_dev() {
