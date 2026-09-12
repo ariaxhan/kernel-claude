@@ -9,6 +9,8 @@ All notable changes to KERNEL are documented in this file.
 - `hooks/scripts/repeat-detector.py` (UserPromptSubmit, Claude and Codex transcripts): a restated
   request or "I already said / still wrong / as we agreed" injects a context-loss recovery order
   and appends to `_meta/ledgers/context-loss.jsonl`. 5 hits in 299 recent prompts, 3 true losses.
+  Fires on the first prompt of a session too (the transcript file may not exist yet); proven
+  through `claude -p --plugin-dir`.
 - `agentdb learn --check` attaches a regression check; `agentdb checks` runs them; `check_failed`
   memory verb registered.
 

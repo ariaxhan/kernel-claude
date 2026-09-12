@@ -58,9 +58,9 @@ def main():
     except ValueError:
         return
     prompt, t = hook.get('prompt') or '', hook.get('transcript_path') or ''
-    if not prompt or not os.path.isfile(t):
+    if not prompt:
         return
-    hit = detect(prompt, user_prompts(t))
+    hit = detect(prompt, user_prompts(t) if os.path.isfile(t) else [])
     if not hit:
         return
     reason, old = hit
