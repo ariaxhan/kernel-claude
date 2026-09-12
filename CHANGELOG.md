@@ -18,6 +18,8 @@ All notable changes to KERNEL are documented in this file.
 
 - kernel.handoff/v1 requires `contract.alternatives_rejected`, each with a `reason`, so a resumed
   session never re-proposes a ruled-out idea.
+- Test suite pruned: 29 unregistered and 44 prose-wording tests removed; stale divergence
+  fixtures repaired; `tests/run-tests.sh --quick` (26s) added. Full suite 296 passed, 0 failed.
 
 ## [9.10.4] - 2026-09-11
 
