@@ -8,6 +8,7 @@
     "identity",
     "provenance",
     "objective",
+    "contract",
     "workflow",
     "context",
     "execution",
@@ -184,7 +185,8 @@
           "items": {
             "type": "object",
             "required": [
-              "alternative"
+              "alternative",
+              "reason"
             ],
             "properties": {
               "alternative": {
@@ -197,10 +199,14 @@
               }
             }
           },
-          "x-kernel-enforced-by": "agent"
+          "x-kernel-enforced-by": "agent",
+          "description": "Required, even when empty: ideas ruled out and why, so the next session never re-proposes them."
         }
       },
-      "x-kernel-enforced-by": "agent"
+      "x-kernel-enforced-by": "agent",
+      "required": [
+        "alternatives_rejected"
+      ]
     },
     "workflow": {
       "type": "object",
