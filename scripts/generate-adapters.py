@@ -48,6 +48,7 @@ HOOK_BINDINGS = [
     {"event": "PreToolUse", "matcher": "Write|Edit", "script": "detect-secrets.sh", "timeout": 5},
     {"event": "PermissionRequest", "matcher": "Bash", "script": "auto-approve-safe.sh", "timeout": 5},
     {"event": "UserPromptSubmit", "matcher": "", "script": "post-compact-restore.sh", "timeout": 5},
+    {"event": "UserPromptSubmit", "matcher": "", "script": "repeat-detector.py", "timeout": 5},
 ]
 
 

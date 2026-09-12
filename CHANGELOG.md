@@ -2,6 +2,21 @@
 
 All notable changes to KERNEL are documented in this file.
 
+## [9.11.0] - 2026-09-12
+
+### Added
+
+- `hooks/scripts/repeat-detector.py` (UserPromptSubmit, Claude and Codex transcripts): a restated
+  request or "I already said / still wrong / as we agreed" injects a context-loss recovery order
+  and appends to `_meta/ledgers/context-loss.jsonl`. 5 hits in 299 recent prompts, 3 true losses.
+- `agentdb learn --check` attaches a regression check; `agentdb checks` runs them; `check_failed`
+  memory verb registered.
+
+### Changed
+
+- kernel.handoff/v1 requires `contract.alternatives_rejected`, each with a `reason`, so a resumed
+  session never re-proposes a ruled-out idea.
+
 ## [9.10.4] - 2026-09-11
 
 ### Changed

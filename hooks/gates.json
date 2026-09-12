@@ -81,6 +81,20 @@
       "degraded_mode": "fail-open-loud"
     },
     {
+      "id": "repeat-detector",
+      "script": "hooks/scripts/repeat-detector.py",
+      "class": "advisory",
+      "events": [
+        "UserPromptSubmit"
+      ],
+      "matcher": "",
+      "external_deps": [
+        "python3"
+      ],
+      "degraded_mode": "fail-open-loud",
+      "rationale": "A restated request means the session lost context; inject a recovery order and append to the context-loss ledger."
+    },
+    {
       "id": "session-start",
       "script": "hooks/scripts/session-start.sh",
       "class": "advisory",
