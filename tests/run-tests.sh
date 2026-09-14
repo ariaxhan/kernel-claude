@@ -1817,7 +1817,18 @@ test_version_sync_all() {
   return $fail
 }
 
+test_skill_load_targets_exist() {
+  # Every skills/... path named in a <skill_load> block or agent Load/Reference line must exist.
+  local f fail=0
+  for f in $(sed -n '/<skill_load>/,/<\/skill_load>/p' "$PLUGIN_ROOT"/skills/*/SKILL.md "$PLUGIN_ROOT"/agents/*.md \
+      | grep -oE 'skills/[A-Za-z0-9_./-]+\.md' | sort -u); do
+    [ -e "$PLUGIN_ROOT/$f" ] || { echo "FAIL: <skill_load> target missing: $f"; fail=1; }
+  done
+  return $fail
+}
+
 test_release_docs_rollback_works_outside_a_checkout() {
+
   local files=("$PLUGIN_ROOT/README.md" "$PLUGIN_ROOT/docs/QUICKSTART.md" "$PLUGIN_ROOT/docs/MIGRATION-8.md") file
   for file in "${files[@]}"; do
     grep -q 'git clone https://github.com/ariaxhan/kernel-claude.git' "$file" || return 1
@@ -4470,6 +4481,8 @@ run_test_suite() {
       ;;
     version_sync)
       run_test "all canonical version declarations in sync" test_version_sync_all
+      run_test "every <skill_load> target exists" test_skill_load_targets_exist
+
       run_test "gemini-extension.json is valid and honest" test_gemini_manifest_is_valid
       run_test "gemini bundle excludes Claude-format agents and hooks" test_gemini_bundle_excludes_incompatible_host_files
       ;;
