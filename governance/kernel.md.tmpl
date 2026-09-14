@@ -29,14 +29,8 @@ omission is also a defect.
 
 ## KERNEL quick reference
 
-```
-agentdb recall "<feature> <subsystem> <files/symbols> <error/outcome>" [--global]
-agentdb learn failure|pattern|gotcha "what" "why"  # capture as discovered
-agentdb write-end '{"did":"X","learned":["Y"]}'    # at session end
-agentdb wtf                                        # confused? full ref: agentdb guide
-```
-
-Recall with concrete nouns, not prose. Recall again after discovery, when scope/hypothesis changes, or on a new failure.
+`agentdb recall "<concrete nouns + files + outcome>" [--global]` before acting and again when scope or failure changes; `agentdb learn` when discovered; `agentdb write-end` at end.
+Full command reference: `agentdb wtf`.
 
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
 Do the work; never ask. A request Aria made or an issue she filed IS the decision: pick the most reasonable reading, do it, state the assumption in the deliverable. No AskUserQuestion, no QUESTION blocks, no menus, no "waiting on a human". Stop only for money, a client default branch, sending in her voice, or unrecoverable deletion.

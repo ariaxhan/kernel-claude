@@ -190,14 +190,8 @@ fi
 cat << 'KERNEL_CONTEXT'
 ## KERNEL quick reference
 
-```
-agentdb recall "<feature> <subsystem> <files/symbols> <error/outcome>" [--global]
-agentdb learn failure|pattern|gotcha "what" "why"  # capture as discovered
-agentdb write-end '{"did":"X","learned":["Y"]}'    # at session end
-agentdb wtf                                        # confused? full ref: agentdb guide
-```
-
-Recall with concrete nouns, not prose. Recall again after discovery, when scope/hypothesis changes, or on a new failure.
+`agentdb recall "<concrete nouns + files + outcome>" [--global]` before acting and again when scope or failure changes; `agentdb learn` when discovered; `agentdb write-end` at end.
+Full command reference: `agentdb wtf`.
 
 Claude invokes skills as /kernel:name; Codex invokes them as $kernel:name. Use the matching form; /kernel:help or $kernel:help lists them.
 Do the work; never ask. A request Aria made or an issue she filed IS the decision: pick the most reasonable reading, do it, state the assumption in the deliverable. No AskUserQuestion, no QUESTION blocks, no menus, no "waiting on a human". Stop only for money, a client default branch, sending in her voice, or unrecoverable deletion.
@@ -328,26 +322,13 @@ else
   echo ""
 fi
 
-# --- Knowledge-graph auto-orientation (8.6.1) ---
-# If this repo has a code graph, inject its architectural spine so the agent boots ALREADY
-# oriented instead of file-crawling to rebuild the map every session. This is the automatic
-# half of the knowledge-graph capability: ambient context, not a tool the agent must remember
-# to call. Self-gating: silent when no graph exists, so users without graphs see no change.
-if command -v graphify >/dev/null 2>&1; then
-  for _gj in "$PROJECT_ROOT/graphify-out/graph.json" "$PROJECT_ROOT/_meta/graphify-out/graph.json"; do
-    [ -f "$_gj" ] || continue
-    _hubs="$(graphify god-nodes --top 8 --graph "$_gj" 2>/dev/null | grep -E '^[[:space:]]*[0-9]+\.' | sed 's/^[[:space:]]*/  /')"
-    [ -n "$_hubs" ] || continue
-    echo "## Code map (auto-orientation)"
-    echo "This repo has a knowledge graph — these are its architectural hubs. Consult the graph"
-    echo "BEFORE crawling files to find where something lives:"
-    echo "$_hubs"
-    echo "Query without reading files: \`graphify query \"<question>\"\` · \`graphify path A B\` · \`graphify affected X\`"
-    echo ""
-    break
-  done
+# --- Knowledge-graph pointer ---
+# One line, not a hub dump: hub lists go stale within a day and are re-read every turn (#212).
+# Self-gating: silent when no graph exists.
+if command -v graphify >/dev/null 2>&1 && { [ -f "$PROJECT_ROOT/graphify-out/graph.json" ] || [ -f "$PROJECT_ROOT/_meta/graphify-out/graph.json" ]; }; then
+  echo 'Code graph present: `graphify query "<question>"` before crawling files.'
 fi
-# --- end auto-orientation ---
+
 
 # Emit session start event
 "$AGENTDB" emit session "session:start" "" "{\"branch\":\"$(git branch --show-current 2>/dev/null || echo none)\",\"profile\":\"$PROFILE\",\"project\":\"$PROJECT_ROOT\"}" "" "$KERNEL_SESSION_ID" 2>/dev/null &
