@@ -34,7 +34,10 @@ Reference: skills/quality/reference/quality-research.md
   context this artifact is judged against. Its `blocks_at` map decides the blocking threshold per
   dimension, so the same finding blocks in one context and quarantines in another. Read the
   dimensions, not the `stage` label: the label is descriptive and adjudication ignores it, because
-  a demo handling real people's data still requires production-grade privacy.
+  a demo handling real people's data still requires production-grade privacy. If you received the
+  profile, you are the invariant axis and cannot be the only verifier: an outcome-shaped pass that
+  never sees the profile must also run (EXP-RTP1 #206: bounded arm 0/20 on an off-contract defect).
+
 - **Any acceptance record for this commit** (`schemas/kernel.acceptance.v1.schema.json`). If one
   exists, the commit is FROZEN. Raising a settled concern again is not a finding. Reopening takes
   one of: `new_failing_input`, `changed_dependency`, `missed_requirement`, `disproven_assumption`,
