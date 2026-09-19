@@ -46,6 +46,11 @@ skills/debug/reference/debug-research.md.</prerequisite>
    - **Input**: large failing input → split in half → recurse to minimal reproduction case.
    - Instrument at boundaries: log inputs/outputs at each layer boundary.
    - Mock external dependencies to isolate which one causes failure.
+   <!-- Updated 2026-09-19: dev.to flaky-test patterns; claudelog/sfeir debugging guides -->
+   - Diff working vs failing state (env, config, input, commit) before theorizing.
+   - Flaky test: classify first as timing/race, shared state, unseeded randomness, or
+     environment difference; only then propose a fix.
+
    - (gate: failure localized to a specific function/commit/input subset)
 
 4. **ROOT CAUSE**: the error line is the FAILURE. The DEFECT is upstream.
