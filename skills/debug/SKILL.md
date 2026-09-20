@@ -33,7 +33,10 @@ skills/debug/reference/debug-research.md.</prerequisite>
 1. **REPRODUCE**: get specific before touching code.
    - Document: exact input, expected output, actual output (full stack trace), environment, frequency.
    - "Sometimes fails" is not a reproduction. Get deterministic.
+   - Sensitive or high-blast-radius bug: investigate read-only (plan mode) and settle the approach before any edit.
+   <!-- Updated 2026-09-20: sitepoint.com / claudelog.com Claude Code debugging guides -->
    - (gate: can reproduce consistently, OR have added targeted logging to wait for next occurrence)
+
 
 2. **HYPOTHESIZE**: list 3 causes before pursuing any.
    - Read ALL error output first (anchoring bias mitigation).
