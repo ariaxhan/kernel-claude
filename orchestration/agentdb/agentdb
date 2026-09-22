@@ -1812,6 +1812,22 @@ cmd_decay() {
     CASE WHEN hit_count >= 3 THEN 1 WHEN hit_count >= 1 THEN 2 ELSE 3 END;"
 }
 
+cmd_archive() {
+  # Soft-delete one learning that is wrong (not stale): emit an `archived` event with
+  # the reason, then set the cache columns. Reverse with: agentdb resurrect <id>.
+  local id="${1:-}" reason="${2:-manual: wrong or superseded}"
+  [ -z "$id" ] && { echo "Usage: agentdb archive <learning_id> [reason]"; exit 1; }
+  [ ! -f "$DB" ] && { echo "No DB"; exit 1; }
+  _ensure_softdelete_cols
+  local safe_id safe_reason
+  safe_id=$(sql_escape "$id"); safe_reason=$(sql_escape "$reason")
+  [ -z "$(db_exec "SELECT 1 FROM learnings WHERE id='$safe_id' AND archived_at IS NULL LIMIT 1;" 2>/dev/null)" ] \
+    && { echo "No live learning with id: $id" >&2; exit 1; }
+  emit_memory_event archived "$id" "$reason" '{"via":"agentdb archive"}'
+  db_exec "UPDATE learnings SET archived_at = strftime('%Y-%m-%dT%H:%M:%fZ','now'), archived_reason = '$safe_reason' WHERE id='$safe_id';" 2>/dev/null
+  echo "Archived: $id"
+}
+
 cmd_resurrect() {
   # Reverse a soft-delete: emit a `resurrected` observation (which clears the
   # archived cache per the design 1.1 derivation), then null the cache columns.
@@ -2736,6 +2752,7 @@ case "${1:-help}" in
   schema)      shift; cmd_schema "$@" ;;
   trace)       shift; cmd_trace "$@" ;;
   decay)       cmd_decay ;;
+  archive)     shift; cmd_archive "$@" ;;
   resurrect)   shift; cmd_resurrect "$@" ;;
   antibody)    shift; cmd_antibody "$@" ;;
   checks)      cmd_checks ;;
@@ -2805,6 +2822,7 @@ case "${1:-help}" in
     echo "LEARNING SYSTEM (after migration 005):"
     echo "  trace <json>            Record GEPA execution trace"
     echo "  decay                   Soft-delete stale learnings (archived event + cache), show freshness"
+    echo "  archive <id> [reason]   Soft-delete one wrong learning (emits an archived event)"
     echo "  resurrect <id>          Reverse a soft-delete (emits a resurrected event)"
     echo "  antibody <text>         Search learnings for pattern matches"
     echo "HYPOTHESIS TESTING (after migration 006):"

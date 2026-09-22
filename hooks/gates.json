@@ -16,22 +16,6 @@
   },
   "hooks": [
     {
-      "id": "normalize-write",
-      "script": "hooks/scripts/normalize-write.py",
-      "class": "normalizer",
-      "events": [
-        "PreToolUse"
-      ],
-      "matcher": "Write|Edit",
-      "external_deps": [],
-      "degraded_mode": "fail-open-silent-by-design",
-      "rationale": "Makes the write correct instead of refusing it. It can only ever repair content, never block, so a silent pass-through is the safe direction: the worst case is the write lands exactly as the model wrote it.",
-      "host_shapes": [
-        "claude",
-        "codex"
-      ]
-    },
-    {
       "id": "auto-approve-safe",
       "script": "hooks/scripts/auto-approve-safe.sh",
       "class": "gate",

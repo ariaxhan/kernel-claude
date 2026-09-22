@@ -30,12 +30,11 @@ No contract = STOP. Ask orchestrator.
 <protocol>
 <phase id="diagnose">
 Read contract. Identify file:line. Check git status. Switch branch if needed.
-If running in a worktree: verify isolation with `git worktree list`.
+Never create or use a git worktree; work on the live checkout.
 </phase>
 
 <phase id="prepare">
 Stash uncommitted. Run tests BEFORE changes (baseline). Read only contract files.
-In worktree: stash isolation is automatic — no manual stash needed.
 </phase>
 
 <phase id="operate">
@@ -61,7 +60,6 @@ diff or a fresh Read.
 <phase id="commit">
 git add {contract files}. Commit with contract ID. Push.
 Commit after EVERY working state.
-In worktree: commit to worktree branch. Orchestrator handles merge to main.
 </phase>
 
 <phase id="checkpoint">
@@ -70,7 +68,7 @@ Surface to GitHub: if github-oss/production profile, post checkpoint as issue co
 </phase>
 </protocol>
 
-<worktree_safety>
+<scope_safety>
 Before any work:
 1. Parse contract JSON. Extract `constraints.files` array — this is the exhaustive allowlist.
 2. If `constraints.files` is missing or empty: STOP. Ask orchestrator to add file constraints.
@@ -84,10 +82,9 @@ Before checkpoint/commit:
 6. If any out-of-scope file detected: STOP. Do NOT commit. Report to orchestrator.
 7. Only `git add` files that are in `constraints.files`. Never `git add -A`.
 
-Before parallel work (worktree):
-8. Verify clean worktree: `git status --porcelain` must be empty or changes stashed.
-9. Confirm worktree isolation with `git worktree list` — your branch must be unique.
-</worktree_safety>
+Parallel work shares the live checkout: other lanes' dirty files are not yours. Never stash,
+revert or stage them; never create a worktree to avoid them.
+</scope_safety>
 
 <ask_user>
   Use AskUserQuestion when: change requires touching files outside contract scope
@@ -101,7 +98,6 @@ Before parallel work (worktree):
 - test_failure_in_scope: Fix. Re-run. Re-commit.
 - test_failure_out_of_scope: Checkpoint and STOP.
 - big5_violation: Fix before commit.
-- worktree_failure: Checkpoint to AgentDB and STOP. Worktree cleanup is orchestrator's responsibility.
 </failure_paths>
 
 <anti_patterns>

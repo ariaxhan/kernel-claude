@@ -4,8 +4,7 @@
     "AWS_KEY_LINE": [
       "AWS_SECRET_ACCESS_KEY=AKIA",
       "IOSFODNN7EXAMPLE"
-    ],
-    "CODEX_SECRET_PATCH": "*** Begin Patch\n*** Add File: config.ts\n+const key = \"{{AWS_KEY_LINE}}\";\n*** End Patch"
+    ]
   },
   "cases": [
     {
@@ -50,34 +49,6 @@
       "host": "claude"
     },
     {
-      "id": "normalize-write/repairs-prose-em-dash",
-      "gate": "normalize-write",
-      "expect": "allow",
-      "why": "Doctrine forbids em dashes. Repairing the write beats refusing it and spending a turn.",
-      "input": {
-        "tool_name": "Write",
-        "tool_input": {
-          "file_path": "docs/note.md",
-          "content": "one - two\n"
-        }
-      },
-      "host": "claude"
-    },
-    {
-      "id": "normalize-write/leaves-code-alone",
-      "gate": "normalize-write",
-      "expect": "allow",
-      "why": "A normalizer that rewrites source it does not understand is worse than the guard it replaced.",
-      "input": {
-        "tool_name": "Write",
-        "tool_input": {
-          "file_path": "src/app.ts",
-          "content": "const a = 1;\n"
-        }
-      },
-      "host": "claude"
-    },
-    {
       "id": "detect-secrets/blocks-codex-apply-patch",
       "gate": "detect-secrets",
       "host": "codex",
@@ -113,19 +84,6 @@
         "tool_name": "shell",
         "tool_input": {
           "command": "rm -rf /tmp/whatever"
-        }
-      }
-    },
-    {
-      "id": "normalize-write/no-ops-on-codex-shape",
-      "gate": "normalize-write",
-      "host": "codex",
-      "expect": "allow",
-      "why": "No capture proves Codex honors updatedInput, so the normalizer stays silent on the apply_patch shape rather than inventing a host contract.",
-      "input": {
-        "tool_name": "apply_patch",
-        "tool_input": {
-          "command": "*** Begin Patch\n*** Add File: doc.md\n+a - b\n*** End Patch"
         }
       }
     }
