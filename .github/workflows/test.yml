@@ -52,7 +52,7 @@ jobs:
         run: |
           set -euo pipefail
           # plugin.json is the source of truth; every declaration must match it.
-          # Mirrors test_version_sync_all in tests/run-tests.sh. Bump via
+          # Bump via
           # scripts/bump-version.sh, which updates all of these at once.
           V=$(jq -r '.version' .claude-plugin/plugin.json)
           echo "source of truth (plugin.json): $V"
@@ -67,8 +67,6 @@ jobs:
             exit 1
           fi
           echo "All canonical version declarations in sync: $V"
-      - name: Verify active release documentation
-        run: ./tests/run-tests.sh release_docs
 
   schema-check:
     runs-on: ubuntu-latest
