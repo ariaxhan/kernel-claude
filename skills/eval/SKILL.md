@@ -67,6 +67,11 @@ See reference for calculation formula and worked examples.
 2. Model-based: for open-ended outputs that can't be checked deterministically. Run multiple times, take majority.
 3. Human: required for security-sensitive changes, UX evaluation, legal/compliance.
 
+Before trusting a model grader, compare its pass and fail decisions with labels from a
+human subject-matter expert. Tune it on separate examples, then measure its ability to
+find failures and recognize passes on a held-out set. Report both rates; overall accuracy
+can hide a grader that labels every case as passing. Recheck after changing the grader.
+
 See reference for full grader templates and examples.
 </grader_selection>
 
