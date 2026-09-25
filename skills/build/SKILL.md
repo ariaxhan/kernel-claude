@@ -1,6 +1,6 @@
 ---
 name: build
-description: "Solution exploration and implementation. Generate 2-3 approaches, pick simplest. Never implement first idea. Triggers: build, implement, create, feature, add."
+description: "Plan and implement a requested code feature when the solution requires choosing among implementation approaches."
 allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Task
 kernel:
   kind: methodology

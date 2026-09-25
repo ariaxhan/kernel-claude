@@ -114,8 +114,10 @@ Change a warning sign when it is unexamined; keep it when the context earns it.
 <verification>
 Do visual QA on rendered output, not source alone. Inspect screenshots at the task's target
 sizes (for a general web page, start with 375, 768, and 1440 widths), then exercise keyboard,
-focus, hover/touch, overflow, and reduced motion. Fix the largest hierarchy or usability
-problem first and re-check. Never claim visual completion without seeing the rendered result.
+focus, hover/touch, overflow, and reduced motion. While tabbing, check that sticky headers,
+footers, and overlays never completely hide the focused control (WCAG 2.2 SC 2.4.11 AA).
+Fix the largest hierarchy or usability problem first and re-check. Never claim visual
+completion without seeing the rendered result.
 </verification>
 
 <reference>
