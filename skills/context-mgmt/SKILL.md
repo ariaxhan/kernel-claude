@@ -35,7 +35,7 @@ Graph telemetry (shadow): JSON receipts → `agentdb graph-project` / `graph-sug
 2. STRUCTURED NOTES: AgentDB + active.md persist across context resets.
 3. MULTI-AGENT: Delegate research to subagents. They explore, report summaries.
 4. MINIMAL READS: grep/glob to find, then read specific sections.
-5. TOOL RESULT CLEARING: Old tool output rarely needs to stay in context.
+5. TOOL RESULT CLEARING: Old tool output rarely needs to stay in context. When calling the Claude API directly (not via this harness), prefer the server-side `context-management-2025-06-27` beta over hand-rolled truncation: `clear_tool_uses_20250919` clears old tool results past a token trigger (client keeps full history, no sync needed), `clear_thinking_20251015` clears old thinking blocks while preserving cache hits. Client-side SDK compaction (TypeScript/Ruby `tool_runner` summarization) is deprecated in favor of this.
 </core_principles>
 
 <token_budget>
