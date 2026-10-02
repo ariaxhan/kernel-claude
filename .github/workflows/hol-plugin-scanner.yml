@@ -36,7 +36,7 @@ jobs:
           if-no-files-found: error
       - name: Publish scanner findings
         if: always() && hashFiles('ai-plugin-scanner.sarif') != ''
-        uses: github/codeql-action/upload-sarif@e46ed2cbd01164d986452f91f178727624ae40d7 # v3
+        uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v3
         with:
           sarif_file: ai-plugin-scanner.sarif
           category: ai-plugin-scanner
