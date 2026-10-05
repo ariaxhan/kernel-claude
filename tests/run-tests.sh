@@ -577,6 +577,26 @@ test_recall_global_no_human_leak() {
     echo "human_only leaked from global brain"; return 1; fi
 }
 
+test_inject_context_hides_archived_and_non_agent_learnings() {
+  agentdb init >/dev/null
+  local db="$TEST_PROJECT/_meta/agentdb/agent.db"
+  sqlite3 "$db" "INSERT INTO learnings (id,ts,type,insight,hit_count,visibility) VALUES
+    ('INJECT-LIVE','2026-10-05T00:03:00Z','failure','injectview current agent marker',99,'agent'),
+    ('INJECT-ARCHIVED','2026-10-05T00:02:00Z','failure','injectview archived marker',99,'agent'),
+    ('INJECT-HUMAN','2026-10-05T00:01:00Z','failure','injectview human only marker',99,'human_only');
+    UPDATE learnings SET archived_at='2026-10-05T00:04:00Z', archived_reason='superseded' WHERE id='INJECT-ARCHIVED';"
+
+  local role out
+  for role in surgeon implementer adversary reviewer researcher scout triage; do
+    out=$(agentdb inject-context "$role")
+    assert_contains "$out" "injectview current agent marker" || return 1
+    [[ "$out" != *"injectview archived marker"* ]] || {
+      echo "  FAIL: archived learning surfaced for $role"; return 1; }
+    [[ "$out" != *"injectview human only marker"* ]] || {
+      echo "  FAIL: human_only learning surfaced for $role"; return 1; }
+  done
+}
+
 test_decay_spares_loaded_learnings() {
   # v7.15: hit_count is recall-only. decay must NOT delete an old, never-recalled
   # learning that read-start is still loading (load_count>0), only truly untouched
@@ -715,6 +735,7 @@ run_test_suite() {
       run_test "recall excludes archived rows" test_recall_excludes_archived
       run_test "recall hides human_only learnings" test_recall_hides_human_only
       run_test "recall --global never leaks human_only" test_recall_global_no_human_leak
+      run_test "inject-context hides archived and non-agent learnings" test_inject_context_hides_archived_and_non_agent_learnings
       run_test "decay soft-archives only untouched learnings" test_decay_spares_loaded_learnings
       run_test "special chars (SQL injection)" test_agentdb_special_chars_in_insight
       run_test "SQL injection via tier" test_agentdb_numeric_injection_tier

@@ -1688,6 +1688,8 @@ cmd_metrics() {
 cmd_inject_context() {
   local agent_type="${1:-surgeon}"
   [ ! -f "$DB" ] && cmd_init >/dev/null
+  _ensure_softdelete_cols
+  local visible_learning="archived_at IS NULL AND (visibility='agent' OR visibility IS NULL)"
 
   echo "# Context Injection: $agent_type"
   echo ""
@@ -1695,34 +1697,34 @@ cmd_inject_context() {
   case "$agent_type" in
     surgeon|implementer)
       echo "## Known Gotchas (AVOID THESE)"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE type='failure' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || true
+      db_exec "SELECT '- ' || insight FROM learnings WHERE $visible_learning AND type='failure' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || true
       echo ""
       echo "## Proven Patterns (USE THESE)"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || true
+      db_exec "SELECT '- ' || insight FROM learnings WHERE $visible_learning AND type='pattern' ORDER BY hit_count DESC, ts DESC LIMIT 5;" 2>/dev/null || true
       echo ""
       echo "## Active Contract"
       db_exec "SELECT content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 1;" 2>/dev/null || true
       ;;
     adversary|reviewer)
       echo "## Past Failures (TEST FOR THESE)"
-      db_exec "SELECT '- ' || insight || COALESCE(' [' || domain || ']', '') FROM learnings WHERE type='failure' ORDER BY ts DESC LIMIT 10;" 2>/dev/null || true
+      db_exec "SELECT '- ' || insight || COALESCE(' [' || domain || ']', '') FROM learnings WHERE $visible_learning AND type='failure' ORDER BY ts DESC LIMIT 10;" 2>/dev/null || true
       echo ""
       echo "## Known Gotchas"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE type='gotcha' ORDER BY hit_count DESC LIMIT 5;" 2>/dev/null || true
+      db_exec "SELECT '- ' || insight FROM learnings WHERE $visible_learning AND type='gotcha' ORDER BY hit_count DESC LIMIT 5;" 2>/dev/null || true
       echo ""
       echo "## Recent Errors (REGRESSION RISK)"
       db_exec "SELECT '- [' || tool || '] ' || substr(error, 1, 80) FROM errors ORDER BY ts DESC LIMIT 5;" 2>/dev/null || true
       ;;
     researcher|scout)
       echo "## All Learnings by Domain"
-      db_exec "SELECT '- [' || COALESCE(domain, 'general') || '] ' || insight FROM learnings ORDER BY domain, ts DESC LIMIT 15;" 2>/dev/null || true
+      db_exec "SELECT '- [' || COALESCE(domain, 'general') || '] ' || insight FROM learnings WHERE $visible_learning ORDER BY domain, ts DESC LIMIT 15;" 2>/dev/null || true
       echo ""
       echo "## Recent Verdicts"
       db_exec "SELECT '- ' || content FROM context WHERE type='verdict' ORDER BY ts DESC LIMIT 3;" 2>/dev/null || true
       ;;
     triage)
       echo "## Complexity Signals"
-      db_exec "SELECT '- ' || insight FROM learnings WHERE type IN ('failure', 'gotcha') ORDER BY ts DESC LIMIT 5;" 2>/dev/null || true
+      db_exec "SELECT '- ' || insight FROM learnings WHERE $visible_learning AND type IN ('failure', 'gotcha') ORDER BY ts DESC LIMIT 5;" 2>/dev/null || true
       echo ""
       echo "## Recent Contracts (scope reference)"
       db_exec "SELECT '- ' || content FROM context WHERE type='contract' ORDER BY ts DESC LIMIT 3;" 2>/dev/null || true
