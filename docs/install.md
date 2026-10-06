@@ -14,17 +14,17 @@ names the missing ones before it writes anything.
 - Claude Code Desktop local and SSH sessions. Remote sessions do not support plugins.
 - Claude Code in VS Code, which uses the same plugin configuration and may ask for a
   restart after changes.
-- Codex CLI and the Codex app through Codex's legacy Claude-plugin compatibility loader.
+- Codex CLI and the Codex app using `.codex-plugin/plugin.json` and
+  `.agents/plugins/marketplace.json`.
 
 KERNEL skills are namespaced. Claude Code invokes `/kernel:ingest`; Codex invokes
 `$kernel:ingest`. Cursor and Claude chat Personal plugins are not supported installation
 targets here.
 
-KERNEL 8 intentionally does not ship a native `.codex-plugin` manifest yet. Claude's
-explicit-only skill marker and Codex's native plugin validator currently disagree; keeping
-the compatibility loader preserves the safety rule instead of quietly making side-effecting
-skills start on their own. The shared `hooks/hooks.json` is regression-tested against both
-loaders.
+KERNEL 9.11.0 ships both Claude and native Codex manifests. The Codex manifest explicitly
+loads `skills/`. Five explicit-only skills have `agents/openai.yaml` policies with
+`allow_implicit_invocation: false`: `experiment`, `forge`, `governance-sync`, `init`, and
+`landing-page`. Both hosts discover the shared `hooks/hooks.json`.
 
 ## Claude Code, from a shell
 
@@ -72,6 +72,16 @@ codex plugin list
 ```
 
 Then explicitly invoke `$kernel:init`; use `$kernel:help` for the Codex skill index.
+Codex requires this setting in its `config.toml` for hooks to execute:
+
+```toml
+[features]
+hooks = true
+```
+
+The install path does not enable it automatically. The current bindings are SessionStart,
+PreToolUse, PermissionRequest, and UserPromptSubmit; host support for other lifecycle events
+does not mean KERNEL binds them.
 
 ## What setup writes
 
@@ -113,10 +123,10 @@ never edits a shell startup file.
 it reports success, and exits non-zero if either half fails.
 
 To check by hand afterwards, use the absolute path so the result does not depend on `PATH`
-or on which directory you are standing in:
+and pin the database independently of your working directory:
 
 ```bash
-"$VAULTS/.local/bin/agentdb" status
+AGENTDB_ROOT="$VAULTS" "$VAULTS/.local/bin/agentdb" status
 readlink "$VAULTS/.local/bin/agentdb"
 readlink "$HOME/.claude/plugins/cache/kernel-marketplace/kernel/current"
 ```
@@ -127,8 +137,9 @@ Two things that trip people up here:
   setup or by the first session start. Checking it before then reports nothing, which is not
   a failure.
 - Bare `agentdb status` resolves its database by walking up from the working directory, so
-  it can report a different database than the one you just created. Use the absolute path
-  above, set `AGENTDB_ROOT="$VAULTS"`, or run from inside the Vaults directory.
+  it can report a different database than the one you just created. Pin `AGENTDB_ROOT="$VAULTS"` as
+  above, or run from inside the Vaults directory. The absolute executable path alone does not
+  select a database.
 
 ## Putting `agentdb` on your PATH
 

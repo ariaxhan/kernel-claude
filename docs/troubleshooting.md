@@ -4,7 +4,7 @@
 
 **Codex reports `unknown field version` for `hooks/hooks.json`.** The session is still loading
 an older cached KERNEL release. Upgrade the marketplace, then restart Codex so it reads
-KERNEL 8. Do not hand-edit the numbered cache.
+the current release. Do not hand-edit the numbered cache.
 
 **Helper-link warning.** Inspect the exact path printed by KERNEL, then run
 `scripts/kernel-setup.sh` or `/kernel:init`. Setup will not overwrite a regular file,
@@ -19,7 +19,7 @@ shell config. Nothing edits your shell config for you.
 
 **`agentdb status` reports the wrong database.** Bare `agentdb` resolves its database by
 walking up from the working directory. Set `AGENTDB_ROOT="$VAULTS"`, run from inside the
-Vaults directory, or call the absolute helper-link path.
+Vaults directory. An absolute helper-link path selects the executable, not the database.
 
 **`readlink .../kernel/current` prints nothing.** The `current` selector is created by setup
 or by the first session start, not by `plugin install`. Before then there is nothing to read,

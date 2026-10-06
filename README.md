@@ -1,5 +1,8 @@
 # KERNEL
 
+Current release: **9.11.0**, as declared in the [plugin manifest](.claude-plugin/plugin.json)
+and [Codex manifest](.codex-plugin/plugin.json).
+
 ## For agents
 
 If you are an agent deciding whether to install this, the machine-readable summary is
@@ -21,8 +24,8 @@ codex plugin marketplace add ariaxhan/kernel-claude
 codex plugin add kernel@kernel-marketplace
 ```
 
-Gemini CLI (methodology only: the 29 skills and `llms.txt` as ambient context; the hooks, the
-approval token, and agentdb do not run on this host):
+Gemini CLI (methodology only: the 28 skills and `llms.txt` as ambient context; the hooks and
+agentdb do not run on this host):
 
 ```bash
 gemini extensions install https://github.com/ariaxhan/kernel-claude
@@ -43,14 +46,11 @@ prompts. Per-action approval is a leash held by someone who stopped looking.
 [academic result](https://arxiv.org/abs/2606.05647) is worse — 94% of developers miss
 deliberate agent sabotage, and 56% accept it even after a warning.)
 
-KERNEL is the other model: fences. The agent runs free inside enforced boundaries — hooks
-that block destructive commands outright rather than warning about them, irreversible
-operations gated behind a one-time token only a human can open, independent verifier agents
-that never saw the builder's reasoning, and receipts for every claim. You review outcomes,
-not keystrokes.
-
-And the fences learn: every mistake a session survives is written to a memory that outlives
-it, so yesterday's near-miss is tomorrow's blocked command.
+KERNEL combines local memory, explicit workflows, and a small set of hooks. Sessions recall
+past work, record outcomes, and recover context when a request has to be repeated. The current
+release scans writes for secrets and handles selected command permissions; destructive-command
+blocks and one-time approval tokens described by older releases are no longer bound.
+Use the host sandbox and permissions for containment, and review the verified outcome.
 
 For people running Claude Code in auto mode on real repositories. Not for you if you want
 an autonomous agent with no boundaries, or a replacement for tests, review, and reading
@@ -74,7 +74,7 @@ Setup finishes by writing a real memory and reading it back by keyword:
 ```text
 ## Recall: KERNEL installed machine
 
-- [pattern] KERNEL 8.7.2 installed on this machine  ↳ kernel-setup.sh completed at 2026-08-04T23:51:39Z
+- [pattern] KERNEL 9.11.0 installed on this machine  ↳ kernel-setup.sh completed at 2026-09-12T23:51:39Z
 
 KERNEL is set up.
   memory:  /Users/you/Documents/Vaults/_meta/agentdb/agent.db
@@ -112,19 +112,12 @@ not prose summaries. A new session reconstructs exactly the state the manifest p
 than inheriting a whole conversation. The manifest CLI is
 `validate | latest | divergence | preflight | compile | resume | activate | deactivate`.
 
-**Reversibility guards.** Hooks classify commands and writes by how hard they are to undo.
-Recoverable mistakes get a warning the model can correct; genuinely destructive ones
-hard-block and surface to you, with a one-time approval token that a prompt-injected command
-cannot forge. These are a tripwire, not a sandbox, and [docs/safety.md](docs/safety.md) is
-explicit about where they stop working.
-
-Underneath, KERNEL classifies each task by domain, work shape, and safety level, then loads
-one domain pack for the announced route. Ordinary work runs with no ceremony.
-
-One honest limit on that, current as of 9.0.0: the model-routing and
-separate-builder-from-verifier rules are checked when receipt validation is run. They are not
-yet enforced on every request, and a request with no receipt at all proceeds normally. Treat
-them as a convention the tooling helps you keep, not as a sandbox.
+**Minimal hooks.** The current runtime supplies startup context, secret detection on writes,
+permission handling for selected commands, and prompt-time context recovery. These hooks
+are a tripwire, not a sandbox; [docs/safety.md](docs/safety.md) describes their scope.
+Manifest context policies and separate-verifier rules are conventions unless an external
+workflow enforces them. This release does not bind the former command, configuration, or
+context guards.
 
 On context cost, the number you will see quoted elsewhere is wrong and this is the corrected
 one. KERNEL's ambient cost to a plugin user is roughly **4,600 tokens**: about 1,900 from the
@@ -139,8 +132,8 @@ file, not ours. An earlier target of "under 500 tokens" came from a measurement 
 Claude Code terminal, Desktop (local and SSH), and VS Code. Remote Claude Code sessions do
 not support plugins.
 
-Codex CLI and the Codex app load the same package through their Claude-marketplace
-compatibility loader:
+Codex CLI and the Codex app load the same package with its native
+`.codex-plugin/plugin.json` manifest:
 
 ```bash
 codex plugin marketplace add ariaxhan/kernel-claude
@@ -148,16 +141,16 @@ codex plugin add kernel@kernel-marketplace
 ```
 
 Restart Codex afterwards, then invoke `$kernel:init`. Skills are namespaced on both hosts:
-Claude Code invokes `/kernel:help`, Codex invokes `$kernel:help`. Two real differences.
-Codex runs the supported synchronous hook events, including `SessionEnd`, but does not
-implement `PostToolUseFailure`. KERNEL's `capture-error.sh` is therefore not bound on that
-host, and tool-error recording degrades to what `PostToolUse` can observe. That degradation is
-silent at runtime, so the per-host matrix is worth reading before you rely on error history:
-[docs/kernel-9/HOST-CAPABILITIES.md](docs/kernel-9/HOST-CAPABILITIES.md), generated from
-`governance/hosts.json`. And Codex does
-not register KERNEL's Claude Code agent definitions as native subagents; it maps the same
-roles onto its own during orchestration. Reasoning and detail:
-[docs/install.md](docs/install.md).
+Claude Code invokes `/kernel:help`, Codex invokes `$kernel:help`. The native Codex manifest
+explicitly declares `skills/`; five setup or costly skills carry a policy forbidding implicit
+invocation. Codex requires `[features] hooks = true` in its configuration to run hooks.
+
+The current `hooks/hooks.json` binds SessionStart, PreToolUse, PermissionRequest, and
+UserPromptSubmit. It does not bind SessionEnd or tool-error capture on either host; record
+end-state explicitly with `agentdb write-end` or a handoff. Codex does not register KERNEL's
+ten Claude Code agent definitions as native subagents. See [installation](docs/install.md)
+and the [host capability report](docs/kernel-9/HOST-CAPABILITIES.md) for host support; the
+checked-in hook manifest determines which supported events this release actually binds.
 
 ## Updating
 

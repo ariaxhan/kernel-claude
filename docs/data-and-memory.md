@@ -15,7 +15,7 @@ KERNEL keeps durable data in the selected Vaults, found in this order: valid
 By default `agentdb recall` is FTS5 keyword search. Run `agentdb embed-init` once to add
 local semantic search: it creates a venv beside the DB, installs `fastembed` (ONNX
 all-MiniLM-L6-v2, ~50MB, no torch, fully on-machine, nothing leaves your computer), embeds
-your learnings, and prints an `AGENTDB_EMBED_PYTHON` export to make it permanent. Recall then
+your learnings, and prints an `AGENTDB_EMBED_PYTHON` export to make it permanent. Export `AGENTDB_EMBED=1` to enable hybrid recall after installing the backend. Recall then
 fuses keyword bm25 with cosine similarity (reciprocal-rank fusion) and surfaces learnings
 whose wording differs from your query. On a real 47-learning corpus this lifted recall@5 from
 0.75 to 0.85 with no regressions. Install nothing and recall stays exactly as before:
@@ -46,22 +46,15 @@ data, excluded from the JSON mirror and rebuilt by `graph build`, like the embed
 ## Hooks and external tools
 
 KERNEL hooks can inspect repository state, run configured checks, and write these records.
-Claude Code runs the full declared lifecycle. Codex runs supported synchronous hook events,
-including the write guards and SessionStart context; it skips asynchronous command hooks and
-has no plugin SessionEnd event, so end-of-session recording in Codex must be invoked
-explicitly with `$kernel:handoff`. Some workflows can use GitHub when the project profile
+The current shared manifest binds SessionStart, PreToolUse, PermissionRequest, and
+UserPromptSubmit. Codex requires `[features] hooks = true` for these hooks to run. Neither
+host has a KERNEL SessionEnd binding in this release, so record end-state explicitly with
+`agentdb write-end` or `$kernel:handoff` (Claude: `/kernel:handoff`). Some workflows can use GitHub when the project profile
 enables it. KERNEL does not promise that all processing stays local when you invoke a
 workflow that uses external tools. Review host permissions and the repository's own
 instructions before granting access.
 
-KERNEL 8.0.2 declares its six advisory hooks as synchronous so Codex executes them instead of
-skipping them. They remain non-blocking in outcome: an internal logging or validation failure
-returns success and cannot reject the tool operation. The critical secret, configuration,
-command, and context guards remain separate blocking gates.
-
-When the active project root exactly matches the Vaults root and the shared continuity engine
-plus an executable Claude or Codex adapter are present, that Vaults service owns compaction
-checkpoints and restore injection. KERNEL's PreCompact and PostCompact paths cleanly no-op
-there; SessionStart still supplies AgentDB and governance without adding a second restore.
-Nested repositories retain KERNEL's deterministic generic fallback. Merely finding continuity
-files above the active project does not disable KERNEL.
+The write secret scanner is a blocking gate and fails closed when `jq` is missing or its
+input is malformed. Other supported host events, including compaction and tool-error
+capture, are not bound in the current manifest. The prompt-time restore hook may defer to
+a shared Vaults continuity service when its runtime prerequisites are present.

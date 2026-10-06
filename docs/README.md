@@ -6,7 +6,8 @@ The [README](../README.md) gets you installed. Everything else is here.
 
 KERNEL is a Claude Code plugin that gives coding sessions durable project memory, bounded
 handoffs, repeatable engineering workflows, and independent checks before risky changes ship.
-Codex can load the same package through its Claude-marketplace compatibility path.
+Codex loads the same package using its native manifest. The current release is **9.11.0**;
+[the plugin manifest](../.claude-plugin/plugin.json) declares the version.
 
 It is for people who use Claude Code on real repositories and want work to survive session
 boundaries without turning the agent loose. It does not replace source control, tests, human
@@ -21,9 +22,9 @@ cannot prove a product is correct by itself.
 | [QUICKSTART.md](QUICKSTART.md) | The longer prose walkthrough of setup and first use |
 | [daily-use.md](daily-use.md) | The working loop, skill groups, governance-sync, manifest CLI |
 | [data-and-memory.md](data-and-memory.md) | What KERNEL writes to disk, semantic recall, lean session start, the learning graph |
-| [safety.md](safety.md) | Risk tiering, the reversibility guard, its six threat classes, and its honest limits |
+| [safety.md](safety.md) | Risk guidance, current hook bindings, and enforcement limits |
 | [troubleshooting.md](troubleshooting.md) | Symptom-first fixes, reinstall, recovery |
-| [upgrading.md](upgrading.md) | Upgrading from 7.23, breaking changes, rolling back without losing data |
+| [upgrading.md](upgrading.md) | Current update commands, historical migrations, and rollback guidance |
 | [MIGRATION-8.md](MIGRATION-8.md) | Full 8.0 migration detail |
 | [contributing.md](contributing.md) | Running from a checkout, tests, architecture references |
 | [skill-template.md](skill-template.md) | Writing a KERNEL skill |
@@ -33,8 +34,8 @@ cannot prove a product is correct by itself.
 
 ## Elsewhere in the repository
 
-- [CLAUDE.md](../CLAUDE.md) and [AGENTS.md](../AGENTS.md): the governance documents KERNEL
-  loads.
+- [CLAUDE.md](../CLAUDE.md) and [AGENTS.md](../AGENTS.md): contributor governance references.
+  Plugin sessions receive ambient guidance through SessionStart, not these repository files.
 - [schemas/](../schemas/): manifest schemas.
 - [workflows/](../workflows/): declarative workflow definitions.
 - [skills/](../skills/): every skill definition.

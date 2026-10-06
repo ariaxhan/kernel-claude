@@ -1,13 +1,13 @@
-# KERNEL 8 setup guide
+# KERNEL 9.11.0 setup guide
 
 KERNEL adds durable memory, resumable JSON state, engineering workflows, and separate
 verification roles to Claude Code. It supports Claude Code Terminal, Desktop local/SSH
 sessions, and VS Code. Plugin skills always use the `kernel:` namespace.
 
-Codex CLI and the Codex app can load KERNEL through their Claude-marketplace
-compatibility loader. KERNEL 8 does not claim native Codex-manifest support because
-the native validator does not preserve Claude's explicit-only marker for the four
-side-effecting skills. The compatibility path keeps that safety rule intact.
+Codex CLI and the Codex app load KERNEL with its native `.codex-plugin/plugin.json`
+manifest and `.agents/plugins/marketplace.json` marketplace. The five explicit-only skills
+carry native policies forbidding automatic invocation. See [install.md](install.md) for
+requirements, including Codex's `[features] hooks = true` setting.
 
 ## Install
 
@@ -51,16 +51,16 @@ Then use `/kernel:help` in Claude Code or `$kernel:help` in Codex.
 1. `/kernel:ingest` starts or resumes work from repository truth and AgentDB.
 2. KERNEL chooses direct work or a contract based on reversibility, quiet failure
    risk, and blast radius—not file count.
-3. `/kernel:validate` checks the result. `/kernel:handoff` creates a bounded JSON
+3. `/kernel:quality` checks the result. `/kernel:handoff` creates a bounded JSON
    resume point when another session must continue.
 
 Common skills below use Claude Code syntax. In Codex, replace the leading `/` with
-`$`, for example `$kernel:validate`.
+`$`, for example `$kernel:quality`.
 
 Common skills:
 
 - Work: `/kernel:ingest`, `/kernel:debug`, `/kernel:dream`
-- Checks: `/kernel:validate`, `/kernel:review`, `/kernel:tearitapart`
+- Checks: `/kernel:quality`, `/kernel:review`, `/kernel:tearitapart`
 - State: `/kernel:checkpoint`, `/kernel:handoff`, `/kernel:retrospective`
 - Setup/reference: `/kernel:init`, `/kernel:help`
 
@@ -73,8 +73,9 @@ checks, compiles the allowed context with a receipt, activates its context polic
 and resumes at the recorded operation. Changed inputs invalidate inherited phases
 instead of silently treating stale work as complete.
 
-Context policies can be `advisory`, `bounded`, or `sealed`. Bounded mode records extra
-file loads in the context receipt. Sealed mode makes hooks block forbidden paths.
+Context policies can be `advisory`, `bounded`, or `sealed`. A context receipt records selected inputs and budgets. The current plugin does not bind
+a context guard, so bounded load tracking and sealed restrictions require external
+enforcement; activation alone does not block forbidden paths.
 Receipts record selected inputs, integrity hashes, and budget status so the next
 session can show what it actually loaded.
 
@@ -125,12 +126,10 @@ instruction coverage. Writes require explicit confirmation and a backup director
 Explicit-only skills (5): `experiment`, `forge`, `governance-sync`, `init`,
 `landing-page`. Their Codex-native policy forbids automatic invocation.
 
-The 15 files under `agents/` are Claude Code agent definitions. Codex does not
-register them as native agents; KERNEL applies their role contracts when coordinating
-available Codex subagents. Codex runs supported synchronous hooks, including
-SessionStart and the write guards. It skips asynchronous command hooks and has no
-plugin SessionEnd event, so finish Codex work with `$kernel:handoff` when durable
-end-state is required.
+The ten files under `agents/` are Claude Code agent definitions. Codex does not
+register them as native agents. The current shared hook manifest binds SessionStart,
+PreToolUse, PermissionRequest, and UserPromptSubmit. It does not bind SessionEnd on either
+host; use `agentdb write-end` or a handoff to persist end-state explicitly.
 
 For a session-only rollback:
 
@@ -158,7 +157,7 @@ Do not clear the plugin cache or remove the marketplace as a normal update step.
 - Host-link warning: inspect the exact path. Init refuses regular files, directories,
   malformed links, and unrelated links instead of replacing them.
 - Codex `unknown field version` warning for `hooks/hooks.json`: restart Codex after
-  upgrading to KERNEL 8; the warning means Codex is still reading a 7.23 cache.
+  upgrading to the current release; the warning indicates an older cached hook manifest.
 - Reinstall only after update/reload fails:
 
 Claude Code:

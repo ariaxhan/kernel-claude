@@ -4,21 +4,21 @@
    defines observable success.
 2. Let risk choose the workflow. Easy-to-undo work runs directly; durable or quiet changes
    use a contract and separate implementation/checking roles.
-3. Run `/kernel:validate`, then `/kernel:handoff` when another session needs an exact resume
+3. Run `/kernel:quality`, then `/kernel:handoff` when another session needs an exact resume
    point.
 
-In Codex, replace the leading `/` with `$`, for example `$kernel:validate`.
+In Codex, replace the leading `/` with `$`, for example `$kernel:quality`.
 
 ## Skill groups
 
 - Workflows: `ingest`, `debug`, `dream`, `metrics`, `forge`, `experiment`
 - State: `handoff`, `checkpoint`, `retrospective`
-- Validation: `validate`, `review`, `tearitapart`
-- Methods: `build`, `testing`, `debug`, `security`, `architecture`, `git`, `frontend`,
+- Validation: `quality`, `review`, `tearitapart`
+- Methods: `build`, `quality`, `debug`, `architecture`, `frontend`,
   `marketing-site`, and more
-- Setup/reference: `init`, `help`, `landing-page`
+- Setup/reference: `init`, `help`, `landing-page`, `governance-sync`
 
-There are 28 skills and 10 specialized Claude Code agent definitions in this release. Use
+There are 28 skills and 10 specialized Claude Code agent definitions in 9.11.0. Use
 `/kernel:help` in Claude Code or `$kernel:help` in Codex for the live index and plugin
 status.
 
@@ -29,8 +29,8 @@ gaps and can generate a missing native adapter after showing conflicts, provenan
 and a backup destination. It never rewrites a conflict.
 
 Codex loads the skills and SessionStart rules, but it does not register the 10 Claude agent
-files as native Codex agents; KERNEL maps the same roles onto Codex's available subagents
-during orchestration.
+files as native Codex agents. Independent verification on Codex requires an explicitly
+arranged verifier.
 
 ## Manifest runtime
 

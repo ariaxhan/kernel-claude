@@ -1,5 +1,17 @@
 # Upgrading and rolling back
 
+## Updating to the current release (9.11.0)
+
+Claude Code: `/plugin marketplace update kernel-marketplace`,
+`/plugin update kernel@kernel-marketplace`, then `/reload-plugins`.
+Codex: `codex plugin marketplace upgrade kernel-marketplace`, then restart Codex.
+Use [install.md](install.md) to verify the loaded plugin and hook configuration.
+
+This release ships native Codex metadata and 28 skills. Its shared hook manifest binds
+SessionStart, PreToolUse, PermissionRequest, and UserPromptSubmit. Older lifecycle and
+guard descriptions below describe their historical releases, not current bindings.
+
+
 ## Upgrading from 8.x to 9.0.0
 
 KERNEL 9 changes how guidance is loaded: instead of one always-on configuration, each request
