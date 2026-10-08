@@ -41,6 +41,9 @@ bolt on a second pipeline.
    - [ ] Push notifications: working in production config
    - [ ] Crash-free rate: > 99% on staging before promoting
    - [ ] Bundle size: within limits, no large accidental assets
+   - [ ] Android targeting API 35+: verify 16 KB page-size support on 64-bit devices;
+         inspect bundled native libraries (including SDKs) and test in a 16 KB environment
+         ([Android guidance](https://developer.android.com/guide/practices/page-sizes))
    - [ ] Offline behavior: handles no-network gracefully
 6. **iOS submission** — `fastlane deliver`/`pilot`: TestFlight (internal → external) →
    App Store review. Before external testing, provide TestFlight test information and submit
