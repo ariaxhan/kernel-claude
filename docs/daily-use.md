@@ -4,10 +4,10 @@
    defines observable success.
 2. Let risk choose the workflow. Easy-to-undo work runs directly; durable or quiet changes
    use a contract and separate implementation/checking roles.
-3. Run `/kernel:validate`, then `/kernel:handoff` when another session needs an exact resume
+3. Run `/kernel:quality`, then `/kernel:handoff` when another session needs an exact resume
    point.
 
-In Codex, replace the leading `/` with `$`, for example `$kernel:validate`.
+In Codex, replace the leading `/` with `$`, for example `$kernel:quality`.
 
 ## Skill groups
 
