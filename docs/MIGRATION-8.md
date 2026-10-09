@@ -45,7 +45,7 @@ uses `$kernel:<name>`. KERNEL adds Codex-native explicit-only policies for `init
 `forge`, `experiment`, and `landing-page`; their existing Claude markers remain.
 
 Codex loads KERNEL's SessionStart context and synchronous write guards. It skips
-asynchronous command hooks and has no plugin SessionEnd event. The 15 files in
+asynchronous command hooks and has no plugin SessionEnd event. The 10 files in
 `agents/` remain Claude Code agent definitions rather than native Codex agents;
 Codex orchestration applies the same role contracts to available Codex subagents.
 Use `$kernel:handoff` explicitly when a Codex session needs durable closing state.
