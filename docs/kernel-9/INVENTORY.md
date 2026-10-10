@@ -2,6 +2,13 @@
 
 Slice 1 deliverable. Every current Kernel capability, classified.
 
+> **Historical snapshot (Kernel 8 → 9, 2026-08).** Hook, skill-count, and ambient-token figures
+> below predate 9.10.0, which cut the hook layer to `detect-secrets.sh`, `auto-approve-safe.sh`,
+> `session-start.sh`, `post-compact-restore.sh`, and (from 9.11.0) `repeat-detector.py`. Current
+> state: `hooks/gates.json`, `hooks/hooks.json`, and `python3 tests/kernel9/measure_ambient.py`
+> (9.11.0: 28 skills, plugin ambient ≈ 3,289 tok). No ambient-budget ratchet test ships;
+> `tests/kernel9/test_ambient_budget.py` no longer exists.
+
 Classification vocabulary:
 
 - **core** — universal, host- and domain-independent. Stays in the always-loaded layer.
