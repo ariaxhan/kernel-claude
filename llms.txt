@@ -1,8 +1,8 @@
 # KERNEL
 
 > A Claude Code plugin, also loadable by Codex, that replaces per-action approval prompts with
-> enforced boundaries: hooks that block destructive commands, a one-time human token for
-> irreversible operations, verifier agents blind to the builder's reasoning, and a SQLite memory
+> enforced boundaries: hooks that block credential writes and auto-approve only safe commands,
+> verifier agents blind to the builder's reasoning, and a SQLite memory
 > that carries lessons between sessions.
 
 Repository: https://github.com/ariaxhan/kernel-claude
@@ -14,10 +14,8 @@ Auto mode removes the per-action prompt. KERNEL supplies what the prompt was sup
 agent runs without per-action confirmation, inside boundaries enforced by hook scripts rather than
 by instructions the model could talk itself past.
 
-- Shell commands and writes are classified by how hard they are to undo. Recoverable mistakes get
-  a warning the model can act on; destructive ones are blocked in a PreToolUse hook.
-- Irreversible operations require a one-time approval token that a prompt-injected command cannot
-  forge, because only a human can open it.
+- Writes that would commit a credential are blocked in a PreToolUse hook; only plain read-only
+  git and test commands are auto-approved, and anything chained or redirected is left to the human.
 - High-consequence work is checked by a separate agent that receives the diff and the acceptance
   record but never the builder's reasoning.
 - Session state persists as schema-validated JSON manifests, so a resume reconstructs the pinned
@@ -59,8 +57,8 @@ codex plugin add kernel@kernel-marketplace
 ```
 
 Restart Codex, then invoke `$kernel:init`. Two differences: Codex does not implement
-`PostToolUseFailure`, so `capture-error.sh` is unbound and tool-error recording degrades to what
-`PostToolUse` observes; and Codex maps KERNEL's agent roles onto its own rather than registering
+`PostToolUseFailure`, and KERNEL binds no tool-error hook, so tool-error history is not recorded;
+and Codex maps KERNEL's agent roles onto its own rather than registering
 the Claude Code agent definitions natively. Matrix: `docs/kernel-9/HOST-CAPABILITIES.md`.
 
 ## Install for Gemini CLI
@@ -73,7 +71,7 @@ Gemini CLI gets the methodology layer only: the 28 skills and this file as ambie
 not get the enforcement layer. Gemini CLI 0.44.1 implements no `PreToolUse`, `PostToolUse`,
 `UserPromptSubmit`, `Stop`, `PreCompact`, `PermissionRequest`, or `PostToolUseFailure` event, which
 is where every KERNEL guardrail binds, and it does not substitute `${CLAUDE_PLUGIN_ROOT}` in a hook
-command. So: no destructive-command blocking, no secret-write blocking, no one-time approval token,
+command. So: no secret-write blocking, no safe-command auto-approval,
 no agentdb recall. The command above installs a curated release bundle carrying only
 `gemini-extension.json`, `llms.txt`, `LICENSE`, and `skills/`, so no Claude-format hook or agent
 definition is loaded and no host-mismatch errors are printed.
@@ -85,17 +83,15 @@ Skills are namespaced per host: Claude Code invokes `/kernel:<name>`, Codex invo
 
 ### Hooks (`hooks.json`, scripts in `hooks/scripts/`)
 
-Bound to SessionStart, PreToolUse, PermissionRequest, PostToolUse, UserPromptSubmit, Stop,
-PreCompact, SessionEnd.
+Bound to SessionStart, PreToolUse, PermissionRequest, UserPromptSubmit. Registry: `hooks/gates.json`.
 
-- `guard-bash.sh` classifies bash commands by reversibility and blocks the destructive ones.
-- `detect-secrets.sh` blocks writes that would commit a credential; `guard-config.sh` restricts
-  edits to agent-configuration paths.
-- `guard-context.sh` enforces the active manifest's context policy (sealed, bounded, advisory).
-- `session-start.sh` delivers the ambient methodology and the AgentDB recall banner; `session-end.sh`
-  writes the session record; `pre-compact-commit.sh` checkpoints before compaction.
-- `test-gate.sh` and `verdict-gate.sh` hold work at the declared quality gate; `circuit-breaker.sh`
-  stops a session looping on the same failure.
+- `detect-secrets.sh` (PreToolUse, Write|Edit) blocks writes that would commit a credential.
+- `auto-approve-safe.sh` (PermissionRequest, Bash) auto-approves demonstrably safe commands and
+  abstains otherwise, so the human is asked.
+- `session-start.sh` delivers the ambient methodology and the AgentDB recall banner.
+- `post-compact-restore.sh` restores context after compaction; `repeat-detector.py` flags a
+  restated request and injects a context-loss recovery order (both UserPromptSubmit).
+- `common.sh`, `circuit-breaker.sh`, `github-integration.sh` are libraries, never bound.
 
 ### Memory (`agentdb`, `orchestration/agentdb/agentdb`)
 
@@ -106,13 +102,13 @@ agentdb recall "<concrete nouns, files, symbols, errors>"   # before acting
 agentdb learn failure|pattern|gotcha "<what>" "<evidence>"  # after discovering
 ```
 
-### Skills (27, `skills/<name>/SKILL.md`)
+### Skills (28, `skills/<name>/SKILL.md`)
 
 - `/kernel:ingest` · `$kernel:ingest`: entry point for new and resumed work: research, classify, scope, execute, or resume from a manifest.
 - `/kernel:help` · `$kernel:help`: KERNEL reference plus live plugin status.
 - `/kernel:build` · `$kernel:build`: generate two or three approaches before implementing, take the simplest.
-- `/kernel:debug` · `$kernel:debug`: reproduce, hypothesize, isolate by binary search, fix root cause, add a regression test.
-- `/kernel:debug` · `$kernel:debug`: diagnosis before prescription for bugs and refactors.
+- `/kernel:debug` · `$kernel:debug`: diagnosis before prescription; reproduce, hypothesize, isolate by binary search, fix root cause, add a regression test; also maps refactors.
+- `/kernel:quality` · `$kernel:quality`: the Big 5 AI-code checks: input validation, edge cases, error handling, duplication, complexity.
 - `/kernel:simplify` · `$kernel:simplify`: reduce cyclomatic complexity with AST-aware JS/TS measurement, per-function budgets, regression diffs, and a project-owned verify gate.
 - `/kernel:review` · `$kernel:review`: code review with a deterministic scanner lane and a refutation pass; APPROVE, REQUEST CHANGES, or COMMENT.
 - `/kernel:tearitapart` · `$kernel:tearitapart`: pre-implementation critique; PROCEED, REVISE, or RETHINK.

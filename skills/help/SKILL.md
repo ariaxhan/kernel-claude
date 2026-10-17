@@ -62,7 +62,7 @@ agentdb recall "<feature> <subsystem> <files/symbols> <error/outcome>" --global
 
 | Skill | Purpose | When to use |
 |-------|---------|-------------|
-| `/kernel:validate` | Pre-commit gates, build, lint, test, security | Before every commit. Blocks on failure. |
+| `/kernel:quality` | The Big 5: input validation, edge cases, error handling, duplication, complexity | Before every commit on AI-written code. Any violation = not ready. |
 | `/kernel:tearitapart` | Critical pre-implementation review | Before tier 2+ work. Verdict: PROCEED/REVISE/RETHINK. |
 | `/kernel:review` | Code review for PRs or staged changes | Before merging. >80% confidence threshold. |
 
@@ -98,10 +98,10 @@ forbidden globs) | bounded (extra loads ledgered) | advisory. Details: docs/MIGR
 Typical flows, skills chain together:
 
 **New feature:**
-  ingest → (dream if complex) → tearitapart → execute → validate → review → handoff
+  ingest → (dream if complex) → tearitapart → execute → quality → review → handoff
 
 **Bug fix:**
-  diagnose → ingest (with diagnosis) → validate → review
+  debug → ingest (with diagnosis) → quality → review
 
 **Overnight autonomous:**
   forge (runs heat/hammer/quench/anneal loop, ships when antifragile)
@@ -118,9 +118,9 @@ Tier by reversibility x silence x blast radius; file count is only a weak hint.
 
 | Tier | Risk profile | Your Role | Skills involved |
 |------|--------------|-----------|-------------------|
-| 1 | easy to undo, loud if wrong | Execute directly | ingest → validate |
-| 2 | persistent or moderately quiet | Orchestrate, spawn surgeon | ingest → tearitapart → validate → review |
-| 3 | hard to undo, quiet, wide blast | Orchestrate, surgeon + adversary | ingest → tearitapart → validate → review |
+| 1 | easy to undo, loud if wrong | Execute directly | ingest → quality |
+| 2 | persistent or moderately quiet | Orchestrate, spawn surgeon | ingest → tearitapart → quality → review |
+| 3 | hard to undo, quiet, wide blast | Orchestrate, surgeon + adversary | ingest → tearitapart → quality → review |
 </tiers>
 
 <agents>
@@ -134,7 +134,10 @@ agents; KERNEL applies the role contracts to available Codex subagents.
 | **Reviewer** | Code review with APPROVE/REQUEST CHANGES/COMMENT verdict. |
 | **Researcher** | Finds proven solutions and anti-patterns before coding. |
 | **Scout** | Codebase reconnaissance, maps structure, detects tooling. |
-| **Validator** | Pre-commit quality gate, build, types, lint, tests, security. |
+| **Deep-diver** | Failure-mode research map before non-trivial infra or schema work. |
+| **Blind-evaluator** | Scores from problem + rubric only, never the solution. |
+| **Lane-worker** | One file-disjoint slice of a parallel burn; never commits. |
+| **Transcript-archaeologist** | Read-only forensic mining of session logs and git history. |
 | **Dreamer** | Multi-perspective debate, minimalist/maximalist/pragmatist. |
 </agents>
 

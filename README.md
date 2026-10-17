@@ -21,8 +21,8 @@ codex plugin marketplace add ariaxhan/kernel-claude
 codex plugin add kernel@kernel-marketplace
 ```
 
-Gemini CLI (methodology only: the 29 skills and `llms.txt` as ambient context; the hooks, the
-approval token, and agentdb do not run on this host):
+Gemini CLI (methodology only: the 28 skills and `llms.txt` as ambient context; the hooks, the
+and agentdb do not run on this host):
 
 ```bash
 gemini extensions install https://github.com/ariaxhan/kernel-claude
@@ -44,9 +44,8 @@ prompts. Per-action approval is a leash held by someone who stopped looking.
 deliberate agent sabotage, and 56% accept it even after a warning.)
 
 KERNEL is the other model: fences. The agent runs free inside enforced boundaries — hooks
-that block destructive commands outright rather than warning about them, irreversible
-operations gated behind a one-time token only a human can open, independent verifier agents
-that never saw the builder's reasoning, and receipts for every claim. You review outcomes,
+that block credential writes and auto-approve only demonstrably safe commands, independent
+verifier agents that never saw the builder's reasoning, and receipts for every claim. You review outcomes,
 not keystrokes.
 
 And the fences learn: every mistake a session survives is written to a memory that outlives
@@ -112,11 +111,11 @@ not prose summaries. A new session reconstructs exactly the state the manifest p
 than inheriting a whole conversation. The manifest CLI is
 `validate | latest | divergence | preflight | compile | resume | activate | deactivate`.
 
-**Reversibility guards.** Hooks classify commands and writes by how hard they are to undo.
-Recoverable mistakes get a warning the model can correct; genuinely destructive ones
-hard-block and surface to you, with a one-time approval token that a prompt-injected command
-cannot forge. These are a tripwire, not a sandbox, and [docs/safety.md](docs/safety.md) is
-explicit about where they stop working.
+**Fences, not intent-guessing.** Two gates ship: `detect-secrets` blocks writes that would
+commit a credential, and `auto-approve-safe` approves only plain read-only git and test
+commands, abstaining (so you are asked) on anything chained or redirected. Hooks that guessed
+intent from command text were removed in 9.9.0. These are a tripwire, not a sandbox, and
+[docs/safety.md](docs/safety.md) is explicit about where they stop working.
 
 Underneath, KERNEL classifies each task by domain, work shape, and safety level, then loads
 one domain pack for the announced route. Ordinary work runs with no ceremony.
@@ -149,10 +148,9 @@ codex plugin add kernel@kernel-marketplace
 
 Restart Codex afterwards, then invoke `$kernel:init`. Skills are namespaced on both hosts:
 Claude Code invokes `/kernel:help`, Codex invokes `$kernel:help`. Two real differences.
-Codex runs the supported synchronous hook events, including `SessionEnd`, but does not
-implement `PostToolUseFailure`. KERNEL's `capture-error.sh` is therefore not bound on that
-host, and tool-error recording degrades to what `PostToolUse` can observe. That degradation is
-silent at runtime, so the per-host matrix is worth reading before you rely on error history:
+Codex runs the supported synchronous hook events but does not implement
+`PostToolUseFailure`, and KERNEL binds no tool-error hook, so tool-error history is not
+recorded on either host. The per-host matrix is worth reading before you rely on it:
 [docs/kernel-9/HOST-CAPABILITIES.md](docs/kernel-9/HOST-CAPABILITIES.md), generated from
 `governance/hosts.json`. And Codex does
 not register KERNEL's Claude Code agent definitions as native subagents; it maps the same
