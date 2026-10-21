@@ -196,6 +196,7 @@ emit_memory_event() {
   # typo in a known verb is surfaced). Never a hard reject (design 2.2).
   case "$kind" in
     created|updated|imported|merged|retrieved|surfaced|used|ignored|reinforced|graduated|archived|resurrected|domain_changed|superseded) ;;
+    recall_call) ;;      # one row per recall call: actor=caller, payload hits (0 = miss)
     check_failed) ;;     # migration 018: a learning's regression check failed (cmd_checks)
     session_outcome) ;;  # phase-4 causal anchor (design 5.1 weak session association): a session's QA outcome, joined to surfaced events by actor
     *) echo "[agentdb] emit_memory_event: '$kind' is not a known memory verb (recording anyway; open vocabulary)" >&2 ;;
@@ -1959,7 +1960,7 @@ _recall_emit() {
       SELECT lower(substr(l.insight,1,200)) || '@@US@@' ||
              replace('- [' || l.type || '] ' || l.insight || '$tag' ||
              CASE WHEN l.evidence IS NOT NULL AND l.evidence != ''
-                  THEN '  ↳ ' || substr(l.evidence,1,90) ELSE '' END,
+                  THEN '  ↳ ' || substr(l.evidence,1,${AGENTDB_EVIDENCE_CHARS:-320}) ELSE '' END,
              '@@US@@', '@@us@@')
              || '@@US@@' || l.id || '@@US@@' || '$origin'
              || '@@US@@' || replace(replace(replace(
@@ -1981,7 +1982,7 @@ _recall_emit() {
       SELECT lower(substr(insight,1,200)) || '@@US@@' ||
              replace('- [' || type || '] ' || insight || '$tag' ||
              CASE WHEN evidence IS NOT NULL AND evidence != ''
-                  THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END,
+                  THEN '  ↳ ' || substr(evidence,1,${AGENTDB_EVIDENCE_CHARS:-320}) ELSE '' END,
              '@@US@@', '@@us@@')
              || '@@US@@' || id || '@@US@@' || '$origin'
       FROM learnings
@@ -2041,7 +2042,7 @@ _emit_rows_by_ids() {
     SELECT lower(substr(insight,1,200)) || '@@US@@' ||
            replace('- [' || type || '] ' || insight || '$tag' ||
            CASE WHEN evidence IS NOT NULL AND evidence != ''
-                THEN '  ↳ ' || substr(evidence,1,90) ELSE '' END,
+                THEN '  ↳ ' || substr(evidence,1,${AGENTDB_EVIDENCE_CHARS:-320}) ELSE '' END,
            '@@US@@', '@@us@@')
            || '@@US@@' || id || '@@US@@' || '$origin'
     FROM learnings
@@ -2326,7 +2327,7 @@ cmd_recall() {
           ($5 + 0) >= m { print }                       # enough terms matched: keep
         ')
   fi
-  dedup=$(printf '%s\n' "$floored" | grep -v '^[[:space:]]*$' \
+  dedup=$(printf '%s\n' "$floored" | { grep -v '^[[:space:]]*$' || true; } \
         | awk -F'@@US@@' '!seen[$1]++' | awk -v n="$limit" 'NR<=n')
 
   # Measurement mode: dump id<TAB>matched-term-count for every surfaced candidate
@@ -2345,6 +2346,16 @@ cmd_recall() {
   fi
 
   out=$(printf '%s\n' "$dedup" | awk -F'@@US@@' 'NF{print $2}')
+
+  # One call-level row per real recall (hit OR miss), so caller/hit/miss can be
+  # counted exactly; the per-row surfaced/reinforced events cannot see misses.
+  # Caller: AGENTDB_CALLER, else the session id, else the parent command name.
+  local rc_hits rc_caller
+  rc_hits=$(printf '%s\n' "$dedup" | awk -F'@@US@@' 'NF>=4' | wc -l | tr -d ' ')
+  rc_caller="${AGENTDB_CALLER:-${AGENTDB_SESSION_ID:-${CLAUDE_SESSION_ID:-$(ps -o comm= -p "$PPID" 2>/dev/null | tr -d ' ')}}}"
+  emit_memory_event recall_call "" "recall call: ${rc_hits} displayed" \
+    "{\"query\":\"$(json_escape "$query")\",\"hits\":${rc_hits:-0},\"global\":${use_global}}" \
+    "${rc_caller:-unknown}"
 
   if [ -n "$out" ]; then
     echo "$out"
