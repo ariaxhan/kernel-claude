@@ -35,6 +35,7 @@ SUITE_PATHS=(
   "runtime_upgrade:hooks/scripts/common.sh scripts/select-runtime"
   "agentdb:orchestration/agentdb/"
   "migrations:orchestration/agentdb/"
+  "router:orchestration/router/ tests/test_kernel_router.py"
   "manifest:schemas/ orchestration/manifest/ tests/fixtures/manifests/"
   "governance:governance/ scripts/generate- scripts/adjudicate hooks/scripts/session-start .claude-plugin/ CLAUDE.md AGENTS.md tests/test_governance.py tests/test_adjudicate.py tests/kernel9/test_adapters.py"
 )
@@ -155,6 +156,10 @@ run_test() {
 test_agentdb_init() {
   agentdb init >/dev/null
   assert_file_exists "$TEST_PROJECT/_meta/agentdb/agent.db"
+}
+
+test_router() {
+  python3 "$PLUGIN_ROOT/tests/test_kernel_router.py"
 }
 
 test_generated_governance() {
@@ -730,6 +735,9 @@ run_test_suite() {
       run_test "missing schema field rejected" test_manifest_validate_rejects_missing_schema_field
       run_test "git_diff rejects option injection" test_manifest_git_diff_rejects_option_injection
       ;;
+    router)
+      run_test "live-run continuation routing" test_router
+      ;;
     governance)
       run_test "generated governance adapters and operator" test_generated_governance
       run_test "host adapters generated from one source" test_host_adapters
@@ -739,7 +747,7 @@ run_test_suite() {
   esac
 }
 
-ALL_SUITES=(security_hooks circuit_breaker corpus hooks runtime_upgrade agentdb migrations manifest governance)
+ALL_SUITES=(security_hooks circuit_breaker corpus hooks runtime_upgrade agentdb migrations manifest router governance)
 
 # Print suites whose mapped paths changed vs $1 (tracked diff + untracked files).
 changed_suites() {
