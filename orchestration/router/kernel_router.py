@@ -634,11 +634,17 @@ def classify_request(
     out = build_classification(
         text,
         state=state,
+        domain_hint=previous.get("domain") if continuing else None,
         safety_hint=previous.get("safety") if continuing else None,
     )
 
     if not previous:
         return out
+
+    if continuing:
+        for field in ("verification", "ownership"):
+            if field in previous:
+                out[field] = previous[field].copy()
 
     transient_status = bool(LIGHTWEIGHT_STATUS.search(text))
 
