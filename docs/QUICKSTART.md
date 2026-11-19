@@ -51,16 +51,16 @@ Then use `/kernel:help` in Claude Code or `$kernel:help` in Codex.
 1. `/kernel:ingest` starts or resumes work from repository truth and AgentDB.
 2. KERNEL chooses direct work or a contract based on reversibility, quiet failure
    risk, and blast radius—not file count.
-3. `/kernel:validate` checks the result. `/kernel:handoff` creates a bounded JSON
+3. `/kernel:review` checks the result. `/kernel:handoff` creates a bounded JSON
    resume point when another session must continue.
 
 Common skills below use Claude Code syntax. In Codex, replace the leading `/` with
-`$`, for example `$kernel:validate`.
+`$`, for example `$kernel:review`.
 
 Common skills:
 
 - Work: `/kernel:ingest`, `/kernel:debug`, `/kernel:dream`
-- Checks: `/kernel:validate`, `/kernel:review`, `/kernel:tearitapart`
+- Checks: `/kernel:review`, `/kernel:quality`, `/kernel:tearitapart`
 - State: `/kernel:checkpoint`, `/kernel:handoff`, `/kernel:retrospective`
 - Setup/reference: `/kernel:init`, `/kernel:help`
 
@@ -125,12 +125,12 @@ instruction coverage. Writes require explicit confirmation and a backup director
 Explicit-only skills (5): `experiment`, `forge`, `governance-sync`, `init`,
 `landing-page`. Their Codex-native policy forbids automatic invocation.
 
-The 15 files under `agents/` are Claude Code agent definitions. Codex does not
+The 10 files under `agents/` are Claude Code agent definitions. Codex does not
 register them as native agents; KERNEL applies their role contracts when coordinating
-available Codex subagents. Codex runs supported synchronous hooks, including
-SessionStart and the write guards. It skips asynchronous command hooks and has no
-plugin SessionEnd event, so finish Codex work with `$kernel:handoff` when durable
-end-state is required.
+available Codex subagents. Codex runs supported synchronous hooks (SessionStart, the secret
+scanner, safe-command approval, UserPromptSubmit). KERNEL binds no SessionEnd hook on
+either host, so finish work with `/kernel:handoff` (`$kernel:handoff` in Codex) when
+durable end-state is required.
 
 For a session-only rollback:
 

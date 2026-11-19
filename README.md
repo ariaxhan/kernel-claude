@@ -21,8 +21,8 @@ codex plugin marketplace add ariaxhan/kernel-claude
 codex plugin add kernel@kernel-marketplace
 ```
 
-Gemini CLI (methodology only: the 29 skills and `llms.txt` as ambient context; the hooks, the
-approval token, and agentdb do not run on this host):
+Gemini CLI (methodology only: the 28 skills and `llms.txt` as ambient context; the hooks
+and agentdb do not run on this host):
 
 ```bash
 gemini extensions install https://github.com/ariaxhan/kernel-claude
@@ -43,11 +43,10 @@ prompts. Per-action approval is a leash held by someone who stopped looking.
 [academic result](https://arxiv.org/abs/2606.05647) is worse — 94% of developers miss
 deliberate agent sabotage, and 56% accept it even after a warning.)
 
-KERNEL is the other model: fences. The agent runs free inside enforced boundaries — hooks
-that block destructive commands outright rather than warning about them, irreversible
-operations gated behind a one-time token only a human can open, independent verifier agents
-that never saw the builder's reasoning, and receipts for every claim. You review outcomes,
-not keystrokes.
+KERNEL is the other model: fences. The agent runs free inside enforced boundaries — a hook
+that blocks writes containing credentials, a hook that auto-approves only demonstrably safe
+commands, independent verifier agents that never saw the builder's reasoning, and receipts for
+every claim. You review outcomes, not keystrokes.
 
 And the fences learn: every mistake a session survives is written to a memory that outlives
 it, so yesterday's near-miss is tomorrow's blocked command.
@@ -112,26 +111,26 @@ not prose summaries. A new session reconstructs exactly the state the manifest p
 than inheriting a whole conversation. The manifest CLI is
 `validate | latest | divergence | preflight | compile | resume | activate | deactivate`.
 
-**Reversibility guards.** Hooks classify commands and writes by how hard they are to undo.
-Recoverable mistakes get a warning the model can correct; genuinely destructive ones
-hard-block and surface to you, with a one-time approval token that a prompt-injected command
-cannot forge. These are a tripwire, not a sandbox, and [docs/safety.md](docs/safety.md) is
-explicit about where they stop working.
+**Hook guards.** Since 9.10.0 the hook layer is deliberately small: a fail-closed secret
+scanner on `Write`/`Edit`, a `PermissionRequest` allowlist for safe commands (it never approves
+on uncertainty), a session banner, compact restore, and a repeated-request detector. Destructive
+command blocking and the one-time approval token were removed. These are a tripwire, not a
+sandbox, and [docs/safety.md](docs/safety.md) is explicit about where they stop working.
 
 Underneath, KERNEL classifies each task by domain, work shape, and safety level, then loads
 one domain pack for the announced route. Ordinary work runs with no ceremony.
 
-One honest limit on that, current as of 9.0.0: the model-routing and
+One honest limit on that, current as of 9.11.0: the model-routing and
 separate-builder-from-verifier rules are checked when receipt validation is run. They are not
 yet enforced on every request, and a request with no receipt at all proceeds normally. Treat
 them as a convention the tooling helps you keep, not as a sandbox.
 
 On context cost, the number you will see quoted elsewhere is wrong and this is the corrected
-one. KERNEL's ambient cost to a plugin user is roughly **4,600 tokens**: about 1,900 from the
-SessionStart hook and about 2,700 from skill frontmatter the host keeps visible so routing can
+one. KERNEL's ambient cost to a plugin user is roughly **3,300 tokens** (measured with `tests/kernel9/measure_ambient.py`): about 650 from the
+SessionStart hook and about 2,650 from skill frontmatter the host keeps visible so routing can
 happen. This repo's `CLAUDE.md` is **not** part of that; your host loads your own instruction
 file, not ours. An earlier target of "under 500 tokens" came from a measurement that charged our
-`CLAUDE.md` to everyone, and it is withdrawn. Detail and the ratchets that now enforce it:
+`CLAUDE.md` to everyone, and it is withdrawn. Detail:
 [docs/kernel-9/INVENTORY.md](docs/kernel-9/INVENTORY.md).
 
 ## Surfaces, and how Codex differs
@@ -149,10 +148,9 @@ codex plugin add kernel@kernel-marketplace
 
 Restart Codex afterwards, then invoke `$kernel:init`. Skills are namespaced on both hosts:
 Claude Code invokes `/kernel:help`, Codex invokes `$kernel:help`. Two real differences.
-Codex runs the supported synchronous hook events, including `SessionEnd`, but does not
-implement `PostToolUseFailure`. KERNEL's `capture-error.sh` is therefore not bound on that
-host, and tool-error recording degrades to what `PostToolUse` can observe. That degradation is
-silent at runtime, so the per-host matrix is worth reading before you rely on error history:
+Codex runs the supported synchronous hook events but does not implement
+`PostToolUseFailure`. KERNEL binds no hook to that event as of 9.10.0, so nothing degrades
+today, but the per-host matrix is worth reading before you rely on a hook:
 [docs/kernel-9/HOST-CAPABILITIES.md](docs/kernel-9/HOST-CAPABILITIES.md), generated from
 `governance/hosts.json`. And Codex does
 not register KERNEL's Claude Code agent definitions as native subagents; it maps the same

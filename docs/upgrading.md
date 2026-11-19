@@ -1,5 +1,13 @@
 # Upgrading and rolling back
 
+## Upgrading to 9.10 and later (current: 9.11.0)
+
+9.10.0 cut the hook layer to the secret scanner, safe-command auto-approval, the session
+banner, and compact restore; 9.11.0 added the repeated-request detector. Destructive-command
+blocking, the `KERNEL_APPROVE` token, and the `SessionEnd`/`PreCompact` batch-commit hooks no
+longer exist. Rely on the host's own permission prompts or sandbox for irreversible operations.
+See [safety.md](safety.md) and [../CHANGELOG.md](../CHANGELOG.md).
+
 ## Upgrading from 8.x to 9.0.0
 
 KERNEL 9 changes how guidance is loaded: instead of one always-on configuration, each request
@@ -97,8 +105,8 @@ runtime:
 
 Missing paths stay missing. Regular files, directories, malformed links, and unrelated links
 are never replaced; KERNEL prints a recovery warning instead. Updating does not replace
-project files, existing manifests, receipts, or AgentDB. Hooks and explicit init still write
-session records and setup files in the selected Vaults.
+project files, existing manifests, receipts, or AgentDB. Explicit init, `agentdb write-end`, and
+handoff still write session records and setup files in the selected Vaults.
 
 ## Breaking changes in 8
 

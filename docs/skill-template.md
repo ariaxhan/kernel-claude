@@ -85,5 +85,5 @@ anti_patterns:
 
 See existing skills for reference:
 - `skills/quality/SKILL.md` -- general quality checks
-- `skills/testing/SKILL.md` -- test methodology
+- `skills/eval/SKILL.md` -- eval-driven development
 - `skills/build/SKILL.md` -- implementation patterns

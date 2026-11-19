@@ -14,18 +14,17 @@ Auto mode removes the per-action prompt. KERNEL supplies what the prompt was sup
 agent runs without per-action confirmation, inside boundaries enforced by hook scripts rather than
 by instructions the model could talk itself past.
 
-- Shell commands and writes are classified by how hard they are to undo. Recoverable mistakes get
-  a warning the model can act on; destructive ones are blocked in a PreToolUse hook.
-- Irreversible operations require a one-time approval token that a prompt-injected command cannot
-  forge, because only a human can open it.
+- Writes containing credentials are blocked by a fail-closed PreToolUse hook; Bash commands are
+  auto-approved only when demonstrably safe, and the hook abstains (the human is asked) on
+  uncertainty. Since 9.10.0 there is no destructive-command blocker and no approval token.
 - High-consequence work is checked by a separate agent that receives the diff and the acceptance
   record but never the builder's reasoning.
 - Session state persists as schema-validated JSON manifests, so a resume reconstructs the pinned
   state instead of inheriting a transcript. Failures recorded to `agentdb` in one session are
   recalled by keyword in the next.
 
-Ambient context cost to a plugin user is about 4,600 tokens: ~1,900 from the SessionStart hook and
-~2,700 from skill frontmatter the host keeps visible for routing. This repo's `CLAUDE.md` is not
+Ambient context cost to a plugin user is about 3,300 tokens: ~650 from the SessionStart hook and
+~2,650 from skill frontmatter the host keeps visible for routing. This repo's `CLAUDE.md` is not
 loaded for plugin users.
 
 Limits stated by the project: the hooks are a tripwire, not a sandbox (`docs/safety.md`), and the
@@ -59,8 +58,7 @@ codex plugin add kernel@kernel-marketplace
 ```
 
 Restart Codex, then invoke `$kernel:init`. Two differences: Codex does not implement
-`PostToolUseFailure`, so `capture-error.sh` is unbound and tool-error recording degrades to what
-`PostToolUse` observes; and Codex maps KERNEL's agent roles onto its own rather than registering
+`PostToolUseFailure` (no KERNEL hook binds it as of 9.10.0); and Codex maps KERNEL's agent roles onto its own rather than registering
 the Claude Code agent definitions natively. Matrix: `docs/kernel-9/HOST-CAPABILITIES.md`.
 
 ## Install for Gemini CLI
@@ -73,8 +71,7 @@ Gemini CLI gets the methodology layer only: the 28 skills and this file as ambie
 not get the enforcement layer. Gemini CLI 0.44.1 implements no `PreToolUse`, `PostToolUse`,
 `UserPromptSubmit`, `Stop`, `PreCompact`, `PermissionRequest`, or `PostToolUseFailure` event, which
 is where every KERNEL guardrail binds, and it does not substitute `${CLAUDE_PLUGIN_ROOT}` in a hook
-command. So: no destructive-command blocking, no secret-write blocking, no one-time approval token,
-no agentdb recall. The command above installs a curated release bundle carrying only
+command. So: no secret-write blocking, no safe-command auto-approval, no agentdb recall. The command above installs a curated release bundle carrying only
 `gemini-extension.json`, `llms.txt`, `LICENSE`, and `skills/`, so no Claude-format hook or agent
 definition is loaded and no host-mismatch errors are printed.
 
@@ -85,17 +82,16 @@ Skills are namespaced per host: Claude Code invokes `/kernel:<name>`, Codex invo
 
 ### Hooks (`hooks.json`, scripts in `hooks/scripts/`)
 
-Bound to SessionStart, PreToolUse, PermissionRequest, PostToolUse, UserPromptSubmit, Stop,
-PreCompact, SessionEnd.
+Bound to SessionStart, PreToolUse (`Write|Edit`), PermissionRequest (`Bash`), UserPromptSubmit.
 
-- `guard-bash.sh` classifies bash commands by reversibility and blocks the destructive ones.
-- `detect-secrets.sh` blocks writes that would commit a credential; `guard-config.sh` restricts
-  edits to agent-configuration paths.
-- `guard-context.sh` enforces the active manifest's context policy (sealed, bounded, advisory).
-- `session-start.sh` delivers the ambient methodology and the AgentDB recall banner; `session-end.sh`
-  writes the session record; `pre-compact-commit.sh` checkpoints before compaction.
-- `test-gate.sh` and `verdict-gate.sh` hold work at the declared quality gate; `circuit-breaker.sh`
-  stops a session looping on the same failure.
+- `detect-secrets.sh` blocks writes that would commit a credential; fail-closed.
+- `auto-approve-safe.sh` auto-approves demonstrably safe Bash commands; abstains on uncertainty.
+- `session-start.sh` delivers the ambient methodology and the AgentDB recall banner.
+- `post-compact-restore.sh` restores context after compaction; `repeat-detector.py` injects a
+  recovery order when a prompt restates an earlier request.
+- `circuit-breaker.sh` (sourced by advisory hooks) disables a hook for 10 minutes after 3
+  consecutive failures. The 9.10.0 release removed the guard-bash, guard-config, guard-context,
+  session-end, pre-compact-commit, test-gate and verdict-gate hooks.
 
 ### Memory (`agentdb`, `orchestration/agentdb/agentdb`)
 
@@ -106,15 +102,15 @@ agentdb recall "<concrete nouns, files, symbols, errors>"   # before acting
 agentdb learn failure|pattern|gotcha "<what>" "<evidence>"  # after discovering
 ```
 
-### Skills (27, `skills/<name>/SKILL.md`)
+### Skills (28, `skills/<name>/SKILL.md`)
 
 - `/kernel:ingest` · `$kernel:ingest`: entry point for new and resumed work: research, classify, scope, execute, or resume from a manifest.
 - `/kernel:help` · `$kernel:help`: KERNEL reference plus live plugin status.
 - `/kernel:build` · `$kernel:build`: generate two or three approaches before implementing, take the simplest.
 - `/kernel:debug` · `$kernel:debug`: reproduce, hypothesize, isolate by binary search, fix root cause, add a regression test.
-- `/kernel:debug` · `$kernel:debug`: diagnosis before prescription for bugs and refactors.
 - `/kernel:simplify` · `$kernel:simplify`: reduce cyclomatic complexity with AST-aware JS/TS measurement, per-function budgets, regression diffs, and a project-owned verify gate.
 - `/kernel:review` · `$kernel:review`: code review with a deterministic scanner lane and a refutation pass; APPROVE, REQUEST CHANGES, or COMMENT.
+- `/kernel:quality` · `$kernel:quality`: the Big 5 (input validation, edge cases, error handling, duplication, complexity) plus data-correctness rules; any violation is NOT READY.
 - `/kernel:tearitapart` · `$kernel:tearitapart`: pre-implementation critique; PROCEED, REVISE, or RETHINK.
 - `/kernel:ship` · `$kernel:ship`: release gate: validate, review, publish, tag.
 - `/kernel:handoff` · `$kernel:handoff`: compile a `kernel.handoff/v1` manifest for bounded resume.

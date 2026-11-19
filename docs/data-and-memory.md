@@ -45,23 +45,22 @@ data, excluded from the JSON mirror and rebuilt by `graph build`, like the embed
 
 ## Hooks and external tools
 
-KERNEL hooks can inspect repository state, run configured checks, and write these records.
-Claude Code runs the full declared lifecycle. Codex runs supported synchronous hook events,
-including the write guards and SessionStart context; it skips asynchronous command hooks and
-has no plugin SessionEnd event, so end-of-session recording in Codex must be invoked
-explicitly with `$kernel:handoff`. Some workflows can use GitHub when the project profile
-enables it. KERNEL does not promise that all processing stays local when you invoke a
+KERNEL hooks can inspect repository state and write these records. As of 9.11.0 the shipped
+hooks are `SessionStart`, `PreToolUse` (`Write|Edit`), `PermissionRequest` (`Bash`), and
+`UserPromptSubmit`. No `SessionEnd`, `PreCompact`, or `PostToolUseFailure` hook is bound on
+either host, so end-of-session recording is explicit: `agentdb write-end` or
+`/kernel:handoff` (`$kernel:handoff` in Codex). Some workflows can use GitHub when the project
+profile enables it. KERNEL does not promise that all processing stays local when you invoke a
 workflow that uses external tools. Review host permissions and the repository's own
 instructions before granting access.
 
-KERNEL 8.0.2 declares its six advisory hooks as synchronous so Codex executes them instead of
-skipping them. They remain non-blocking in outcome: an internal logging or validation failure
-returns success and cannot reject the tool operation. The critical secret, configuration,
-command, and context guards remain separate blocking gates.
+The secret scanner is the only blocking hook; it fails closed. The safe-command allowlist
+abstains rather than approves when it cannot evaluate. The other hooks inject context and
+cannot reject a tool operation.
 
 When the active project root exactly matches the Vaults root and the shared continuity engine
 plus an executable Claude or Codex adapter are present, that Vaults service owns compaction
-checkpoints and restore injection. KERNEL's PreCompact and PostCompact paths cleanly no-op
+checkpoints and restore injection. KERNEL's compact-restore path (`post-compact-restore.sh`) cleanly no-ops
 there; SessionStart still supplies AgentDB and governance without adding a second restore.
 Nested repositories retain KERNEL's deterministic generic fallback. Merely finding continuity
 files above the active project does not disable KERNEL.
