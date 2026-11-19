@@ -54,14 +54,14 @@ enables it. KERNEL does not promise that all processing stays local when you inv
 workflow that uses external tools. Review host permissions and the repository's own
 instructions before granting access.
 
-KERNEL 8.0.2 declares its six advisory hooks as synchronous so Codex executes them instead of
+KERNEL declares its advisory hooks (`session-start`, `post-compact-restore`, `repeat-detector`) as synchronous so Codex executes them instead of
 skipping them. They remain non-blocking in outcome: an internal logging or validation failure
 returns success and cannot reject the tool operation. The critical secret, configuration,
 command, and context guards remain separate blocking gates.
 
 When the active project root exactly matches the Vaults root and the shared continuity engine
 plus an executable Claude or Codex adapter are present, that Vaults service owns compaction
-checkpoints and restore injection. KERNEL's PreCompact and PostCompact paths cleanly no-op
+checkpoints and restore injection. KERNEL's post-compact restore path cleanly no-ops
 there; SessionStart still supplies AgentDB and governance without adding a second restore.
 Nested repositories retain KERNEL's deterministic generic fallback. Merely finding continuity
 files above the active project does not disable KERNEL.
