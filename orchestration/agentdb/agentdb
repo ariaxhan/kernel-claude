@@ -457,6 +457,36 @@ cmd_preflight() {
   return 0
 }
 
+# Capture the selected set once: display, load telemetry and surfaced events agree.
+_read_ranked_preamble() {
+  local count="$1" rows ids_sql
+  rows=$(db_exec "
+    WITH eligible AS (
+      SELECT *, MIN(hit_count,20) * 0.5
+        + CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END
+        + CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END
+        + CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END AS score
+      FROM learnings WHERE archived_at IS NULL AND id IS NOT NULL
+        AND (visibility = 'agent' OR visibility IS NULL)
+    ), tail AS (
+      SELECT * FROM eligible WHERE hit_count < 5
+      ORDER BY COALESCE(load_count,0), score DESC, ts DESC, id LIMIT 2
+    ), ranked AS (
+      SELECT * FROM eligible WHERE id NOT IN (SELECT id FROM tail)
+      ORDER BY score DESC, ts DESC, id LIMIT $((count - 2))
+    )
+    SELECT id || '@@US@@- [' || type || '] ' || replace(insight,'@@US@@','@@us@@') FROM ranked
+    UNION ALL
+    SELECT id || '@@US@@- [' || type || '] ' || replace(insight,'@@US@@','@@us@@') FROM tail;")
+  printf '%s\n' "$rows" | awk -F'@@US@@' 'NF>=2{print $2}'
+  loaded_ids=$(printf '%s\n' "$rows" | awk -F'@@US@@' 'NF>=2{print $1}')
+  [ -n "$loaded_ids" ] || return 0
+  ids_sql=$(printf '%s\n' "$loaded_ids" | while IFS= read -r lid; do
+    [ -n "$lid" ] && printf "'%s'," "$(sql_escape "$lid")"
+  done)
+  [ -z "$ids_sql" ] || db_exec "UPDATE learnings SET load_count = COALESCE(load_count,0) + 1 WHERE id IN (${ids_sql%,});"
+}
+
 cmd_read_start() {
   local mode="${1:---weighted}"
   [ ! -f "$DB" ] && cmd_init >/dev/null
@@ -490,33 +520,8 @@ cmd_read_start() {
       # Minimal: top 10 by score (~400 tokens). Use in tight context.
       echo "## Mode: summary (top 10)"
       echo ""
-      db_exec "
-        SELECT '- [' || type || '] ' || insight FROM (
-          SELECT type, insight,
-            (hit_count * 10)
-            + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END)
-            AS score
-          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 10
-        );
-      " 2>/dev/null || echo "None"
-      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE id IN (
-        SELECT id FROM (
-          SELECT id,
-            (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 10
-        )
-      );" 2>/dev/null
-      loaded_ids=$(db_exec "SELECT id FROM (
-          SELECT id,
-            (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 10
-        );" 2>/dev/null); sf_mode="summary"
+      _read_ranked_preamble 10
+      sf_mode="summary"
       ;;
 
     --tiered)
@@ -565,38 +570,11 @@ cmd_read_start() {
       ;;
 
     --weighted|*)
-      # Default: WEIGHTED-75 (~3.4K tokens, 84% failure coverage). H078 graduated.
-      # Score = (hit_count * 10) + (failure_bonus * 50) + (recency_7d * 10) + (recency_14d * 5)
+      # Explicit audit mode keeps 75 rows, including two rotating tail slots.
       echo "## Mode: weighted-75"
       echo ""
-      db_exec "
-        SELECT '- [' || type || '] ' || insight FROM (
-          SELECT type, insight,
-            (hit_count * 10)
-            + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END)
-            AS score
-          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 75
-        );
-      " 2>/dev/null || echo "None"
-      # Telemetry only: bump load_count for the dumped set (see migration 013).
-      db_exec "UPDATE learnings SET load_count = load_count + 1 WHERE id IN (
-        SELECT id FROM (
-          SELECT id,
-            (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 75
-        )
-      );" 2>/dev/null
-      loaded_ids=$(db_exec "SELECT id FROM (
-          SELECT id,
-            (hit_count * 10) + (CASE WHEN type IN ('failure','gotcha') THEN 50 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 7 THEN 10 ELSE 0 END)
-            + (CASE WHEN julianday('now') - julianday(ts) < 14 THEN 5 ELSE 0 END) AS score
-          FROM learnings WHERE archived_at IS NULL ORDER BY score DESC LIMIT 75
-        );" 2>/dev/null); sf_mode="weighted-75"
+      _read_ranked_preamble 75
+      sf_mode="weighted-75"
       ;;
   esac
 
@@ -1062,21 +1040,9 @@ cmd_prune() {
       echo "Pruned $(( before_con - after_con )) contract(s). Kept $after_con."
       ;;
     learnings)
-      # H081: Prune stale learnings. Safe targets: hit_count=0, >14 days old, pattern/preference type.
-      # Failures and gotchas are never auto-pruned (safety-critical).
-      local before_lrn
-      before_lrn=$(db_exec "SELECT COUNT(*) FROM learnings;")
-      local pruned_lrn
-      pruned_lrn=$(db_exec "SELECT COUNT(*) FROM learnings WHERE hit_count = 0 AND julianday('now') - julianday(ts) > 14 AND type IN ('pattern', 'preference');")
-      db_exec "
-        DELETE FROM learnings
-        WHERE hit_count = 0
-          AND julianday('now') - julianday(ts) > 14
-          AND type IN ('pattern', 'preference');
-      "
-      local after_lrn
-      after_lrn=$(db_exec "SELECT COUNT(*) FROM learnings;")
-      echo "Pruned $pruned_lrn stale learning(s) (hit=0, >14d, pattern/preference). $after_lrn remain."
+      # Legacy prune shares the 46-day soft-archive policy with decay.
+      # One reversible policy for every learning removal, including legacy prune.
+      cmd_decay
       ;;
     all)
       cmd_prune checkpoints "$keep"
@@ -1933,7 +1899,7 @@ find_global_db() {
 # global brain — its FTS is refreshed by the nightly consolidation job, never here).
 # Always visibility-filtered (never surfaces human_only/operational to an agent).
 _recall_emit() {
-  local db="$1" fts_query="$2" like_clause="$3" tag="$4" limit="$5" writable="$6" origin="${7:-local}"
+  local db="$1" fts_query="$2" like_clause="$3" tag="$4" limit="$5" writable="$6" origin="${7:-local}" exploration="${8:-0}"
   [ -f "$db" ] || return 0
   # Each row is: <dedup-key>@@US@@<display>@@US@@<row id>@@US@@<origin>. The id +
   # origin let cmd_recall emit/reinforce the ACTUALLY-displayed rows (design 5.1),
@@ -1945,6 +1911,10 @@ _recall_emit() {
   if sqlite3 "$db" "SELECT 1 FROM pragma_table_info('learnings') WHERE name='archived_at' LIMIT 1;" 2>/dev/null | grep -q 1; then
     arch_fts="AND l.archived_at IS NULL"
     arch_like="AND archived_at IS NULL"
+  fi
+  if [ "$exploration" = "1" ]; then
+    arch_fts="$arch_fts AND l.hit_count < 5"
+    arch_like="$arch_like AND hit_count < 5"
   fi
   local has_fts
   has_fts=$(sqlite3 "$db" "SELECT 1 FROM sqlite_master WHERE type='table' AND name='learnings_fts' LIMIT 1;" 2>/dev/null || echo "")
@@ -1965,19 +1935,24 @@ _recall_emit() {
              || '@@US@@' || l.id || '@@US@@' || '$origin'
              || '@@US@@' || replace(replace(replace(
                   lower(l.insight || ' ' || COALESCE(l.evidence,'')),
-                  char(10),' '), char(13),' '), char(9),' ')
+                  char(10),' '), char(13),' '), char(9),' ') || '@@US@@$exploration'
       FROM learnings l JOIN learnings_fts f ON f.rowid = l.rowid
       WHERE learnings_fts MATCH '$fts_query'
         AND (l.visibility = 'agent' OR l.visibility IS NULL)
         $arch_fts
       ORDER BY (
         bm25(learnings_fts)
-        - (CASE WHEN l.type IN ('failure','gotcha') THEN 1.5 ELSE 0 END)
-        - (MIN(l.hit_count,20) * 0.05)
-        - (CASE WHEN julianday('now') - julianday(l.ts) < 14 THEN 0.5 ELSE 0 END)
+        - (CASE WHEN $exploration = 0 AND l.type IN ('failure','gotcha') THEN 1.5 ELSE 0 END)
+        - (CASE WHEN $exploration = 0 THEN MIN(l.hit_count,20) * 0.05 ELSE 0 END)
+        - (CASE WHEN $exploration = 0 AND julianday('now') - julianday(l.ts) < 14 THEN 0.5 ELSE 0 END)
       ) ASC
-      LIMIT $((limit * 5));" 2>/dev/null || true
+      LIMIT $(if [ "$exploration" = "1" ]; then echo -1; else echo $((limit * 5)); fi);" 2>/dev/null || true
   elif [ -n "$like_clause" ]; then
+    local relevance="0" term
+    while IFS= read -r term; do
+      [ -z "$term" ] && continue
+      relevance="$relevance + CASE WHEN lower(insight || ' ' || COALESCE(evidence,'')) LIKE '%$term%' THEN 1 ELSE 0 END"
+    done < <(printf '%s' "$fts_query" | tr -cs 'a-z0-9' '\n' | awk 'NF && $0 != "or"')
     sqlite3 "$db" "
       SELECT lower(substr(insight,1,200)) || '@@US@@' ||
              replace('- [' || type || '] ' || insight || '$tag' ||
@@ -1985,12 +1960,15 @@ _recall_emit() {
                   THEN '  ↳ ' || substr(evidence,1,${AGENTDB_EVIDENCE_CHARS:-320}) ELSE '' END,
              '@@US@@', '@@us@@')
              || '@@US@@' || id || '@@US@@' || '$origin'
+              || CASE WHEN $exploration = 1 THEN '@@US@@' || replace(replace(replace(
+                   lower(insight || ' ' || COALESCE(evidence,'')),
+                   char(10),' '), char(13),' '), char(9),' ') || '@@US@@1' ELSE '' END
       FROM learnings
       WHERE ($like_clause)
         AND (visibility = 'agent' OR visibility IS NULL)
         $arch_like
-      ORDER BY hit_count DESC, ts DESC
-      LIMIT $((limit * 5));" 2>/dev/null || true
+      ORDER BY ($relevance) DESC, MIN(hit_count,20) * 0.05 DESC, ts DESC, id
+      LIMIT $(if [ "$exploration" = "1" ]; then echo -1; else echo $((limit * 5)); fi);" 2>/dev/null || true
   fi
 }
 
@@ -2274,13 +2252,21 @@ cmd_recall() {
   # a raw \037 byte never survives the shell; see _recall_emit note). Each row now
   # carries trailing @@US@@<id>@@US@@<origin> fields so events + reinforcement target
   # the ACTUALLY-displayed rows, not the raw match set (the D9 / 5.1 bump-vs-display fix).
-  local raw_local raw_global dedup out
+  local raw_local raw_global raw_explore dedup out
   raw_local=$(_recall_emit "$DB" "$fts_query" "$like_clause" "" "$limit" 1 "local")
   # Migration 015: fuse in semantic ranking when an embedding backend + vectors exist.
   # No backend / no vectors -> raw_local returns unchanged (pure FTS, pre-015 behavior).
   raw_local=$(_maybe_hybrid "$DB" "$query" "$raw_local" "$limit")
   raw_global=""
   [ -n "$global_db" ] && raw_global=$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0 "global")
+
+  # Fetch a separate low-hit pool before truncation, so popular matches cannot
+  # crowd it out. It still passes the exact same relevance floor below.
+  raw_explore=$(_recall_emit "$DB" "$fts_query" "$like_clause" "" "$limit" 0 "local" 1)
+  if [ -n "$global_db" ]; then
+    raw_explore="$raw_explore
+$(_recall_emit "$global_db" "$fts_query" "$like_clause" " [global]" "$limit" 0 "global" 1)"
+  fi
 
   # RELEVANCE FLOOR (2026-07-24, EXP-REC-016). FTS ORs every query term, so any query
   # that shares even ONE common word with the corpus returns SOMETHING — the OR-noise
@@ -2303,7 +2289,7 @@ cmd_recall() {
   # keep the count they had, or pass when non-numeric — the floor never degrades a
   # non-FTS mode. Kill-switch AGENTDB_NO_FLOOR=1; tune via AGENTDB_RECALL_MIN_TERMS=<n>.
   local scored
-  scored=$(printf '%s\n%s\n' "$raw_local" "$raw_global" \
+  scored=$(printf '%s\n%s\n%s\n' "$raw_local" "$raw_global" "$raw_explore" \
     | awk -F'@@US@@' -v OFS='@@US@@' -v terms="$terms_space" '
         BEGIN { nt = split(terms, T, " ") }
         NF < 5 { print; next }                          # fragment / no-text row: unchanged
@@ -2327,8 +2313,14 @@ cmd_recall() {
           ($5 + 0) >= m { print }                       # enough terms matched: keep
         ')
   fi
-  dedup=$(printf '%s\n' "$floored" | { grep -v '^[[:space:]]*$' || true; } \
-        | awk -F'@@US@@' '!seen[$1]++' | awk -v n="$limit" 'NR<=n')
+  dedup=$(printf '%s\n' "$floored" | awk -F'@@US@@' -v n="$limit" '
+    NF >= 6 && $6 == 1 { if (!explore || $5+0 > best) { explore=$0; key=$1; best=$5+0 }; next }
+    NF >= 4 && !seen[$1]++ { rows[++count]=$0; keys[count]=$1 }
+    END {
+      for (i=1; i<=count && shown<n-1; i++)
+        if (keys[i] != key) { print rows[i]; shown++ }
+      if (explore) print explore
+    }')
 
   # Measurement mode: dump id<TAB>matched-term-count for every surfaced candidate
   # (ZERO side effects). Used by the relevance-floor calibration harness. $5 is the
