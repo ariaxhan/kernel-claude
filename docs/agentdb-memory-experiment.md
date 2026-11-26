@@ -30,3 +30,30 @@ Verification on disposable copies only; recall uses --ids:
 These measurements establish retrieval behavior, not task usefulness. No model-comparison results are claimed here. Phase 2 will use llm-bench, never the NOT CERTIFIED model-familiarity grader.
 
 Scratch receipts: /tmp/kernel-272/{before.txt,final-eval8.txt,before-k5.json,after-k5.json,replay.json,repo-tests-final.txt,review.txt}.
+
+## Phase 2 experiment, 2026-11-26
+
+Same task, same model, only memory differs. Harness: llm-bench `run_single_test` with a deterministic choice grader (positive/negative controls asserted). The model-familiarity engine was not used (NOT CERTIFIED). Memory per condition came from `recall --ids` on DB copies.
+
+- Tasks: 20 retrospective fleet diagnosis tasks (fleet-01..20) from ariaxhan/Vaults #872, #874, #875, #885, #886, #887, #888, #889, #890, #900, #901, #902, #903. That is 13 correlated issue clusters. Each task offers three actions: the correct one, the one that repeats the failure a learning exists to prevent (recurrence), and a distractor.
+- Conditions: none, old recall top 8, new recall top 8 with the exploration slot. Exploration-only was not run.
+- Models: gpt-6.1-sol (Codex CLI, medium effort), qwen3.8:27b (Ollama, temperature 0).
+
+| Model | Condition | n | Success | Recurrence | Success 95% Wilson |
+|---|---|---:|---:|---:|---|
+| gpt-6.1-sol | none | 20 | 20/20 | 0/20 | 0.84-1.00 |
+| gpt-6.1-sol | old | 20 | 20/20 | 0/20 | 0.84-1.00 |
+| gpt-6.1-sol | new | 20 | 20/20 | 0/20 | 0.84-1.00 |
+| qwen3.8:27b | none | 20 | 20/20 | 0/20 | 0.84-1.00 |
+| qwen3.8:27b | old | 20 | 20/20 | 0/20 | 0.84-1.00 |
+| qwen3.8:27b | new | 20 | 20/20 | 0/20 | 0.84-1.00 |
+
+Recurrence 95% upper bound: 0.16 in every cell. Zero invalid outputs.
+
+Replicate: an accidental concurrent second run produced a second trial for 117 of 120 keys. All of them were 100% correct, and 117 of 117 matched the primary run's action. The table uses the first trial per key.
+
+Verdict: the experiment is at ceiling and cannot tell the conditions apart. Even with no memory, both models get every task right. So it shows neither benefit nor harm from the Phase 1 ranking. A three-way choice whose evidence already names the failure is too easy. The next useful version needs open-ended tasks (a real repair graded by tests) or prompts that leave out the evidence the learning supplies.
+
+Limitations: 20 tasks in 13 correlated clusters. Hindsight snapshot. Choice accuracy, not production repair. Wilson intervals assume independence and are only descriptive here.
+
+Receipts: /tmp/kernel-272/{experiment-manifest.json,experiment-results.jsonl,experiment-final.json,recompute.py}.
